@@ -13,4 +13,4 @@ This document lists all tasks associated with PBI 1.
 | 1-4 | [E2E CoS Test Plan + execution](./1-4.md) | Proposed | Document and run holistic test plan covering acceptance criteria. |
 | 1-5 | [Responsive layout + header controls refresh](./1-5.md) | Done | Remove horizontal scroll, auto-resize tableau columns, move New Game into header. |
 | 1-6 | [Tap/hold interaction overhaul](./1-6.md) | Done | Add tap-to-auto-move plus long-press manual selection UX with feedback. |
-| 1-7 | [Auto-complete endgame workflow](./1-7.md) | Review | Detect no face-down cards and auto-play remaining moves to foundations. |
+| 1-7 | [Auto-complete endgame workflow](./1-7.md) | Done | Detect no face-down cards and auto-play remaining moves to foundations. |
