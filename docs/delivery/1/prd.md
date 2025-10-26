@@ -28,13 +28,14 @@ The project currently ships with a default Tamagui starter screen and provides n
 ## Acceptance Criteria
 1. All policy-required documentation (backlog, PRD, tasks, task histories) exists and is up to date.
 2. The default tab renders a Klondike board with accurate piles, face-up / face-down management, and valid move constraints.
-3. Tableau columns automatically resize to fit the available width with no horizontal scrolling, the board uses the full width (no outer border) with symmetric margins, the New Game control lives in the header next to "Hello!", foundations render on the left, and the stock/waste stack sits on the right showing a three-card waste fan.
-4. Cards remain legible in stacks thanks to larger spacing and the face layout (rank top-left, suit top-right, large center icon) regardless of device width.
-5. Tap-to-move automatically sends cards to foundations/tableau when legal; tap-and-hold enables manual destination selection just like the previous workflow.
-6. Draw-1 stock cycling works with recycling after empty (per Klondike rules), and every move pushes an undo snapshot while exposing Undo in the control bar.
-7. Once no face-down cards remain in the tableau, auto-complete runs at ~5 cards/second, draws from stock if needed, and celebrates completion with a 🎉 toast.
-8. Expo build / TypeScript check completes without errors.
-9. Task list includes a dedicated E2E/CoS test plan entry referencing manual verification steps.
+3. Tableau columns automatically resize to fit the available width with no horizontal scrolling, the board uses the full width (no outer border) with symmetric margins, the New Game control lives in the header next to "Hello!", foundations render in a single row on the left, and the stock/waste stack sits on the right showing a three-card waste fan with draw pile trailing the fan.
+4. Cards render like the reference screenshot: smaller corner radius, rank and suit nearly touching the top corners, matching font sizes, and a centered suit icon (never ellipses) in the remaining space.
+5. Tap-to-move automatically sends cards to foundations/tableau when legal; tap-and-hold enables manual destination selection just like the previous workflow, and foundation cards can be tapped/long-pressed to return to play.
+6. Draw-1 stock cycling works with recycling after empty (per Klondike rules), every move (including Undo) increments the move counter, the draw pile uses iconography instead of text when recycling, and foundations without aces stay de-emphasized.
+7. Once no face-down cards remain in the tableau, auto-complete runs at ~5 cards/second, draws/recycles from the stock if needed, and celebrates completion with a 🎉 toast while hiding the draw button because the game is won.
+8. Starting a new game asks for confirmation so players don’t lose progress accidentally.
+9. Expo build / TypeScript check completes without errors.
+10. Task list includes a dedicated E2E/CoS test plan entry referencing manual verification steps.
 
 ## Dependencies
 - Expo Router / React Native runtime already in repo.

@@ -6,8 +6,10 @@ import {
   useReducer,
   useRef,
   useState,
+  ReactNode,
 } from 'react'
 import {
+  Alert,
   LayoutChangeEvent,
   Pressable,
   StyleSheet,
@@ -44,6 +46,7 @@ const MIN_CARD_WIDTH = 24
 const WASTE_FAN_OVERLAP_RATIO = 0.35
 const WASTE_FAN_MAX_OFFSET = 28
 const AUTO_QUEUE_INTERVAL_MS = 200
+const COLUMN_MARGIN = TABLEAU_GAP / 2
 const COLOR_CARD_FACE = '#ffffff'
 const COLOR_CARD_BACK = '#3b4d75'
 const COLOR_CARD_BORDER = '#cbd5f5'
@@ -99,7 +102,7 @@ function computeCardMetrics(availableWidth: number | null): CardMetrics {
   const constrainedWidth = Math.min(Math.max(unclampedWidth, MIN_CARD_WIDTH), MAX_CARD_WIDTH)
   const height = Math.round(constrainedWidth * CARD_ASPECT_RATIO)
   const stackOffset = Math.max(24, Math.round(constrainedWidth * (BASE_STACK_OFFSET / BASE_CARD_WIDTH + 0.12)))
-  const radius = Math.max(8, Math.round(constrainedWidth * 0.2))
+  const radius = Math.max(6, Math.round(constrainedWidth * 0.12))
 
   return {
     width: constrainedWidth,
@@ -119,11 +122,7 @@ export default function TabOneScreen() {
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
   const winCelebrationsRef = useRef(state.winCelebrations)
 
-  const drawLabel = state.stock.length
-    ? 'Draw'
-    : state.waste.length
-      ? 'Recycle'
-      : 'Empty'
+  const drawLabel = state.stock.length ? 'Draw' : ''
 
   const handleBoardLayout = useCallback((event: LayoutChangeEvent) => {
     setBoardWidth(event.nativeEvent.layout.width)
@@ -148,9 +147,18 @@ export default function TabOneScreen() {
   }, [dispatch, notifyInvalidMove, state.history.length])
 
   const handleNewGame = useCallback(() => {
-    dispatch({ type: 'NEW_GAME' })
-    toast.show('New game', { message: 'Shuffled cards and reset the board.' })
-  }, [toast])
+    Alert.alert('Start a new game?', 'Current progress will be lost.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'New Game',
+        style: 'destructive',
+        onPress: () => {
+          dispatch({ type: 'NEW_GAME' })
+          toast.show('New game', { message: 'Shuffled cards and reset the board.' })
+        },
+      },
+    ])
+  }, [dispatch, toast])
 
   const attemptAutoMove = useCallback(
     (selection: Selection) => {
@@ -196,19 +204,22 @@ export default function TabOneScreen() {
     [dispatch, dropHints.tableau, notifyInvalidMove, state.selected],
   )
 
-  const handleFoundationPress = useCallback(
-    (suit: Suit) => {
-      if (!state.selected) {
-        return
+const handleFoundationPress = useCallback(
+  (suit: Suit) => {
+    if (!state.selected) {
+      if (state.foundations[suit].length) {
+        attemptAutoMove({ source: 'foundation', suit })
       }
-      if (dropHints.foundations[suit]) {
-        dispatch({ type: 'PLACE_ON_FOUNDATION', suit })
-      } else {
-        notifyInvalidMove('Selected stack cannot move there yet.')
-      }
-    },
-    [dispatch, dropHints.foundations, notifyInvalidMove, state.selected],
-  )
+      return
+    }
+    if (dropHints.foundations[suit]) {
+      dispatch({ type: 'PLACE_ON_FOUNDATION', suit })
+    } else {
+      notifyInvalidMove('Selected stack cannot move there yet.')
+    }
+  },
+  [attemptAutoMove, dispatch, dropHints.foundations, notifyInvalidMove, state.foundations, state.selected],
+)
 
   const clearSelection = useCallback(() => {
     if (state.selected) {
@@ -339,6 +350,12 @@ const TopRow = ({
 }: TopRowProps) => {
   const stockDisabled = !state.stock.length && !state.waste.length
   const wasteSelected = state.selected?.source === 'waste'
+  const showRecycle = !state.stock.length && state.waste.length > 0
+  const drawVariant = showRecycle
+    ? 'recycle'
+    : state.stock.length
+      ? 'stock'
+      : 'empty'
 
   const handleWastePress = useCallback(() => {
     if (!state.waste.length) {
@@ -350,7 +367,7 @@ const TopRow = ({
 
   return (
     <XStack gap="$4" width="100%" items="flex-start">
-      <XStack flex={1} gap="$2" flexWrap="wrap" justify="flex-start">
+      <XStack gap="$2" flexWrap="nowrap" justify="flex-start" shrink={0}>
         {FOUNDATION_SUIT_ORDER.map((suit) => (
           <FoundationPile
             key={suit}
@@ -366,10 +383,6 @@ const TopRow = ({
       </XStack>
 
       <XStack flex={1} gap="$3" justify="flex-end" items="flex-end">
-        <PileButton label={`${state.stock.length}`} onPress={onDraw} disabled={stockDisabled}>
-          <CardBack label={drawLabel} metrics={cardMetrics} />
-        </PileButton>
-
         <PileButton
           label={`${state.waste.length}`}
           onPress={handleWastePress}
@@ -385,9 +398,20 @@ const TopRow = ({
               onLongPress={onWasteHold}
             />
           ) : (
-            <EmptySlot label="" highlight={false} metrics={cardMetrics} />
+            <EmptySlot highlight={false} metrics={cardMetrics} />
           )}
         </PileButton>
+
+        {!state.hasWon && (
+          <PileButton label={`${state.stock.length}`} onPress={onDraw} disabled={stockDisabled}>
+            <CardBack
+              label={state.stock.length ? drawLabel : undefined}
+              metrics={cardMetrics}
+              variant={drawVariant}
+              icon={showRecycle ? <RefreshCcw color="#0f172a" size={18} /> : undefined}
+            />
+          </PileButton>
+        )}
       </XStack>
     </XStack>
   )
@@ -424,7 +448,6 @@ const TableauSection = ({
         }
         onCardLongPress={(cardIndex) => onLongPress(columnIndex, cardIndex)}
         onColumnPress={() => onColumnPress(columnIndex)}
-        isLast={columnIndex === state.tableau.length - 1}
       />
     ))}
   </View>
@@ -439,7 +462,6 @@ type TableauColumnProps = {
   onCardPress: (cardIndex: number) => void
   onCardLongPress: (cardIndex: number) => void
   onColumnPress: () => void
-  isLast: boolean
 }
 
 const TableauColumn = ({
@@ -451,7 +473,6 @@ const TableauColumn = ({
   onCardPress,
   onCardLongPress,
   onColumnPress,
-  isLast,
 }: TableauColumnProps) => {
   const columnHeight = column.length
     ? cardMetrics.height + (column.length - 1) * cardMetrics.stackOffset
@@ -468,15 +489,20 @@ const TableauColumn = ({
         {
           width: cardMetrics.width,
           height: columnHeight,
-          borderColor: isDroppable ? COLOR_DROP_BORDER : COLOR_COLUMN_BORDER,
+          borderColor:
+            column.length === 0
+              ? 'transparent'
+              : isDroppable
+                ? COLOR_DROP_BORDER
+                : COLOR_COLUMN_BORDER,
           backgroundColor: columnSelected ? COLOR_COLUMN_SELECTED : 'transparent',
-          marginRight: isLast ? 0 : TABLEAU_GAP,
+          marginHorizontal: COLUMN_MARGIN,
         },
       ]}
       onPress={onColumnPress}
     >
       {column.length === 0 && (
-        <EmptySlot label="Empty" highlight={isDroppable} metrics={cardMetrics} />
+        <EmptySlot highlight={isDroppable} metrics={cardMetrics} />
       )}
       {column.map((card, cardIndex) => (
         <CardView
@@ -564,17 +590,26 @@ const CardView = ({
     >
       <Text
         style={[styles.cardCornerRank, { color: SUIT_COLORS[card.suit] }]}
+        ellipsizeMode="clip"
         numberOfLines={1}
+        allowFontScaling={false}
       >
         {rankToLabel(card.rank)}
       </Text>
       <Text
         style={[styles.cardCornerSuit, { color: SUIT_COLORS[card.suit] }]}
+        ellipsizeMode="clip"
         numberOfLines={1}
+        allowFontScaling={false}
       >
         {SUIT_SYMBOLS[card.suit]}
       </Text>
-      <Text style={[styles.cardSymbol, { color: SUIT_COLORS[card.suit] }]} numberOfLines={1}>
+      <Text
+        style={[styles.cardSymbol, { color: SUIT_COLORS[card.suit] }]}
+        ellipsizeMode="clip"
+        numberOfLines={1}
+        allowFontScaling={false}
+      >
         {SUIT_SYMBOLS[card.suit]}
       </Text>
     </Pressable>
@@ -605,20 +640,37 @@ const EmptySlot = ({
   </View>
 )
 
-const CardBack = ({ label, metrics }: { label: string; metrics: CardMetrics }) => (
-  <View
-    style={[
-      styles.cardBack,
-      {
-        width: metrics.width,
-        height: metrics.height,
-        borderRadius: metrics.radius,
-      },
-    ]}
-  >
-    <Text style={styles.cardBackText}>{label}</Text>
-  </View>
-)
+type CardBackProps = {
+  label?: string
+  metrics: CardMetrics
+  variant: 'stock' | 'recycle' | 'empty'
+  icon?: React.ReactNode
+}
+
+const CardBack = ({ label, metrics, variant, icon }: CardBackProps) => {
+  const baseStyle =
+    variant === 'stock'
+      ? styles.cardBack
+      : [
+          styles.cardBackOutline,
+          variant === 'recycle' ? styles.cardBackRecycle : styles.cardBackEmpty,
+        ]
+
+  return (
+    <View
+      style={[
+        baseStyle,
+        {
+          width: metrics.width,
+          height: metrics.height,
+          borderRadius: metrics.radius,
+        },
+      ]}
+    >
+      {icon ? icon : label ? <Text style={styles.cardBackText}>{label}</Text> : null}
+    </View>
+  )
+}
 
 type WasteFanProps = {
   cards: Card[]
@@ -700,11 +752,14 @@ const FoundationPile = ({
   onLongPress,
 }: FoundationPileProps) => {
   const topCard = cards[cards.length - 1]
+  const hasCards = cards.length > 0
   const borderColor = isDroppable
     ? COLOR_DROP_BORDER
     : isSelected
       ? COLOR_SELECTED_BORDER
-      : COLOR_FOUNDATION_BORDER
+      : hasCards
+        ? COLOR_FOUNDATION_BORDER
+        : COLOR_COLUMN_BORDER
 
   return (
     <Pressable
@@ -723,7 +778,12 @@ const FoundationPile = ({
       {topCard ? (
         <CardView card={topCard} metrics={cardMetrics} />
       ) : (
-        <Text style={[styles.foundationSymbol, { color: SUIT_COLORS[suit] }]}>
+        <Text
+          style={[
+            styles.foundationSymbol,
+            { color: hasCards ? SUIT_COLORS[suit] : COLOR_TEXT_MUTED },
+          ]}
+        >
           {SUIT_SYMBOLS[suit]}
         </Text>
       )}
@@ -796,19 +856,21 @@ const styles = StyleSheet.create({
   boardShell: {
     width: '100%',
     alignSelf: 'stretch',
+    paddingHorizontal: COLUMN_MARGIN,
   },
   tableauRow: {
     width: '100%',
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
     alignItems: 'flex-start',
     flexWrap: 'nowrap',
+    paddingHorizontal: COLUMN_MARGIN,
   },
   column: {
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    position: 'relative',
+    // borderWidth: 0,
+    // borderStyle: 'dashed',
+    // borderRadius: 12,
+    // position: 'relative',
     overflow: 'visible',
     paddingBottom: 8,
   },
@@ -816,7 +878,7 @@ const styles = StyleSheet.create({
     shadowColor: 'rgba(0,0,0,0.25)',
     shadowOpacity: 0.2,
     shadowRadius: 6,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
     paddingVertical: 6,
     justifyContent: 'center',
     backgroundColor: COLOR_CARD_FACE,
@@ -832,22 +894,23 @@ const styles = StyleSheet.create({
   },
   cardCornerRank: {
     position: 'absolute',
-    top: 4,
-    left: 6,
+    top: -2,
+    left: 3,
     fontWeight: '700',
-    fontSize: 18,
+    fontSize: 16,
   },
   cardCornerSuit: {
     position: 'absolute',
-    top: 4,
-    right: 6,
-    fontSize: 18,
+    top: 0,
+    right: 0,
+    fontSize: 12,
   },
   cardSymbol: {
     textAlignVertical: 'center',
     textAlign: 'center',
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '600',
+    marginTop: 16,
   },
   movesLabel: {
     fontSize: 12,
@@ -875,6 +938,19 @@ const styles = StyleSheet.create({
     borderColor: COLOR_CARD_BORDER,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cardBackOutline: {
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  cardBackRecycle: {
+    borderColor: COLOR_TEXT_STRONG,
+  },
+  cardBackEmpty: {
+    borderColor: COLOR_COLUMN_BORDER,
   },
   cardBackText: {
     color: '#ffffff',

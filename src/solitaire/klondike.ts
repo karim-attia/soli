@@ -105,52 +105,63 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
     case 'NEW_GAME':
       return createInitialState()
     case 'DRAW_OR_RECYCLE':
-      return finalizeState(drawFromStock(state))
+      return finalizeState(drawFromStock(haltAutoQueue(state)))
     case 'UNDO':
-      return finalizeState(handleUndo(state))
+      return finalizeState(handleUndo(haltAutoQueue(state)))
     case 'SELECT_TABLEAU':
-      return handleSelectTableau(state, action.columnIndex, action.cardIndex)
+      return handleSelectTableau(haltAutoQueue(state), action.columnIndex, action.cardIndex)
     case 'SELECT_WASTE':
-      return handleSelectWaste(state)
+      return handleSelectWaste(haltAutoQueue(state))
     case 'SELECT_FOUNDATION_TOP':
-      return handleSelectFoundation(state, action.suit)
+      return handleSelectFoundation(haltAutoQueue(state), action.suit)
     case 'CLEAR_SELECTION':
-      return state.selected ? { ...state, selected: null } : state
+      {
+        const workingState = haltAutoQueue(state)
+        return workingState.selected ? { ...workingState, selected: null } : workingState
+      }
     case 'PLACE_ON_TABLEAU':
       if (!state.selected) {
         return state
       }
       {
-        const nextState = applyMove(state, state.selected, {
+        const workingState = haltAutoQueue(state)
+        const nextState = applyMove(workingState, workingState.selected!, {
           type: 'tableau',
           columnIndex: action.columnIndex,
         })
-        return nextState ? finalizeState(nextState) : state
+        return nextState ? finalizeState(nextState) : workingState
       }
     case 'PLACE_ON_FOUNDATION':
       if (!state.selected) {
         return state
       }
       {
-        const nextState = applyMove(state, state.selected, {
+        const workingState = haltAutoQueue(state)
+        const nextState = applyMove(workingState, workingState.selected!, {
           type: 'foundation',
           suit: action.suit,
         })
-        return nextState ? finalizeState(nextState) : state
+        return nextState ? finalizeState(nextState) : workingState
       }
     case 'ADVANCE_AUTO_QUEUE':
       return finalizeState(advanceAutoQueue(state))
     case 'APPLY_MOVE':
       {
-        const nextState = applyMove(state, action.selection, action.target, {
+        const workingState = haltAutoQueue(state)
+        const nextState = applyMove(workingState, action.selection, action.target, {
           recordHistory: action.recordHistory,
         })
-        return nextState ? finalizeState(nextState) : state
+        return nextState ? finalizeState(nextState) : workingState
       }
     default:
       return state
   }
 }
+
+const haltAutoQueue = (state: GameState): GameState =>
+  state.autoQueue.length || state.isAutoCompleting
+    ? { ...state, autoQueue: [], isAutoCompleting: false }
+    : state
 
 export const getDropHints = (state: GameState): DropHints => {
   const tableauHints = Array.from({ length: TABLEAU_COLUMN_COUNT }, () => false)
@@ -285,6 +296,7 @@ const handleUndo = (state: GameState): GameState => {
     selected: null,
     autoQueue: [],
     isAutoCompleting: false,
+    moveCount: state.moveCount + 1,
   }
 }
 
