@@ -6,7 +6,6 @@ import {
   useReducer,
   useRef,
   useState,
-  ReactNode,
 } from 'react'
 import {
   Alert,
@@ -16,16 +15,6 @@ import {
   View,
   ScrollView,
 } from 'react-native'
-import Animated, {
-  Easing,
-  Layout,
-  SharedTransition,
-  cancelAnimation,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated'
 import { Link, useNavigation } from 'expo-router'
 import { Button, H2, Paragraph, Text, XStack, YStack } from 'tamagui'
 import { RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
@@ -101,41 +90,10 @@ const FACE_CARD_LABELS: Partial<Record<Rank, string>> = {
   12: 'Q',
   13: 'K',
 }
-const CARD_ANIMATION_DURATION_MS = 2200
-const CARD_MOVE_EASING = Easing.bezier(0.2, 0.8, 0.2, 1)
-const CARD_LAYOUT_TRANSITION = Layout.duration(CARD_ANIMATION_DURATION_MS).easing(
-  CARD_MOVE_EASING,
-)
-const WASTE_SLIDE_DURATION_MS = 140
-const WASTE_SLIDE_EASING = Easing.bezier(0.2, 0, 0.2, 1)
-const WASTE_TIMING_CONFIG = {
-  duration: WASTE_SLIDE_DURATION_MS,
-  easing: WASTE_SLIDE_EASING,
-}
-const WIGGLE_OFFSET_PX = 5
-const WIGGLE_SEGMENT_DURATION_MS = 70
-const WIGGLE_EASING = Easing.bezier(0.4, 0, 0.2, 1)
-const WIGGLE_TIMING_CONFIG = {
-  duration: WIGGLE_SEGMENT_DURATION_MS,
-  easing: WIGGLE_EASING,
-}
 
 // Solver visual tweaks: grey only for covered cards in solver mode
 const COLOR_SOLVER_COVERED_FACE = '#f3f4f6'
 
-const AnimatedView = Animated.createAnimatedComponent(View)
-const CARD_SHARED_TRANSITION = SharedTransition.custom((values) => {
-  'worklet'
-  const timingConfig = { duration: CARD_ANIMATION_DURATION_MS, easing: CARD_MOVE_EASING }
-  return {
-    animations: {
-      originX: withTiming(values.targetOriginX, timingConfig),
-      originY: withTiming(values.targetOriginY, timingConfig),
-      width: withTiming(values.targetWidth, timingConfig),
-      height: withTiming(values.targetHeight, timingConfig),
-    },
-  }
-})
 
 type CardMetrics = {
   width: number
@@ -466,7 +424,7 @@ const handleFoundationPress = useCallback(
           <>
             <SolverStockGrid snapshot={atomicSnapshot} cardMetrics={cardMetrics} />
             <YStack gap="$2">
-              <Text style={styles.movesLabel}>Next maxApproachSteps</Text>
+              <Text style={styles.movesLabel}>Next Approaches</Text>
               {atomicCandidates.map((cand, i) => {
                 const flip = getFlipCoverInfo(atomicSnapshot, cand.state)
                 const header = flip
@@ -757,7 +715,7 @@ const SolverStockGrid = ({ snapshot, cardMetrics }: { snapshot: AtomicSnapshot; 
   const stacks: Array<typeof sorted> = Array.from({ length: cols }, (_, i) => sorted.slice(i * perCol, (i + 1) * perCol))
   return (
     <YStack gap="$2">
-      <Text style={styles.movesLabel}>Stock (as 4 open stacks)</Text>
+      <Text style={styles.movesLabel}>Stock</Text>
       <XStack width="100%" justify="center" items="flex-start" style={styles.tableauRow}>
         {stacks.map((stack, si) => (
           <Pressable
@@ -990,33 +948,9 @@ const CardView = ({
         left: typeof offsetLeft === 'number' ? offsetLeft : 0,
       }
     : undefined
-  const wiggle = useSharedValue(0)
-  const lastTriggerRef = useRef(invalidWiggle.key)
-  const shouldAnimateInvalid = invalidWiggle.lookup.has(card.id)
-  const wiggleStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: wiggle.value }],
-  }))
-
-  useEffect(() => {
-    if (!shouldAnimateInvalid) {
-      return
-    }
-    if (lastTriggerRef.current === invalidWiggle.key) {
-      return
-    }
-    lastTriggerRef.current = invalidWiggle.key
-    cancelAnimation(wiggle)
-    wiggle.value = 0
-    wiggle.value = withSequence(
-      withTiming(-WIGGLE_OFFSET_PX, WIGGLE_TIMING_CONFIG),
-      withTiming(WIGGLE_OFFSET_PX, WIGGLE_TIMING_CONFIG),
-      withTiming(0, WIGGLE_TIMING_CONFIG),
-    )
-  }, [invalidWiggle.key, shouldAnimateInvalid, wiggle])
 
   const containerStyle = [
     positionStyle,
-    wiggleStyle,
     {
       width: metrics.width,
       height: metrics.height,
@@ -1025,12 +959,7 @@ const CardView = ({
 
   if (!card.faceUp) {
     return (
-      <AnimatedView
-        layout={CARD_LAYOUT_TRANSITION}
-        sharedTransitionTag={`card-${card.id}`}
-        sharedTransitionStyle={CARD_SHARED_TRANSITION}
-        style={containerStyle}
-      >
+      <View style={containerStyle}>
         <View
           style={[
             styles.cardBase,
@@ -1042,7 +971,7 @@ const CardView = ({
             },
           ]}
         />
-      </AnimatedView>
+      </View>
     )
   }
 
@@ -1050,12 +979,7 @@ const CardView = ({
   const faceColor = variant === 'solver' ? COLOR_SOLVER_COVERED_FACE : COLOR_CARD_FACE
 
   return (
-    <AnimatedView
-      layout={CARD_LAYOUT_TRANSITION}
-      sharedTransitionTag={`card-${card.id}`}
-      sharedTransitionStyle={CARD_SHARED_TRANSITION}
-      style={containerStyle}
-    >
+    <View style={containerStyle}>
       <Pressable
         style={[
           styles.cardBase,
@@ -1097,7 +1021,7 @@ const CardView = ({
           {SUIT_SYMBOLS[card.suit]}
         </Text>
       </Pressable>
-    </AnimatedView>
+    </View>
   )
 }
 
@@ -1240,19 +1164,8 @@ const WasteFanCard = ({
   isEntering,
   zIndex,
 }: WasteFanCardProps) => {
-  const enterOffset = targetOffset + metrics.width * 0.35
-  const translateX = useSharedValue(isEntering ? enterOffset : targetOffset)
-  const positionStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }))
-
-  useEffect(() => {
-    cancelAnimation(translateX)
-    translateX.value = withTiming(targetOffset, WASTE_TIMING_CONFIG)
-  }, [targetOffset, translateX])
-
   return (
-    <AnimatedView
+    <View
       pointerEvents="box-none"
       style={[
         styles.wasteFanCardWrapper,
@@ -1260,8 +1173,8 @@ const WasteFanCard = ({
           width: metrics.width,
           height: metrics.height,
           zIndex,
+          transform: [{ translateX: targetOffset }],
         },
-        positionStyle,
       ]}
     >
       <CardView
@@ -1272,7 +1185,7 @@ const WasteFanCard = ({
         onLongPress={onLongPress}
         invalidWiggle={invalidWiggle}
       />
-    </AnimatedView>
+    </View>
   )
 }
 
