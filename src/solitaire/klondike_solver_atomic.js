@@ -146,49 +146,55 @@ function isSafeToFoundation(card, foundations) {
 	return r1 >= required && r2 >= required
 }
 
-// Normalize state by auto-moving "safe" cards to foundations without causing flips.
-// - stock -> foundation: allowed when safe
-// - tableau top -> foundation: allowed only if removing it will NOT flip (i.e., second from top is faceUp)
 // Normalize state by auto-moving "safe" cards to foundations.
-// If allowTableauFlip is false, only move a tableau top card to foundation when it does NOT cause a flip.
-function normalizeSafeToFoundationNoFlip(state, allowTableauFlip = false) {
-	let changed = true
-	while (changed) {
-		changed = false
-		// stock -> foundation
-		for (const s of SUITS) {
-			const need = state.foundations[s].length ? state.foundations[s][state.foundations[s].length - 1].rank + 1 : ACE
-			const idx = state.stock.findIndex((c) => c.suit === s && c.rank === need)
-			if (idx >= 0) {
-				const card = state.stock[idx]
-				if (isSafeToFoundation(card, state.foundations)) {
-					state.stock.splice(idx, 1)
-					state.foundations[s].push({ suit: card.suit, rank: card.rank })
-					changed = true
-				}
-			}
-		}
-        // tableau top -> foundation (optional flip depending on allowTableauFlip)
-		for (let ci = 0; ci < state.tableau.length; ci += 1) {
-			const col = state.tableau[ci]
-			if (col.length === 0) continue
-			const top = col[col.length - 1]
-			if (!top.faceUp) continue
+// - Always allow safe moves from stock.
+// - From tableau, also allow safe moves even if they cause a flip. When a flip occurs
+//   due to removing the top card, we flip the new top immediately.
+// The function returns whether any tableau flip happened during normalization.
+function normalizeSafeToFoundationNoFlip(state, allowTableauFlip = true) {
+    let changed = true
+    let flippedAny = false
+    while (changed) {
+        changed = false
+        // stock -> foundation (never flips tableau)
+        for (const s of SUITS) {
+            const need = state.foundations[s].length ? state.foundations[s][state.foundations[s].length - 1].rank + 1 : ACE
+            const idx = state.stock.findIndex((c) => c.suit === s && c.rank === need)
+            if (idx >= 0) {
+                const card = state.stock[idx]
+                if (isSafeToFoundation(card, state.foundations)) {
+                    state.stock.splice(idx, 1)
+                    state.foundations[s].push({ suit: card.suit, rank: card.rank })
+                    changed = true
+                }
+            }
+        }
+        // tableau top -> foundation (allow flips by default)
+        for (let ci = 0; ci < state.tableau.length; ci += 1) {
+            const col = state.tableau[ci]
+            if (col.length === 0) continue
+            const top = col[col.length - 1]
+            if (!top.faceUp) continue
+            // If flips are not allowed, only move when removing the top won't flip
             const noFlip = col.length >= 2 && !!col[col.length - 2].faceUp
             if (!allowTableauFlip && !noFlip) continue
-			for (const s of SUITS) {
-				if (canDropOnFoundation(top, state.foundations[s], s) && isSafeToFoundation(top, state.foundations)) {
-					col.pop()
+            for (const s of SUITS) {
+                if (canDropOnFoundation(top, state.foundations[s], s) && isSafeToFoundation(top, state.foundations)) {
+                    col.pop()
                     state.foundations[s].push({ suit: top.suit, rank: top.rank })
                     // flip new top if any and flipping is allowed
                     const newTopIndex = col.length - 1
-                    if (allowTableauFlip && newTopIndex >= 0 && !col[newTopIndex].faceUp) col[newTopIndex].faceUp = true
-					changed = true
-					break
-				}
-			}
-		}
-	}
+                    if (allowTableauFlip && newTopIndex >= 0 && !col[newTopIndex].faceUp) {
+                        col[newTopIndex].faceUp = true
+                        flippedAny = true
+                    }
+                    changed = true
+                    break
+                }
+            }
+        }
+    }
+    return flippedAny
 }
 
 function listMoves(state) {
@@ -365,10 +371,10 @@ function findNextFlipCandidates(rootState, budget) {
 			for (const mv of movesOrdered) {
 				if (deadline && Date.now() > deadline) break
 				if (maxLocalNodes && nodes >= maxLocalNodes) break
-				const { state: nxt, flipped } = applyMoveClone(cur.state, mv)
-				normalizeSafeToFoundationNoFlip(nxt)
+                const { state: nxt, flipped } = applyMoveClone(cur.state, mv)
+                const normFlipped = normalizeSafeToFoundationNoFlip(nxt, true)
 				nodes += 1
-				if (flipped) {
+                if (flipped || normFlipped) {
                     const fullPath = cur.path.concat([mv])
                     const key = zobristKey(nxt)
                     const { stockUses, f2tUses } = countPathStats(fullPath)
@@ -425,10 +431,10 @@ function findNextFlipCandidates(rootState, budget) {
         for (const mv of movesOrdered) {
 			if (deadline && Date.now() > deadline) break
 			if (maxLocalNodes && nodes >= maxLocalNodes) break
-			const { state: nxt, flipped } = applyMoveClone(cur.state, mv)
-			normalizeSafeToFoundationNoFlip(nxt)
+            const { state: nxt, flipped } = applyMoveClone(cur.state, mv)
+            const normFlipped = normalizeSafeToFoundationNoFlip(nxt, true)
 			nodes += 1
-			if (flipped) {
+            if (flipped || normFlipped) {
                 const fullPath = cur.path.concat([mv])
                 const key = zobristKey(nxt)
                 const { stockUses, f2tUses } = countPathStats(fullPath)
@@ -554,7 +560,7 @@ function emptyColumns(state) { let t = 0; for (const col of state.tableau) if (c
  let PRINTED_ATOMIC_CONFIG = false
 
  function solveKlondikeAtomic(deckOrder, options = {}) {
-    const { maxNodes = 200000, maxTimeMs = 1000, maxLocalNodes = 20000, maxApproachSteps = 20, maxApproachStepsHigh = 80, relaxAtDepth = 19, approachStepsIncrement = 3, avoidEmptyUnlessKing = true, enableBackjump = true, rankingStrategy = 'blended' } = options
+    const { maxNodes = 2000000, maxTimeMs = 5000, maxLocalNodes = 200000, maxApproachSteps = 20, maxApproachStepsHigh = 80, relaxAtDepth = 17, approachStepsIncrement = 3, avoidEmptyUnlessKing = true, enableBackjump = true, rankingStrategy = 'blended' } = options
     if (!PRINTED_ATOMIC_CONFIG) {
         PRINTED_ATOMIC_CONFIG = true
         /* eslint-disable no-console */
@@ -578,8 +584,10 @@ function emptyColumns(state) { let t = 0; for (const col of state.tableau) if (c
 	let flipsDepth = 0
 	let atomicTried = 0
 	let atomicDead = 0
-	const deadline = Date.now() + maxTimeMs
-	const bestAtDepth = new Map()
+    const deadline = Date.now() + maxTimeMs
+    // Cache of approaches per atomic state (by Zobrist key)
+    // key -> { candidates: Array, tried: Set<index> }
+    const atomicCache = new Map()
 
 function blockedColumnsOf(s) {
     const blocked = []
@@ -605,51 +613,58 @@ function changedColumnsFromPath(path) {
 
 function sigOfChangedCols(set) { return Array.from(set).sort().join(',') }
 
+    // Compute the normalized atomic snapshot and its Zobrist key for the current state
+    function computeAtomicKeyAndSnapshot(curState) {
+        const snap = cloneState(curState)
+        normalizeSafeToFoundationNoFlip(snap)
+        const key = zobristKey(snap)
+        return { key, snapshot: snap }
+    }
+
     function pushAtomicFrame() {
 		atomicTried += 1
 		if (tryGreedyFinishIfReady(state)) return { solved: true }
-        let localCap = maxApproachSteps
-        if (flipsDepth >= relaxAtDepth) {
-            const high = maxApproachStepsHigh || maxApproachSteps
-            const inc = approachStepsIncrement || 0
-            const extra = inc > 0 ? inc * (flipsDepth - relaxAtDepth + 1) : 0
-            localCap = Math.min(high, maxApproachSteps + extra)
-        }
-        const budget = { maxLocalNodes, deadline, maxApproachSteps: localCap, avoidEmptyUnlessKing }
-		const { candidates, nodesUsed } = findNextFlipCandidates(state, budget)
-		nodes += nodesUsed
-		if (!candidates.length) { atomicDead += 1; return { solved: false, candidates: [] } }
-        let sorted
-        if (rankingStrategy === 'blended') sorted = rankCandidatesBlended(state, candidates)
-        else if (rankingStrategy === 'mostCovered') sorted = rankCandidatesByMostCovered(state, candidates)
-        else sorted = rankCandidates(state, candidates)
-		return { solved: false, candidates: sorted }
-	}
-
-	// Transposition across atomic layers: avoid revisiting equivalent atomic states at >= same flipsDepth
-	function seenAtomic() {
-		normalizeSafeToFoundationNoFlip(state)
-		const key = zobristKey(state)
-		const prev = bestAtDepth.get(key)
-		if (prev !== undefined && prev <= flipsDepth) return true
-		bestAtDepth.set(key, flipsDepth)
-		return false
+		let localCap = maxApproachSteps
+		if (flipsDepth >= relaxAtDepth) {
+			const high = maxApproachStepsHigh || maxApproachSteps
+			const inc = approachStepsIncrement || 0
+			const extra = inc > 0 ? inc * (flipsDepth - relaxAtDepth + 1) : 0
+			localCap = Math.min(high, maxApproachSteps + extra)
+		}
+		const { key, snapshot } = computeAtomicKeyAndSnapshot(state)
+		let entry = atomicCache.get(key)
+		if (!entry) {
+			const budget = { maxLocalNodes, deadline, maxApproachSteps: localCap, avoidEmptyUnlessKing }
+			const { candidates, nodesUsed } = findNextFlipCandidates(state, budget)
+			nodes += nodesUsed
+			let sorted
+			if (rankingStrategy === 'blended') sorted = rankCandidatesBlended(state, candidates)
+			else if (rankingStrategy === 'mostCovered') sorted = rankCandidatesByMostCovered(state, candidates)
+			else sorted = rankCandidates(state, candidates)
+			entry = { candidates: sorted, tried: new Set() }
+			atomicCache.set(key, entry)
+		}
+		const allTried = entry.candidates.length === 0 || entry.tried.size >= entry.candidates.length
+		if (allTried) { atomicDead += 1; return { solved: false, candidates: [], key, snapshot } }
+		return { solved: false, candidates: entry.candidates, key, snapshot }
 	}
 
     const frames = []
 	if (tryGreedyFinishIfReady(state)) {
 		return { solvable: true, difficulty: classifyDifficultyByNodes(0), stats: { nodes: 0, depth: 0, timeMs: 0, cutoffReason: null } }
 	}
-	if (seenAtomic()) return { solvable: false, difficulty: undefined, stats: { nodes: 0, depth: 0, timeMs: 0, cutoffReason: null } }
 	let init = pushAtomicFrame()
 	if (init.solved) return { solvable: true, difficulty: classifyDifficultyByNodes(nodes), stats: { nodes, depth: flipsDepth, timeMs: Math.max(0, Date.now() - (deadline - maxTimeMs)), cutoffReason: null } }
-    frames.push({ idx: 0, candidates: init.candidates, snapshot: cloneState(state), changedCols: new Set() })
+	frames.push({ idx: 0, key: init.key, candidates: init.candidates, snapshot: init.snapshot || cloneState(state), changedCols: new Set() })
 
 	while (frames.length) {
 		if (Date.now() > deadline) return { solvable: false, difficulty: undefined, stats: { nodes, depth: flipsDepth, timeMs: Math.max(0, Date.now() - (deadline - maxTimeMs)), cutoffReason: 'time', atomicTried, atomicDead } }
 		if (nodes >= maxNodes) return { solvable: false, difficulty: undefined, stats: { nodes, depth: flipsDepth, timeMs: Math.max(0, Date.now() - (deadline - maxTimeMs)), cutoffReason: 'nodes', atomicTried, atomicDead } }
 		const top = frames[frames.length - 1]
-        if (top.idx >= top.candidates.length) {
+		// Skip candidates already tried globally for this atomic state
+		const cacheEntry = top.key ? atomicCache.get(top.key) : undefined
+		while (cacheEntry && top.idx < top.candidates.length && cacheEntry.tried.has(top.idx)) top.idx += 1
+		if (top.idx >= top.candidates.length) {
             // Backjump: jump to most recent ancestor that changed any currently blocked column
             if (!enableBackjump) {
                 frames.pop()
@@ -683,7 +698,9 @@ function sigOfChangedCols(set) { return Array.from(set).sort().join(',') }
             }
             continue
         }
-		const cand = top.candidates[top.idx++]
+		const cand = top.candidates[top.idx]
+		if (cacheEntry) cacheEntry.tried.add(top.idx)
+		top.idx += 1
 		// Rebuild from the atomic snapshot before applying this candidate path
 		const base = top.snapshot
 		state.tableau = base.tableau.map((col) => col.map((c) => ({ suit: c.suit, rank: c.rank, faceUp: c.faceUp })))
@@ -698,20 +715,11 @@ function sigOfChangedCols(set) { return Array.from(set).sort().join(',') }
 		if (tryGreedyFinishIfReady(state) || isWin(state)) {
 			return { solvable: true, difficulty: classifyDifficultyByNodes(nodes), stats: { nodes, depth: flipsDepth, timeMs: Math.max(0, Date.now() - (deadline - maxTimeMs)), cutoffReason: null, atomicTried, atomicDead } }
 		}
-		if (seenAtomic()) { // backtrack immediately; don't expand duplicate atomic state
-			flipsDepth = Math.max(0, flipsDepth - 1)
-			// restore to top snapshot (still same top frame)
-			const snap2 = frames[frames.length - 1].snapshot
-			state.tableau = snap2.tableau.map((col) => col.map((c) => ({ suit: c.suit, rank: c.rank, faceUp: c.faceUp })))
-			state.stock = snap2.stock.map((c) => ({ suit: c.suit, rank: c.rank }))
-			state.foundations = (() => { const f = {}; for (const s of SUITS) f[s] = snap2.foundations[s].map((c) => ({ suit: c.suit, rank: c.rank })); return f })()
-			continue
-		}
 		const next = pushAtomicFrame()
 		if (next.solved) {
 			return { solvable: true, difficulty: classifyDifficultyByNodes(nodes), stats: { nodes, depth: flipsDepth, timeMs: Math.max(0, Date.now() - (deadline - maxTimeMs)), cutoffReason: null, atomicTried, atomicDead } }
 		}
-        frames.push({ idx: 0, candidates: next.candidates, snapshot: cloneState(state), changedCols: changedColumnsFromPath(cand.path) })
+		frames.push({ idx: 0, key: next.key, candidates: next.candidates, snapshot: next.snapshot || cloneState(state), changedCols: changedColumnsFromPath(cand.path) })
 	}
 
     return { solvable: false, difficulty: undefined, stats: { nodes, depth: flipsDepth, timeMs: Math.max(0, Date.now() - (deadline - maxTimeMs)), cutoffReason: 'exhausted', atomicTried, atomicDead } }

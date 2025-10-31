@@ -118,10 +118,10 @@ function writeComparisonMdAppend(filePath, decks, resA, resB, labelA, labelB, ti
 function main() {
     const args = parseArgs()
     const trials = args.trials || 50
-    const strategy = args.strategy || process.env.SOLVER_STRATEGY || 'dfs'
-    const maxNodes = args.maxNodes || 1000000
-    const maxTimeMs = args.maxTimeMs || 2000
-    const avoidEmptyUnlessKing = args.avoidEmptyUnlessKing !== undefined ? !!args.avoidEmptyUnlessKing : undefined
+    const strategy = args.strategy || process.env.SOLVER_STRATEGY || 'atomic'
+    const maxNodes = args.maxNodes || 2000000
+    const maxTimeMs = args.maxTimeMs || 5000
+    const avoidEmptyUnlessKing = args.avoidEmptyUnlessKing === undefined ? true : !!args.avoidEmptyUnlessKing
     const enableBackjump = args.enableBackjump !== undefined ? !!args.enableBackjump : undefined
     const maxApproachSteps = args.maxApproachSteps !== undefined ? Number(args.maxApproachSteps) : undefined
     const maxApproachStepsHigh = args.maxApproachStepsHigh !== undefined ? Number(args.maxApproachStepsHigh) : undefined
@@ -177,9 +177,14 @@ function main() {
         return
     }
 
+    // Load the 100 shuffles by default for consistent testing
+    const decks = loadOrGenerateShuffles(shufflesFile, 100, 0x12345678)
+    console.log(`Using ${decks.length} shuffles from ${shufflesFile}`)
+
     const results = []
     for (let t = 0; t < trials; t += 1) {
-        const deckOrder = randomDeckOrder()
+        // Cycle through the shuffles (use modulo to wrap around if trials > decks.length)
+        const deckOrder = decks[t % decks.length]
         const res = solveKlondike(deckOrder, { maxNodes, maxTimeMs, strategy, avoidEmptyUnlessKing, enableBackjump, maxApproachSteps, maxApproachStepsHigh, rankingStrategy })
         const tried = res.stats.atomicTried !== undefined ? ` atomicTried=${res.stats.atomicTried}` : ''
         const dead = res.stats.atomicDead !== undefined ? ` atomicDead=${res.stats.atomicDead}` : ''
