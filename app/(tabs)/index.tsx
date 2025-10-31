@@ -15,6 +15,16 @@ import {
   StyleSheet,
   View,
 } from 'react-native'
+import Animated, {
+  Easing,
+  Layout,
+  SharedTransition,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated'
 import { Link, useNavigation } from 'expo-router'
 import { Button, H2, Paragraph, Text, XStack, YStack } from 'tamagui'
 import { RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
@@ -75,12 +85,54 @@ const FACE_CARD_LABELS: Partial<Record<Rank, string>> = {
   12: 'Q',
   13: 'K',
 }
+const CARD_ANIMATION_DURATION_MS = 2200
+const CARD_MOVE_EASING = Easing.bezier(0.2, 0.8, 0.2, 1)
+const CARD_LAYOUT_TRANSITION = Layout.duration(CARD_ANIMATION_DURATION_MS).easing(
+  CARD_MOVE_EASING,
+)
+const WASTE_SLIDE_DURATION_MS = 140
+const WASTE_SLIDE_EASING = Easing.bezier(0.2, 0, 0.2, 1)
+const WASTE_TIMING_CONFIG = {
+  duration: WASTE_SLIDE_DURATION_MS,
+  easing: WASTE_SLIDE_EASING,
+}
+const WIGGLE_OFFSET_PX = 5
+const WIGGLE_SEGMENT_DURATION_MS = 70
+const WIGGLE_EASING = Easing.bezier(0.4, 0, 0.2, 1)
+const WIGGLE_TIMING_CONFIG = {
+  duration: WIGGLE_SEGMENT_DURATION_MS,
+  easing: WIGGLE_EASING,
+}
+
+const AnimatedView = Animated.createAnimatedComponent(View)
+const CARD_SHARED_TRANSITION = SharedTransition.custom((values) => {
+  'worklet'
+  const timingConfig = { duration: CARD_ANIMATION_DURATION_MS, easing: CARD_MOVE_EASING }
+  return {
+    animations: {
+      originX: withTiming(values.targetOriginX, timingConfig),
+      originY: withTiming(values.targetOriginY, timingConfig),
+      width: withTiming(values.targetWidth, timingConfig),
+      height: withTiming(values.targetHeight, timingConfig),
+    },
+  }
+})
 
 type CardMetrics = {
   width: number
   height: number
   stackOffset: number
   radius: number
+}
+
+type InvalidWiggleConfig = {
+  key: number
+  lookup: Set<string>
+}
+
+const EMPTY_INVALID_WIGGLE: InvalidWiggleConfig = {
+  key: 0,
+  lookup: new Set<string>(),
 }
 
 const DEFAULT_METRICS: CardMetrics = {
@@ -112,6 +164,29 @@ function computeCardMetrics(availableWidth: number | null): CardMetrics {
   }
 }
 
+function collectSelectionCardIds(state: GameState, selection?: Selection | null): string[] {
+  if (!selection) {
+    return []
+  }
+
+  if (selection.source === 'waste') {
+    const topWaste = state.waste[state.waste.length - 1]
+    return topWaste ? [topWaste.id] : []
+  }
+
+  if (selection.source === 'foundation') {
+    const topFoundation = state.foundations[selection.suit][state.foundations[selection.suit].length - 1]
+    return topFoundation ? [topFoundation.id] : []
+  }
+
+  if (selection.source === 'tableau') {
+    const column = state.tableau[selection.columnIndex] ?? []
+    return column.slice(selection.cardIndex).map((card) => card.id)
+  }
+
+  return []
+}
+
 export default function TabOneScreen() {
   const [state, dispatch] = useReducer(klondikeReducer, undefined, createInitialState)
   const [boardWidth, setBoardWidth] = useState<number | null>(null)
@@ -121,6 +196,29 @@ export default function TabOneScreen() {
   const dropHints = useMemo(() => getDropHints(state), [state])
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
   const winCelebrationsRef = useRef(state.winCelebrations)
+  const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(() => ({
+    ...EMPTY_INVALID_WIGGLE,
+    lookup: new Set<string>(),
+  }))
+  const triggerInvalidSelectionWiggle = useCallback(
+    (selection?: Selection | null) => {
+      const ids = collectSelectionCardIds(state, selection)
+      if (!ids.length) {
+        return
+      }
+      setInvalidWiggle({
+        key: Date.now(),
+        lookup: new Set(ids),
+      })
+    },
+    [state],
+  )
+  const notifyInvalidMove = useCallback(
+    (options?: { selection?: Selection | null }) => {
+      triggerInvalidSelectionWiggle(options?.selection ?? null)
+    },
+    [triggerInvalidSelectionWiggle],
+  )
 
   const drawLabel = state.stock.length ? 'Draw' : ''
 
@@ -128,11 +226,9 @@ export default function TabOneScreen() {
     setBoardWidth(event.nativeEvent.layout.width)
   }, [])
 
-  const notifyInvalidMove = useCallback((_message?: string) => undefined, [])
-
   const handleDraw = useCallback(() => {
     if (!state.stock.length && !state.waste.length) {
-      notifyInvalidMove('Stock and waste piles are empty.')
+      notifyInvalidMove()
       return
     }
     dispatch({ type: 'DRAW_OR_RECYCLE' })
@@ -140,7 +236,7 @@ export default function TabOneScreen() {
 
   const handleUndo = useCallback(() => {
     if (!state.history.length) {
-      notifyInvalidMove('No moves to undo.')
+      notifyInvalidMove()
       return
     }
     dispatch({ type: 'UNDO' })
@@ -164,7 +260,7 @@ export default function TabOneScreen() {
     (selection: Selection) => {
       const target = findAutoMoveTarget(state, selection)
       if (!target) {
-        notifyInvalidMove('No automatic move available. Tap & hold to choose a destination.')
+        notifyInvalidMove({ selection })
         return
       }
       dispatch({ type: 'APPLY_MOVE', selection, target })
@@ -198,7 +294,7 @@ export default function TabOneScreen() {
       if (dropHints.tableau[columnIndex]) {
         dispatch({ type: 'PLACE_ON_TABLEAU', columnIndex })
       } else {
-        notifyInvalidMove('Selected stack cannot go there.')
+        notifyInvalidMove({ selection: state.selected })
       }
     },
     [dispatch, dropHints.tableau, notifyInvalidMove, state.selected],
@@ -215,7 +311,7 @@ const handleFoundationPress = useCallback(
     if (dropHints.foundations[suit]) {
       dispatch({ type: 'PLACE_ON_FOUNDATION', suit })
     } else {
-      notifyInvalidMove('Selected stack cannot move there yet.')
+      notifyInvalidMove({ selection: state.selected })
     }
   },
   [attemptAutoMove, dispatch, dropHints.foundations, notifyInvalidMove, state.foundations, state.selected],
@@ -294,6 +390,7 @@ const handleFoundationPress = useCallback(
           cardMetrics={cardMetrics}
           dropHints={dropHints}
           notifyInvalidMove={notifyInvalidMove}
+          invalidWiggle={invalidWiggle}
         />
 
         <TableauSection
@@ -303,6 +400,7 @@ const handleFoundationPress = useCallback(
           onAutoMove={attemptAutoMove}
           onLongPress={handleManualSelectTableau}
           onColumnPress={handleColumnPress}
+          invalidWiggle={invalidWiggle}
         />
 
         <SelectionHint state={state} onClear={clearSelection} />
@@ -333,7 +431,8 @@ type TopRowProps = {
   onFoundationHold: (suit: Suit) => void
   cardMetrics: CardMetrics
   dropHints: ReturnType<typeof getDropHints>
-  notifyInvalidMove: (message: string) => void
+  notifyInvalidMove: (options?: { selection?: Selection | null }) => void
+  invalidWiggle: InvalidWiggleConfig
 }
 
 const TopRow = ({
@@ -347,6 +446,7 @@ const TopRow = ({
   cardMetrics,
   dropHints,
   notifyInvalidMove,
+  invalidWiggle,
 }: TopRowProps) => {
   const stockDisabled = !state.stock.length && !state.waste.length
   const wasteSelected = state.selected?.source === 'waste'
@@ -359,7 +459,7 @@ const TopRow = ({
 
   const handleWastePress = useCallback(() => {
     if (!state.waste.length) {
-      notifyInvalidMove('Waste pile is empty.')
+      notifyInvalidMove()
       return
     }
     onWasteTap()
@@ -378,6 +478,7 @@ const TopRow = ({
             isSelected={state.selected?.source === 'foundation' && state.selected.suit === suit}
             onPress={() => onFoundationPress(suit)}
             onLongPress={() => onFoundationHold(suit)}
+            invalidWiggle={invalidWiggle}
           />
         ))}
       </XStack>
@@ -396,6 +497,7 @@ const TopRow = ({
               isSelected={wasteSelected}
               onPress={handleWastePress}
               onLongPress={onWasteHold}
+              invalidWiggle={invalidWiggle}
             />
           ) : (
             <EmptySlot highlight={false} metrics={cardMetrics} />
@@ -424,6 +526,7 @@ type TableauSectionProps = {
   onAutoMove: (selection: Selection) => void
   onLongPress: (columnIndex: number, cardIndex: number) => void
   onColumnPress: (columnIndex: number) => void
+  invalidWiggle: InvalidWiggleConfig
 }
 
 const TableauSection = ({
@@ -433,6 +536,7 @@ const TableauSection = ({
   onAutoMove,
   onLongPress,
   onColumnPress,
+  invalidWiggle,
 }: TableauSectionProps) => (
   <View style={styles.tableauRow}>
     {state.tableau.map((column, columnIndex) => (
@@ -448,6 +552,7 @@ const TableauSection = ({
         }
         onCardLongPress={(cardIndex) => onLongPress(columnIndex, cardIndex)}
         onColumnPress={() => onColumnPress(columnIndex)}
+        invalidWiggle={invalidWiggle}
       />
     ))}
   </View>
@@ -462,6 +567,7 @@ type TableauColumnProps = {
   onCardPress: (cardIndex: number) => void
   onCardLongPress: (cardIndex: number) => void
   onColumnPress: () => void
+  invalidWiggle: InvalidWiggleConfig
 }
 
 const TableauColumn = ({
@@ -473,6 +579,7 @@ const TableauColumn = ({
   onCardPress,
   onCardLongPress,
   onColumnPress,
+  invalidWiggle,
 }: TableauColumnProps) => {
   const columnHeight = column.length
     ? cardMetrics.height + (column.length - 1) * cardMetrics.stackOffset
@@ -518,6 +625,7 @@ const TableauColumn = ({
           }
           onPress={card.faceUp ? () => onCardPress(cardIndex) : undefined}
           onLongPress={card.faceUp ? () => onCardLongPress(cardIndex) : undefined}
+          invalidWiggle={invalidWiggle}
         />
       ))}
     </Pressable>
@@ -532,6 +640,7 @@ type CardViewProps = {
   isSelected?: boolean
   onPress?: () => void
   onLongPress?: () => void
+  invalidWiggle: InvalidWiggleConfig
 }
 
 const CardView = ({
@@ -542,6 +651,7 @@ const CardView = ({
   isSelected,
   onPress,
   onLongPress,
+  invalidWiggle,
 }: CardViewProps) => {
   const shouldFloat = typeof offsetTop === 'number' || typeof offsetLeft === 'number'
   const positionStyle = shouldFloat
@@ -551,68 +661,112 @@ const CardView = ({
         left: typeof offsetLeft === 'number' ? offsetLeft : 0,
       }
     : undefined
+  const wiggle = useSharedValue(0)
+  const lastTriggerRef = useRef(invalidWiggle.key)
+  const shouldAnimateInvalid = invalidWiggle.lookup.has(card.id)
+  const wiggleStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: wiggle.value }],
+  }))
+
+  useEffect(() => {
+    if (!shouldAnimateInvalid) {
+      return
+    }
+    if (lastTriggerRef.current === invalidWiggle.key) {
+      return
+    }
+    lastTriggerRef.current = invalidWiggle.key
+    cancelAnimation(wiggle)
+    wiggle.value = 0
+    wiggle.value = withSequence(
+      withTiming(-WIGGLE_OFFSET_PX, WIGGLE_TIMING_CONFIG),
+      withTiming(WIGGLE_OFFSET_PX, WIGGLE_TIMING_CONFIG),
+      withTiming(0, WIGGLE_TIMING_CONFIG),
+    )
+  }, [invalidWiggle.key, shouldAnimateInvalid, wiggle])
+
+  const containerStyle = [
+    positionStyle,
+    wiggleStyle,
+    {
+      width: metrics.width,
+      height: metrics.height,
+    },
+  ]
 
   if (!card.faceUp) {
     return (
-      <View
-        style={[
-          styles.cardBase,
-          styles.faceDown,
-          positionStyle,
-          {
-            width: metrics.width,
-            height: metrics.height,
-            borderRadius: metrics.radius,
-          },
-        ]}
-      />
+      <AnimatedView
+        layout={CARD_LAYOUT_TRANSITION}
+        sharedTransitionTag={`card-${card.id}`}
+        sharedTransitionStyle={CARD_SHARED_TRANSITION}
+        style={containerStyle}
+      >
+        <View
+          style={[
+            styles.cardBase,
+            styles.faceDown,
+            {
+              width: '100%',
+              height: '100%',
+              borderRadius: metrics.radius,
+            },
+          ]}
+        />
+      </AnimatedView>
     )
   }
 
   const borderColor = isSelected ? COLOR_SELECTED_BORDER : COLOR_CARD_BORDER
 
   return (
-    <Pressable
-      style={[
-        styles.cardBase,
-        styles.faceUp,
-        positionStyle,
-        {
-          width: metrics.width,
-          height: metrics.height,
-          borderRadius: metrics.radius,
-          borderColor,
-        },
-      ]}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      disabled={!onPress && !onLongPress}
+    <AnimatedView
+      layout={CARD_LAYOUT_TRANSITION}
+      sharedTransitionTag={`card-${card.id}`}
+      sharedTransitionStyle={CARD_SHARED_TRANSITION}
+      style={containerStyle}
     >
-      <Text
-        style={[styles.cardCornerRank, { color: SUIT_COLORS[card.suit] }]}
-        ellipsizeMode="clip"
-        numberOfLines={1}
-        allowFontScaling={false}
+      <Pressable
+        style={[
+          styles.cardBase,
+          styles.faceUp,
+          {
+            width: '100%',
+            height: '100%',
+            borderRadius: metrics.radius,
+            borderColor,
+          },
+        ]}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        disabled={!onPress && !onLongPress}
       >
-        {rankToLabel(card.rank)}
-      </Text>
-      <Text
-        style={[styles.cardCornerSuit, { color: SUIT_COLORS[card.suit] }]}
-        ellipsizeMode="clip"
-        numberOfLines={1}
-        allowFontScaling={false}
-      >
-        {SUIT_SYMBOLS[card.suit]}
-      </Text>
-      <Text
-        style={[styles.cardSymbol, { color: SUIT_COLORS[card.suit] }]}
-        ellipsizeMode="clip"
-        numberOfLines={1}
-        allowFontScaling={false}
-      >
-        {SUIT_SYMBOLS[card.suit]}
-      </Text>
-    </Pressable>
+        <Text
+          style={[styles.cardCornerRank, { color: SUIT_COLORS[card.suit] }]}
+          ellipsizeMode="clip"
+          numberOfLines={1}
+          allowFontScaling={false}
+        >
+          {rankToLabel(card.rank)}
+        </Text>
+        <Text
+          style={[styles.cardCornerSuit, { color: SUIT_COLORS[card.suit] }]}
+          ellipsizeMode="clip"
+          numberOfLines={1}
+          allowFontScaling={false}
+        >
+          {SUIT_SYMBOLS[card.suit]}
+        </Text>
+        <Text
+          style={[styles.cardSymbol, { color: SUIT_COLORS[card.suit] }]}
+          ellipsizeMode="clip"
+          numberOfLines={1}
+          allowFontScaling={false}
+        >
+          {SUIT_SYMBOLS[card.suit]}
+        </Text>
+      </Pressable>
+    </AnimatedView>
   )
 }
 
@@ -678,30 +832,116 @@ type WasteFanProps = {
   isSelected: boolean
   onPress: () => void
   onLongPress: () => void
+  invalidWiggle: InvalidWiggleConfig
 }
 
-const WasteFan = ({ cards, metrics, isSelected, onPress, onLongPress }: WasteFanProps) => {
+const WasteFan = ({
+  cards,
+  metrics,
+  isSelected,
+  onPress,
+  onLongPress,
+  invalidWiggle,
+}: WasteFanProps) => {
   const visible = cards.slice(-3)
   const overlap = Math.min(metrics.width * WASTE_FAN_OVERLAP_RATIO, WASTE_FAN_MAX_OFFSET)
   const width = metrics.width + overlap * (visible.length - 1)
+  const previousVisibleIdsRef = useRef<Set<string>>(new Set())
+  const animationSignature = `${cards[cards.length - 1]?.id ?? 'none'}-${cards.length}`
+  const enteringLookup = useMemo(() => {
+    const prev = previousVisibleIdsRef.current
+    const entering = new Set<string>()
+    visible.forEach((card) => {
+      if (!prev.has(card.id)) {
+        entering.add(card.id)
+      }
+    })
+    return entering
+  }, [visible])
+
+  useEffect(() => {
+    previousVisibleIdsRef.current = new Set(visible.map((card) => card.id))
+  }, [animationSignature, visible])
 
   return (
     <View style={{ width, height: metrics.height, position: 'relative' }}>
       {visible.map((card, index) => {
         const isTop = index === visible.length - 1
         return (
-          <CardView
+          <WasteFanCard
             key={card.id}
             card={card}
             metrics={metrics}
-            offsetLeft={index * overlap}
+            targetOffset={index * overlap}
             isSelected={isTop && isSelected}
             onPress={isTop ? onPress : undefined}
             onLongPress={isTop ? onLongPress : undefined}
+            invalidWiggle={invalidWiggle}
+            isEntering={enteringLookup.has(card.id)}
+            zIndex={index}
           />
         )
       })}
     </View>
+  )
+}
+
+type WasteFanCardProps = {
+  card: Card
+  metrics: CardMetrics
+  targetOffset: number
+  isSelected: boolean
+  onPress?: () => void
+  onLongPress?: () => void
+  invalidWiggle: InvalidWiggleConfig
+  isEntering: boolean
+  zIndex: number
+}
+
+const WasteFanCard = ({
+  card,
+  metrics,
+  targetOffset,
+  isSelected,
+  onPress,
+  onLongPress,
+  invalidWiggle,
+  isEntering,
+  zIndex,
+}: WasteFanCardProps) => {
+  const enterOffset = targetOffset + metrics.width * 0.35
+  const translateX = useSharedValue(isEntering ? enterOffset : targetOffset)
+  const positionStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }))
+
+  useEffect(() => {
+    cancelAnimation(translateX)
+    translateX.value = withTiming(targetOffset, WASTE_TIMING_CONFIG)
+  }, [targetOffset, translateX])
+
+  return (
+    <AnimatedView
+      pointerEvents="box-none"
+      style={[
+        styles.wasteFanCardWrapper,
+        {
+          width: metrics.width,
+          height: metrics.height,
+          zIndex,
+        },
+        positionStyle,
+      ]}
+    >
+      <CardView
+        card={card}
+        metrics={metrics}
+        isSelected={isSelected}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        invalidWiggle={invalidWiggle}
+      />
+    </AnimatedView>
   )
 }
 
@@ -740,6 +980,7 @@ type FoundationPileProps = {
   isSelected: boolean
   onPress: () => void
   onLongPress: () => void
+  invalidWiggle: InvalidWiggleConfig
 }
 
 const FoundationPile = ({
@@ -750,6 +991,7 @@ const FoundationPile = ({
   isSelected,
   onPress,
   onLongPress,
+  invalidWiggle,
 }: FoundationPileProps) => {
   const topCard = cards[cards.length - 1]
   const hasCards = cards.length > 0
@@ -776,7 +1018,7 @@ const FoundationPile = ({
       ]}
     >
       {topCard ? (
-        <CardView card={topCard} metrics={cardMetrics} />
+        <CardView card={topCard} metrics={cardMetrics} invalidWiggle={invalidWiggle} />
       ) : (
         <Text
           style={[
@@ -971,5 +1213,10 @@ const styles = StyleSheet.create({
   foundationSymbol: {
     fontSize: 28,
     color: COLOR_TEXT_STRONG,
+  },
+  wasteFanCardWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
 })
