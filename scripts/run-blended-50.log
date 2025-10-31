@@ -1,0 +1,89 @@
+[run-config]
+{
+  "trials": 50,
+  "strategy": "atomic",
+  "maxNodes": 5000000,
+  "maxTimeMs": 5000,
+  "avoidEmptyUnlessKing": "(default)",
+  "enableBackjump": "(default)",
+  "maxApproachSteps": "(default)",
+  "maxApproachStepsHigh": "(default)",
+  "rankingStrategy": "blended",
+  "shufflesFile": "/Users/karim/Code/Soli/soli-app/scripts/shuffles-100.json",
+  "saveMd": "scripts/compare-100.md",
+  "compare": false,
+  "compareAtomicVariants": false
+}
+[atomic-config]
+{
+  "maxNodes": 5000000,
+  "maxTimeMs": 5000,
+  "maxLocalNodes": 20000,
+  "maxApproachSteps": 20,
+  "maxApproachStepsHigh": 80,
+  "relaxAtDepth": 19,
+  "approachStepsIncrement": 3,
+  "avoidEmptyUnlessKing": true,
+  "enableBackjump": true,
+  "rankingStrategy": "blended"
+}
+❌ Trial 1: nodes=20000 depth=0 time=111ms cutoff=exhausted atomicTried=1 atomicDead=1
+✅ Trial 2: nodes=154556 depth=21 time=709ms cutoff=- atomicTried=207 atomicDead=122
+❌ Trial 3: nodes=1624508 depth=15 time=5001ms cutoff=time atomicTried=11013 atomicDead=9540
+❌ Trial 4: nodes=20000 depth=0 time=67ms cutoff=exhausted atomicTried=1 atomicDead=1
+❌ Trial 5: nodes=3610033 depth=22 time=5001ms cutoff=time atomicTried=301 atomicDead=246
+❌ Trial 6: nodes=1832028 depth=21 time=5001ms cutoff=time atomicTried=306 atomicDead=153
+❌ Trial 7: nodes=1720729 depth=15 time=5001ms cutoff=time atomicTried=8357 atomicDead=7183
+❌ Trial 8: nodes=1716691 depth=9 time=5004ms cutoff=time atomicTried=14634 atomicDead=3840
+❌ Trial 9: nodes=1480790 depth=6 time=5010ms cutoff=time atomicTried=5891 atomicDead=1215
+✅ Trial 10: nodes=69373 depth=21 time=273ms cutoff=- atomicTried=21 atomicDead=0
+❌ Trial 11: nodes=20000 depth=0 time=61ms cutoff=exhausted atomicTried=1 atomicDead=1
+❌ Trial 12: nodes=1561109 depth=10 time=5001ms cutoff=time atomicTried=5861 atomicDead=4905
+❌ Trial 13: nodes=1463507 depth=8 time=5001ms cutoff=time atomicTried=4148 atomicDead=2016
+❌ Trial 14: nodes=1599111 depth=14 time=5001ms cutoff=time atomicTried=10563 atomicDead=1678
+❌ Trial 15: nodes=8869 depth=0 time=26ms cutoff=exhausted atomicTried=203 atomicDead=80
+✅ Trial 16: nodes=482610 depth=21 time=1491ms cutoff=- atomicTried=4681 atomicDead=1872
+❌ Trial 17: nodes=40011 depth=0 time=134ms cutoff=exhausted atomicTried=6 atomicDead=1
+❌ Trial 18: nodes=1377579 depth=19 time=5001ms cutoff=time atomicTried=95 atomicDead=70
+✅ Trial 19: nodes=142384 depth=21 time=498ms cutoff=- atomicTried=1527 atomicDead=600
+❌ Trial 20: nodes=51107 depth=0 time=177ms cutoff=exhausted atomicTried=1151 atomicDead=230
+❌ Trial 21: nodes=387290 depth=0 time=938ms cutoff=exhausted atomicTried=5145 atomicDead=936
+✅ Trial 22: nodes=151886 depth=21 time=666ms cutoff=- atomicTried=21 atomicDead=0
+❌ Trial 23: nodes=1385143 depth=13 time=5001ms cutoff=time atomicTried=3929 atomicDead=1192
+❌ Trial 24: nodes=1396899 depth=19 time=5001ms cutoff=time atomicTried=434 atomicDead=129
+❌ Trial 25: nodes=20000 depth=0 time=60ms cutoff=exhausted atomicTried=1 atomicDead=1
+❌ Trial 26: nodes=1751711 depth=7 time=5001ms cutoff=time atomicTried=10184 atomicDead=1954
+❌ Trial 27: nodes=1415306 depth=19 time=5001ms cutoff=time atomicTried=165 atomicDead=133
+❌ Trial 28: nodes=20004 depth=0 time=64ms cutoff=exhausted atomicTried=3 atomicDead=1
+❌ Trial 29: nodes=1670989 depth=18 time=5001ms cutoff=time atomicTried=5401 atomicDead=745
+✅ Trial 30: nodes=84615 depth=21 time=375ms cutoff=- atomicTried=191 atomicDead=110
+❌ Trial 31: nodes=20000 depth=0 time=62ms cutoff=exhausted atomicTried=1 atomicDead=1
+❌ Trial 32: nodes=1684213 depth=19 time=5001ms cutoff=time atomicTried=202 atomicDead=92
+✅ Trial 33: nodes=52456 depth=21 time=174ms cutoff=- atomicTried=21 atomicDead=0
+❌ Trial 34: nodes=1417036 depth=22 time=5001ms cutoff=time atomicTried=88 atomicDead=60
+✅ Trial 35: nodes=301752 depth=21 time=945ms cutoff=- atomicTried=1741 atomicDead=576
+❌ Trial 36: nodes=1437258 depth=22 time=5001ms cutoff=time atomicTried=86 atomicDead=64
+❌ Trial 37: nodes=1227494 depth=18 time=5002ms cutoff=time atomicTried=304 atomicDead=69
+❌ Trial 38: nodes=1680522 depth=13 time=5001ms cutoff=time atomicTried=3085 atomicDead=1538
+❌ Trial 39: nodes=40018 depth=0 time=128ms cutoff=exhausted atomicTried=7 atomicDead=1
+✅ Trial 40: nodes=55653 depth=21 time=203ms cutoff=- atomicTried=21 atomicDead=0
+❌ Trial 41: nodes=1699003 depth=13 time=5001ms cutoff=time atomicTried=5845 atomicDead=3580
+✅ Trial 42: nodes=373293 depth=21 time=988ms cutoff=- atomicTried=2821 atomicDead=1200
+❌ Trial 43: nodes=20008 depth=0 time=64ms cutoff=exhausted atomicTried=4 atomicDead=1
+❌ Trial 44: nodes=1532913 depth=17 time=5001ms cutoff=time atomicTried=192 atomicDead=88
+❌ Trial 45: nodes=1340780 depth=12 time=5001ms cutoff=time atomicTried=3853 atomicDead=1522
+✅ Trial 46: nodes=46059 depth=21 time=207ms cutoff=- atomicTried=21 atomicDead=0
+❌ Trial 47: nodes=2265839 depth=21 time=5001ms cutoff=time atomicTried=1745 atomicDead=727
+❌ Trial 48: nodes=1912838 depth=7 time=5001ms cutoff=time atomicTried=7725 atomicDead=2859
+❌ Trial 49: nodes=20010 depth=0 time=68ms cutoff=exhausted atomicTried=5 atomicDead=1
+❌ Trial 50: nodes=1751197 depth=10 time=5001ms cutoff=time atomicTried=4664 atomicDead=864
+
+Summary:
+  ✅ Solved: 11/50 (22%)
+  brutal: 5
+  challenging: 1
+  hard: 5
+  unsolved: 39
+  Avg nodes: 923144
+  Avg time: 2771ms
+  Cutoffs: time=26, nodes=0
