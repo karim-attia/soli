@@ -23,6 +23,14 @@
 | 2025-10-26 20:32:52 | 2 | submit_for_review | Per-card waste fan animation implemented to satisfy feedback. | ai_agent |
 | 2025-10-26 20:33:00 | 2 | reject | Reviewer approved earlier fixes but re-opened for explicit card-flight animation. | user |
 | 2025-10-26 20:37:18 | 2 | submit_for_review | Card shared transitions added so moves fly into place. | ai_agent |
+| 2025-10-26 20:50:00 | 2 | reject | Reviewer requested the flight animation be slowed for visibility. | user |
+| 2025-10-26 20:51:32 | 2 | submit_for_review | Increased card-flight duration to highlight the effect. | ai_agent |
+| 2025-10-26 21:10:00 | 2 | reject | Reviewer still cannot see the stack-to-stack flight animation. | user |
+| 2025-10-26 21:23:39 | 2 | submit_for_review | Attempted native LayoutAnimation choreography for card moves. | ai_agent |
+| 2025-10-31 12:00:00 | 2 | reject | LayoutAnimation approach unsupported under current architecture; needs alternative. | user |
+| 2025-10-31 12:05:22 | 2 | submit_for_review | Reanimated measure-based card flight implemented for stack moves. | ai_agent |
+| 2025-10-31 12:32:00 | 2 | significant_update | Flight/flip acceleration, foundation coverage, and z-order tweaks underway. | ai_agent |
+| 2025-10-31 12:40:00 | 2 | submit_for_review | Faster glide, flip, and draw animations ready for review. | ai_agent |
 | 2025-10-26 17:00:00 | 3 | create_pbi | Added Expo dependency cleanup backlog item. | ai_agent |
 | 2025-10-26 17:02:00 | 3 | start_implementation | Began upgrading/removing packages per expo-doctor. | ai_agent |
 | 2025-10-26 17:30:00 | 3 | approve | PBI completed and approved by user. | user |

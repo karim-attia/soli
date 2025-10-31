@@ -17,14 +17,17 @@ import {
 } from 'react-native'
 import Animated, {
   Easing,
-  Layout,
-  SharedTransition,
   cancelAnimation,
+  measure,
+  runOnJS,
+  runOnUI,
+  useAnimatedRef,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
   withTiming,
 } from 'react-native-reanimated'
+import type { AnimatedRef, SharedValue } from 'react-native-reanimated'
 import { Link, useNavigation } from 'expo-router'
 import { Button, H2, Paragraph, Text, XStack, YStack } from 'tamagui'
 import { RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
@@ -85,12 +88,21 @@ const FACE_CARD_LABELS: Partial<Record<Rank, string>> = {
   12: 'Q',
   13: 'K',
 }
-const CARD_ANIMATION_DURATION_MS = 2200
-const CARD_MOVE_EASING = Easing.bezier(0.2, 0.8, 0.2, 1)
-const CARD_LAYOUT_TRANSITION = Layout.duration(CARD_ANIMATION_DURATION_MS).easing(
-  CARD_MOVE_EASING,
-)
-const WASTE_SLIDE_DURATION_MS = 140
+const CARD_ANIMATION_DURATION_MS = 120
+const CARD_MOVE_EASING = Easing.bezier(0.25, 0.8, 0.25, 1)
+const CARD_FLIGHT_TIMING = {
+  duration: CARD_ANIMATION_DURATION_MS,
+  easing: CARD_MOVE_EASING,
+}
+
+const ENABLE_ANIMATIONS = true
+const ENABLE_CARD_FLIP_ANIMATION = false
+const CARD_FLIP_HALF_DURATION_MS = 40
+const CARD_FLIP_HALF_TIMING = {
+  duration: CARD_FLIP_HALF_DURATION_MS,
+  easing: Easing.bezier(0.45, 0, 0.55, 1),
+}
+const WASTE_SLIDE_DURATION_MS = 90
 const WASTE_SLIDE_EASING = Easing.bezier(0.2, 0, 0.2, 1)
 const WASTE_TIMING_CONFIG = {
   duration: WASTE_SLIDE_DURATION_MS,
@@ -105,18 +117,14 @@ const WIGGLE_TIMING_CONFIG = {
 }
 
 const AnimatedView = Animated.createAnimatedComponent(View)
-const CARD_SHARED_TRANSITION = SharedTransition.custom((values) => {
-  'worklet'
-  const timingConfig = { duration: CARD_ANIMATION_DURATION_MS, easing: CARD_MOVE_EASING }
-  return {
-    animations: {
-      originX: withTiming(values.targetOriginX, timingConfig),
-      originY: withTiming(values.targetOriginY, timingConfig),
-      width: withTiming(values.targetWidth, timingConfig),
-      height: withTiming(values.targetHeight, timingConfig),
-    },
-  }
-})
+type CardFlightSnapshot = {
+  pageX: number
+  pageY: number
+  width: number
+  height: number
+}
+
+type CardFlightRegistry = SharedValue<Record<string, CardFlightSnapshot>>
 
 type CardMetrics = {
   width: number
@@ -196,6 +204,7 @@ export default function TabOneScreen() {
   const dropHints = useMemo(() => getDropHints(state), [state])
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
   const winCelebrationsRef = useRef(state.winCelebrations)
+  const cardFlights = useSharedValue<Record<string, CardFlightSnapshot>>({})
   const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(() => ({
     ...EMPTY_INVALID_WIGGLE,
     lookup: new Set<string>(),
@@ -391,6 +400,7 @@ const handleFoundationPress = useCallback(
           dropHints={dropHints}
           notifyInvalidMove={notifyInvalidMove}
           invalidWiggle={invalidWiggle}
+          cardFlights={cardFlights}
         />
 
         <TableauSection
@@ -401,6 +411,7 @@ const handleFoundationPress = useCallback(
           onLongPress={handleManualSelectTableau}
           onColumnPress={handleColumnPress}
           invalidWiggle={invalidWiggle}
+          cardFlights={cardFlights}
         />
 
         <SelectionHint state={state} onClear={clearSelection} />
@@ -433,6 +444,7 @@ type TopRowProps = {
   dropHints: ReturnType<typeof getDropHints>
   notifyInvalidMove: (options?: { selection?: Selection | null }) => void
   invalidWiggle: InvalidWiggleConfig
+  cardFlights: CardFlightRegistry
 }
 
 const TopRow = ({
@@ -447,6 +459,7 @@ const TopRow = ({
   dropHints,
   notifyInvalidMove,
   invalidWiggle,
+  cardFlights,
 }: TopRowProps) => {
   const stockDisabled = !state.stock.length && !state.waste.length
   const wasteSelected = state.selected?.source === 'waste'
@@ -479,6 +492,7 @@ const TopRow = ({
             onPress={() => onFoundationPress(suit)}
             onLongPress={() => onFoundationHold(suit)}
             invalidWiggle={invalidWiggle}
+            cardFlights={cardFlights}
           />
         ))}
       </XStack>
@@ -498,6 +512,7 @@ const TopRow = ({
               onPress={handleWastePress}
               onLongPress={onWasteHold}
               invalidWiggle={invalidWiggle}
+              cardFlights={cardFlights}
             />
           ) : (
             <EmptySlot highlight={false} metrics={cardMetrics} />
@@ -527,6 +542,7 @@ type TableauSectionProps = {
   onLongPress: (columnIndex: number, cardIndex: number) => void
   onColumnPress: (columnIndex: number) => void
   invalidWiggle: InvalidWiggleConfig
+  cardFlights: CardFlightRegistry
 }
 
 const TableauSection = ({
@@ -537,6 +553,7 @@ const TableauSection = ({
   onLongPress,
   onColumnPress,
   invalidWiggle,
+  cardFlights,
 }: TableauSectionProps) => (
   <View style={styles.tableauRow}>
     {state.tableau.map((column, columnIndex) => (
@@ -553,6 +570,7 @@ const TableauSection = ({
         onCardLongPress={(cardIndex) => onLongPress(columnIndex, cardIndex)}
         onColumnPress={() => onColumnPress(columnIndex)}
         invalidWiggle={invalidWiggle}
+        cardFlights={cardFlights}
       />
     ))}
   </View>
@@ -568,6 +586,7 @@ type TableauColumnProps = {
   onCardLongPress: (cardIndex: number) => void
   onColumnPress: () => void
   invalidWiggle: InvalidWiggleConfig
+  cardFlights: CardFlightRegistry
 }
 
 const TableauColumn = ({
@@ -580,6 +599,7 @@ const TableauColumn = ({
   onCardLongPress,
   onColumnPress,
   invalidWiggle,
+  cardFlights,
 }: TableauColumnProps) => {
   const columnHeight = column.length
     ? cardMetrics.height + (column.length - 1) * cardMetrics.stackOffset
@@ -626,6 +646,7 @@ const TableauColumn = ({
           onPress={card.faceUp ? () => onCardPress(cardIndex) : undefined}
           onLongPress={card.faceUp ? () => onCardLongPress(cardIndex) : undefined}
           invalidWiggle={invalidWiggle}
+          cardFlights={cardFlights}
         />
       ))}
     </Pressable>
@@ -641,6 +662,7 @@ type CardViewProps = {
   onPress?: () => void
   onLongPress?: () => void
   invalidWiggle: InvalidWiggleConfig
+  cardFlights: CardFlightRegistry
 }
 
 const CardView = ({
@@ -652,7 +674,9 @@ const CardView = ({
   onPress,
   onLongPress,
   invalidWiggle,
+  cardFlights,
 }: CardViewProps) => {
+  const [renderFaceUp, setRenderFaceUp] = useState(card.faceUp)
   const shouldFloat = typeof offsetTop === 'number' || typeof offsetLeft === 'number'
   const positionStyle = shouldFloat
     ? {
@@ -661,14 +685,95 @@ const CardView = ({
         left: typeof offsetLeft === 'number' ? offsetLeft : 0,
       }
     : undefined
+  const cardRef = useAnimatedRef<View>()
   const wiggle = useSharedValue(0)
+  const flightX = useSharedValue(0)
+  const flightY = useSharedValue(0)
+  const flightZ = useSharedValue(0)
+  const hasPreviousSnapshot = ENABLE_ANIMATIONS && !!cardFlights.value[card.id]
+  const flightOpacity = useSharedValue(hasPreviousSnapshot ? 0 : 1)
+  const flipScale = useSharedValue(1)
   const lastTriggerRef = useRef(invalidWiggle.key)
   const shouldAnimateInvalid = invalidWiggle.lookup.has(card.id)
-  const wiggleStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: wiggle.value }],
+  const baseZIndex = shouldFloat ? 2 : 0
+  const motionStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: wiggle.value + flightX.value },
+      { translateY: flightY.value },
+    ],
+    opacity: flightOpacity.value,
+    zIndex: flightZ.value > 0 ? flightZ.value : baseZIndex,
   }))
+  const flipStyle = useAnimatedStyle(() => {
+    if (!ENABLE_ANIMATIONS || !ENABLE_CARD_FLIP_ANIMATION) {
+      return {}
+    }
+    return {
+      transform: [{ scaleX: flipScale.value }],
+    }
+  })
+  const handleCardLayout = useCallback(() => {
+    const cardId = card.id
+    const previousSnapshot = cardFlights.value[cardId]
+    if (ENABLE_ANIMATIONS && previousSnapshot) {
+      flightOpacity.value = 0
+    }
+    runOnUI((prevSnapshot: CardFlightSnapshot | null) => {
+      'worklet'
+      const layout = measure(cardRef)
+      if (!layout) {
+        return
+      }
+      if (!ENABLE_ANIMATIONS) {
+        cardFlights.value = {
+          ...cardFlights.value,
+          [cardId]: {
+            pageX: layout.pageX,
+            pageY: layout.pageY,
+            width: layout.width,
+            height: layout.height,
+          },
+        }
+        flightX.value = 0
+        flightY.value = 0
+        flightZ.value = 0
+        flightOpacity.value = 1
+        return
+      }
+      const existingSnapshot = cardFlights.value[cardId] as CardFlightSnapshot | undefined
+      const previous = prevSnapshot ?? existingSnapshot
+      if (previous) {
+        const deltaX = previous.pageX - layout.pageX
+        const deltaY = previous.pageY - layout.pageY
+        if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
+          flightX.value = deltaX
+          flightY.value = deltaY
+          flightZ.value = 1000
+          flightX.value = withTiming(0, CARD_FLIGHT_TIMING, (finished) => {
+            if (finished) {
+              flightZ.value = 0
+            }
+          })
+          flightY.value = withTiming(0, CARD_FLIGHT_TIMING)
+        }
+      }
+      cardFlights.value = {
+        ...cardFlights.value,
+        [cardId]: {
+          pageX: layout.pageX,
+          pageY: layout.pageY,
+          width: layout.width,
+          height: layout.height,
+        },
+      }
+      flightOpacity.value = withTiming(1, { duration: Math.max(1, CARD_ANIMATION_DURATION_MS / 2) })
+    })(previousSnapshot ?? null)
+  }, [cardFlights, card.id, cardRef, flightOpacity, flightX, flightY, flightZ])
 
   useEffect(() => {
+    if (!ENABLE_ANIMATIONS) {
+      return
+    }
     if (!shouldAnimateInvalid) {
       return
     }
@@ -685,87 +790,98 @@ const CardView = ({
     )
   }, [invalidWiggle.key, shouldAnimateInvalid, wiggle])
 
-  const containerStyle = [
-    positionStyle,
-    wiggleStyle,
-    {
-      width: metrics.width,
-      height: metrics.height,
-    },
-  ]
+  useEffect(() => {
+    if (!ENABLE_ANIMATIONS || !ENABLE_CARD_FLIP_ANIMATION) {
+      setRenderFaceUp(card.faceUp)
+      flipScale.value = 1
+      return
+    }
+    if (card.faceUp === renderFaceUp) {
+      return
+    }
+    flipScale.value = withTiming(0, CARD_FLIP_HALF_TIMING, (finished) => {
+      if (!finished) {
+        return
+      }
+      runOnJS(setRenderFaceUp)(card.faceUp)
+      flipScale.value = withTiming(1, CARD_FLIP_HALF_TIMING)
+    })
+  }, [card.faceUp, flipScale, renderFaceUp])
 
-  if (!card.faceUp) {
-    return (
-      <AnimatedView
-        layout={CARD_LAYOUT_TRANSITION}
-        sharedTransitionTag={`card-${card.id}`}
-        sharedTransitionStyle={CARD_SHARED_TRANSITION}
-        style={containerStyle}
-      >
-        <View
-          style={[
-            styles.cardBase,
-            styles.faceDown,
-            {
-              width: '100%',
-              height: '100%',
-              borderRadius: metrics.radius,
-            },
-          ]}
-        />
-      </AnimatedView>
-    )
+  const containerStaticStyle = {
+    width: metrics.width,
+    height: metrics.height,
   }
 
-  const borderColor = isSelected ? COLOR_SELECTED_BORDER : COLOR_CARD_BORDER
+  const borderColor =
+    renderFaceUp && isSelected ? COLOR_SELECTED_BORDER : COLOR_CARD_BORDER
+
+  const frontContent = (
+    <Pressable
+      style={[
+        styles.cardBase,
+        styles.faceUp,
+        {
+          width: '100%',
+          height: '100%',
+          borderRadius: metrics.radius,
+          borderColor,
+        },
+      ]}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      disabled={!onPress && !onLongPress}
+    >
+      <Text
+        style={[styles.cardCornerRank, { color: SUIT_COLORS[card.suit] }]}
+        ellipsizeMode="clip"
+        numberOfLines={1}
+        allowFontScaling={false}
+      >
+        {rankToLabel(card.rank)}
+      </Text>
+      <Text
+        style={[styles.cardCornerSuit, { color: SUIT_COLORS[card.suit] }]}
+        ellipsizeMode="clip"
+        numberOfLines={1}
+        allowFontScaling={false}
+      >
+        {SUIT_SYMBOLS[card.suit]}
+      </Text>
+      <Text
+        style={[styles.cardSymbol, { color: SUIT_COLORS[card.suit] }]}
+        ellipsizeMode="clip"
+        numberOfLines={1}
+        allowFontScaling={false}
+      >
+        {SUIT_SYMBOLS[card.suit]}
+      </Text>
+    </Pressable>
+  )
+
+  const backContent = (
+    <View
+      style={[
+        styles.cardBase,
+        styles.faceDown,
+        {
+          width: '100%',
+          height: '100%',
+          borderRadius: metrics.radius,
+        },
+      ]}
+    />
+  )
 
   return (
     <AnimatedView
-      layout={CARD_LAYOUT_TRANSITION}
-      sharedTransitionTag={`card-${card.id}`}
-      sharedTransitionStyle={CARD_SHARED_TRANSITION}
-      style={containerStyle}
+      ref={cardRef}
+      onLayout={handleCardLayout}
+      style={[positionStyle, motionStyle, containerStaticStyle]}
     >
-      <Pressable
-        style={[
-          styles.cardBase,
-          styles.faceUp,
-          {
-            width: '100%',
-            height: '100%',
-            borderRadius: metrics.radius,
-            borderColor,
-          },
-        ]}
-        onPress={onPress}
-        onLongPress={onLongPress}
-        disabled={!onPress && !onLongPress}
-      >
-        <Text
-          style={[styles.cardCornerRank, { color: SUIT_COLORS[card.suit] }]}
-          ellipsizeMode="clip"
-          numberOfLines={1}
-          allowFontScaling={false}
-        >
-          {rankToLabel(card.rank)}
-        </Text>
-        <Text
-          style={[styles.cardCornerSuit, { color: SUIT_COLORS[card.suit] }]}
-          ellipsizeMode="clip"
-          numberOfLines={1}
-          allowFontScaling={false}
-        >
-          {SUIT_SYMBOLS[card.suit]}
-        </Text>
-        <Text
-          style={[styles.cardSymbol, { color: SUIT_COLORS[card.suit] }]}
-          ellipsizeMode="clip"
-          numberOfLines={1}
-          allowFontScaling={false}
-        >
-          {SUIT_SYMBOLS[card.suit]}
-        </Text>
-      </Pressable>
+      <Animated.View style={[styles.cardFlipWrapper, flipStyle]}>
+        {renderFaceUp ? frontContent : backContent}
+      </Animated.View>
     </AnimatedView>
   )
 }
@@ -833,6 +949,7 @@ type WasteFanProps = {
   onPress: () => void
   onLongPress: () => void
   invalidWiggle: InvalidWiggleConfig
+  cardFlights: CardFlightRegistry
 }
 
 const WasteFan = ({
@@ -842,6 +959,7 @@ const WasteFan = ({
   onPress,
   onLongPress,
   invalidWiggle,
+  cardFlights,
 }: WasteFanProps) => {
   const visible = cards.slice(-3)
   const overlap = Math.min(metrics.width * WASTE_FAN_OVERLAP_RATIO, WASTE_FAN_MAX_OFFSET)
@@ -879,6 +997,7 @@ const WasteFan = ({
             invalidWiggle={invalidWiggle}
             isEntering={enteringLookup.has(card.id)}
             zIndex={index}
+            cardFlights={cardFlights}
           />
         )
       })}
@@ -896,6 +1015,7 @@ type WasteFanCardProps = {
   invalidWiggle: InvalidWiggleConfig
   isEntering: boolean
   zIndex: number
+  cardFlights: CardFlightRegistry
 }
 
 const WasteFanCard = ({
@@ -908,15 +1028,20 @@ const WasteFanCard = ({
   invalidWiggle,
   isEntering,
   zIndex,
+  cardFlights,
 }: WasteFanCardProps) => {
   const enterOffset = targetOffset + metrics.width * 0.35
-  const translateX = useSharedValue(isEntering ? enterOffset : targetOffset)
+  const translateX = useSharedValue(!ENABLE_ANIMATIONS ? targetOffset : (isEntering ? enterOffset : targetOffset))
   const positionStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
   }))
 
   useEffect(() => {
     cancelAnimation(translateX)
+    if (!ENABLE_ANIMATIONS) {
+      translateX.value = targetOffset
+      return
+    }
     translateX.value = withTiming(targetOffset, WASTE_TIMING_CONFIG)
   }, [targetOffset, translateX])
 
@@ -940,6 +1065,7 @@ const WasteFanCard = ({
         onPress={onPress}
         onLongPress={onLongPress}
         invalidWiggle={invalidWiggle}
+        cardFlights={cardFlights}
       />
     </AnimatedView>
   )
@@ -981,6 +1107,7 @@ type FoundationPileProps = {
   onPress: () => void
   onLongPress: () => void
   invalidWiggle: InvalidWiggleConfig
+  cardFlights: CardFlightRegistry
 }
 
 const FoundationPile = ({
@@ -992,6 +1119,7 @@ const FoundationPile = ({
   onPress,
   onLongPress,
   invalidWiggle,
+  cardFlights,
 }: FoundationPileProps) => {
   const topCard = cards[cards.length - 1]
   const hasCards = cards.length > 0
@@ -1018,7 +1146,12 @@ const FoundationPile = ({
       ]}
     >
       {topCard ? (
-        <CardView card={topCard} metrics={cardMetrics} invalidWiggle={invalidWiggle} />
+        <CardView
+          card={topCard}
+          metrics={cardMetrics}
+          invalidWiggle={invalidWiggle}
+          cardFlights={cardFlights}
+        />
       ) : (
         <Text
           style={[
@@ -1125,6 +1258,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: COLOR_CARD_FACE,
     overflow: 'hidden',
+  },
+  cardFlipWrapper: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   faceDown: {
     backgroundColor: COLOR_CARD_BACK,
