@@ -57,6 +57,7 @@ const TABLEAU_GAP = 10
 const MAX_CARD_WIDTH = 96
 const MIN_CARD_WIDTH = 24
 const WASTE_FAN_OVERLAP_RATIO = 0.35
+const WASTE_ENTER_EXTRA_RATIO = 0.25
 const WASTE_FAN_MAX_OFFSET = 28
 const AUTO_QUEUE_INTERVAL_MS = 200
 const COLUMN_MARGIN = TABLEAU_GAP / 2
@@ -88,22 +89,23 @@ const FACE_CARD_LABELS: Partial<Record<Rank, string>> = {
   12: 'Q',
   13: 'K',
 }
-const CARD_ANIMATION_DURATION_MS = 120
-const CARD_MOVE_EASING = Easing.bezier(0.25, 0.8, 0.25, 1)
+const CARD_ANIMATION_DURATION_MS = 90
+const CARD_MOVE_EASING = Easing.bezier(0.15, 0.9, 0.2, 1)
 const CARD_FLIGHT_TIMING = {
   duration: CARD_ANIMATION_DURATION_MS,
   easing: CARD_MOVE_EASING,
 }
 
 const ENABLE_ANIMATIONS = true
+const ENABLE_STACK_ANIMATION = false
 const ENABLE_CARD_FLIP_ANIMATION = false
 const CARD_FLIP_HALF_DURATION_MS = 40
 const CARD_FLIP_HALF_TIMING = {
   duration: CARD_FLIP_HALF_DURATION_MS,
   easing: Easing.bezier(0.45, 0, 0.55, 1),
 }
-const WASTE_SLIDE_DURATION_MS = 90
-const WASTE_SLIDE_EASING = Easing.bezier(0.2, 0, 0.2, 1)
+const WASTE_SLIDE_DURATION_MS = 70
+const WASTE_SLIDE_EASING = Easing.bezier(0.15, 0.9, 0.2, 1)
 const WASTE_TIMING_CONFIG = {
   duration: WASTE_SLIDE_DURATION_MS,
   easing: WASTE_SLIDE_EASING,
@@ -766,7 +768,7 @@ const CardView = ({
           height: layout.height,
         },
       }
-      flightOpacity.value = withTiming(1, { duration: Math.max(1, CARD_ANIMATION_DURATION_MS / 2) })
+      flightOpacity.value = 1
     })(previousSnapshot ?? null)
   }, [cardFlights, card.id, cardRef, flightOpacity, flightX, flightY, flightZ])
 
@@ -1030,15 +1032,15 @@ const WasteFanCard = ({
   zIndex,
   cardFlights,
 }: WasteFanCardProps) => {
-  const enterOffset = targetOffset + metrics.width * 0.35
-  const translateX = useSharedValue(!ENABLE_ANIMATIONS ? targetOffset : (isEntering ? enterOffset : targetOffset))
+  const enterOffset = targetOffset + metrics.width * WASTE_ENTER_EXTRA_RATIO
+  const translateX = useSharedValue((!ENABLE_ANIMATIONS || !ENABLE_STACK_ANIMATION) ? targetOffset : (isEntering ? enterOffset : targetOffset))
   const positionStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
   }))
 
   useEffect(() => {
     cancelAnimation(translateX)
-    if (!ENABLE_ANIMATIONS) {
+    if (!ENABLE_ANIMATIONS || !ENABLE_STACK_ANIMATION) {
       translateX.value = targetOffset
       return
     }
