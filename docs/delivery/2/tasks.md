@@ -7,4 +7,4 @@ This document lists all tasks associated with PBI 2.
 
 | Task ID | Name | Status | Description |
 | :------ | :----------------------------------------------- | :------- | :------------------------------------------------------------- |
-| 2-1 | [Animate card moves & waste fan](./2-1.md) | Review | Add fast card/foundation animations, waste fan slide, and wiggle feedback for invalid taps. |
+| 2-1 | [Animate card moves & waste fan](./2-1.md) | Done | Add fast card/foundation animations, waste fan slide, and wiggle feedback for invalid taps. |
