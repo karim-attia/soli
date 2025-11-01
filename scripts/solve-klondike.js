@@ -128,6 +128,7 @@ function main() {
     const shufflesFile = args.shufflesFile || 'scripts/shuffles-100.json'
     const saveMd = args.saveMd || 'scripts/compare-100.md'
     const rankingStrategy = args.rankingStrategy // 'leastSteps' | 'mostCovered'
+    const useNeededRanks = args.useNeededRanks !== undefined ? !!args.useNeededRanks : undefined
     const compareAtomicVariants = !!args.compareAtomicVariants
 
     // Print resolved run configuration (including implicit defaults)
@@ -145,6 +146,7 @@ function main() {
         saveMd,
         compare: !!args.compare,
         compareAtomicVariants,
+        useNeededRanks: useNeededRanks === undefined ? '(default: false)' : useNeededRanks,
     }
     /* eslint-disable no-console */
     console.log('[run-config]\n' + JSON.stringify(resolved, null, 2))
@@ -159,7 +161,7 @@ function main() {
 
     if (compare) {
         const decks = loadOrGenerateShuffles(shufflesFile, 100, 0x12345678)
-        const baseOpts = { maxNodes, maxTimeMs, avoidEmptyUnlessKing, enableBackjump, maxApproachSteps, maxApproachStepsHigh }
+        const baseOpts = { maxNodes, maxTimeMs, avoidEmptyUnlessKing, enableBackjump, maxApproachSteps, maxApproachStepsHigh, useNeededRanks }
         const dfsResults = runForDecks(decks, { ...baseOpts, strategy: 'dfs' })
         const atomicResults = runForDecks(decks, { ...baseOpts, strategy: 'atomic' })
         writeComparisonMd(saveMd, decks, dfsResults, atomicResults, 'dfs', 'atomic')
@@ -169,7 +171,7 @@ function main() {
 
     if (compareAtomicVariants) {
         const decks = loadOrGenerateShuffles(shufflesFile, 100, 0x12345678)
-        const baseOpts = { maxNodes, maxTimeMs, avoidEmptyUnlessKing, enableBackjump, maxApproachSteps, maxApproachStepsHigh }
+        const baseOpts = { maxNodes, maxTimeMs, avoidEmptyUnlessKing, enableBackjump, maxApproachSteps, maxApproachStepsHigh, useNeededRanks }
         const atomicLeast = runForDecks(decks, { ...baseOpts, strategy: 'atomic', rankingStrategy: 'leastSteps' })
         const atomicMost = runForDecks(decks, { ...baseOpts, strategy: 'atomic', rankingStrategy: 'mostCovered' })
         writeComparisonMdAppend(saveMd, decks, atomicLeast, atomicMost, 'atomic_leastSteps', 'atomic_mostCovered', '## Atomic strategy comparison (leastSteps vs mostCovered)')
@@ -185,7 +187,7 @@ function main() {
     for (let t = 0; t < trials; t += 1) {
         // Cycle through the shuffles (use modulo to wrap around if trials > decks.length)
         const deckOrder = decks[t % decks.length]
-        const res = solveKlondike(deckOrder, { maxNodes, maxTimeMs, strategy, avoidEmptyUnlessKing, enableBackjump, maxApproachSteps, maxApproachStepsHigh, rankingStrategy })
+        const res = solveKlondike(deckOrder, { maxNodes, maxTimeMs, strategy, avoidEmptyUnlessKing, enableBackjump, maxApproachSteps, maxApproachStepsHigh, rankingStrategy, useNeededRanks })
         const tried = res.stats.atomicTried !== undefined ? ` atomicTried=${res.stats.atomicTried}` : ''
         const dead = res.stats.atomicDead !== undefined ? ` atomicDead=${res.stats.atomicDead}` : ''
         const mark = res.solvable ? '✅' : '❌'

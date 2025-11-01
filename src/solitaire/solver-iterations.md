@@ -98,3 +98,15 @@ Results (50 trials, strategy=atomic):
   Avg time: 3794ms
   Cutoffs: time=35, nodes=0
   Notes: Reuse reduced recomputation but also explored more branches from repeated atomic states, increasing average nodes and lowering solve rate under the same time budget.
+
+## Iteration 3 (Needed ranks heuristic)
+
+Description: Add optional tie-breaker `useNeededRanks` that, for each blocked column, computes the frontier card (first face-up above the topmost facedown) and prefers candidates whose resulting tops satisfy the needed target (opposite color, +1 rank; or any empty column if frontier is a king). Weighted by count of facedowns in that column.
+
+Results (50 trials, strategy=atomic, useNeededRanks=true):
+
+  ✅ Solved: 11/50 (22%)
+  Avg nodes: 1097437
+  Avg time: 3953ms
+  Cutoffs: time=36, nodes=0
+  Interpretation: The heuristic biases exploration toward unblocking large columns but increases branching, slightly lowering solve rate under the same 5s budget. It may combine better with stricter `maxApproachSteps` or a higher `relaxAtDepth` threshold to focus on impactful flips without inflating local search.

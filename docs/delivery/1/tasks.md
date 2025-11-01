@@ -17,3 +17,4 @@ This document lists all tasks associated with PBI 1.
 | 1-8 | [Klondike solver (deckOrder) + difficulty](./1-8.md) | InProgress | Implement a solver that evaluates solvability and difficulty from a given deck order (draw-1, unlimited recycles). |
 | 1-9 | [Atomic solver approaches and flows](./1-9.md) | Review | Document approaches (minimal paths to next flip) and ranking/flow logic. |
 | 1-10 | [Atomic flip solver + toggle](./1-10.md) | InProgress | Implement atomic flip solver and option to select strategy. |
+| 1-11 | [Needed ranks heuristic in atomic solver](./1-11.md) | Agreed | Add optional tie-breaker that favors paths enabling required target ranks to unblock flips. |

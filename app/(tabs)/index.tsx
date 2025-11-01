@@ -97,7 +97,8 @@ const CARD_FLIGHT_TIMING = {
 }
 
 const ENABLE_ANIMATIONS = true
-const ENABLE_STACK_ANIMATION = false
+const ENABLE_STACK_ANIMATION = true
+const ENABLE_WIGGLE_ANIMATION = true
 const ENABLE_CARD_FLIP_ANIMATION = false
 const CARD_FLIP_HALF_DURATION_MS = 40
 const CARD_FLIP_HALF_TIMING = {
@@ -773,7 +774,9 @@ const CardView = ({
   }, [cardFlights, card.id, cardRef, flightOpacity, flightX, flightY, flightZ])
 
   useEffect(() => {
-    if (!ENABLE_ANIMATIONS) {
+    if (!ENABLE_ANIMATIONS || !ENABLE_WIGGLE_ANIMATION) {
+      cancelAnimation(wiggle)
+      wiggle.value = 0
       return
     }
     if (!shouldAnimateInvalid) {

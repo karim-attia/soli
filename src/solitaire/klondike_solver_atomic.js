@@ -469,9 +469,16 @@ function countFaceDowns(state) {
 }
 
 function rankCandidates(rootState, candidates) {
-    // primary: fewer steps; ties: fewer remaining face-downs, more foundations, more empty columns
+    // primary: fewer steps; optional tie-breaker: needed ranks; then fewer remaining face-downs, more foundations, more empty columns
+    const needs = USE_NEEDED_RANKS ? computeNeededRequirements(rootState) : null
+    const cache = new Map()
+    const getScore = (c) => { if (!needs) return 0; if (cache.has(c)) return cache.get(c); const s = neededScoreFromNeeds(needs, c.state); cache.set(c, s); return s }
     return candidates.sort((a, b) => {
         if (a.steps !== b.steps) return a.steps - b.steps
+        if (needs) {
+            const sa = getScore(a), sb = getScore(b)
+            if (sa !== sb) return sb - sa // prefer higher needed score
+        }
         const ad = countFaceDowns(a.state)
         const bd = countFaceDowns(b.state)
         if (ad !== bd) return ad - bd
@@ -509,12 +516,19 @@ function findFlipColumn(rootState, nextState) {
 
 function rankCandidatesByMostCovered(rootState, candidates) {
     const before = faceDownsByColumn(rootState)
+    const needs = USE_NEEDED_RANKS ? computeNeededRequirements(rootState) : null
+    const cache = new Map()
+    const getScore = (c) => { if (!needs) return 0; if (cache.has(c)) return cache.get(c); const s = neededScoreFromNeeds(needs, c.state); cache.set(c, s); return s }
     return candidates.slice().sort((a, b) => {
         const ca = findFlipColumn(rootState, a.state)
         const cb = findFlipColumn(rootState, b.state)
         const va = ca >= 0 ? before[ca] : -1
         const vb = cb >= 0 ? before[cb] : -1
         if (va !== vb) return vb - va // prefer larger count of covered cards before flip
+        if (needs) {
+            const sa = getScore(a), sb = getScore(b)
+            if (sa !== sb) return sb - sa
+        }
         // tie-break with fewer steps
         if (a.steps !== b.steps) return a.steps - b.steps
         return 0
@@ -536,12 +550,19 @@ function changedColumnsFromPathStandalone(path) {
 // Blended ranking: prioritize most covered, then fewer steps, then fewer stock/f2t uses, then fewer columns touched
 function rankCandidatesBlended(rootState, candidates) {
     const before = faceDownsByColumn(rootState)
+    const needs = USE_NEEDED_RANKS ? computeNeededRequirements(rootState) : null
+    const cache = new Map()
+    const getScore = (c) => { if (!needs) return 0; if (cache.has(c)) return cache.get(c); const s = neededScoreFromNeeds(needs, c.state); cache.set(c, s); return s }
     return candidates.slice().sort((a, b) => {
         const ca = findFlipColumn(rootState, a.state)
         const cb = findFlipColumn(rootState, b.state)
         const va = ca >= 0 ? before[ca] : -1
         const vb = cb >= 0 ? before[cb] : -1
         if (va !== vb) return vb - va
+        if (needs) {
+            const sa = getScore(a), sb = getScore(b)
+            if (sa !== sb) return sb - sa
+        }
         if (a.steps !== b.steps) return a.steps - b.steps
         const sa = a.stockUses ?? 0, sb = b.stockUses ?? 0
         if (sa !== sb) return sa - sb
@@ -557,10 +578,66 @@ function rankCandidatesBlended(rootState, candidates) {
 function totalFoundationCount(state) { let t = 0; for (const s of SUITS) t += state.foundations[s].length; return t }
 function emptyColumns(state) { let t = 0; for (const col of state.tableau) if (col.length === 0) t += 1; return t }
 
- let PRINTED_ATOMIC_CONFIG = false
+// Optional heuristic toggle (set from options)
+let USE_NEEDED_RANKS = false
+let PRINTED_ATOMIC_CONFIG = false
+
+// --- Needed ranks heuristic ---
+// For each blocked column in the root state, identify the frontier base card (first face-up above the topmost face-down).
+// If base is a KING, the need is an empty column; otherwise, need a top-of-column card of opposite color with rank base.rank + 1.
+// Weight each need by the number of face-down cards in that column (more blocked -> higher priority).
+function computeNeededRequirements(rootState) {
+    const needs = []
+    const weights = faceDownsByColumn(rootState)
+    for (let c = 0; c < rootState.tableau.length; c += 1) {
+        const downCount = weights[c]
+        if (!downCount) continue
+        const col = rootState.tableau[c]
+        let lastDown = -1
+        for (let i = 0; i < col.length; i += 1) { if (!col[i].faceUp) lastDown = i }
+        const baseIdx = lastDown + 1
+        if (baseIdx < 0 || baseIdx >= col.length) continue
+        const base = col[baseIdx]
+        if (base.rank === KING) {
+            needs.push({ type: 'empty', weight: downCount })
+        } else {
+            const baseColor = colorOf(base.suit)
+            const needColor = baseColor === 'red' ? 'black' : 'red'
+            needs.push({ type: 'rank', weight: downCount, rank: base.rank + 1, color: needColor })
+        }
+    }
+    return needs
+}
+
+function neededScoreFromNeeds(needs, candState) {
+    if (!needs || !needs.length) return 0
+    const tops = []
+    let emptyCount = 0
+    for (let c = 0; c < candState.tableau.length; c += 1) {
+        const col = candState.tableau[c]
+        if (!col.length) { emptyCount += 1; continue }
+        const top = col[col.length - 1]
+        if (top && top.faceUp) tops.push(top)
+    }
+    let score = 0
+    for (const need of needs) {
+        if (need.type === 'empty') {
+            if (emptyCount > 0) score += need.weight
+            continue
+        }
+        let satisfied = false
+        for (const t of tops) {
+            const tColor = colorOf(t.suit)
+            if (t.rank === need.rank && tColor === need.color) { satisfied = true; break }
+        }
+        if (satisfied) score += need.weight
+    }
+    return score
+}
 
  function solveKlondikeAtomic(deckOrder, options = {}) {
-    const { maxNodes = 2000000, maxTimeMs = 5000, maxLocalNodes = 200000, maxApproachSteps = 20, maxApproachStepsHigh = 80, relaxAtDepth = 17, approachStepsIncrement = 3, avoidEmptyUnlessKing = true, enableBackjump = true, rankingStrategy = 'blended' } = options
+    const { maxNodes = 2000000, maxTimeMs = 5000, maxLocalNodes = 200000, maxApproachSteps = 20, maxApproachStepsHigh = 80, relaxAtDepth = 17, approachStepsIncrement = 3, avoidEmptyUnlessKing = true, enableBackjump = true, rankingStrategy = 'blended', useNeededRanks = false } = options
+    USE_NEEDED_RANKS = !!useNeededRanks
     if (!PRINTED_ATOMIC_CONFIG) {
         PRINTED_ATOMIC_CONFIG = true
         /* eslint-disable no-console */
@@ -575,6 +652,7 @@ function emptyColumns(state) { let t = 0; for (const col of state.tableau) if (c
             avoidEmptyUnlessKing,
             enableBackjump,
             rankingStrategy,
+            useNeededRanks: USE_NEEDED_RANKS,
         }
         console.log('[atomic-config]\n' + JSON.stringify(cfg, null, 2))
         /* eslint-enable no-console */
@@ -737,6 +815,7 @@ function getAtomicFrame(deckOrder, options = {}) {
 // Helper to compute atomic frame from an existing state snapshot
 function getAtomicFrameFromState(state, options = {}) {
     const { maxLocalNodes = 20000, maxTimeMs = 1000, maxApproachSteps = 20, avoidEmptyUnlessKing = true, maxApproachStepsHigh, relaxAtDepth, strategy = 'blended' } = options
+    USE_NEEDED_RANKS = !!options.useNeededRanks
     const deadline = Date.now() + (options.maxTimeMs || maxTimeMs)
     const budget = { maxLocalNodes, deadline, maxApproachSteps, avoidEmptyUnlessKing, maxApproachStepsHigh, relaxAtDepth }
     const snapshot = cloneState(state)
