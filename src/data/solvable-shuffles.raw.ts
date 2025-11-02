@@ -602,4 +602,364 @@ id=harvested-20251102-00001 addedAt=2025-11-02 source=new-solver
 6: D2 HK C6 D3 C7 | S3
 7: HQ SJ SK H7 CT HA | S8
 ---
+id=harvested-20251102-00002 addedAt=2025-11-02 source=new-solver
+1: | D8
+2: SA | S9
+3: SK D2 | SQ
+4: CJ HA H4 | D3
+5: S8 S4 C9 S6 | D4
+6: ST C6 S3 S5 D6 | HK
+7: DK DJ HQ DT C3 H9 | S2
+---
+id=harvested-20251102-00003 addedAt=2025-11-02 source=new-solver
+1: | D8
+2: D5 | H6
+3: HT ST | HQ
+4: DT S7 H9 | SQ
+5: S6 SK C8 C9 | SJ
+6: D2 DK C7 S3 SA | CQ
+7: HJ S4 D3 H2 H5 S5 | C4
+---
+id=harvested-20251102-00004 addedAt=2025-11-02 source=new-solver
+1: | SK
+2: SJ | DA
+3: D8 H3 | H8
+4: DT C4 H2 | C2
+5: S3 HQ HJ D5 | SA
+6: CQ D4 ST C7 D7 | C5
+7: H6 DJ H7 D6 H9 HK | C3
+---
+id=harvested-20251102-00005 addedAt=2025-11-02 source=new-solver
+1: | D7
+2: CJ | HA
+3: C2 H3 | D5
+4: S6 S2 CT | D6
+5: ST H8 HQ DA | C5
+6: D8 S5 H4 SQ H5 | D2
+7: C6 DJ H7 CK HJ SJ | DT
+---
+id=harvested-20251102-00006 addedAt=2025-11-02 source=new-solver
+1: | DT
+2: C5 | H4
+3: C2 D2 | SK
+4: SA D8 S4 | H3
+5: D9 D3 C7 D6 | CT
+6: HT CQ CK S6 CA | C4
+7: H7 HK SQ D5 H5 H8 | S8
+---
+id=harvested-20251102-00007 addedAt=2025-11-02 source=new-solver
+1: | H8
+2: C3 | D4
+3: C4 SJ | SA
+4: C2 HK H7 | CA
+5: HT D2 H9 H2 | ST
+6: S7 CQ C8 D3 CK | DT
+7: C7 S9 D5 CJ D6 H5 | S2
+---
+id=harvested-20251102-00008 addedAt=2025-11-02 source=new-solver
+1: | SA
+2: S9 | S8
+3: H8 SJ | D4
+4: H6 C8 D3 | DJ
+5: CA D7 D9 C2 | H9
+6: CJ HQ D6 HJ D2 | C7
+7: ST HA HK D5 SK S3 | CQ
+---
+id=harvested-20251102-00009 addedAt=2025-11-02 source=new-solver
+1: | HA
+2: H7 | S8
+3: S2 DA | S9
+4: HT S7 S3 | C8
+5: H2 SK H4 S6 | H5
+6: C3 CJ H9 SJ D5 | SQ
+7: H3 C4 HJ DT H8 D4 | C7
+---
+id=harvested-20251102-00010 addedAt=2025-11-02 source=new-solver
+1: | D4
+2: S9 | D8
+3: CJ S4 | HA
+4: CK DJ C7 | H7
+5: C6 C3 H4 D3 | D6
+6: C5 S8 H2 SA SK | C8
+7: H3 HK H5 HQ HT D5 | DT
+---
+id=harvested-20251102-00011 addedAt=2025-11-02 source=new-solver
+1: | C7
+2: C6 | H5
+3: D9 S3 | S9
+4: H6 D8 SA | D7
+5: DK D6 DA S5 | DT
+6: C2 S6 C9 C8 H7 | ST
+7: DQ C4 HA HT CJ H4 | S7
+---
+id=harvested-20251102-00012 addedAt=2025-11-02 source=new-solver
+1: | SA
+2: D9 | D8
+3: HQ S8 | S5
+4: C2 H4 D7 | C6
+5: S3 S9 D5 CA | H7
+6: S4 CT C5 CJ H8 | SK
+7: DK H3 HA CQ DT HK | DA
+---
+id=harvested-20251102-00013 addedAt=2025-11-02 source=new-solver
+1: | S7
+2: S4 | HQ
+3: S5 D8 | C3
+4: DT CJ HJ | C5
+5: H2 CT CA D5 | CK
+6: H7 C6 C2 D6 DK | DA
+7: D4 HK C4 DQ S8 HA | H4
+---
+id=harvested-20251102-00014 addedAt=2025-11-02 source=new-solver
+1: | SJ
+2: S6 | CQ
+3: DQ HK | SA
+4: SK DT ST | H8
+5: H4 HJ D7 D5 | CA
+6: CT DK C7 D4 D3 | S5
+7: D8 CJ HQ D9 S8 H6 | SQ
+---
+id=harvested-20251102-00015 addedAt=2025-11-02 source=new-solver
+1: | H3
+2: H9 | SQ
+3: H6 HT | S9
+4: D6 S6 HQ | DA
+5: C7 ST H7 D8 | D9
+6: H8 C9 CQ SK CK | C4
+7: DK HA H2 D3 D2 CA | DJ
+---
+id=harvested-20251102-00016 addedAt=2025-11-02 source=new-solver
+1: | D7
+2: CQ | D5
+3: SA D3 | H4
+4: D8 DJ C2 | D2
+5: SJ D9 CK CA | ST
+6: HK S3 S5 DT DA | C5
+7: D6 HJ C3 C4 CJ C9 | H9
+---
+id=harvested-20251102-00017 addedAt=2025-11-02 source=new-solver
+1: | S7
+2: D5 | S3
+3: SA DK | D2
+4: DA H4 CQ | D4
+5: C4 D9 D7 C9 | SQ
+6: DT D8 H6 HJ H9 | S5
+7: H3 S8 CJ C3 C8 D6 | CT
+---
+id=harvested-20251102-00018 addedAt=2025-11-02 source=new-solver
+1: | DT
+2: S4 | H4
+3: H7 S2 | C2
+4: SJ HA C9 | H2
+5: S5 CK HT H8 | D6
+6: C6 D9 SA SQ DA | HK
+7: HQ H9 S3 S7 SK S6 | D8
+---
+id=harvested-20251102-00019 addedAt=2025-11-02 source=new-solver
+1: | C8
+2: DJ | C6
+3: H3 D6 | C2
+4: C4 S2 D2 | SA
+5: S6 S5 H2 DA | CK
+6: D9 C5 S8 DT SK | C9
+7: CQ S3 S7 SQ H8 HA | ST
+---
+id=harvested-20251102-00020 addedAt=2025-11-02 source=new-solver
+1: | C7
+2: CA | S7
+3: CK C6 | D4
+4: C3 CJ H4 | DT
+5: DA D8 H2 S3 | S2
+6: CQ HJ SQ HK SK | C8
+7: H9 DK HA DQ H7 D2 | S4
+---
+id=harvested-20251102-00021 addedAt=2025-11-02 source=new-solver
+1: | H9
+2: D2 | CK
+3: SK D6 | C5
+4: S7 C6 H4 | CT
+5: S8 D8 C7 S5 | DT
+6: S9 D3 DA C9 SQ | CA
+7: H7 H6 SA D7 C8 C3 | DJ
+---
+id=harvested-20251102-00022 addedAt=2025-11-02 source=new-solver
+1: | DQ
+2: C2 | D6
+3: D7 S6 | SA
+4: H3 S7 D2 | DT
+5: DJ CJ H2 C7 | H8
+6: SK S9 S5 S3 CA | HJ
+7: D4 SJ H6 D9 C9 D5 | C5
+---
+id=harvested-20251102-00023 addedAt=2025-11-02 source=new-solver
+1: | C6
+2: SA | HT
+3: H6 H9 | H2
+4: C2 HK S3 | C9
+5: HQ D2 DA D4 | DQ
+6: CK S7 DT D3 H8 | C4
+7: H7 S4 H3 D8 H5 HA | ST
+---
+id=harvested-20251102-00024 addedAt=2025-11-02 source=new-solver
+1: | S4
+2: S6 | H8
+3: C4 CJ | S5
+4: SQ S7 SK | HT
+5: DK DJ H6 H5 | C3
+6: D6 S2 H2 SJ D2 | D9
+7: CT D8 HQ C9 D5 HK | D4
+---
+id=harvested-20251102-00025 addedAt=2025-11-02 source=new-solver
+1: | C9
+2: DK | CK
+3: CA CJ | H6
+4: C2 H9 C5 | HJ
+5: SK D2 H2 SA | S8
+6: H4 DQ HT H8 S6 | S9
+7: H7 D6 D5 S7 DJ S3 | HA
+---
+id=harvested-20251102-00026 addedAt=2025-11-02 source=new-solver
+1: | HT
+2: C2 | DT
+3: H5 ST | SJ
+4: C8 C4 CQ | D3
+5: SQ H8 C7 CA | D4
+6: DJ D6 H4 S4 S7 | DA
+7: S6 C5 H6 S3 SA H3 | DK
+---
+id=harvested-20251102-00027 addedAt=2025-11-02 source=new-solver
+1: | D5
+2: DJ | S7
+3: C9 H3 | HQ
+4: SJ H2 D9 | C6
+5: D7 S5 DQ CA | HK
+6: HT S8 S3 HA S6 | C5
+7: D6 CQ D3 S9 CK SK | HJ
+---
+id=harvested-20251102-00028 addedAt=2025-11-02 source=new-solver
+1: | DQ
+2: H9 | S7
+3: S6 C9 | SA
+4: HQ C6 C5 | D9
+5: S2 CA CQ S3 | S5
+6: HK HT CT H7 H3 | DK
+7: ST SQ H6 S8 H2 D3 | D4
+---
+id=harvested-20251102-00029 addedAt=2025-11-02 source=new-solver
+1: | HA
+2: D3 | DT
+3: D7 H2 | SK
+4: S4 SQ H8 | S9
+5: SA HQ HT C7 | SJ
+6: CQ HJ DQ H7 C8 | D2
+7: DA CT S7 C5 C6 D4 | ST
+---
+id=harvested-20251102-00030 addedAt=2025-11-02 source=new-solver
+1: | D5
+2: C6 | CA
+3: C7 SK | D8
+4: S3 HT SQ | H4
+5: S4 C5 S7 S8 | C2
+6: HA D3 HQ D7 DK | D2
+7: H6 H3 C9 C4 DT D4 | CJ
+---
+id=harvested-20251102-00031 addedAt=2025-11-02 source=new-solver
+1: | DA
+2: D6 | CJ
+3: DT S6 | D9
+4: S8 S5 D2 | SA
+5: C6 C7 HA C8 | DK
+6: H3 SJ C4 DQ D8 | CQ
+7: H9 C5 HQ D4 H8 SK | HK
+---
+id=harvested-20251102-00032 addedAt=2025-11-02 source=new-solver
+1: | H2
+2: DT | CT
+3: D3 H7 | H4
+4: ST S9 C9 | S2
+5: C6 S6 D8 C2 | HA
+6: D5 C5 S8 CJ DJ | DQ
+7: SK SQ HQ C8 H6 CQ | CA
+---
+id=harvested-20251102-00033 addedAt=2025-11-02 source=new-solver
+1: | DJ
+2: CT | HA
+3: CJ D9 | C6
+4: D3 S9 HJ | H8
+5: C4 C2 DA CQ | H5
+6: S7 H4 CK D4 SJ | DT
+7: HQ D8 S6 HT DQ S3 | D2
+---
+id=harvested-20251102-00034 addedAt=2025-11-02 source=new-solver
+1: | H4
+2: C7 | HJ
+3: DT C6 | HQ
+4: D6 SQ ST | C4
+5: CQ DA SK H8 | S4
+6: CK D9 C3 C2 C9 | CT
+7: D2 S7 DK D4 DQ HK | H7
+---
+id=harvested-20251102-00035 addedAt=2025-11-02 source=new-solver
+1: | D4
+2: ST | DQ
+3: SA SK | D8
+4: C3 S2 CQ | H4
+5: S4 D5 CA H9 | HT
+6: C2 D2 D3 C6 CJ | C8
+7: SQ C7 S7 S6 HK H6 | D6
+---
+id=harvested-20251102-00036 addedAt=2025-11-02 source=new-solver
+1: | H3
+2: D8 | D6
+3: HT H5 | H2
+4: D9 C8 S6 | H7
+5: SJ D5 H8 HA | S7
+6: H9 SK DQ S5 S9 | C2
+7: S2 DA S3 CA DT D2 | H4
+---
+id=harvested-20251102-00037 addedAt=2025-11-02 source=new-solver
+1: | C4
+2: DJ | C3
+3: S4 D3 | CT
+4: DT S8 D6 | HK
+5: D7 S6 C2 HT | C8
+6: D4 DA ST C5 H3 | D5
+7: D8 SK S9 DQ HJ C7 | HQ
+---
+id=harvested-20251102-00038 addedAt=2025-11-02 source=new-solver
+1: | S3
+2: SK | H4
+3: SA DK | D9
+4: ST C3 HA | SQ
+5: H3 C8 H7 H6 | CQ
+6: S6 C7 D4 D2 HJ | S9
+7: H2 D7 S4 C6 HQ S7 | DQ
+---
+id=harvested-20251102-00039 addedAt=2025-11-02 source=new-solver
+1: | D6
+2: CT | D8
+3: H8 D4 | DJ
+4: DT D2 S3 | H2
+5: S2 H9 CQ H6 | C8
+6: H4 C9 C4 DA HQ | CK
+7: S8 H5 C3 HJ S7 C5 | H3
+---
+id=harvested-20251102-00040 addedAt=2025-11-02 source=new-solver
+1: | S5
+2: C5 | SQ
+3: HJ C7 | HT
+4: CT D2 DK | C3
+5: C8 S8 C9 H3 | D3
+6: D6 CJ DQ SA CQ | DJ
+7: S7 C4 D8 SK H5 D9 | H9
+---
+id=harvested-20251102-00041 addedAt=2025-11-02 source=new-solver
+1: | D7
+2: DQ | D3
+3: S6 S5 | CT
+4: S4 H4 SA | DT
+5: C6 CK C3 C7 | D6
+6: H8 D4 S3 D5 D8 | C5
+7: HQ S9 ST HK CQ SQ | D9
+---
 `

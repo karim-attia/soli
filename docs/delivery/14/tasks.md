@@ -12,3 +12,4 @@ This document lists all tasks associated with PBI 14.
 | 14-3 | [Refine foundation feedback handling](./14-3.md) | Proposed | Ensure automation never triggers wiggle while preserving manual feedback. |
 | 14-4 | [Observability & regression tooling](./14-4.md) | Proposed | Add logging/overlay tooling and automated tests to catch future regressions. |
 
+

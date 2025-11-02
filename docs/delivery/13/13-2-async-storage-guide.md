@@ -57,3 +57,4 @@ export async function loadGame(): Promise<PersistedGamePayload | null> {
 - Before releasing schema-breaking changes, add upgrade logic that transforms prior versions to the new shape where feasible.
 - Document migrations in Task 13-3 so future work knows how to evolve the format.
 
+

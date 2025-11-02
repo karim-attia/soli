@@ -544,9 +544,11 @@ export default function TabOneScreen() {
   }, [state])
 
   useEffect(() => {
-    currentStartingPreviewRef.current = createHistoryPreviewFromState(state)
-    currentDisplayNameRef.current = formatShuffleDisplayName(state.shuffleId)
-  }, [state.shuffleId])
+    if (state.moveCount === 0) {
+      currentStartingPreviewRef.current = createHistoryPreviewFromState(state)
+      currentDisplayNameRef.current = formatShuffleDisplayName(state.shuffleId)
+    }
+  }, [state.moveCount, state.shuffleId, state.stock.length, state.waste.length])
 
   useEffect(() => {
     if (state.hasWon && !previousHasWonRef.current) {

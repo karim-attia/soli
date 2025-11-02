@@ -42,3 +42,4 @@ The current client keeps the in-memory game state only for the active session. F
 ## Related Tasks
 - [Task list](./tasks.md)
 
+
