@@ -53,6 +53,7 @@ export default function SettingsScreen() {
     setGlobalAnimationsEnabled,
     setAnimationPreference,
     setThemeMode,
+    setSolvableGamesOnly,
   } = useSettings()
 
   return (
@@ -95,6 +96,19 @@ export default function SettingsScreen() {
               />
             ))}
           </YStack>
+        </YStack>
+
+        <YStack gap="$3">
+          <Text fontSize={16} fontWeight="700">
+            Gameplay
+          </Text>
+          <ToggleRow
+            label="Only deal solvable games"
+            description="Use curated solvable layouts when starting a new game."
+            value={state.solvableGamesOnly}
+            onValueChange={setSolvableGamesOnly}
+            disabled={!hydrated}
+          />
         </YStack>
 
         <YStack gap="$3">

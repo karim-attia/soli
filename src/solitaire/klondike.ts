@@ -1,3 +1,6 @@
+import type { SolvableShuffleConfig } from '../data/solvableShuffles'
+import { createSolvableShuffleId } from '../data/solvableShuffles'
+
 const SUITS = ['clubs', 'diamonds', 'hearts', 'spades'] as const
 const RANKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] as const
 
@@ -10,6 +13,14 @@ const ACE_RANK = 1
 const KING_RANK = 13
 const TOTAL_CARDS_PER_SUIT = 13
 const RED_SUITS = new Set(['hearts', 'diamonds'])
+const SUIT_HASH_VALUES: Record<Suit, number> = {
+  clubs: 1,
+  diamonds: 2,
+  hearts: 3,
+  spades: 4,
+}
+const FNV_OFFSET_BASIS_64 = 0xcbf29ce484222325n
+const FNV_PRIME_64 = 0x100000001b3n
 
 export type Suit = (typeof SUITS)[number]
 export type Rank = (typeof RANKS)[number]
@@ -45,6 +56,8 @@ export interface GameSnapshot {
   isAutoCompleting: boolean
   hasWon: boolean
   winCelebrations: number
+  shuffleId: string
+  solvableId: string | null
 }
 
 export interface GameState extends GameSnapshot {
@@ -80,6 +93,7 @@ let cardIdCounter = 0
 
 export const createInitialState = (): GameState => {
   const deck = shuffle(createDeck())
+  const shuffleId = computeShuffleId(deck)
   const { tableau, stock } = dealTableau(deck)
   const snapshot: GameSnapshot = {
     stock,
@@ -92,12 +106,86 @@ export const createInitialState = (): GameState => {
     isAutoCompleting: false,
     hasWon: false,
     winCelebrations: 0,
+    shuffleId,
+    solvableId: null,
   }
 
   return {
     ...snapshot,
     history: [],
     selected: null,
+  }
+}
+
+export const createSolvableGameState = (shuffleConfig: SolvableShuffleConfig): GameState => {
+  const deck = createDeck()
+  const lookup = new Map<string, Card>()
+  deck.forEach((card) => {
+    lookup.set(`${card.suit}-${card.rank}`, card)
+  })
+
+  const tableau: Tableau = shuffleConfig.tableau.map((columnConfig, columnIndex) => {
+    const column: Card[] = []
+
+    columnConfig.down.forEach((cardConfig, cardIndex) => {
+      column.push(takeCardFromLookup(lookup, cardConfig.suit, cardConfig.rank, false, columnIndex, cardIndex, 'down'))
+    })
+
+    columnConfig.up.forEach((cardConfig, cardIndex) => {
+      column.push(
+        takeCardFromLookup(lookup, cardConfig.suit, cardConfig.rank, true, columnIndex, cardIndex, 'up'),
+      )
+    })
+
+    return column
+  })
+
+  const remainingCards = Array.from(lookup.values()).map((card) => ({ ...card, faceUp: false }))
+  const stock = shuffle(remainingCards)
+
+  const snapshot: GameSnapshot = {
+    stock,
+    waste: [],
+    foundations: createEmptyFoundations(),
+    tableau,
+    moveCount: 0,
+    autoCompleteRuns: 0,
+    autoQueue: [],
+    isAutoCompleting: false,
+    hasWon: false,
+    winCelebrations: 0,
+    shuffleId: createSolvableShuffleId(shuffleConfig.id),
+    solvableId: shuffleConfig.id,
+  }
+
+  return {
+    ...snapshot,
+    history: [],
+    selected: null,
+  }
+}
+
+const takeCardFromLookup = (
+  lookup: Map<string, Card>,
+  suit: Suit,
+  rank: Rank,
+  faceUp: boolean,
+  columnIndex: number,
+  cardIndex: number,
+  zone: 'down' | 'up',
+): Card => {
+  const key = `${suit}-${rank}`
+  const card = lookup.get(key)
+  if (!card) {
+    throw new Error(
+      `Solvable shuffle is missing card ${key} (${zone} column ${columnIndex} position ${cardIndex}).`,
+    )
+  }
+
+  lookup.delete(key)
+  return {
+    ...card,
+    faceUp,
   }
 }
 
@@ -722,6 +810,8 @@ const snapshotFromState = (state: GameState): GameSnapshot => ({
   isAutoCompleting: false,
   hasWon: state.hasWon,
   winCelebrations: state.winCelebrations,
+  shuffleId: state.shuffleId,
+  solvableId: state.solvableId ?? null,
 })
 
 const cloneSnapshot = (snapshot: GameSnapshot): GameState => ({
@@ -735,6 +825,8 @@ const cloneSnapshot = (snapshot: GameSnapshot): GameState => ({
   isAutoCompleting: false,
   hasWon: snapshot.hasWon,
   winCelebrations: snapshot.winCelebrations,
+  shuffleId: snapshot.shuffleId,
+  solvableId: snapshot.solvableId,
   history: [],
   selected: null,
 })
@@ -764,6 +856,23 @@ const createDeck = (): Card[] => {
     }
   })
   return deck
+}
+
+const computeShuffleId = (deck: Card[]): string => {
+  let hash = FNV_OFFSET_BASIS_64
+
+  deck.forEach((card, index) => {
+    const suitValue = BigInt(SUIT_HASH_VALUES[card.suit])
+    const rankValue = BigInt(card.rank)
+    const position = BigInt(index + 1)
+    const combined = (suitValue << 16n) ^ (rankValue << 4n) ^ position
+    hash ^= combined
+    hash = (hash * FNV_PRIME_64) & 0xffffffffffffffffn
+  })
+
+  const normalized = hash & 0xffffffffffffffffn
+  const base36 = normalized.toString(36).toUpperCase()
+  return base36.padStart(13, '0')
 }
 
 const shuffle = (cards: Card[]): Card[] => {

@@ -60,7 +60,8 @@ const isPersistedGamePayload = (value: unknown): value is PersistedGamePayload =
     Array.isArray(candidate.waste) &&
     candidate.foundations !== undefined &&
     Array.isArray(candidate.tableau) &&
-    Array.isArray(candidate.history ?? [])
+    Array.isArray(candidate.history ?? []) &&
+    typeof candidate.shuffleId === 'string'
   )
 }
 
@@ -93,14 +94,30 @@ export const loadGameState = async (): Promise<GameState | null> => {
     throw new PersistedGameError('unsupported-version', 'Saved game payload version is unsupported.')
   }
 
+  const shuffleId =
+    typeof parsed.state.shuffleId === 'string' && parsed.state.shuffleId.length
+      ? parsed.state.shuffleId
+      : createLegacyShuffleId()
+
+  const solvableIdValue =
+    typeof (parsed.state as { solvableId?: unknown }).solvableId === 'string'
+      ? (parsed.state as { solvableId: string }).solvableId
+      : null
+
   return {
     ...parsed.state,
     selected: null,
     history: Array.isArray(parsed.state.history) ? parsed.state.history : [],
+    shuffleId,
+    solvableId: solvableIdValue,
   }
 }
 
 export const clearGameState = async (): Promise<void> => {
   await AsyncStorage.removeItem(KLONDIKE_STORAGE_KEY)
 }
+
+const createLegacyShuffleId = (): string => `LEGACY-${Date.now().toString(36).toUpperCase()}-${
+  Math.random().toString(36).slice(2, 6).toUpperCase()
+}`
 

@@ -27,6 +27,7 @@ export type SettingsState = {
   animations: AnimationPreferences
   themeMode: ThemeMode
   shareSolvedGames: boolean
+  solvableGamesOnly: boolean
 }
 
 type SettingsContextValue = {
@@ -36,6 +37,7 @@ type SettingsContextValue = {
   setGlobalAnimationsEnabled: (enabled: boolean) => void
   setAnimationPreference: (key: AnimationPreferenceKey, enabled: boolean) => void
   setShareSolvedGames: (enabled: boolean) => void
+  setSolvableGamesOnly: (enabled: boolean) => void
 }
 
 const STORAGE_KEY = '@soli/settings/v1'
@@ -52,6 +54,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   },
   themeMode: 'auto',
   shareSolvedGames: false,
+  solvableGamesOnly: false,
 }
 
 export const animationPreferenceDescriptors: Array<{
@@ -184,6 +187,12 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     )
   }, [])
 
+  const setSolvableGamesOnly = useCallback((enabled: boolean) => {
+    setState((previous) =>
+      previous.solvableGamesOnly === enabled ? previous : { ...previous, solvableGamesOnly: enabled },
+    )
+  }, [])
+
   const value = useMemo<SettingsContextValue>(
     () => ({
       state,
@@ -192,8 +201,17 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setGlobalAnimationsEnabled,
       setAnimationPreference,
       setShareSolvedGames,
+      setSolvableGamesOnly,
     }),
-    [hydrated, setAnimationPreference, setGlobalAnimationsEnabled, setShareSolvedGames, setThemeMode, state],
+    [
+      hydrated,
+      setAnimationPreference,
+      setGlobalAnimationsEnabled,
+      setShareSolvedGames,
+      setSolvableGamesOnly,
+      setThemeMode,
+      state,
+    ],
   )
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>
@@ -251,6 +269,7 @@ const mergeSettings = (current: SettingsState, incoming?: Partial<SettingsState>
     },
     themeMode: isThemeMode(incoming.themeMode) ? incoming.themeMode : current.themeMode,
     shareSolvedGames: getBoolean(incoming.shareSolvedGames, current.shareSolvedGames),
+    solvableGamesOnly: getBoolean(incoming.solvableGamesOnly, current.solvableGamesOnly),
   }
 }
 

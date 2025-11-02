@@ -199,3 +199,42 @@ Interpretation:
 - The relevance-first Stage A improves solve rate and reduces nodes vs baseline.
 - Needed ranks helps ranking on its own; combining with FSF keeps solve rate competitive while reducing nodes.
 - Cover-canonical remains harmful for solve rate under current ranking; keep it as a cache-only optimization, not for approach selection.
+
+### Iteration 6 (FSF tuning)
+
+Description: Tune frontier Stage A cap and compare with/without needed ranks; try deeper relaxation.
+
+- FSF only, cap=6:
+  - ✅ Solved: 9/50 (18%)
+  - Avg nodes: 745793
+  - Avg time: 3060ms
+  - Cutoffs: time=5, nodes=29
+
+- FSF only, cap=10:
+  - ✅ Solved: 15/50 (30%)
+  - Avg nodes: 784217
+  - Avg time: 3158ms
+  - Cutoffs: time=3, nodes=30
+
+- FSF only, cap=12:
+  - ✅ Solved: 12/50 (24%)
+  - Avg nodes: 732229
+  - Avg time: 2970ms
+  - Cutoffs: time=5, nodes=26
+
+- FSF + Needed, cap=10:
+  - ✅ Solved: 18/50 (36%)
+  - Avg nodes: 617002
+  - Avg time: 2326ms
+  - Cutoffs: time=1, nodes=25
+
+- FSF only, cap=8, relaxAtDepth=15, maxApproachStepsHigh=100:
+  - ✅ Solved: 9/50 (18%)
+  - Avg nodes: 822216
+  - Avg time: 3095ms
+  - Cutoffs: time=3, nodes=34
+
+Interpretation:
+- Best of this batch is FSF + Needed with cap=10 (36% solved, lowest nodes among top performers).
+- Caps lower than 8 starve; 10 seems a sweet spot; 12 is okay but not better overall.
+- Increasing high-depth approach limit without other changes didn’t improve solve rate under the same budget.

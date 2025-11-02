@@ -25,3 +25,8 @@ npx expo run:android --variant release
 
 ## Verification
 Check device connection: `adb devices`
+
+## Notes
+- Production builds are optimized and don't include dev tools
+- The app will run with production performance characteristics
+- Ready for distribution or testing real-world performance

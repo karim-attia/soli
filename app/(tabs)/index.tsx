@@ -41,6 +41,7 @@ import {
   FOUNDATION_SUIT_ORDER,
   TABLEAU_COLUMN_COUNT,
   createInitialState,
+  createSolvableGameState,
   findAutoMoveTarget,
   getDropHints,
   klondikeReducer,
@@ -59,7 +60,9 @@ import {
   loadGameState,
   saveGameState,
 } from '../../src/storage/gamePersistence'
-import { useAnimationToggles } from '../../src/state/settings'
+import { SOLVABLE_SHUFFLES, extractSolvableBaseId } from '../../src/data/solvableShuffles'
+import { useHistory } from '../../src/state/history'
+import { useAnimationToggles, useSettings } from '../../src/state/settings'
 
 const BASE_CARD_WIDTH = 72
 const BASE_CARD_HEIGHT = 102
@@ -181,8 +184,9 @@ const DEFAULT_METRICS: CardMetrics = {
   radius: 12,
 }
 
-const CELEBRATION_MODE_DURATIONS_MS = [7800, 8400, 7600, 8000, 8200, 8300, 8600, 8800, 7900, 8700] as const
-const CELEBRATION_MODE_COUNT = CELEBRATION_MODE_DURATIONS_MS.length
+const CELEBRATION_MODE_COUNT = 10
+const CELEBRATION_DURATION_MS = 60_000
+const CELEBRATION_DIALOG_DELAY_MS = 30_000
 const FOUNDATION_FALLBACK_GAP = 16
 const TAU = Math.PI * 2
 
@@ -261,7 +265,10 @@ export default function TabOneScreen() {
   const navigation = useNavigation()
   const colorScheme = useColorScheme()
   const feltBackground = colorScheme === 'dark' ? COLOR_FELT_DARK : COLOR_FELT_LIGHT
+  const { state: settingsState, hydrated: settingsHydrated } = useSettings()
+  const solvableGamesOnly = settingsState.solvableGamesOnly
   const animationToggles = useAnimationToggles()
+  const { entries: historyEntries, recordResult } = useHistory()
   const {
     master: animationsEnabled,
     cardFlights: cardFlightsEnabled,
@@ -278,6 +285,10 @@ export default function TabOneScreen() {
   const cardFlightMemoryRef = useRef<Record<string, CardFlightSnapshot>>({})
   const recentFoundationArrivalsRef = useRef<Map<string, number>>(new Map())
   const stateRef = useRef(state)
+  const lastRecordedShuffleRef = useRef<string | null>(null)
+  const previousHasWonRef = useRef(state.hasWon)
+  const celebrationDialogTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const celebrationDialogShownRef = useRef(false)
   const topRowLayoutRef = useRef<LayoutRectangle | null>(null)
   const foundationLayoutsRef = useRef<Partial<Record<Suit, LayoutRectangle>>>({})
   const boardLockedRef = useRef(false)
@@ -326,6 +337,99 @@ export default function TabOneScreen() {
     cardFlightMemoryRef.current = {}
     cardFlights.value = {}
   }, [cardFlights])
+  const selectNextSolvableShuffle = useCallback(() => {
+    if (!SOLVABLE_SHUFFLES.length) {
+      return null
+    }
+
+    const stats = new Map<string, { plays: number; solves: number }>()
+
+    historyEntries.forEach((entry) => {
+      if (!entry.solvable) {
+        return
+      }
+      const baseId = extractSolvableBaseId(entry.shuffleId) ?? entry.shuffleId
+      if (!baseId) {
+        return
+      }
+      const record = stats.get(baseId) ?? { plays: 0, solves: 0 }
+      record.plays += 1
+      if (entry.solved) {
+        record.solves += 1
+      }
+      stats.set(baseId, record)
+    })
+
+    const unsolved = SOLVABLE_SHUFFLES.filter((shuffle) => {
+      const record = stats.get(shuffle.id)
+      return !record || record.solves === 0
+    })
+
+    const pool = unsolved.length ? unsolved : SOLVABLE_SHUFFLES
+    if (!pool.length) {
+      return null
+    }
+
+    let candidate = pool[0]
+    let candidatePlays = stats.get(candidate.id)?.plays ?? 0
+
+    for (const shuffle of pool) {
+      const plays = stats.get(shuffle.id)?.plays ?? 0
+      if (plays < candidatePlays || (plays === candidatePlays && shuffle.id < candidate.id)) {
+        candidate = shuffle
+        candidatePlays = plays
+      }
+    }
+
+    return candidate
+  }, [historyEntries])
+  const dealNewGame = useCallback(() => {
+    if (settingsHydrated && solvableGamesOnly) {
+      const solvableShuffle = selectNextSolvableShuffle()
+      if (solvableShuffle) {
+        const solvableState = createSolvableGameState(solvableShuffle)
+        dispatch({ type: 'HYDRATE_STATE', state: solvableState })
+        lastRecordedShuffleRef.current = null
+        return
+      }
+    }
+
+    dispatch({ type: 'NEW_GAME' })
+    lastRecordedShuffleRef.current = null
+  }, [dispatch, selectNextSolvableShuffle, settingsHydrated, solvableGamesOnly])
+  const recordCurrentGameResult = useCallback(
+    (options?: { solved?: boolean }) => {
+      const current = stateRef.current
+      if (!current.shuffleId) {
+        return
+      }
+      if (lastRecordedShuffleRef.current === current.shuffleId) {
+        return
+      }
+
+      const solved = options?.solved ?? current.hasWon
+      if (!solved && current.moveCount === 0) {
+        return
+      }
+
+      recordResult({
+        shuffleId: current.shuffleId,
+        solved,
+        solvable: Boolean(current.solvableId),
+        finishedAt: new Date().toISOString(),
+        moves: current.moveCount,
+      })
+      lastRecordedShuffleRef.current = current.shuffleId
+    },
+    [recordResult],
+  )
+
+  const clearCelebrationDialogTimer = useCallback(() => {
+    if (celebrationDialogTimeoutRef.current) {
+      clearTimeout(celebrationDialogTimeoutRef.current)
+      celebrationDialogTimeoutRef.current = null
+    }
+  }, [])
   const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(() => ({
     ...EMPTY_INVALID_WIGGLE,
     lookup: new Set<string>(),
@@ -428,6 +532,15 @@ export default function TabOneScreen() {
   useEffect(() => {
     stateRef.current = state
   }, [state])
+
+  useEffect(() => {
+    if (state.hasWon && !previousHasWonRef.current) {
+      recordCurrentGameResult({ solved: true })
+    }
+
+    previousHasWonRef.current = state.hasWon
+  }, [recordCurrentGameResult, state.hasWon])
+
 
   // Requirement PBI-13: hydrate persisted Klondike state on launch.
   useEffect(() => {
@@ -532,6 +645,7 @@ export default function TabOneScreen() {
 
   const requestNewGame = useCallback(
     (options?: { reason?: 'manual' | 'celebration' }) => {
+      clearCelebrationDialogTimer()
       const reason = options?.reason ?? 'manual'
       const forced = reason === 'celebration' || boardLockedRef.current
       const buttons: Array<{
@@ -550,6 +664,7 @@ export default function TabOneScreen() {
         text: 'Deal Again',
         style: forced ? 'default' : 'destructive',
         onPress: () => {
+          recordCurrentGameResult()
           setCelebrationState(null)
           resetCardFlights()
           foundationLayoutsRef.current = {}
@@ -558,7 +673,7 @@ export default function TabOneScreen() {
           void clearGameState().catch((error) => {
             console.warn('Failed to clear persisted game before new shuffle', error)
           })
-          dispatch({ type: 'NEW_GAME' })
+          dealNewGame()
           updateBoardLocked(false)
           toast.show('New game', { message: 'Shuffled cards and reset the board.' })
         },
@@ -571,18 +686,52 @@ export default function TabOneScreen() {
         { cancelable: !forced },
       )
     },
-    [clearGameState, dispatch, resetCardFlights, toast, updateBoardLocked],
+    [
+      clearCelebrationDialogTimer,
+      clearGameState,
+      dealNewGame,
+      recordCurrentGameResult,
+      resetCardFlights,
+      toast,
+      updateBoardLocked,
+    ],
   )
+
+  const openCelebrationDialog = useCallback(() => {
+    clearCelebrationDialogTimer()
+    if (celebrationDialogShownRef.current) {
+      return
+    }
+    celebrationDialogShownRef.current = true
+    requestNewGame({ reason: 'celebration' })
+  }, [clearCelebrationDialogTimer, requestNewGame])
 
   const handleCelebrationComplete = useCallback(() => {
     setCelebrationState(null)
-    requestNewGame({ reason: 'celebration' })
-  }, [requestNewGame])
+    openCelebrationDialog()
+  }, [openCelebrationDialog])
 
   const handleCelebrationAbort = useCallback(() => {
+    clearCelebrationDialogTimer()
     setCelebrationState(null)
-    requestNewGame({ reason: 'celebration' })
-  }, [requestNewGame])
+    openCelebrationDialog()
+  }, [clearCelebrationDialogTimer, openCelebrationDialog])
+
+  useEffect(() => {
+    if (!celebrationState) {
+      celebrationDialogShownRef.current = false
+      clearCelebrationDialogTimer()
+      return
+    }
+
+    celebrationDialogShownRef.current = false
+    clearCelebrationDialogTimer()
+    celebrationDialogTimeoutRef.current = setTimeout(openCelebrationDialog, CELEBRATION_DIALOG_DELAY_MS)
+
+    return () => {
+      clearCelebrationDialogTimer()
+    }
+  }, [celebrationState, clearCelebrationDialogTimer, openCelebrationDialog])
 
   const attemptAutoMove = useCallback(
     (selection: Selection) => {
@@ -759,7 +908,7 @@ const handleFoundationPress = useCallback(
 
     setCelebrationState({
       modeId,
-      durationMs: CELEBRATION_MODE_DURATIONS_MS[modeId],
+      durationMs: CELEBRATION_DURATION_MS,
       boardWidth: boardWidthValue,
       boardHeight: boardHeightValue,
       cards: shuffledCards,
