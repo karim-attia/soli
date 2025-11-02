@@ -14,7 +14,6 @@
 | 10 | Completion tracker | As a player I want to review past games so that I can see which shuffles I solved. | Agreed | 1. The burger menu links to a history page showing saved games with shuffle ID and solved state.<br>2. History persists shuffle identifiers and solved/not-solved status.<br>3. The history view displays the total number of solved games.<br>[View Details](./10/prd.md) |
 | 11 | Challenge seeker | As a player I want to opt into solvable shuffles so that each game can be completed with skill. | Agreed | 1. A setting enables "solvable games only" mode.<br>2. A curated list of solvable shuffles is stored (tableau state only) while the stock remains randomized.<br>3. When the setting is enabled, the next game reuses the least-played solvable shuffle that has not been solved yet and history marks solvable games with a badge.<br>[View Details](./11/prd.md) |
 | 12 | Community contributor | As a player I want to share solvable shuffles so that the catalog can grow. | Agreed | 1. A setting allows opting into sharing solved games.<br>2. When enabled, completed solvable games upload their shuffle and solution steps to a backend endpoint (to be defined).<br>3. Shared shuffles are queued for manual review and tagged accordingly in history.<br>[View Details](./12/prd.md) |
-| 15 | Klondike Solver | As a developer I want a complete solver implementation so that games can be analyzed for solvability and difficulty. | InProgress | 1. Solver accepts deckOrder permutation and returns solvability boolean.<br>2. Difficulty assessment provides easy/medium/hard ratings.<br>3. Atomic flip solver minimizes solution steps.<br>4. Needed ranks heuristic optimizes tableau moves.<br>5. CLI harness supports random shuffle testing.<br>[View Details](./15/prd.md) |
 | 14 | Animation systems maintainer | As a developer I want flight animations and foundation feedback to be deterministic so that players always see cards travel from their true origin without stray wiggles. | Proposed | 1. Card flight orchestration is refactored around a single deterministic pipeline that never dispatches a move before origin/target snapshots are ready.<br>2. Automation and manual flows share instrumentation that flags any suppressed flight or fallback path for debugging.<br>3. Foundation piles never wiggle in response to automation while manual invalid taps continue to provide feedback.<br>[View Details](./14/prd.md) |
 
 ## History
@@ -69,8 +68,7 @@
 | 2025-11-01 09:18:00 | 12 | propose_for_backlog | User approved solvable game sharing initiative. | user |
 | 2025-11-01 10:56:00 | 5 | submit_for_review | Auto-foundation polish ready for review with supporting tasks completed. | ai_agent |
 | 2025-11-02 12:25:00 | 5 | approve | User approved auto-foundation polish after manual verification confirmation. | user |
-| 2025-11-02 16:45:00 | 2 | approve | User approved animation polish implementation. | user |
 | 2025-11-01 11:05:00 | 8 | submit_for_review | Publish readiness assets and metadata prepared for review. | ai_agent |
+| 2025-11-02 12:30:00 | 2 | approve | User approved animation polish implementation after task completion. | user |
+| 2025-11-02 12:35:00 | 1 | approve | User approved Klondike MVP completion, moving solver tasks to PBI 11. | user |
 | 2025-11-02 16:40:00 | 14 | create_pbi | Logged refactor initiative to stabilize card flight animations and foundation feedback. | ai_agent |
-| 2025-11-02 17:05:00 | 15 | create_pbi | Created PBI 15 to house solver functionality separated from PBI 1. | user |
-| 2025-11-02 17:10:00 | 1 | approve | User approved PBI 1 completion after separating solver functionality to PBI 15. | user |
