@@ -3,13 +3,16 @@ import { TamaguiProvider, type TamaguiProviderProps } from 'tamagui'
 import { ToastProvider, ToastViewport } from '@tamagui/toast'
 import { CurrentToast } from './CurrentToast'
 import { SettingsProvider, useSettings } from '../src/state/settings'
+import { HistoryProvider } from '../src/state/history'
 import { resolveThemeName } from '../src/theme'
 import { config } from '../tamagui.config'
 
 export function Provider({ children, ...rest }: Omit<TamaguiProviderProps, 'config'>) {
   return (
     <SettingsProvider>
-      <TamaguiWithSettings {...rest}>{children}</TamaguiWithSettings>
+      <HistoryProvider>
+        <TamaguiWithSettings {...rest}>{children}</TamaguiWithSettings>
+      </HistoryProvider>
     </SettingsProvider>
   )
 }

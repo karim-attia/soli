@@ -94,6 +94,16 @@ function RootLayoutNav() {
             },
           }}
         />
+
+        <Stack.Screen
+          name="history"
+          options={{
+            title: 'History',
+            contentStyle: {
+              backgroundColor: theme.background.val,
+            },
+          }}
+        />
       </Stack>
     </ThemeProvider>
   )
