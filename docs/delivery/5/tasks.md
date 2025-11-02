@@ -7,8 +7,8 @@ This document lists all tasks associated with PBI 5.
 
 | Task ID | Name | Status | Description |
 | :------ | :----------------------------------------------- | :------- | :------------------------------------------------------------- |
-| 5-1 | [Animate auto-foundation card flights](./5-1.md) | Review | Ensure auto-complete moves reuse the shared animation path. |
-| 5-2 | [Backfill tableau during stock traversal](./5-2.md) | Review | Promote eligible tableau moves while auto-processing the stock. |
-| 5-3 | [Eliminate foundation wiggle during auto-play](./5-3.md) | Review | Prevent invalid-move feedback while foundations auto-resolve. |
-| 5-4 | [E2E CoS validation](./5-4.md) | Review | Verify auto-foundation polish through end-to-end testing. |
+| 5-1 | [Animate auto-foundation card flights](./5-1.md) | Done | Ensure auto-complete moves reuse the shared animation path. |
+| 5-2 | [Backfill tableau during stock traversal](./5-2.md) | Done | Promote eligible tableau moves while auto-processing the stock. |
+| 5-3 | [Eliminate foundation wiggle during auto-play](./5-3.md) | Done | Prevent invalid-move feedback while foundations auto-resolve. |
+| 5-4 | [E2E CoS validation](./5-4.md) | Done | Verify auto-foundation polish through end-to-end testing. |
 
