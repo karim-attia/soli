@@ -328,7 +328,7 @@ function tryGreedyFinishIfReady(state) {
 
 // BFS from an atomic state to gather all next flips at minimal step count
 function findNextFlipCandidates(rootState, budget) {
-	const { maxLocalNodes, deadline, maxApproachSteps, avoidEmptyUnlessKing, trivialFirst = true } = budget
+    const { maxLocalNodes, deadline, maxApproachSteps, avoidEmptyUnlessKing, trivialFirst = true, relevantOnly = false, relevantFirst = false, relevanceStepsCap } = budget
 	let nodes = 0
 	const root = cloneState(rootState)
 	normalizeSafeToFoundationNoFlip(root)
@@ -337,7 +337,7 @@ function findNextFlipCandidates(rootState, budget) {
 	const q = [{ state: root, steps: 0, path: [] }]
 	const candidates = []
 
-    function runBfsWithFilter(moveFilter) {
+    function runBfsWithFilter(moveFilter, capOverride, relevantOverride) {
 		const q2 = [{ state: cloneState(root), steps: 0, path: [] }]
 		const seen2 = new Set([rootKey])
         const foundMap = new Map() // key -> best candidate by (stockUses, f2tUses, steps)
@@ -352,12 +352,16 @@ function findNextFlipCandidates(rootState, budget) {
 		while (q2.length) {
 			if (deadline && Date.now() > deadline) break
 			const cur = q2.shift()
-			if (maxApproachSteps !== undefined && cur.steps > maxApproachSteps) break
+			const cap = capOverride !== undefined ? capOverride : maxApproachSteps
+			if (cap !== undefined && cur.steps > cap) break
 			const allMoves = listMoves(cur.state)
+			const frOnly = (relevantOverride !== undefined ? relevantOverride : relevantOnly)
+			const frontiers = frOnly ? computeFrontiers(cur.state) : null
 			const preferred = []
 			const deferred = []
 			for (const mv of allMoves) {
 				if (!moveFilter(mv, cur.state)) continue
+				if (frOnly && !isRelevantMove(mv, cur.state, frontiers)) continue
 				if (avoidEmptyUnlessKing && mv.kind === 't2t' && mv.index === 0) {
 					const fromCol = cur.state.tableau[mv.from]
 					const moving = fromCol.slice(mv.index)
@@ -392,7 +396,14 @@ function findNextFlipCandidates(rootState, budget) {
         return Array.from(foundMap.values())
 	}
 
-	if (trivialFirst) {
+    // Stage A: frontier-relevant quick pass with small cap, then fallback if nothing found
+    if (relevantFirst) {
+        const capA = relevanceStepsCap !== undefined ? relevanceStepsCap : (maxApproachSteps !== undefined ? Math.min(maxApproachSteps, 8) : 8)
+        const rel = runBfsWithFilter(() => true, capA, true)
+        if (rel.length) return { candidates: rel, nodesUsed: nodes }
+    }
+
+    if (trivialFirst) {
 		// Phase 1: foundation-only (t2f, stock2f)
 		const trivial1 = runBfsWithFilter((mv) => mv.kind === 't2f' || mv.kind === 'stock2f')
 		if (trivial1.length) return { candidates: trivial1, nodesUsed: nodes }
@@ -414,10 +425,12 @@ function findNextFlipCandidates(rootState, budget) {
 		const cur = q.shift()
         if (maxApproachSteps !== undefined && cur.steps > maxApproachSteps) break
         const allMoves = listMoves(cur.state)
+        const frontiers = relevantOnly ? computeFrontiers(cur.state) : null
         // Prefer moves that don't empty a column; defer emptying unless king-to-empty (if enabled)
         const preferred = []
         const deferred = []
         for (const mv of allMoves) {
+            if (relevantOnly && !isRelevantMove(mv, cur.state, frontiers)) continue
             if (avoidEmptyUnlessKing && mv.kind === 't2t' && mv.index === 0) {
                 const fromCol = cur.state.tableau[mv.from]
                 const moving = fromCol.slice(mv.index)
@@ -580,6 +593,7 @@ function emptyColumns(state) { let t = 0; for (const col of state.tableau) if (c
 
 // Optional heuristic toggle (set from options)
 let USE_NEEDED_RANKS = false
+let USE_COVER_CANONICAL = false
 let PRINTED_ATOMIC_CONFIG = false
 
 // --- Needed ranks heuristic ---
@@ -635,9 +649,97 @@ function neededScoreFromNeeds(needs, candState) {
     return score
 }
 
+// Compute canonical representative for an atomic state by applying only no-flip safe moves
+// (stock->foundation and tableau-top->foundation that does not expose a facedown), until fixpoint.
+// This preserves the covered-card configuration while maximizing safe progress to foundations.
+function computeCanonicalKeyAndSnapshot(curState) {
+    const snap = cloneState(curState)
+    normalizeSafeToFoundationNoFlip(snap, false)
+    const key = zobristKey(snap)
+    return { key, snapshot: snap }
+}
+
+// --- Frontier relevance pruning ---
+function computeFrontiers(state) {
+    const frontiers = []
+    for (let c = 0; c < state.tableau.length; c += 1) {
+        const col = state.tableau[c]
+        let lastDown = -1
+        for (let i = 0; i < col.length; i += 1) { if (!col[i].faceUp) lastDown = i }
+        if (lastDown >= 0 && lastDown + 1 < col.length) {
+            const baseIdx = lastDown + 1
+            const base = col[baseIdx]
+            if (!base || !base.faceUp) continue
+            if (base.rank === KING) {
+                frontiers.push({ col: c, baseIdx, need: { type: 'empty' } })
+            } else {
+                const needColor = colorOf(base.suit) === 'red' ? 'black' : 'red'
+                frontiers.push({ col: c, baseIdx, need: { type: 'rank', rank: base.rank + 1, color: needColor } })
+            }
+        }
+    }
+    return frontiers
+}
+
+function isRelevantMove(mv, state, frontiers) {
+    if (!frontiers || !frontiers.length) return true
+    if (mv.kind === 'stock2f') return true
+    if (mv.kind === 't2f') {
+        const col = state.tableau[mv.ci]
+        const newTopIndex = col.length - 2
+        const flips = newTopIndex >= 0 && !col[newTopIndex].faceUp
+        if (flips) return true
+        for (const f of frontiers) if (f.col === mv.ci) return true
+        return false
+    }
+    if (mv.kind === 't2t') {
+        let srcFrontier = null
+        for (const f of frontiers) { if (f.col === mv.from) { srcFrontier = f; break } }
+        if (!srcFrontier) return false
+        if (mv.index !== srcFrontier.baseIdx) return false
+        const moving = state.tableau[mv.from].slice(mv.index)
+        if (!moving.length) return false
+        const top = moving[0]
+        const toCol = state.tableau[mv.to]
+        if (toCol.length === 0) return srcFrontier.need.type === 'empty' && top.rank === KING
+        const toTop = toCol[toCol.length - 1]
+        if (!toTop.faceUp) return false
+        if (srcFrontier.need.type === 'rank') {
+            const needColor = srcFrontier.need.color
+            const needRank = srcFrontier.need.rank
+            const topColor = colorOf(toTop.suit)
+            return topColor === needColor && toTop.rank === needRank
+        }
+        return false
+    }
+    if (mv.kind === 'stock2t') {
+        let tgtFrontier = null
+        for (const f of frontiers) { if (f.col === mv.to) { tgtFrontier = f; break } }
+        if (!tgtFrontier) return false
+        const card = state.stock[mv.stockIndex]
+        if (!card) return false
+        if (tgtFrontier.need.type === 'empty') return false
+        const cardColor = colorOf(card.suit)
+        return cardColor === tgtFrontier.need.color && card.rank === tgtFrontier.need.rank
+    }
+    if (mv.kind === 'f2t') {
+        let tgtFrontier = null
+        for (const f of frontiers) { if (f.col === mv.to) { tgtFrontier = f; break } }
+        if (!tgtFrontier) return false
+        if (tgtFrontier.need.type === 'empty') return false
+        const pile = state.foundations[mv.suit]
+        if (!pile.length) return false
+        const card = pile[pile.length - 1]
+        const cardColor = colorOf(card.suit)
+        return cardColor === tgtFrontier.need.color && card.rank === tgtFrontier.need.rank
+    }
+    return true
+}
+
  function solveKlondikeAtomic(deckOrder, options = {}) {
-    const { maxNodes = 2000000, maxTimeMs = 5000, maxLocalNodes = 200000, maxApproachSteps = 20, maxApproachStepsHigh = 80, relaxAtDepth = 17, approachStepsIncrement = 3, avoidEmptyUnlessKing = true, enableBackjump = true, rankingStrategy = 'blended', useNeededRanks = false } = options
+    const { maxNodes = 2000000, maxTimeMs = 5000, maxLocalNodes = 200000, maxApproachSteps = 20, maxApproachStepsHigh = 80, relaxAtDepth = 17, approachStepsIncrement = 3, avoidEmptyUnlessKing = true, enableBackjump = true, rankingStrategy = 'blended', useNeededRanks = false, useCoverCanonical = false, frontierOnlyMoves = false, frontierStageFirst = false, relevanceStepsCap } = options
     USE_NEEDED_RANKS = !!useNeededRanks
+    USE_COVER_CANONICAL = !!useCoverCanonical
     if (!PRINTED_ATOMIC_CONFIG) {
         PRINTED_ATOMIC_CONFIG = true
         /* eslint-disable no-console */
@@ -653,6 +755,10 @@ function neededScoreFromNeeds(needs, candState) {
             enableBackjump,
             rankingStrategy,
             useNeededRanks: USE_NEEDED_RANKS,
+            useCoverCanonical: USE_COVER_CANONICAL,
+            frontierOnlyMoves,
+            frontierStageFirst,
+            relevanceStepsCap,
         }
         console.log('[atomic-config]\n' + JSON.stringify(cfg, null, 2))
         /* eslint-enable no-console */
@@ -663,7 +769,7 @@ function neededScoreFromNeeds(needs, candState) {
 	let atomicTried = 0
 	let atomicDead = 0
     const deadline = Date.now() + maxTimeMs
-    // Cache of approaches per atomic state (by Zobrist key)
+    // Cache of approaches per atomic/canonical state (by Zobrist key)
     // key -> { candidates: Array, tried: Set<index> }
     const atomicCache = new Map()
 
@@ -693,6 +799,7 @@ function sigOfChangedCols(set) { return Array.from(set).sort().join(',') }
 
     // Compute the normalized atomic snapshot and its Zobrist key for the current state
     function computeAtomicKeyAndSnapshot(curState) {
+        if (USE_COVER_CANONICAL) return computeCanonicalKeyAndSnapshot(curState)
         const snap = cloneState(curState)
         normalizeSafeToFoundationNoFlip(snap)
         const key = zobristKey(snap)
@@ -712,7 +819,7 @@ function sigOfChangedCols(set) { return Array.from(set).sort().join(',') }
 		const { key, snapshot } = computeAtomicKeyAndSnapshot(state)
 		let entry = atomicCache.get(key)
 		if (!entry) {
-			const budget = { maxLocalNodes, deadline, maxApproachSteps: localCap, avoidEmptyUnlessKing }
+        const budget = { maxLocalNodes, deadline, maxApproachSteps: localCap, avoidEmptyUnlessKing, relevantOnly: !!frontierOnlyMoves, relevantFirst: !!frontierStageFirst, relevanceStepsCap }
 			const { candidates, nodesUsed } = findNextFlipCandidates(state, budget)
 			nodes += nodesUsed
 			let sorted
@@ -817,7 +924,7 @@ function getAtomicFrameFromState(state, options = {}) {
     const { maxLocalNodes = 20000, maxTimeMs = 1000, maxApproachSteps = 20, avoidEmptyUnlessKing = true, maxApproachStepsHigh, relaxAtDepth, strategy = 'blended' } = options
     USE_NEEDED_RANKS = !!options.useNeededRanks
     const deadline = Date.now() + (options.maxTimeMs || maxTimeMs)
-    const budget = { maxLocalNodes, deadline, maxApproachSteps, avoidEmptyUnlessKing, maxApproachStepsHigh, relaxAtDepth }
+    const budget = { maxLocalNodes, deadline, maxApproachSteps, avoidEmptyUnlessKing, maxApproachStepsHigh, relaxAtDepth, relevantOnly: !!options.frontierOnlyMoves, relevantFirst: !!options.frontierStageFirst, relevanceStepsCap: options.relevanceStepsCap }
     const snapshot = cloneState(state)
     normalizeSafeToFoundationNoFlip(snapshot)
     const { candidates, nodesUsed } = findNextFlipCandidates(snapshot, budget)

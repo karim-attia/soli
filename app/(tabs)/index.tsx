@@ -11,13 +11,16 @@ import {
 import {
   Alert,
   LayoutChangeEvent,
+  LayoutRectangle,
   Pressable,
   StyleSheet,
   View,
+  useColorScheme,
 } from 'react-native'
 import Animated, {
   Easing,
   cancelAnimation,
+  interpolate,
   measure,
   runOnJS,
   runOnUI,
@@ -28,9 +31,10 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import type { AnimatedRef, SharedValue } from 'react-native-reanimated'
-import { Link, useNavigation } from 'expo-router'
+import { useNavigation } from 'expo-router'
+import { DrawerActions } from '@react-navigation/native'
 import { Button, H2, Paragraph, Text, XStack, YStack } from 'tamagui'
-import { RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
+import { Menu, RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
 import { useToastController } from '@tamagui/toast'
 
 import {
@@ -43,11 +47,19 @@ import {
 } from '../../src/solitaire/klondike'
 import type {
   Card,
+  GameAction,
   GameState,
   Rank,
   Selection,
   Suit,
 } from '../../src/solitaire/klondike'
+import {
+  PersistedGameError,
+  clearGameState,
+  loadGameState,
+  saveGameState,
+} from '../../src/storage/gamePersistence'
+import { useAnimationToggles } from '../../src/state/settings'
 
 const BASE_CARD_WIDTH = 72
 const BASE_CARD_HEIGHT = 102
@@ -71,6 +83,10 @@ const COLOR_COLUMN_SELECTED = 'rgba(147, 197, 253, 0.25)'
 const COLOR_FOUNDATION_BORDER = '#94a3b8'
 const COLOR_TEXT_MUTED = '#94a3b8'
 const COLOR_TEXT_STRONG = '#1f2933'
+const COLOR_FELT_LIGHT = '#6B8E5A'
+const COLOR_FELT_DARK = '#4A5F3F'
+const COLOR_FELT_TEXT_PRIMARY = '#f8fafc'
+const COLOR_FELT_TEXT_SECONDARY = '#e2f2d9'
 const SUIT_SYMBOLS: Record<Suit, string> = {
   clubs: '♣',
   diamonds: '♦',
@@ -95,11 +111,8 @@ const CARD_FLIGHT_TIMING = {
   duration: CARD_ANIMATION_DURATION_MS,
   easing: CARD_MOVE_EASING,
 }
+const AUTO_QUEUE_MOVE_DELAY_MS = CARD_ANIMATION_DURATION_MS + 80
 
-const ENABLE_ANIMATIONS = true
-const ENABLE_STACK_ANIMATION = true
-const ENABLE_WIGGLE_ANIMATION = true
-const ENABLE_CARD_FLIP_ANIMATION = false
 const CARD_FLIP_HALF_DURATION_MS = 40
 const CARD_FLIP_HALF_TIMING = {
   duration: CARD_FLIP_HALF_DURATION_MS,
@@ -118,6 +131,21 @@ const WIGGLE_TIMING_CONFIG = {
   duration: WIGGLE_SEGMENT_DURATION_MS,
   easing: WIGGLE_EASING,
 }
+const FOUNDATION_GLOW_MAX_OPACITY = 0.55
+const FOUNDATION_GLOW_IN_DURATION_MS = 90
+const FOUNDATION_GLOW_OUT_DURATION_MS = 220
+const FOUNDATION_GLOW_COLOR = 'rgba(255, 255, 160, 0.65)'
+const FOUNDATION_GLOW_OUTSET = 10
+const FOUNDATION_GLOW_IN_TIMING = {
+  duration: FOUNDATION_GLOW_IN_DURATION_MS,
+  easing: Easing.bezier(0.3, 0, 0.5, 1),
+}
+const FOUNDATION_GLOW_OUT_TIMING = {
+  duration: FOUNDATION_GLOW_OUT_DURATION_MS,
+  easing: Easing.bezier(0.2, 0, 0.2, 1),
+}
+const FOUNDATION_WIGGLE_SUPPRESS_MS = 250
+const FLIGHT_WAIT_TIMEOUT_MS = 160
 
 const AnimatedView = Animated.createAnimatedComponent(View)
 type CardFlightSnapshot = {
@@ -151,6 +179,29 @@ const DEFAULT_METRICS: CardMetrics = {
   height: BASE_CARD_HEIGHT,
   stackOffset: BASE_STACK_OFFSET,
   radius: 12,
+}
+
+const CELEBRATION_MODE_DURATIONS_MS = [7800, 8400, 7600, 8000, 8200, 8300, 8600, 8800, 7900, 8700] as const
+const CELEBRATION_MODE_COUNT = CELEBRATION_MODE_DURATIONS_MS.length
+const FOUNDATION_FALLBACK_GAP = 16
+const TAU = Math.PI * 2
+
+type CelebrationCardConfig = {
+  card: Card
+  suit: Suit
+  suitIndex: number
+  stackIndex: number
+  baseX: number
+  baseY: number
+  randomSeed: number
+}
+
+type CelebrationState = {
+  modeId: number
+  durationMs: number
+  boardWidth: number
+  boardHeight: number
+  cards: CelebrationCardConfig[]
 }
 
 function computeCardMetrics(availableWidth: number | null): CardMetrics {
@@ -200,18 +251,123 @@ function collectSelectionCardIds(state: GameState, selection?: Selection | null)
 
 export default function TabOneScreen() {
   const [state, dispatch] = useReducer(klondikeReducer, undefined, createInitialState)
-  const [boardWidth, setBoardWidth] = useState<number | null>(null)
-  const cardMetrics = useMemo(() => computeCardMetrics(boardWidth), [boardWidth])
+  const [storageHydrationComplete, setStorageHydrationComplete] = useState(false)
+  const [boardLayout, setBoardLayout] = useState<{ width: number | null; height: number | null }>({
+    width: null,
+    height: null,
+  })
+  const cardMetrics = useMemo(() => computeCardMetrics(boardLayout.width), [boardLayout.width])
   const toast = useToastController()
   const navigation = useNavigation()
+  const colorScheme = useColorScheme()
+  const feltBackground = colorScheme === 'dark' ? COLOR_FELT_DARK : COLOR_FELT_LIGHT
+  const animationToggles = useAnimationToggles()
+  const {
+    master: animationsEnabled,
+    cardFlights: cardFlightsEnabled,
+    invalidMoveWiggle: invalidMoveEnabled,
+    wasteFan: wasteFanEnabled,
+    cardFlip: cardFlipEnabled,
+    foundationGlow: foundationGlowEnabled,
+    celebrations: celebrationAnimationsEnabled,
+  } = animationToggles
   const dropHints = useMemo(() => getDropHints(state), [state])
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
   const winCelebrationsRef = useRef(state.winCelebrations)
   const cardFlights = useSharedValue<Record<string, CardFlightSnapshot>>({})
+  const cardFlightMemoryRef = useRef<Record<string, CardFlightSnapshot>>({})
+  const recentFoundationArrivalsRef = useRef<Map<string, number>>(new Map())
+  const stateRef = useRef(state)
+  const topRowLayoutRef = useRef<LayoutRectangle | null>(null)
+  const foundationLayoutsRef = useRef<Partial<Record<Suit, LayoutRectangle>>>({})
+  const boardLockedRef = useRef(false)
+  const [boardLocked, setBoardLocked] = useState(false)
+  const [celebrationState, setCelebrationState] = useState<CelebrationState | null>(null)
+  const updateBoardLocked = useCallback((locked: boolean) => {
+    boardLockedRef.current = locked
+    setBoardLocked(locked)
+  }, [])
+  const isCelebrationActive = celebrationState !== null
+  const handleTopRowLayout = useCallback((layout: LayoutRectangle) => {
+    topRowLayoutRef.current = layout
+  }, [])
+  const handleFoundationLayout = useCallback((suit: Suit, layout: LayoutRectangle) => {
+    foundationLayoutsRef.current[suit] = layout
+  }, [])
+  const handleCardMeasured = useCallback((cardId: string, snapshot: CardFlightSnapshot) => {
+    cardFlightMemoryRef.current[cardId] = snapshot
+  }, [])
+  const registerFoundationArrival = useCallback((cardId: string | null | undefined) => {
+    if (!cardId) {
+      return
+    }
+    const expiry = Date.now() + FOUNDATION_WIGGLE_SUPPRESS_MS
+    recentFoundationArrivalsRef.current.set(cardId, expiry)
+    setTimeout(() => {
+      const storedExpiry = recentFoundationArrivalsRef.current.get(cardId)
+      if (storedExpiry !== undefined && storedExpiry <= Date.now()) {
+        recentFoundationArrivalsRef.current.delete(cardId)
+      }
+    }, FOUNDATION_WIGGLE_SUPPRESS_MS)
+  }, [])
+  const ensureCardFlightsReady = useCallback(() => {
+    if (!cardFlightsEnabled) {
+      return
+    }
+    if (!Object.keys(cardFlightMemoryRef.current).length) {
+      return
+    }
+    cardFlights.value = {
+      ...cardFlights.value,
+      ...cardFlightMemoryRef.current,
+    }
+  }, [cardFlights, cardFlightsEnabled])
+  const resetCardFlights = useCallback(() => {
+    cardFlightMemoryRef.current = {}
+    cardFlights.value = {}
+  }, [cardFlights])
   const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(() => ({
     ...EMPTY_INVALID_WIGGLE,
     lookup: new Set<string>(),
   }))
+  const dispatchWithFlightPrep = useCallback(
+    (action: GameAction, selection?: Selection | null) => {
+      if (boardLockedRef.current) {
+        return
+      }
+
+      if (!cardFlightsEnabled) {
+        ensureCardFlightsReady()
+        dispatch(action)
+        return
+      }
+
+      const waitStart = Date.now()
+
+      const attemptDispatch = () => {
+        const ids = selection ? collectSelectionCardIds(stateRef.current, selection) : []
+        const snapshotsReady =
+          ids.length === 0 || ids.every((id) => !!cardFlightMemoryRef.current[id])
+
+        if (snapshotsReady || Date.now() - waitStart >= FLIGHT_WAIT_TIMEOUT_MS) {
+          ensureCardFlightsReady()
+          if (!snapshotsReady && __DEV__) {
+            console.warn('[FlightPrep] Timeout waiting for snapshots', {
+              action: action.type,
+              ids,
+            })
+          }
+          dispatch(action)
+          return
+        }
+
+        requestAnimationFrame(attemptDispatch)
+      }
+
+      attemptDispatch()
+    },
+    [cardFlightsEnabled, dispatch, ensureCardFlightsReady],
+  )
   const triggerInvalidSelectionWiggle = useCallback(
     (selection?: Selection | null) => {
       const ids = collectSelectionCardIds(state, selection)
@@ -225,48 +381,208 @@ export default function TabOneScreen() {
     },
     [state],
   )
+  const autoPlayActive = state.isAutoCompleting || state.autoQueue.length > 0
+  const shouldSuppressFoundationWiggle = useCallback((selection: Selection | null | undefined) => {
+    const now = Date.now()
+
+    const ids = selection ? collectSelectionCardIds(stateRef.current, selection) : []
+    if (ids.length) {
+      const allRecent = ids.every((id) => {
+        const expiry = recentFoundationArrivalsRef.current.get(id)
+        return expiry !== undefined && expiry >= now
+      })
+      if (allRecent) {
+        return true
+      }
+    }
+
+    for (const expiry of recentFoundationArrivalsRef.current.values()) {
+      if (expiry >= now) {
+        return true
+      }
+    }
+
+    return false
+  }, [])
   const notifyInvalidMove = useCallback(
     (options?: { selection?: Selection | null }) => {
+      if (autoPlayActive) {
+        return
+      }
+      if (boardLockedRef.current) {
+        return
+      }
+      if (shouldSuppressFoundationWiggle(options?.selection ?? null)) {
+        if (__DEV__) {
+          console.log('[Wiggle] suppressed for recent foundation arrival', options)
+        }
+        return
+      }
       triggerInvalidSelectionWiggle(options?.selection ?? null)
     },
-    [triggerInvalidSelectionWiggle],
+    [autoPlayActive, shouldSuppressFoundationWiggle, triggerInvalidSelectionWiggle],
   )
 
   const drawLabel = state.stock.length ? 'Draw' : ''
 
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
+
+  // Requirement PBI-13: hydrate persisted Klondike state on launch.
+  useEffect(() => {
+    let isCancelled = false
+
+    ;(async () => {
+      try {
+        const persistedState = await loadGameState()
+        if (isCancelled) {
+          return
+        }
+        if (persistedState) {
+          dispatch({ type: 'HYDRATE_STATE', state: persistedState })
+        }
+      } catch (error) {
+        if (isCancelled) {
+          return
+        }
+
+        let message = 'Saved game was corrupted and has been cleared.'
+        if (error instanceof PersistedGameError && error.reason === 'unsupported-version') {
+          message = 'Saved game came from an older version and has been cleared.'
+        }
+
+        try {
+          await clearGameState()
+        } catch (clearError) {
+          console.warn('Failed clearing invalid saved game state', clearError)
+        }
+
+        if (!isCancelled) {
+          toast.show('Game reset', { message })
+        }
+      } finally {
+        if (!isCancelled) {
+          setStorageHydrationComplete(true)
+        }
+      }
+    })()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [dispatch, toast])
+
+  // Requirement PBI-13: persist state changes after hydration.
+  useEffect(() => {
+    if (!storageHydrationComplete) {
+      return
+    }
+
+    let isCancelled = false
+
+    ;(async () => {
+      try {
+        await saveGameState(state)
+      } catch (error) {
+        if (!isCancelled) {
+          console.warn('Failed to persist Klondike game state', error)
+        }
+      }
+    })()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [state, storageHydrationComplete])
+
   const handleBoardLayout = useCallback((event: LayoutChangeEvent) => {
-    setBoardWidth(event.nativeEvent.layout.width)
+    const { width, height } = event.nativeEvent.layout
+    setBoardLayout((previous) => {
+      if (previous.width === width && previous.height === height) {
+        return previous
+      }
+      return { width, height }
+    })
   }, [])
 
   const handleDraw = useCallback(() => {
+    if (boardLockedRef.current) {
+      return
+    }
     if (!state.stock.length && !state.waste.length) {
       notifyInvalidMove()
       return
     }
+    ensureCardFlightsReady()
     dispatch({ type: 'DRAW_OR_RECYCLE' })
-  }, [dispatch, notifyInvalidMove, state.stock.length, state.waste.length])
+  }, [dispatch, ensureCardFlightsReady, notifyInvalidMove, state.stock.length, state.waste.length])
 
   const handleUndo = useCallback(() => {
+    if (boardLockedRef.current) {
+      return
+    }
     if (!state.history.length) {
       notifyInvalidMove()
       return
     }
+    ensureCardFlightsReady()
     dispatch({ type: 'UNDO' })
-  }, [dispatch, notifyInvalidMove, state.history.length])
+  }, [dispatch, ensureCardFlightsReady, notifyInvalidMove, state.history.length])
 
-  const handleNewGame = useCallback(() => {
-    Alert.alert('Start a new game?', 'Current progress will be lost.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'New Game',
-        style: 'destructive',
+  const requestNewGame = useCallback(
+    (options?: { reason?: 'manual' | 'celebration' }) => {
+      const reason = options?.reason ?? 'manual'
+      const forced = reason === 'celebration' || boardLockedRef.current
+      const buttons: Array<{
+        text: string
+        style?: 'default' | 'cancel' | 'destructive'
+        onPress?: () => void
+      }> = []
+
+      if (forced) {
+        updateBoardLocked(true)
+      } else {
+        buttons.push({ text: 'Cancel', style: 'cancel' })
+      }
+
+      buttons.push({
+        text: 'Deal Again',
+        style: forced ? 'default' : 'destructive',
         onPress: () => {
+          setCelebrationState(null)
+          resetCardFlights()
+          foundationLayoutsRef.current = {}
+          topRowLayoutRef.current = null
+          winCelebrationsRef.current = 0
+          void clearGameState().catch((error) => {
+            console.warn('Failed to clear persisted game before new shuffle', error)
+          })
           dispatch({ type: 'NEW_GAME' })
+          updateBoardLocked(false)
           toast.show('New game', { message: 'Shuffled cards and reset the board.' })
         },
-      },
-    ])
-  }, [dispatch, toast])
+      })
+
+      Alert.alert(
+        'Start a new game?',
+        forced ? 'Nice win! Ready for another round?' : 'Ready for another round?',
+        buttons,
+        { cancelable: !forced },
+      )
+    },
+    [clearGameState, dispatch, resetCardFlights, toast, updateBoardLocked],
+  )
+
+  const handleCelebrationComplete = useCallback(() => {
+    setCelebrationState(null)
+    requestNewGame({ reason: 'celebration' })
+  }, [requestNewGame])
+
+  const handleCelebrationAbort = useCallback(() => {
+    setCelebrationState(null)
+    requestNewGame({ reason: 'celebration' })
+  }, [requestNewGame])
 
   const attemptAutoMove = useCallback(
     (selection: Selection) => {
@@ -275,24 +591,33 @@ export default function TabOneScreen() {
         notifyInvalidMove({ selection })
         return
       }
-      dispatch({ type: 'APPLY_MOVE', selection, target })
+      dispatchWithFlightPrep({ type: 'APPLY_MOVE', selection, target }, selection)
     },
-    [dispatch, notifyInvalidMove, state],
+    [dispatchWithFlightPrep, notifyInvalidMove, state],
   )
 
   const handleManualSelectTableau = useCallback(
     (columnIndex: number, cardIndex: number) => {
+      if (boardLockedRef.current) {
+        return
+      }
       dispatch({ type: 'SELECT_TABLEAU', columnIndex, cardIndex })
     },
     [dispatch],
   )
 
   const handleManualWasteSelect = useCallback(() => {
+    if (boardLockedRef.current) {
+      return
+    }
     dispatch({ type: 'SELECT_WASTE' })
   }, [dispatch])
 
   const handleManualFoundationSelect = useCallback(
     (suit: Suit) => {
+      if (boardLockedRef.current) {
+        return
+      }
       dispatch({ type: 'SELECT_FOUNDATION_TOP', suit })
     },
     [dispatch],
@@ -300,20 +625,26 @@ export default function TabOneScreen() {
 
   const handleColumnPress = useCallback(
     (columnIndex: number) => {
+      if (boardLockedRef.current) {
+        return
+      }
       if (!state.selected) {
         return
       }
       if (dropHints.tableau[columnIndex]) {
-        dispatch({ type: 'PLACE_ON_TABLEAU', columnIndex })
+        dispatchWithFlightPrep({ type: 'PLACE_ON_TABLEAU', columnIndex }, state.selected)
       } else {
         notifyInvalidMove({ selection: state.selected })
       }
     },
-    [dispatch, dropHints.tableau, notifyInvalidMove, state.selected],
+    [dispatchWithFlightPrep, dropHints.tableau, notifyInvalidMove, state.selected],
   )
 
 const handleFoundationPress = useCallback(
   (suit: Suit) => {
+    if (boardLockedRef.current) {
+      return
+    }
     if (!state.selected) {
       if (state.foundations[suit].length) {
         attemptAutoMove({ source: 'foundation', suit })
@@ -321,35 +652,41 @@ const handleFoundationPress = useCallback(
       return
     }
     if (dropHints.foundations[suit]) {
-      dispatch({ type: 'PLACE_ON_FOUNDATION', suit })
+        dispatchWithFlightPrep({ type: 'PLACE_ON_FOUNDATION', suit }, state.selected)
     } else {
       notifyInvalidMove({ selection: state.selected })
     }
   },
-  [attemptAutoMove, dispatch, dropHints.foundations, notifyInvalidMove, state.foundations, state.selected],
+    [attemptAutoMove, dispatchWithFlightPrep, dropHints.foundations, notifyInvalidMove, state.foundations, state.selected],
 )
 
   const clearSelection = useCallback(() => {
+    if (boardLockedRef.current) {
+      return
+    }
     if (state.selected) {
       dispatch({ type: 'CLEAR_SELECTION' })
     }
   }, [dispatch, state.selected])
 
+  const canUndo = !boardLocked && state.history.length > 0
+  const openDrawer = useCallback(() => {
+    navigation.dispatch(DrawerActions.openDrawer())
+  }, [navigation])
+
   useLayoutEffect(() => {
     navigation.setOptions({
+      headerTitle: 'Klondike',
       headerRight: () => (
-        <XStack gap="$2" mr="$4">
-          <Link href="/modal" asChild>
-            <Button size="$2.5">Hello!</Button>
-          </Link>
-          <Button size="$2.5" variant="outlined" onPress={handleNewGame}>
-            New Game
-          </Button>
-        </XStack>
+        <HeaderControls
+          onMenuPress={openDrawer}
+          onNewGame={() => requestNewGame({ reason: 'manual' })}
+        />
       ),
     })
-  }, [handleNewGame, navigation])
+  }, [navigation, openDrawer, requestNewGame])
 
+  // Requirement PBI-13: persist state changes after hydration.
   useEffect(() => {
     if (state.autoCompleteRuns > autoCompleteRunsRef.current) {
       toast.show('Auto-complete engaged', {
@@ -360,26 +697,124 @@ const handleFoundationPress = useCallback(
   }, [state.autoCompleteRuns, toast])
 
   useEffect(() => {
-    if (state.winCelebrations > winCelebrationsRef.current) {
-      toast.show('🎉 Tada!', { message: 'Foundations complete!' })
-      winCelebrationsRef.current = state.winCelebrations
+    if (!animationsEnabled || !celebrationAnimationsEnabled) {
+      return
     }
-  }, [state.winCelebrations, toast])
+
+    if (state.winCelebrations <= winCelebrationsRef.current) {
+      return
+    }
+
+    winCelebrationsRef.current = state.winCelebrations
+    toast.show('🎉 Tada!', { message: 'Foundations complete!' })
+
+    if (celebrationState) {
+      return
+    }
+
+    ensureCardFlightsReady()
+
+    const boardWidthValue = boardLayout.width ?? 0
+    const boardHeightValue = boardLayout.height ?? 0
+
+    if (!boardWidthValue || !boardHeightValue) {
+      return
+    }
+
+    const topLayout = topRowLayoutRef.current
+    const topOffsetX = topLayout?.x ?? 0
+    const topOffsetY = topLayout?.y ?? 0
+    const fallbackSpacing = cardMetrics.width + FOUNDATION_FALLBACK_GAP
+    const cards: CelebrationCardConfig[] = []
+
+    FOUNDATION_SUIT_ORDER.forEach((suit, suitIndex) => {
+      const pile = state.foundations[suit]
+      if (!pile.length) {
+        return
+      }
+      const layout = foundationLayoutsRef.current[suit]
+      const baseX = topOffsetX + (layout?.x ?? suitIndex * fallbackSpacing)
+      const baseY = topOffsetY + (layout?.y ?? 0)
+
+      pile.forEach((card, stackIndex) => {
+        const cardOffsetY = stackIndex * (cardMetrics.height * 0.02)
+        cards.push({
+          card,
+          suit,
+          suitIndex,
+          stackIndex,
+          baseX,
+          baseY: baseY - cardOffsetY,
+          randomSeed: Math.random(),
+        })
+      })
+    })
+
+    if (!cards.length) {
+      return
+    }
+
+    const shuffledCards = [...cards].sort(() => Math.random() - 0.5)
+    const modeId = Math.floor(Math.random() * CELEBRATION_MODE_COUNT)
+
+    setCelebrationState({
+      modeId,
+      durationMs: CELEBRATION_MODE_DURATIONS_MS[modeId],
+      boardWidth: boardWidthValue,
+      boardHeight: boardHeightValue,
+      cards: shuffledCards,
+    })
+    updateBoardLocked(true)
+  }, [
+    animationsEnabled,
+    celebrationAnimationsEnabled,
+    boardLayout.height,
+    boardLayout.width,
+    cardMetrics.height,
+    cardMetrics.width,
+    celebrationState,
+    ensureCardFlightsReady,
+    state.foundations,
+    state.winCelebrations,
+    toast,
+    updateBoardLocked,
+  ])
 
   useEffect(() => {
     if (!state.isAutoCompleting || state.autoQueue.length === 0) {
       return
     }
-    const timer = setTimeout(() => {
-      dispatch({ type: 'ADVANCE_AUTO_QUEUE' })
-    }, AUTO_QUEUE_INTERVAL_MS)
-    return () => clearTimeout(timer)
-  }, [dispatch, state.autoQueue.length, state.isAutoCompleting])
+
+    const [nextAction] = state.autoQueue
+    if (!nextAction) {
+      return
+    }
+
+    const delay =
+      nextAction.type === 'move' ? AUTO_QUEUE_MOVE_DELAY_MS : AUTO_QUEUE_INTERVAL_MS
+    const selection = nextAction.type === 'move' ? nextAction.selection : null
+
+    const timeoutId = setTimeout(() => {
+      dispatchWithFlightPrep({ type: 'ADVANCE_AUTO_QUEUE' }, selection)
+    }, delay)
+
+    return () => {
+      clearTimeout(timeoutId)
+    }
+  }, [dispatchWithFlightPrep, state.autoQueue, state.isAutoCompleting])
 
   return (
-    <YStack flex={1} bg="$background" px="$2" pt="$6" pb="$2" gap="$4">
+    <YStack
+      flex={1}
+      px="$2"
+      pt="$6"
+      pb="$2"
+      gap="$4"
+      style={{ backgroundColor: feltBackground }}
+    >
+      <FeltPattern />
       <H2 style={styles.centeredHeading}>Klondike Solitaire</H2>
-      <Paragraph style={styles.centeredParagraph} color="$color11">
+      <Paragraph style={styles.centeredParagraph}>
         Tap to auto-move cards; long-press to pick one up and choose a destination.
       </Paragraph>
 
@@ -404,6 +839,13 @@ const handleFoundationPress = useCallback(
           notifyInvalidMove={notifyInvalidMove}
           invalidWiggle={invalidWiggle}
           cardFlights={cardFlights}
+          onCardMeasured={handleCardMeasured}
+          cardFlightMemory={cardFlightMemoryRef.current}
+          onFoundationArrival={registerFoundationArrival}
+          interactionsLocked={boardLocked}
+          hideFoundations={isCelebrationActive}
+          onTopRowLayout={handleTopRowLayout}
+          onFoundationLayout={handleFoundationLayout}
         />
 
         <TableauSection
@@ -415,22 +857,44 @@ const handleFoundationPress = useCallback(
           onColumnPress={handleColumnPress}
           invalidWiggle={invalidWiggle}
           cardFlights={cardFlights}
+          onCardMeasured={handleCardMeasured}
+          cardFlightMemory={cardFlightMemoryRef.current}
+          interactionsLocked={boardLocked}
         />
 
         <SelectionHint state={state} onClear={clearSelection} />
-        <XStack gap="$2" items="center">
+        <XStack
+          gap="$2"
+          style={{ justifyContent: 'flex-start', alignItems: 'center' }}
+        >
           <Text style={styles.movesLabel}>Moves</Text>
           <Text style={styles.movesValue}>{state.moveCount}</Text>
         </XStack>
+        {celebrationState && (
+          <CelebrationOverlay
+            cards={celebrationState.cards}
+            cardMetrics={cardMetrics}
+            boardWidth={celebrationState.boardWidth}
+            boardHeight={celebrationState.boardHeight}
+            modeId={celebrationState.modeId}
+            durationMs={celebrationState.durationMs}
+            onComplete={handleCelebrationComplete}
+            onAbort={handleCelebrationAbort}
+          />
+        )}
       </YStack>
 
-      <ControlBar
-        onDraw={handleDraw}
-        drawLabel={drawLabel}
-        onUndo={handleUndo}
-        canUndo={state.history.length > 0}
-        canDraw={Boolean(state.stock.length || state.waste.length)}
-      />
+      <XStack mt="$3" style={{ justifyContent: 'flex-end' }}>
+        <Button
+          width="50%"
+          icon={Undo2}
+          onPress={handleUndo}
+          disabled={!canUndo}
+          themeInverse
+        >
+          Undo
+        </Button>
+      </XStack>
     </YStack>
   )
 }
@@ -448,6 +912,13 @@ type TopRowProps = {
   notifyInvalidMove: (options?: { selection?: Selection | null }) => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
+  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  cardFlightMemory: Record<string, CardFlightSnapshot>
+  onFoundationArrival?: (cardId: string | null | undefined) => void
+  interactionsLocked: boolean
+  hideFoundations?: boolean
+  onTopRowLayout?: (layout: LayoutRectangle) => void
+  onFoundationLayout?: (suit: Suit, layout: LayoutRectangle) => void
 }
 
 const TopRow = ({
@@ -463,8 +934,16 @@ const TopRow = ({
   notifyInvalidMove,
   invalidWiggle,
   cardFlights,
+  onCardMeasured,
+  cardFlightMemory,
+  onFoundationArrival,
+  interactionsLocked,
+  hideFoundations,
+  onTopRowLayout,
+  onFoundationLayout,
 }: TopRowProps) => {
-  const stockDisabled = !state.stock.length && !state.waste.length
+  const handleFoundationArrival = onFoundationArrival ?? (() => {})
+  const stockDisabled = (!state.stock.length && !state.waste.length) || interactionsLocked
   const wasteSelected = state.selected?.source === 'waste'
   const showRecycle = !state.stock.length && state.waste.length > 0
   const drawVariant = showRecycle
@@ -474,15 +953,32 @@ const TopRow = ({
       : 'empty'
 
   const handleWastePress = useCallback(() => {
+    if (interactionsLocked) {
+      return
+    }
     if (!state.waste.length) {
       notifyInvalidMove()
       return
     }
     onWasteTap()
-  }, [notifyInvalidMove, onWasteTap, state.waste.length])
+  }, [interactionsLocked, notifyInvalidMove, onWasteTap, state.waste.length])
+
+  const handleRowLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      onTopRowLayout?.(event.nativeEvent.layout)
+    },
+    [onTopRowLayout],
+  )
+
+  const createFoundationLayoutHandler = useCallback(
+    (suit: Suit) => (layout: LayoutRectangle) => {
+      onFoundationLayout?.(suit, layout)
+    },
+    [onFoundationLayout],
+  )
 
   return (
-    <XStack gap="$4" width="100%" items="flex-start">
+    <XStack gap="$4" width="100%" items="flex-start" onLayout={handleRowLayout}>
       <XStack gap="$2" flexWrap="nowrap" justify="flex-start" shrink={0}>
         {FOUNDATION_SUIT_ORDER.map((suit) => (
           <FoundationPile
@@ -496,6 +992,12 @@ const TopRow = ({
             onLongPress={() => onFoundationHold(suit)}
             invalidWiggle={invalidWiggle}
             cardFlights={cardFlights}
+            onCardMeasured={onCardMeasured}
+            cardFlightMemory={cardFlightMemory}
+            onCardArrived={handleFoundationArrival}
+            disableInteractions={interactionsLocked}
+            hideTopCard={hideFoundations}
+            onLayout={createFoundationLayoutHandler(suit)}
           />
         ))}
       </XStack>
@@ -504,7 +1006,7 @@ const TopRow = ({
         <PileButton
           label={`${state.waste.length}`}
           onPress={handleWastePress}
-          disabled={!state.waste.length}
+          disabled={!state.waste.length || interactionsLocked}
           disablePress
         >
           {state.waste.length ? (
@@ -516,6 +1018,9 @@ const TopRow = ({
               onLongPress={onWasteHold}
               invalidWiggle={invalidWiggle}
               cardFlights={cardFlights}
+              onCardMeasured={onCardMeasured}
+              cardFlightMemory={cardFlightMemory}
+              disabled={interactionsLocked}
             />
           ) : (
             <EmptySlot highlight={false} metrics={cardMetrics} />
@@ -546,6 +1051,9 @@ type TableauSectionProps = {
   onColumnPress: (columnIndex: number) => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
+  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  cardFlightMemory: Record<string, CardFlightSnapshot>
+  interactionsLocked: boolean
 }
 
 const TableauSection = ({
@@ -557,6 +1065,9 @@ const TableauSection = ({
   onColumnPress,
   invalidWiggle,
   cardFlights,
+  onCardMeasured,
+  cardFlightMemory,
+  interactionsLocked,
 }: TableauSectionProps) => (
   <View style={styles.tableauRow}>
     {state.tableau.map((column, columnIndex) => (
@@ -574,6 +1085,9 @@ const TableauSection = ({
         onColumnPress={() => onColumnPress(columnIndex)}
         invalidWiggle={invalidWiggle}
         cardFlights={cardFlights}
+        onCardMeasured={onCardMeasured}
+        cardFlightMemory={cardFlightMemory}
+        disableInteractions={interactionsLocked}
       />
     ))}
   </View>
@@ -590,6 +1104,9 @@ type TableauColumnProps = {
   onColumnPress: () => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
+  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  cardFlightMemory: Record<string, CardFlightSnapshot>
+  disableInteractions: boolean
 }
 
 const TableauColumn = ({
@@ -603,6 +1120,9 @@ const TableauColumn = ({
   onColumnPress,
   invalidWiggle,
   cardFlights,
+  onCardMeasured,
+  cardFlightMemory,
+  disableInteractions,
 }: TableauColumnProps) => {
   const columnHeight = column.length
     ? cardMetrics.height + (column.length - 1) * cardMetrics.stackOffset
@@ -629,7 +1149,8 @@ const TableauColumn = ({
           marginHorizontal: COLUMN_MARGIN,
         },
       ]}
-      onPress={onColumnPress}
+      onPress={disableInteractions ? undefined : onColumnPress}
+      disabled={disableInteractions}
     >
       {column.length === 0 && (
         <EmptySlot highlight={isDroppable} metrics={cardMetrics} />
@@ -646,10 +1167,20 @@ const TableauColumn = ({
             selectedCardIndex <= cardIndex &&
             card.faceUp
           }
-          onPress={card.faceUp ? () => onCardPress(cardIndex) : undefined}
-          onLongPress={card.faceUp ? () => onCardLongPress(cardIndex) : undefined}
+          onPress={
+            disableInteractions || !card.faceUp
+              ? undefined
+              : () => onCardPress(cardIndex)
+          }
+          onLongPress={
+            disableInteractions || !card.faceUp
+              ? undefined
+              : () => onCardLongPress(cardIndex)
+          }
           invalidWiggle={invalidWiggle}
           cardFlights={cardFlights}
+          onCardMeasured={onCardMeasured}
+          cardFlightMemory={cardFlightMemory}
         />
       ))}
     </Pressable>
@@ -666,6 +1197,8 @@ type CardViewProps = {
   onLongPress?: () => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
+  onCardMeasured?: (cardId: string, snapshot: CardFlightSnapshot) => void
+  cardFlightMemory?: Record<string, CardFlightSnapshot>
 }
 
 const CardView = ({
@@ -678,7 +1211,14 @@ const CardView = ({
   onLongPress,
   invalidWiggle,
   cardFlights,
+  onCardMeasured,
+  cardFlightMemory,
 }: CardViewProps) => {
+  const {
+    cardFlights: cardFlightsEnabled,
+    invalidMoveWiggle: invalidMoveEnabled,
+    cardFlip: cardFlipEnabled,
+  } = useAnimationToggles()
   const [renderFaceUp, setRenderFaceUp] = useState(card.faceUp)
   const shouldFloat = typeof offsetTop === 'number' || typeof offsetLeft === 'number'
   const positionStyle = shouldFloat
@@ -693,7 +1233,8 @@ const CardView = ({
   const flightX = useSharedValue(0)
   const flightY = useSharedValue(0)
   const flightZ = useSharedValue(0)
-  const hasPreviousSnapshot = ENABLE_ANIMATIONS && !!cardFlights.value[card.id]
+  const previousSnapshot = cardFlightMemory?.[card.id]
+  const hasPreviousSnapshot = cardFlightsEnabled && !!previousSnapshot
   const flightOpacity = useSharedValue(hasPreviousSnapshot ? 0 : 1)
   const flipScale = useSharedValue(1)
   const lastTriggerRef = useRef(invalidWiggle.key)
@@ -708,7 +1249,7 @@ const CardView = ({
     zIndex: flightZ.value > 0 ? flightZ.value : baseZIndex,
   }))
   const flipStyle = useAnimatedStyle(() => {
-    if (!ENABLE_ANIMATIONS || !ENABLE_CARD_FLIP_ANIMATION) {
+    if (!cardFlipEnabled) {
       return {}
     }
     return {
@@ -717,8 +1258,8 @@ const CardView = ({
   })
   const handleCardLayout = useCallback(() => {
     const cardId = card.id
-    const previousSnapshot = cardFlights.value[cardId]
-    if (ENABLE_ANIMATIONS && previousSnapshot) {
+    const snapshotBeforeLayout = cardFlightMemory?.[cardId]
+    if (cardFlightsEnabled && previousSnapshot) {
       flightOpacity.value = 0
     }
     runOnUI((prevSnapshot: CardFlightSnapshot | null) => {
@@ -727,20 +1268,24 @@ const CardView = ({
       if (!layout) {
         return
       }
-      if (!ENABLE_ANIMATIONS) {
+      if (!cardFlightsEnabled) {
+        const snapshot: CardFlightSnapshot = {
+          pageX: layout.pageX,
+          pageY: layout.pageY,
+          width: layout.width,
+          height: layout.height,
+        }
         cardFlights.value = {
           ...cardFlights.value,
-          [cardId]: {
-            pageX: layout.pageX,
-            pageY: layout.pageY,
-            width: layout.width,
-            height: layout.height,
-          },
+          [cardId]: snapshot,
         }
         flightX.value = 0
         flightY.value = 0
         flightZ.value = 0
         flightOpacity.value = 1
+        if (onCardMeasured) {
+          runOnJS(onCardMeasured)(cardId, snapshot)
+        }
         return
       }
       const existingSnapshot = cardFlights.value[cardId] as CardFlightSnapshot | undefined
@@ -760,21 +1305,25 @@ const CardView = ({
           flightY.value = withTiming(0, CARD_FLIGHT_TIMING)
         }
       }
+      const nextSnapshot: CardFlightSnapshot = {
+        pageX: layout.pageX,
+        pageY: layout.pageY,
+        width: layout.width,
+        height: layout.height,
+      }
       cardFlights.value = {
         ...cardFlights.value,
-        [cardId]: {
-          pageX: layout.pageX,
-          pageY: layout.pageY,
-          width: layout.width,
-          height: layout.height,
-        },
+        [cardId]: nextSnapshot,
       }
       flightOpacity.value = 1
-    })(previousSnapshot ?? null)
-  }, [cardFlights, card.id, cardRef, flightOpacity, flightX, flightY, flightZ])
+      if (onCardMeasured) {
+        runOnJS(onCardMeasured)(cardId, nextSnapshot)
+      }
+    })(previousSnapshot ?? snapshotBeforeLayout ?? null)
+  }, [cardFlightMemory, cardFlights, card.id, cardRef, flightOpacity, flightX, flightY, flightZ, onCardMeasured, previousSnapshot])
 
   useEffect(() => {
-    if (!ENABLE_ANIMATIONS || !ENABLE_WIGGLE_ANIMATION) {
+    if (!invalidMoveEnabled) {
       cancelAnimation(wiggle)
       wiggle.value = 0
       return
@@ -793,10 +1342,10 @@ const CardView = ({
       withTiming(WIGGLE_OFFSET_PX, WIGGLE_TIMING_CONFIG),
       withTiming(0, WIGGLE_TIMING_CONFIG),
     )
-  }, [invalidWiggle.key, shouldAnimateInvalid, wiggle])
+  }, [invalidMoveEnabled, invalidWiggle.key, shouldAnimateInvalid, wiggle])
 
   useEffect(() => {
-    if (!ENABLE_ANIMATIONS || !ENABLE_CARD_FLIP_ANIMATION) {
+    if (!cardFlipEnabled) {
       setRenderFaceUp(card.faceUp)
       flipScale.value = 1
       return
@@ -811,7 +1360,7 @@ const CardView = ({
       runOnJS(setRenderFaceUp)(card.faceUp)
       flipScale.value = withTiming(1, CARD_FLIP_HALF_TIMING)
     })
-  }, [card.faceUp, flipScale, renderFaceUp])
+  }, [card.faceUp, cardFlipEnabled, flipScale, renderFaceUp])
 
   const containerStaticStyle = {
     width: metrics.width,
@@ -955,6 +1504,9 @@ type WasteFanProps = {
   onLongPress: () => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
+  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  cardFlightMemory: Record<string, CardFlightSnapshot>
+  disabled?: boolean
 }
 
 const WasteFan = ({
@@ -965,6 +1517,9 @@ const WasteFan = ({
   onLongPress,
   invalidWiggle,
   cardFlights,
+  onCardMeasured,
+  cardFlightMemory,
+  disabled = false,
 }: WasteFanProps) => {
   const visible = cards.slice(-3)
   const overlap = Math.min(metrics.width * WASTE_FAN_OVERLAP_RATIO, WASTE_FAN_MAX_OFFSET)
@@ -990,19 +1545,22 @@ const WasteFan = ({
     <View style={{ width, height: metrics.height, position: 'relative' }}>
       {visible.map((card, index) => {
         const isTop = index === visible.length - 1
+        const enableInteractions = isTop && !disabled
         return (
           <WasteFanCard
             key={card.id}
             card={card}
             metrics={metrics}
             targetOffset={index * overlap}
-            isSelected={isTop && isSelected}
-            onPress={isTop ? onPress : undefined}
-            onLongPress={isTop ? onLongPress : undefined}
+            isSelected={enableInteractions && isSelected}
+            onPress={enableInteractions ? onPress : undefined}
+            onLongPress={enableInteractions ? onLongPress : undefined}
             invalidWiggle={invalidWiggle}
             isEntering={enteringLookup.has(card.id)}
             zIndex={index}
             cardFlights={cardFlights}
+            onCardMeasured={onCardMeasured}
+            cardFlightMemory={cardFlightMemory}
           />
         )
       })}
@@ -1021,6 +1579,8 @@ type WasteFanCardProps = {
   isEntering: boolean
   zIndex: number
   cardFlights: CardFlightRegistry
+  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  cardFlightMemory: Record<string, CardFlightSnapshot>
 }
 
 const WasteFanCard = ({
@@ -1034,21 +1594,24 @@ const WasteFanCard = ({
   isEntering,
   zIndex,
   cardFlights,
+  onCardMeasured,
+  cardFlightMemory,
 }: WasteFanCardProps) => {
+  const { wasteFan: wasteFanEnabled } = useAnimationToggles()
   const enterOffset = targetOffset + metrics.width * WASTE_ENTER_EXTRA_RATIO
-  const translateX = useSharedValue((!ENABLE_ANIMATIONS || !ENABLE_STACK_ANIMATION) ? targetOffset : (isEntering ? enterOffset : targetOffset))
+  const translateX = useSharedValue(!wasteFanEnabled ? targetOffset : isEntering ? enterOffset : targetOffset)
   const positionStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
   }))
 
   useEffect(() => {
     cancelAnimation(translateX)
-    if (!ENABLE_ANIMATIONS || !ENABLE_STACK_ANIMATION) {
+    if (!wasteFanEnabled) {
       translateX.value = targetOffset
       return
     }
     translateX.value = withTiming(targetOffset, WASTE_TIMING_CONFIG)
-  }, [targetOffset, translateX])
+  }, [targetOffset, translateX, wasteFanEnabled])
 
   return (
     <AnimatedView
@@ -1071,6 +1634,8 @@ const WasteFanCard = ({
         onLongPress={onLongPress}
         invalidWiggle={invalidWiggle}
         cardFlights={cardFlights}
+        onCardMeasured={onCardMeasured}
+        cardFlightMemory={cardFlightMemory}
       />
     </AnimatedView>
   )
@@ -1113,6 +1678,12 @@ type FoundationPileProps = {
   onLongPress: () => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
+  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  cardFlightMemory: Record<string, CardFlightSnapshot>
+  onCardArrived?: (cardId: string | null | undefined) => void
+  disableInteractions?: boolean
+  hideTopCard?: boolean
+  onLayout?: (layout: LayoutRectangle) => void
 }
 
 const FoundationPile = ({
@@ -1125,7 +1696,15 @@ const FoundationPile = ({
   onLongPress,
   invalidWiggle,
   cardFlights,
+  onCardMeasured,
+  cardFlightMemory,
+  onCardArrived,
+  disableInteractions = false,
+  hideTopCard = false,
+  onLayout,
 }: FoundationPileProps) => {
+  const { foundationGlow: foundationGlowEnabled } = useAnimationToggles()
+  const handleCardArrived = onCardArrived ?? (() => {})
   const topCard = cards[cards.length - 1]
   const hasCards = cards.length > 0
   const borderColor = isDroppable
@@ -1135,11 +1714,58 @@ const FoundationPile = ({
       : hasCards
         ? COLOR_FOUNDATION_BORDER
         : COLOR_COLUMN_BORDER
+  const glowOpacity = useSharedValue(0)
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+  }))
+  const lastGlowCardRef = useRef<string | null>(null)
+  const previousCountRef = useRef(cards.length)
+  const glowWidth = cardMetrics.width + FOUNDATION_GLOW_OUTSET * 2
+  const glowHeight = cardMetrics.height + FOUNDATION_GLOW_OUTSET * 2
+  useEffect(() => {
+    const previousCount = previousCountRef.current
+    previousCountRef.current = cards.length
+    const removedCard = cards.length < previousCount
+    const previousId = lastGlowCardRef.current
+    const currentId = topCard?.id ?? null
+
+    if (!foundationGlowEnabled) {
+      glowOpacity.value = 0
+      if (!removedCard && currentId && currentId !== previousId) {
+        handleCardArrived(currentId)
+      }
+      lastGlowCardRef.current = currentId
+      return
+    }
+    if (!currentId) {
+      lastGlowCardRef.current = null
+      glowOpacity.value = 0
+      return
+    }
+    if (removedCard) {
+      lastGlowCardRef.current = currentId
+      glowOpacity.value = 0
+      return
+    }
+    if (lastGlowCardRef.current === currentId) {
+      return
+    }
+    lastGlowCardRef.current = currentId
+    handleCardArrived(currentId)
+    cancelAnimation(glowOpacity)
+    glowOpacity.value = 0
+    glowOpacity.value = withSequence(
+      withTiming(FOUNDATION_GLOW_MAX_OPACITY, FOUNDATION_GLOW_IN_TIMING),
+      withTiming(0, FOUNDATION_GLOW_OUT_TIMING),
+    )
+  }, [cards.length, foundationGlowEnabled, glowOpacity, handleCardArrived, topCard?.id])
 
   return (
     <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
+      onPress={disableInteractions ? undefined : onPress}
+      onLongPress={disableInteractions ? undefined : onLongPress}
+      disabled={disableInteractions}
+      onLayout={(event) => onLayout?.(event.nativeEvent.layout)}
       style={[
         styles.foundation,
         {
@@ -1150,13 +1776,37 @@ const FoundationPile = ({
         },
       ]}
     >
+      <AnimatedView
+        pointerEvents="none"
+        style={[
+          styles.foundationGlow,
+          {
+            width: glowWidth,
+            height: glowHeight,
+            borderRadius: cardMetrics.radius + FOUNDATION_GLOW_OUTSET,
+            top: -FOUNDATION_GLOW_OUTSET,
+            left: -FOUNDATION_GLOW_OUTSET,
+            backgroundColor: FOUNDATION_GLOW_COLOR,
+          },
+          glowStyle,
+        ]}
+      />
       {topCard ? (
-        <CardView
-          card={topCard}
-          metrics={cardMetrics}
-          invalidWiggle={invalidWiggle}
-          cardFlights={cardFlights}
-        />
+        <AnimatedView
+          pointerEvents="none"
+          style={hideTopCard ? styles.hiddenCard : undefined}
+        >
+          <CardView
+            card={topCard}
+            metrics={cardMetrics}
+            invalidWiggle={invalidWiggle}
+            cardFlights={cardFlights}
+            onCardMeasured={onCardMeasured}
+            cardFlightMemory={cardFlightMemory}
+            onPress={disableInteractions ? undefined : onPress}
+            onLongPress={disableInteractions ? undefined : onLongPress}
+          />
+        </AnimatedView>
       ) : (
         <Text
           style={[
@@ -1171,6 +1821,251 @@ const FoundationPile = ({
   )
 }
 
+type CelebrationOverlayProps = {
+  cards: CelebrationCardConfig[]
+  cardMetrics: CardMetrics
+  boardWidth: number
+  boardHeight: number
+  modeId: number
+  durationMs: number
+  onComplete: () => void
+  onAbort: () => void
+}
+
+const CelebrationOverlay = ({
+  cards,
+  cardMetrics,
+  boardWidth,
+  boardHeight,
+  modeId,
+  durationMs,
+  onComplete,
+  onAbort,
+}: CelebrationOverlayProps) => {
+  const progress = useSharedValue(0)
+  const overlayFlights = useSharedValue<Record<string, CardFlightSnapshot>>({})
+  const abortedRef = useRef(false)
+
+  useEffect(() => {
+    abortedRef.current = false
+    progress.value = 0
+    progress.value = withTiming(1, { duration: durationMs, easing: Easing.linear }, (finished) => {
+      if (finished && !abortedRef.current) {
+        runOnJS(onComplete)()
+      }
+    })
+  }, [durationMs, onComplete, progress])
+
+  const handleAbort = useCallback(() => {
+    if (abortedRef.current) {
+      return
+    }
+    abortedRef.current = true
+    runOnUI(() => {
+      'worklet'
+      cancelAnimation(progress)
+    })()
+    runOnJS(onAbort)()
+  }, [onAbort, progress])
+
+  return (
+    <Pressable style={styles.celebrationOverlay} onPress={handleAbort}>
+      {cards.map((config, index) => (
+        <CelebrationCard
+          key={config.card.id}
+          config={config}
+          metrics={cardMetrics}
+          totalCards={cards.length}
+          index={index}
+          boardWidth={boardWidth}
+          boardHeight={boardHeight}
+          modeId={modeId}
+          progress={progress}
+          cardFlights={overlayFlights}
+        />
+      ))}
+    </Pressable>
+  )
+}
+
+type CelebrationCardProps = {
+  config: CelebrationCardConfig
+  metrics: CardMetrics
+  totalCards: number
+  index: number
+  boardWidth: number
+  boardHeight: number
+  modeId: number
+  progress: SharedValue<number>
+  cardFlights: SharedValue<Record<string, CardFlightSnapshot>>
+}
+
+const CelebrationCard = ({
+  config,
+  metrics,
+  totalCards,
+  index,
+  boardWidth,
+  boardHeight,
+  modeId,
+  progress,
+  cardFlights,
+}: CelebrationCardProps) => {
+  const animatedStyle = useAnimatedStyle(() => {
+    'worklet'
+    const p = progress.value
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
+    const easeInOutQuad = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2)
+    const eased = easeOutCubic(p)
+
+    const baseX = config.baseX
+    const baseY = config.baseY
+    const relativeIndex = index - totalCards / 2
+    const normalizedIndex = (index + 1) / totalCards
+    const seed = config.randomSeed
+    const stackFactor = config.stackIndex / 13
+
+    const centerX = boardWidth / 2 - metrics.width / 2
+    const centerY = boardHeight / 2 - metrics.height / 2
+
+    let targetX = baseX
+    let targetY = baseY
+    let rotation = 0
+    let scale = 1
+    let opacity = 1
+
+    switch (modeId % CELEBRATION_MODE_COUNT) {
+      case 0: {
+        const spread = relativeIndex * metrics.width * 0.4
+        const lift = boardHeight * 0.55
+        const parabola = -4 * (p - 0.5) * (p - 0.5) + 1
+        targetX = baseX + spread
+        targetY = baseY - lift * Math.max(parabola, 0)
+        rotation = relativeIndex * 6 * p
+        scale = 1 + 0.08 * Math.max(parabola, 0)
+        break
+      }
+      case 1: {
+        const angle = TAU * (p * 1.6 + seed)
+        const radius = p * Math.min(boardWidth, boardHeight) * 0.45
+        targetX = centerX + Math.cos(angle) * radius
+        targetY = centerY + Math.sin(angle) * radius
+        rotation = (angle * 180) / Math.PI
+        scale = 1 + 0.1 * p
+        break
+      }
+      case 2: {
+        const waveSpan = boardWidth * 0.8
+        const baseOffsetX = boardWidth * 0.1
+        const oscillation = Math.sin(p * TAU * 2 + seed * TAU) * boardHeight * 0.12 * p
+        targetX = baseOffsetX + waveSpan * p
+        targetY = baseY - boardHeight * 0.3 * p + oscillation
+        rotation = Math.sin(p * TAU + seed * TAU) * 20
+        break
+      }
+      case 3: {
+        const helixRadius = boardWidth * 0.3
+        const helixAngle = TAU * (p * 2 + seed)
+        targetX = centerX + Math.cos(helixAngle) * helixRadius * (0.5 + 0.5 * p)
+        targetY = baseY - boardHeight * 0.45 * p + Math.sin(helixAngle) * boardHeight * 0.05
+        rotation = (helixAngle * 90) / Math.PI
+        scale = 1 + 0.05 * p
+        break
+      }
+      case 4: {
+        const horizontal = seed < 0.5 ? 0 : boardWidth - metrics.width
+        const verticalStart = normalizedIndex < 0.5 ? 0 : boardHeight - metrics.height
+        const sweep = easeInOutQuad(p)
+        targetX = baseX + (horizontal - baseX) * sweep
+        targetY = baseY + (verticalStart - baseY) * sweep
+        rotation = (seed < 0.5 ? -1 : 1) * 45 * sweep
+        break
+      }
+      case 5: {
+        const angle = TAU * (seed + normalizedIndex * 0.5 + p)
+        const burstRadius = Math.min(boardWidth, boardHeight) * (0.2 + 0.6 * p)
+        targetX = centerX + Math.cos(angle) * burstRadius
+        targetY = centerY + Math.sin(angle) * burstRadius - boardHeight * 0.15 * p
+        rotation = (angle * 180) / Math.PI
+        opacity = 1 - p * 0.2
+        break
+      }
+      case 6: {
+        const direction = index % 2 === 0 ? 1 : -1
+        targetX = baseX + direction * boardWidth * 0.45 * p
+        targetY = baseY - boardHeight * 0.4 * p + Math.sin(p * TAU * (2 + seed)) * boardHeight * 0.1 * (1 - p)
+        rotation = direction * 20 * p
+        break
+      }
+      case 7: {
+        const targetColumnX = centerX + (relativeIndex * metrics.width * 0.8)
+        targetX = targetColumnX
+        targetY = boardHeight - metrics.height - stackFactor * metrics.height * 0.4
+        rotation = 180 * p
+        break
+      }
+      case 8: {
+        const rings = 3
+        const ringIndex = Math.floor(normalizedIndex * rings)
+        const ringRadius = (Math.min(boardWidth, boardHeight) * 0.15) * (ringIndex + 1)
+        const angle = TAU * (seed + p * (0.5 + ringIndex))
+        targetX = centerX + Math.cos(angle) * ringRadius
+        targetY = centerY + Math.sin(angle) * ringRadius
+        rotation = ringIndex * 30 + p * 90
+        scale = 1 + ringIndex * 0.05
+        break
+      }
+      case 9:
+      default: {
+        const explosionRadius = Math.min(boardWidth, boardHeight) * (0.25 + 0.5 * p)
+        const explosionAngle = TAU * (seed + p)
+        targetX = centerX + Math.cos(explosionAngle) * explosionRadius
+        targetY = centerY - Math.abs(Math.sin(explosionAngle)) * explosionRadius
+        rotation = (explosionAngle * 180) / Math.PI
+        opacity = 1 - Math.max(0, p - 0.7) / 0.3
+        break
+      }
+    }
+
+    const baseCurrentX = baseX + (targetX - baseX) * eased
+    const baseCurrentY = baseY + (targetY - baseY) * eased
+    const wobbleEnvelope = p * (1 - p)
+    const wobbleX = Math.sin(TAU * (p * (2.2 + seed) + seed)) * metrics.width * 0.1 * wobbleEnvelope
+    const wobbleY = Math.cos(TAU * (p * (2.5 + seed * 0.5) + seed)) * metrics.height * 0.08 * wobbleEnvelope
+    const finalX = baseCurrentX + wobbleX
+    const finalY = baseCurrentY + wobbleY
+
+    return {
+      transform: [
+        { translateX: finalX },
+        { translateY: finalY },
+        { rotate: `${rotation}deg` },
+        { scale: scale * (1 + wobbleEnvelope * 0.05) },
+      ],
+      opacity,
+    }
+  })
+
+  return (
+    <AnimatedView
+      pointerEvents="none"
+      style={[
+        styles.celebrationCard,
+        animatedStyle,
+        { width: metrics.width, height: metrics.height },
+      ]}
+    >
+      <CardView
+        card={config.card}
+        metrics={metrics}
+        invalidWiggle={EMPTY_INVALID_WIGGLE}
+        cardFlights={cardFlights}
+        cardFlightMemory={{}}
+      />
+    </AnimatedView>
+  )
+}
+
 const SelectionHint = ({ state, onClear }: { state: GameState; onClear: () => void }) => {
   if (!state.selected) {
     return null
@@ -1179,7 +2074,7 @@ const SelectionHint = ({ state, onClear }: { state: GameState; onClear: () => vo
   const selectionLabel = describeSelection(state)
 
   return (
-    <XStack gap="$2" items="center">
+    <XStack gap="$2" style={{ alignItems: 'center' }}>
       <Paragraph color="$color11">Selected: {selectionLabel}</Paragraph>
       <Button size="$2" variant="outlined" onPress={onClear}>
         Clear
@@ -1187,25 +2082,6 @@ const SelectionHint = ({ state, onClear }: { state: GameState; onClear: () => vo
     </XStack>
   )
 }
-
-type ControlBarProps = {
-  onDraw: () => void
-  drawLabel: string
-  onUndo: () => void
-  canUndo: boolean
-  canDraw: boolean
-}
-
-const ControlBar = ({ onDraw, drawLabel, onUndo, canUndo, canDraw }: ControlBarProps) => (
-  <XStack gap="$3">
-    <Button flex={1} icon={RefreshCcw} onPress={onDraw} disabled={!canDraw}>
-      {drawLabel}
-    </Button>
-    <Button flex={1} icon={Undo2} onPress={onUndo} disabled={!canUndo}>
-      Undo
-    </Button>
-  </XStack>
-)
 
 const describeSelection = (state: GameState): string => {
   const selection = state.selected
@@ -1229,14 +2105,17 @@ const rankToLabel = (rank: Rank): string => FACE_CARD_LABELS[rank] ?? String(ran
 const styles = StyleSheet.create({
   centeredHeading: {
     textAlign: 'center',
+    color: COLOR_FELT_TEXT_PRIMARY,
   },
   centeredParagraph: {
     textAlign: 'center',
+    color: COLOR_FELT_TEXT_SECONDARY,
   },
   boardShell: {
     width: '100%',
     alignSelf: 'stretch',
     paddingHorizontal: COLUMN_MARGIN,
+    position: 'relative',
   },
   tableauRow: {
     width: '100%',
@@ -1300,14 +2179,14 @@ const styles = StyleSheet.create({
   },
   movesLabel: {
     fontSize: 12,
-    color: COLOR_TEXT_MUTED,
+    color: COLOR_FELT_TEXT_SECONDARY,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   movesValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: COLOR_TEXT_STRONG,
+    color: COLOR_FELT_TEXT_PRIMARY,
   },
   emptySlot: {
     borderWidth: 2,
@@ -1316,7 +2195,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyLabel: {
-    color: COLOR_TEXT_MUTED,
+    color: COLOR_FELT_TEXT_SECONDARY,
   },
   cardBack: {
     backgroundColor: COLOR_CARD_BACK,
@@ -1333,7 +2212,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   cardBackRecycle: {
-    borderColor: COLOR_TEXT_STRONG,
+    borderColor: COLOR_FELT_TEXT_SECONDARY,
   },
   cardBackEmpty: {
     borderColor: COLOR_COLUMN_BORDER,
@@ -1353,14 +2232,114 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
+  },
+  foundationGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    opacity: 0,
+    shadowColor: FOUNDATION_GLOW_COLOR,
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
   },
   foundationSymbol: {
     fontSize: 28,
-    color: COLOR_TEXT_STRONG,
+    color: COLOR_FELT_TEXT_PRIMARY,
   },
   wasteFanCardWrapper: {
     position: 'absolute',
     top: 0,
     left: 0,
   },
+  celebrationOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    pointerEvents: 'auto',
+  },
+  celebrationCard: {
+    position: 'absolute',
+  },
+  hiddenCard: {
+    opacity: 0,
+  },
+  feltPatternOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  feltPatternLine: {
+    position: 'absolute',
+    left: -500,
+    width: 2000,
+    height: 0.5,
+  },
 })
+
+type HeaderControlsProps = {
+  onMenuPress: () => void
+  onNewGame: () => void
+}
+
+const HeaderControls = ({ onMenuPress, onNewGame }: HeaderControlsProps) => (
+  <XStack gap="$2" style={{ alignItems: 'center' }}>
+    <Button size="$2.5" variant="outlined" onPress={onNewGame}>
+      New Game
+    </Button>
+    <HeaderMenuButton onPress={onMenuPress} />
+  </XStack>
+)
+
+const FeltPattern = () => {
+  const colorScheme = useColorScheme()
+  const patternColor = colorScheme === 'dark' 
+    ? 'rgba(255, 255, 255, 0.015)' 
+    : 'rgba(0, 0, 0, 0.015)'
+  
+  return (
+    <View style={styles.feltPatternOverlay} pointerEvents="none">
+      {Array.from({ length: 60 }).map((_, i) => (
+        <View
+          key={`diag-${i}`}
+          style={[
+            styles.feltPatternLine,
+            {
+              top: i * 30 - 400,
+              backgroundColor: patternColor,
+              transform: [{ rotate: '45deg' }],
+            },
+          ]}
+        />
+      ))}
+      {Array.from({ length: 60 }).map((_, i) => (
+        <View
+          key={`diag-rev-${i}`}
+          style={[
+            styles.feltPatternLine,
+            {
+              top: i * 30 - 400,
+              backgroundColor: patternColor,
+              transform: [{ rotate: '-45deg' }],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  )
+}
+
+const HeaderMenuButton = ({ onPress }: { onPress: () => void }) => (
+  <Button
+    size="$2.5"
+    circular
+    icon={Menu}
+    onPress={onPress}
+    accessibilityLabel="Open navigation menu"
+  />
+)

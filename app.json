@@ -1,34 +1,42 @@
 {
   "expo": {
-    "name": "expo-router-example",
-    "slug": "expo-router-example",
-    "version": "1.0.0",
+    "name": "Soli Klondike",
+    "slug": "soli-klondike",
+    "version": "0.1.0",
+    "description": "A polished Klondike Solitaire experience with responsive animations and a solvable shuffle catalog.",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "soli",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0b8b3c"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.soli.klondike",
+      "buildNumber": "0.1.0"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0b8b3c"
       },
-      "package": "com.anonymous.exporouterexample"
+      "package": "com.soli.klondike",
+      "versionCode": 1,
+      "permissions": []
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "backgroundColor": "#0b8b3c",
+      "display": "standalone",
+      "themeColor": "#0b8b3c"
     },
     "plugins": [
       "expo-router",
@@ -48,6 +56,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "supportEmail": "support@soli.app",
+      "marketingUrl": "https://soli.app",
+      "releaseNotes": "Initial public preview with polished animations, history tracking, and solvable shuffle options."
     }
   }
 }

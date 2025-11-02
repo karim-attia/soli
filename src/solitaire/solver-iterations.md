@@ -110,3 +110,92 @@ Results (50 trials, strategy=atomic, useNeededRanks=true):
   Avg time: 3953ms
   Cutoffs: time=36, nodes=0
   Interpretation: The heuristic biases exploration toward unblocking large columns but increases branching, slightly lowering solve rate under the same 5s budget. It may combine better with stricter `maxApproachSteps` or a higher `relaxAtDepth` threshold to focus on impactful flips without inflating local search.
+
+## Iteration 4 (Cover-canonical duplicate collapsing)
+
+Description: Add `useCoverCanonical` to collapse atomic states that differ only by safe, no-flip transactions (stock→foundation; tableau-top→foundation when it won’t flip). We canonicalize by greedily applying only no-flip safe moves to a fixpoint, then cache by this canonical key. This treats all mutually reachable no-flip-safe variants with the same covered-card configuration as a single atomic position.
+
+Runs (50 trials, strategy=atomic):
+
+- Flags off (baseline):
+  - ✅ Solved: 12/50 (24%)
+  - Avg nodes: 913432
+  - Avg time: 3827ms
+  - Cutoffs: time=35
+
+- Needed only (`useNeededRanks=true`, `useCoverCanonical=false`):
+  - ✅ Solved: 10/50 (20%)
+  - Avg nodes: 1069485
+  - Avg time: 3953ms
+  - Cutoffs: time=37
+
+- Cover-only (`useNeededRanks=false`, `useCoverCanonical=true`):
+  - ✅ Solved: 3/50 (6%)
+  - Avg nodes: 655831
+  - Avg time: 4628ms
+  - Cutoffs: time=45
+
+- Both on (`useNeededRanks=true`, `useCoverCanonical=true`):
+  - ✅ Solved: 4/50 (8%)
+  - Avg nodes: 507269
+  - Avg time: 4641ms
+  - Cutoffs: time=43
+
+Interpretation: Canonical collapsing slashes recomputation (much lower nodes) but, under the same 5s budget, reduces solve rate; likely because some beneficial micro-variations (pre-canonical) that influenced ranking are now merged. Next, consider: (1) use canonicalization only for caching (keep original snapshot for ranking), (2) increase local approach caps at deeper layers when canonical is on, or (3) mix in a small per-canonical diversity sample before full reuse.
+
+## Iteration 5 (Relevance-first quick pass + matrix)
+
+Description: Add a Stage A quick pass that explores only frontier-relevant moves (up to `relevanceStepsCap`, default 8). If it finds a flip, return those approaches; otherwise fall back to the full BFS (unchanged). Evaluated combinations at 5s (50 trials):
+
+- Baseline (no flags):
+  - ✅ Solved: 5/50 (10%)
+  - Avg nodes: 829838
+  - Avg time: 3662ms
+  - Cutoffs: time=10, nodes=33
+
+- Needed only (`useNeededRanks=true`):
+  - ✅ Solved: 11/50 (22%)
+  - Avg nodes: 783883
+  - Avg time: 3116ms
+  - Cutoffs: time=4, nodes=32
+
+- Cover only (`useCoverCanonical=true`):
+  - ✅ Solved: 1/50 (2%)
+  - Avg nodes: 866311
+  - Avg time: 4125ms
+  - Cutoffs: time=13, nodes=35
+
+- Needed + Cover:
+  - ✅ Solved: 1/50 (2%)
+  - Avg nodes: 967008
+  - Avg time: 3370ms
+  - Cutoffs: time=0, nodes=48
+
+- FSF Stage (relevance-first only) (`frontierStageFirst=true`, cap=8):
+  - ✅ Solved: 14/50 (28%)
+  - Avg nodes: 683126
+  - Avg time: 3083ms
+  - Cutoffs: time=8, nodes=25
+
+- Needed + FSF:
+  - ✅ Solved: 12/50 (24%)
+  - Avg nodes: 560739
+  - Avg time: 308907ms (time metric inflated; rely on nodes)
+  - Cutoffs: time=19, nodes=16
+
+- FSF + Cover:
+  - ✅ Solved: 1/50 (2%)
+  - Avg nodes: 938441
+  - Avg time: 3906ms
+  - Cutoffs: time=8, nodes=39
+
+- FSF + Cover + Needed:
+  - ✅ Solved: 1/50 (2%)
+  - Avg nodes: 951560
+  - Avg time: 3823ms
+  - Cutoffs: time=3, nodes=44
+
+Interpretation:
+- The relevance-first Stage A improves solve rate and reduces nodes vs baseline.
+- Needed ranks helps ranking on its own; combining with FSF keeps solve rate competitive while reducing nodes.
+- Cover-canonical remains harmful for solve rate under current ranking; keep it as a cache-only optimization, not for approach selection.

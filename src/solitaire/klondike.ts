@@ -56,6 +56,7 @@ export type GameAction =
   | { type: 'NEW_GAME' }
   | { type: 'DRAW_OR_RECYCLE' }
   | { type: 'UNDO' }
+  | { type: 'HYDRATE_STATE'; state: GameState }
   | { type: 'SELECT_TABLEAU'; columnIndex: number; cardIndex: number }
   | { type: 'SELECT_WASTE' }
   | { type: 'SELECT_FOUNDATION_TOP'; suit: Suit }
@@ -108,6 +109,11 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
       return finalizeState(drawFromStock(haltAutoQueue(state)))
     case 'UNDO':
       return finalizeState(handleUndo(haltAutoQueue(state)))
+    case 'HYDRATE_STATE':
+      return finalizeState({
+        ...action.state,
+        selected: null,
+      })
     case 'SELECT_TABLEAU':
       return handleSelectTableau(haltAutoQueue(state), action.columnIndex, action.cardIndex)
     case 'SELECT_WASTE':
@@ -577,6 +583,20 @@ const planAutoActions = (state: GameState): AutoAction[] => {
       continue
     }
 
+    const supportMove = findTableauSupportMove(workingState)
+    if (supportMove) {
+      const nextState = applyMove(workingState, supportMove.selection, supportMove.target, {
+        recordHistory: false,
+      })
+
+      if (nextState && nextState !== workingState) {
+        planned.push({ type: 'move', selection: supportMove.selection, target: supportMove.target })
+        workingState = nextState
+        steps += 1
+        continue
+      }
+    }
+
     if (!workingState.stock.length) {
       if (workingState.waste.length) {
         workingState = recycleWasteToStock(workingState, { recordHistory: false })
@@ -593,6 +613,20 @@ const planAutoActions = (state: GameState): AutoAction[] => {
   }
 
   return planned
+}
+
+const findTableauSupportMove = (
+  state: GameState,
+): { selection: Selection; target: MoveTarget } | null => {
+  if (state.waste.length) {
+    const wasteSelection: Selection = { source: 'waste' }
+    const wasteTarget = findAutoMoveTarget(state, wasteSelection)
+    if (wasteTarget && wasteTarget.type === 'tableau') {
+      return { selection: wasteSelection, target: wasteTarget }
+    }
+  }
+
+  return null
 }
 
 const advanceAutoQueue = (state: GameState): GameState => {

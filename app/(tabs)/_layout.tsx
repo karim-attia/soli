@@ -1,39 +1,66 @@
-import { Tabs } from 'expo-router'
+import { Drawer } from 'expo-router/drawer'
 import { useTheme } from 'tamagui'
-import { Atom, AudioWaveform } from '@tamagui/lucide-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Atom, AudioWaveform, Settings, Smile } from '@tamagui/lucide-icons'
 
-export default function TabLayout() {
+export default function DrawerLayout() {
   const theme = useTheme()
+  const insets = useSafeAreaInsets()
+  const headerRightPadding = 16
 
   return (
-    <Tabs
+    <Drawer
       screenOptions={{
-        tabBarActiveTintColor: theme.red10.val,
-        tabBarStyle: {
+        drawerActiveTintColor: theme.red10.val,
+        drawerInactiveTintColor: theme.color.val,
+        drawerStyle: {
           backgroundColor: theme.background.val,
-          borderTopColor: theme.borderColor.val,
         },
         headerStyle: {
           backgroundColor: theme.background.val,
           borderBottomColor: theme.borderColor.val,
         },
         headerTintColor: theme.color.val,
+        headerStatusBarHeight: insets.top,
+        headerLeft: () => null,
+        headerRightContainerStyle: {
+          paddingRight: headerRightPadding,
+        },
       }}
     >
-      <Tabs.Screen
+      <Drawer.Screen
         name="index"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <Atom color={color as any} />,
+          title: 'Klondike',
+          headerTitle: 'Klondike',
+          drawerLabel: 'Play Klondike',
+          drawerIcon: ({ color, size }) => <Atom color={color as any} size={size} />,
         }}
       />
-      <Tabs.Screen
+      <Drawer.Screen
         name="two"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <AudioWaveform color={color as any} />,
+          title: 'Solver Lab',
+          drawerLabel: 'Solver Lab',
+          drawerIcon: ({ color, size }) => <AudioWaveform color={color as any} size={size} />,
         }}
       />
-    </Tabs>
+      <Drawer.Screen
+        name="hello"
+        options={{
+          title: 'Hello',
+          drawerLabel: 'Hello',
+          drawerIcon: ({ color, size }) => <Smile color={color as any} size={size} />,
+        }}
+      />
+      <Drawer.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          drawerLabel: 'Settings',
+          drawerIcon: ({ color, size }) => <Settings color={color as any} size={size} />,
+        }}
+      />
+    </Drawer>
   )
 }

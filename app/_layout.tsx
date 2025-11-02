@@ -8,6 +8,8 @@ import { useFonts } from 'expo-font'
 import { SplashScreen, Stack } from 'expo-router'
 import { Provider } from 'components/Provider'
 import { useTheme } from 'tamagui'
+import { useSettings } from '../src/state/settings'
+import { isDarkTheme, resolveThemeName } from '../src/theme'
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -52,10 +54,15 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme()
+  const {
+    state: { themeMode },
+  } = useSettings()
   const theme = useTheme()
+  const resolvedThemeName = resolveThemeName(themeMode, colorScheme)
+  const navigationTheme = resolvedThemeName === 'dark' ? DarkTheme : DefaultTheme
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+    <ThemeProvider value={navigationTheme}>
+      <StatusBar style={isDarkTheme(resolvedThemeName) ? 'light' : 'dark'} />
       <Stack>
         <Stack.Screen
           name="(tabs)"
@@ -72,6 +79,16 @@ function RootLayoutNav() {
             animation: 'slide_from_right',
             gestureEnabled: true,
             gestureDirection: 'horizontal',
+            contentStyle: {
+              backgroundColor: theme.background.val,
+            },
+          }}
+        />
+
+        <Stack.Screen
+          name="settings"
+          options={{
+            title: 'Settings',
             contentStyle: {
               backgroundColor: theme.background.val,
             },

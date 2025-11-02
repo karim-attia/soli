@@ -2,17 +2,27 @@ import { useColorScheme } from 'react-native'
 import { TamaguiProvider, type TamaguiProviderProps } from 'tamagui'
 import { ToastProvider, ToastViewport } from '@tamagui/toast'
 import { CurrentToast } from './CurrentToast'
+import { SettingsProvider, useSettings } from '../src/state/settings'
+import { resolveThemeName } from '../src/theme'
 import { config } from '../tamagui.config'
 
 export function Provider({ children, ...rest }: Omit<TamaguiProviderProps, 'config'>) {
+  return (
+    <SettingsProvider>
+      <TamaguiWithSettings {...rest}>{children}</TamaguiWithSettings>
+    </SettingsProvider>
+  )
+}
+
+const TamaguiWithSettings = ({ children, ...rest }: Omit<TamaguiProviderProps, 'config'>) => {
   const colorScheme = useColorScheme()
+  const {
+    state: { themeMode },
+  } = useSettings()
+  const themeName = resolveThemeName(themeMode, colorScheme)
 
   return (
-    <TamaguiProvider
-      config={config}
-      defaultTheme={colorScheme === 'dark' ? 'dark' : 'light'}
-      {...rest}
-    >
+    <TamaguiProvider config={config} defaultTheme={themeName} {...rest}>
       <ToastProvider
         swipeDirection="horizontal"
         duration={6000}

@@ -8,16 +8,17 @@ import {
   useState,
 } from 'react'
 import {
-  Alert,
+  InteractionManager,
   LayoutChangeEvent,
   Pressable,
   StyleSheet,
   View,
   ScrollView,
 } from 'react-native'
-import { Link, useNavigation } from 'expo-router'
+import { useFocusEffect, useNavigation } from 'expo-router'
+import { DrawerActions } from '@react-navigation/native'
 import { Button, H2, Paragraph, Text, XStack, YStack } from 'tamagui'
-import { RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
+import { Menu, RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
 import { useToastController } from '@tamagui/toast'
 
 // @ts-ignore - JSON import for predefined shuffles
@@ -173,6 +174,7 @@ export default function TabOneScreen() {
   const dropHints = useMemo(() => getDropHints(state), [state])
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
   const winCelebrationsRef = useRef(state.winCelebrations)
+  const solverInitializedRef = useRef(false)
   const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(() => ({
     ...EMPTY_INVALID_WIGGLE,
     lookup: new Set<string>(),
@@ -190,11 +192,18 @@ export default function TabOneScreen() {
     },
     [state],
   )
+  const autoPlayActive = state.isAutoCompleting || state.autoQueue.length > 0
   const notifyInvalidMove = useCallback(
     (options?: { selection?: Selection | null }) => {
+      if (options?.selection?.source === 'foundation') {
+        return
+      }
+      if (autoPlayActive) {
+        return
+      }
       triggerInvalidSelectionWiggle(options?.selection ?? null)
     },
-    [triggerInvalidSelectionWiggle],
+    [autoPlayActive, triggerInvalidSelectionWiggle],
   )
 
   // --- Atomic solver visualization state ---
@@ -203,27 +212,71 @@ export default function TabOneScreen() {
   const [atomicReady, setAtomicReady] = useState(false)
   const [atomicStepCount, setAtomicStepCount] = useState(0)
 
-  useEffect(() => {
-    // Initialize from shuffle 91 (1-based)
-    const idx = 90
-    const deckOrder: number[] = Array.isArray(shuffles) && shuffles[idx] ? shuffles[idx] : []
-    try {
-      const frame = atomicSolver.getAtomicFrame(deckOrder, {
-        maxLocalNodes: 20000,
-        maxTimeMs: 1000,
-        maxApproachSteps: 20,
-        avoidEmptyUnlessKing: true,
-        strategy: 'leastSteps',
-      })
-      setAtomicSnapshot(frame.snapshot)
-      setAtomicCandidates(frame.candidates || [])
-      setAtomicReady(true)
-      setAtomicStepCount(0)
-    } catch (e) {
-      // ignore if solver unavailable
-      setAtomicReady(false)
+  const initializeSolver = useCallback(() => {
+    if (solverInitializedRef.current) {
+      return () => {}
+    }
+
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    setAtomicReady(false)
+    setAtomicSnapshot(null)
+    setAtomicCandidates([])
+
+    const task = InteractionManager.runAfterInteractions(() => {
+      timer = setTimeout(() => {
+        if (cancelled) {
+          return
+        }
+
+        const idx = 90
+        const deckOrder: number[] = Array.isArray(shuffles) && shuffles[idx] ? shuffles[idx] : []
+
+        try {
+          const frame = atomicSolver.getAtomicFrame(deckOrder, {
+            maxLocalNodes: 20000,
+            maxTimeMs: 1000,
+            maxApproachSteps: 20,
+            avoidEmptyUnlessKing: true,
+            strategy: 'leastSteps',
+          })
+
+          if (cancelled) {
+            return
+          }
+
+          setAtomicSnapshot(frame.snapshot)
+          setAtomicCandidates(frame.candidates || [])
+          setAtomicStepCount(0)
+          setAtomicReady(true)
+          solverInitializedRef.current = true
+        } catch (error) {
+          if (!cancelled) {
+            setAtomicReady(true)
+            solverInitializedRef.current = true
+          }
+        }
+      }, 200)
+    })
+
+    return () => {
+      cancelled = true
+      if (timer) {
+        clearTimeout(timer)
+      }
+      task?.cancel?.()
     }
   }, [])
+
+  useFocusEffect(
+    useCallback(() => {
+      const cleanup = initializeSolver()
+      return () => {
+        cleanup()
+      }
+    }, [initializeSolver]),
+  )
 
   const drawLabel = state.stock.length ? 'Draw' : ''
 
@@ -246,20 +299,6 @@ export default function TabOneScreen() {
     }
     dispatch({ type: 'UNDO' })
   }, [dispatch, notifyInvalidMove, state.history.length])
-
-  const handleNewGame = useCallback(() => {
-    Alert.alert('Start a new game?', 'Current progress will be lost.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'New Game',
-        style: 'destructive',
-        onPress: () => {
-          dispatch({ type: 'NEW_GAME' })
-          toast.show('New game', { message: 'Shuffled cards and reset the board.' })
-        },
-      },
-    ])
-  }, [dispatch, toast])
 
   const attemptAutoMove = useCallback(
     (selection: Selection) => {
@@ -328,20 +367,24 @@ const handleFoundationPress = useCallback(
     }
   }, [dispatch, state.selected])
 
+  const openDrawer = useCallback(() => {
+    navigation.dispatch(DrawerActions.openDrawer())
+  }, [navigation])
+
   useLayoutEffect(() => {
     navigation.setOptions({
+      headerTitle: 'Solver Lab',
       headerRight: () => (
-        <XStack gap="$2" mr="$4">
-          <Link href="/modal" asChild>
-            <Button size="$2.5">Hello!</Button>
-          </Link>
-          <Button size="$2.5" variant="outlined" onPress={handleNewGame}>
-            New Game
-          </Button>
-        </XStack>
+        <Button
+          size="$2.5"
+          circular
+          icon={Menu}
+          accessibilityLabel="Open navigation menu"
+          onPress={openDrawer}
+        />
       ),
     })
-  }, [handleNewGame, navigation])
+  }, [navigation, openDrawer])
 
   useEffect(() => {
     if (state.autoCompleteRuns > autoCompleteRunsRef.current) {
@@ -380,6 +423,11 @@ const handleFoundationPress = useCallback(
         py="$2"
         gap="$3"
       >
+        {!atomicReady && (
+          <View style={styles.solverOverlay} pointerEvents="auto">
+            <Paragraph color="$color10">Preparing solver…</Paragraph>
+          </View>
+        )}
         {atomicReady && atomicSnapshot ? (
           <SolverTopRow snapshot={atomicSnapshot} cardMetrics={cardMetrics} />
         ) : (
@@ -1345,6 +1393,14 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'stretch',
     paddingHorizontal: COLUMN_MARGIN,
+    position: 'relative',
+  },
+  solverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(9, 14, 22, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   tableauRow: {
     width: '100%',

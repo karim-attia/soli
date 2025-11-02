@@ -9,8 +9,13 @@ function parseArgs() {
         if (!a.startsWith('--')) continue
         const [k, v] = a.slice(2).split('=')
         if (v === undefined) { args[k] = true } else {
-            const num = Number(v)
-            args[k] = Number.isNaN(num) ? v : num
+            const lv = String(v).toLowerCase()
+            if (lv === 'true') args[k] = true
+            else if (lv === 'false') args[k] = false
+            else {
+                const num = Number(v)
+                args[k] = Number.isNaN(num) ? v : num
+            }
         }
     }
     return args
@@ -118,10 +123,10 @@ function writeComparisonMdAppend(filePath, decks, resA, resB, labelA, labelB, ti
 function main() {
     const args = parseArgs()
     const trials = args.trials || 50
-    const strategy = args.strategy || process.env.SOLVER_STRATEGY || 'atomic'
-    const maxNodes = args.maxNodes || 2000000
-    const maxTimeMs = args.maxTimeMs || 5000
-    const avoidEmptyUnlessKing = args.avoidEmptyUnlessKing === undefined ? true : !!args.avoidEmptyUnlessKing
+    const strategy = args.strategy || process.env.SOLVER_STRATEGY || 'dfs'
+    const maxNodes = args.maxNodes || 1000000
+    const maxTimeMs = args.maxTimeMs || 2000
+    const avoidEmptyUnlessKing = args.avoidEmptyUnlessKing !== undefined ? !!args.avoidEmptyUnlessKing : undefined
     const enableBackjump = args.enableBackjump !== undefined ? !!args.enableBackjump : undefined
     const maxApproachSteps = args.maxApproachSteps !== undefined ? Number(args.maxApproachSteps) : undefined
     const maxApproachStepsHigh = args.maxApproachStepsHigh !== undefined ? Number(args.maxApproachStepsHigh) : undefined
@@ -129,7 +134,10 @@ function main() {
     const saveMd = args.saveMd || 'scripts/compare-100.md'
     const rankingStrategy = args.rankingStrategy // 'leastSteps' | 'mostCovered'
     const useNeededRanks = args.useNeededRanks !== undefined ? !!args.useNeededRanks : undefined
-    const compareAtomicVariants = !!args.compareAtomicVariants
+    const useCoverCanonical = args.useCoverCanonical !== undefined ? !!args.useCoverCanonical : undefined
+    const frontierOnlyMoves = args.frontierOnlyMoves !== undefined ? !!args.frontierOnlyMoves : undefined
+    const frontierStageFirst = args.frontierStageFirst !== undefined ? !!args.frontierStageFirst : undefined
+    const relevanceStepsCap = args.relevanceStepsCap !== undefined ? Number(args.relevanceStepsCap) : undefined
 
     // Print resolved run configuration (including implicit defaults)
     const resolved = {
@@ -145,8 +153,12 @@ function main() {
         shufflesFile,
         saveMd,
         compare: !!args.compare,
-        compareAtomicVariants,
+        compareAtomicVariants: !!args.compareAtomicVariants,
         useNeededRanks: useNeededRanks === undefined ? '(default: false)' : useNeededRanks,
+        useCoverCanonical: useCoverCanonical === undefined ? '(default: false)' : useCoverCanonical,
+        frontierOnlyMoves: frontierOnlyMoves === undefined ? '(default: false)' : frontierOnlyMoves,
+        frontierStageFirst: frontierStageFirst === undefined ? '(default: false)' : frontierStageFirst,
+        relevanceStepsCap: relevanceStepsCap === undefined ? '(default: 8)' : relevanceStepsCap,
     }
     /* eslint-disable no-console */
     console.log('[run-config]\n' + JSON.stringify(resolved, null, 2))
@@ -161,7 +173,7 @@ function main() {
 
     if (compare) {
         const decks = loadOrGenerateShuffles(shufflesFile, 100, 0x12345678)
-        const baseOpts = { maxNodes, maxTimeMs, avoidEmptyUnlessKing, enableBackjump, maxApproachSteps, maxApproachStepsHigh, useNeededRanks }
+        const baseOpts = { maxNodes, maxTimeMs, avoidEmptyUnlessKing, enableBackjump, maxApproachSteps, maxApproachStepsHigh, useNeededRanks, useCoverCanonical, frontierOnlyMoves, frontierStageFirst, relevanceStepsCap }
         const dfsResults = runForDecks(decks, { ...baseOpts, strategy: 'dfs' })
         const atomicResults = runForDecks(decks, { ...baseOpts, strategy: 'atomic' })
         writeComparisonMd(saveMd, decks, dfsResults, atomicResults, 'dfs', 'atomic')
@@ -169,9 +181,9 @@ function main() {
         return
     }
 
-    if (compareAtomicVariants) {
+    if (args.compareAtomicVariants) {
         const decks = loadOrGenerateShuffles(shufflesFile, 100, 0x12345678)
-        const baseOpts = { maxNodes, maxTimeMs, avoidEmptyUnlessKing, enableBackjump, maxApproachSteps, maxApproachStepsHigh, useNeededRanks }
+        const baseOpts = { maxNodes, maxTimeMs, avoidEmptyUnlessKing, enableBackjump, maxApproachSteps, maxApproachStepsHigh, useNeededRanks, useCoverCanonical, frontierOnlyMoves, frontierStageFirst, relevanceStepsCap }
         const atomicLeast = runForDecks(decks, { ...baseOpts, strategy: 'atomic', rankingStrategy: 'leastSteps' })
         const atomicMost = runForDecks(decks, { ...baseOpts, strategy: 'atomic', rankingStrategy: 'mostCovered' })
         writeComparisonMdAppend(saveMd, decks, atomicLeast, atomicMost, 'atomic_leastSteps', 'atomic_mostCovered', '## Atomic strategy comparison (leastSteps vs mostCovered)')
@@ -179,15 +191,10 @@ function main() {
         return
     }
 
-    // Load the 100 shuffles by default for consistent testing
-    const decks = loadOrGenerateShuffles(shufflesFile, 100, 0x12345678)
-    console.log(`Using ${decks.length} shuffles from ${shufflesFile}`)
-
     const results = []
     for (let t = 0; t < trials; t += 1) {
-        // Cycle through the shuffles (use modulo to wrap around if trials > decks.length)
-        const deckOrder = decks[t % decks.length]
-        const res = solveKlondike(deckOrder, { maxNodes, maxTimeMs, strategy, avoidEmptyUnlessKing, enableBackjump, maxApproachSteps, maxApproachStepsHigh, rankingStrategy, useNeededRanks })
+        const deckOrder = randomDeckOrder()
+        const res = solveKlondike(deckOrder, { maxNodes, maxTimeMs, strategy, avoidEmptyUnlessKing, enableBackjump, maxApproachSteps, maxApproachStepsHigh, rankingStrategy, useNeededRanks, useCoverCanonical, frontierOnlyMoves, frontierStageFirst, relevanceStepsCap })
         const tried = res.stats.atomicTried !== undefined ? ` atomicTried=${res.stats.atomicTried}` : ''
         const dead = res.stats.atomicDead !== undefined ? ` atomicDead=${res.stats.atomicDead}` : ''
         const mark = res.solvable ? '✅' : '❌'

@@ -7,8 +7,8 @@ This document lists all tasks associated with PBI 4.
 
 | Task ID | Name | Status | Description |
 | :------ | :----------------------------------------------- | :------- | :----------------------------------------------- |
-| 4-1 | [Fix undo animation origin tracking](./4-1.md) | InProgress | Ensure undo-replayed moves animate from the prior pile coordinates. |
-| 4-2 | [Ensure foundation transitions animate](./4-2.md) | Agreed | Route tableau and auto-foundation moves through the shared animation pipeline. |
-| 4-3 | [Add foundation arrival glow effect](./4-3.md) | Agreed | Emit a brief glow when cards land on a foundation stack. |
-| 4-4 | [E2E CoS validation](./4-4.md) | Agreed | Execute end-to-end checks covering undo and foundation animation polish. |
+| 4-1 | [Fix undo animation origin tracking](./4-1.md) | Done | Ensure undo-replayed moves animate from the prior pile coordinates. |
+| 4-2 | [Ensure foundation transitions animate](./4-2.md) | Done | Route tableau and auto-foundation moves through the shared animation pipeline. |
+| 4-3 | [Add foundation arrival glow effect](./4-3.md) | Done | Emit a brief glow when cards land on a foundation stack. |
+| 4-4 | [E2E CoS validation](./4-4.md) | Proposed | Execute end-to-end checks covering undo and foundation animation polish. |
 
