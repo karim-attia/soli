@@ -1,44 +1,56 @@
-import { useCallback, useLayoutEffect, useMemo } from 'react'
-import { FlatList, Pressable, StyleSheet } from 'react-native'
+import { Dispatch, SetStateAction, useCallback, useLayoutEffect, useMemo, useState } from 'react'
+import { Dimensions, FlatList, LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native'
 import { DrawerActions } from '@react-navigation/native'
-import { useNavigation, useRouter } from 'expo-router'
-import { Button, Paragraph, Separator, Text, XStack, YStack, useTheme } from 'tamagui'
+import { useNavigation } from 'expo-router'
+import { Button, Paragraph, Separator, Sheet, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu } from '@tamagui/lucide-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { type HistoryEntry, useHistory } from '../src/state/history'
+import {
+  type HistoryEntry,
+  type HistoryPreviewCard,
+  type HistoryPreviewColumn,
+  useHistory,
+} from '../src/state/history'
+
+const DEFAULT_SHEET_SNAP_POINTS = [65, 45, 25]
 
 export default function HistoryScreen() {
   const navigation = useNavigation()
-  const router = useRouter()
   const { entries, solvedCount, hydrated } = useHistory()
   const totalEntries = entries.length
   const incompleteCount = useMemo(
     () => entries.filter((entry) => !entry.solved).length,
     [entries],
   )
+  const [selectedEntry, setSelectedEntry] = useState<HistoryEntry | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetSnapPoints, setSheetSnapPoints] = useState<number[]>([...DEFAULT_SHEET_SNAP_POINTS])
 
   const openDrawer = useCallback(() => {
     navigation.dispatch(DrawerActions.openDrawer())
   }, [navigation])
 
-  const headerTitle = useMemo(
-    () => (
-      <YStack gap="$1">
-        <Text fontSize={16} fontWeight="700">
-          Game History
-        </Text>
-        <Paragraph fontSize={12} color="$color10">
-          {totalEntries} recorded · {solvedCount} solved · {incompleteCount} incomplete
-        </Paragraph>
-      </YStack>
-    ),
-    [incompleteCount, solvedCount, totalEntries],
-  )
+  const handleEntryPress = useCallback((entry: HistoryEntry) => {
+    setSelectedEntry(entry)
+    setSheetSnapPoints([...DEFAULT_SHEET_SNAP_POINTS])
+    setSheetOpen(true)
+  }, [])
+
+  const handleSheetOpenChange = useCallback((nextOpen: boolean) => {
+    setSheetOpen(nextOpen)
+    if (!nextOpen) {
+      // Allow sheet close animation to finish before clearing state
+      setTimeout(() => {
+        setSelectedEntry(null)
+      }, 240)
+    }
+  }, [])
 
   const theme = useTheme()
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: () => headerTitle,
+      headerTitle: 'Game History',
       headerRight: () => (
         <Pressable
           onPress={openDrawer}
@@ -49,7 +61,7 @@ export default function HistoryScreen() {
         </Pressable>
       ),
     })
-  }, [headerTitle, navigation, openDrawer, theme])
+  }, [navigation, openDrawer, theme])
 
   const listHeader = useMemo(() => {
     const stats: HistoryStat[] = [
@@ -72,22 +84,29 @@ export default function HistoryScreen() {
   }, [incompleteCount, solvedCount, totalEntries])
 
   return (
-    <FlatList
-      data={entries}
-      keyExtractor={(item) => item.id}
-      ListHeaderComponent={listHeader}
-      ListEmptyComponent={
-        <EmptyHistory hydrated={hydrated} paddingHorizontal={24} paddingVertical={48} />
-      }
-      renderItem={({ item }) => (
-        <HistoryListItem
-          entry={item}
-          onPress={() => router.push({ pathname: '/history/[entryId]', params: { entryId: item.id } })}
-        />
-      )}
-      ItemSeparatorComponent={ListSpacer}
-      contentContainerStyle={{ paddingBottom: 64 }}
-    />
+    <>
+      <FlatList
+        data={entries}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
+          <EmptyHistory hydrated={hydrated} paddingHorizontal={24} paddingVertical={48} />
+        }
+        renderItem={({ item }) => (
+          <HistoryListItem entry={item} onPress={() => handleEntryPress(item)} />
+        )}
+        ItemSeparatorComponent={ListSpacer}
+        contentContainerStyle={{ paddingBottom: 64 }}
+      />
+
+      <HistoryPreviewSheet
+        entry={selectedEntry}
+        open={sheetOpen}
+        onOpenChange={handleSheetOpenChange}
+        snapPoints={sheetSnapPoints}
+        onSnapPointsChange={setSheetSnapPoints}
+      />
+    </>
   )
 }
 
@@ -111,8 +130,8 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
 
   const cardStyle = useMemo(
     () => ({
-      marginHorizontal: 12,
-      padding: 16,
+      marginHorizontal: 8,
+      padding: 14,
       borderRadius: 12,
       borderWidth: StyleSheet.hairlineWidth * 2,
       borderColor: theme.borderColor?.val ?? '#cbd5f5',
@@ -147,7 +166,7 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
   )
 }
 
-const ListSpacer = () => <YStack height="$3" />
+const ListSpacer = () => <YStack height="$2" />
 
 const EmptyHistory = ({ hydrated, paddingHorizontal, paddingVertical }: { hydrated: boolean; paddingHorizontal: number; paddingVertical: number }) => (
   <YStack gap="$3" style={{ paddingHorizontal, paddingVertical }}>
@@ -268,4 +287,372 @@ const HistoryStatTile = ({ stat }: { stat: HistoryStat }) => {
     </YStack>
   )
 }
+
+type HistoryPreviewSheetProps = {
+  entry: HistoryEntry | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  snapPoints: number[]
+  onSnapPointsChange: Dispatch<SetStateAction<number[]>>
+}
+
+const PREVIEW_TABLEAU_COLUMN_COUNT = 7
+const PREVIEW_TABLEAU_GAP = 10
+const PREVIEW_COLUMN_MARGIN = PREVIEW_TABLEAU_GAP / 2
+const PREVIEW_BASE_CARD_WIDTH = 72
+const PREVIEW_BASE_CARD_HEIGHT = 102
+const PREVIEW_CARD_ASPECT_RATIO = PREVIEW_BASE_CARD_HEIGHT / PREVIEW_BASE_CARD_WIDTH
+const PREVIEW_BASE_STACK_OFFSET = 28
+const PREVIEW_MIN_CARD_WIDTH = 24
+const PREVIEW_MAX_CARD_WIDTH = 96
+const PREVIEW_COLOR_CARD_FACE = '#ffffff'
+const PREVIEW_COLOR_CARD_BACK = '#3b4d75'
+const PREVIEW_COLOR_CARD_BORDER = '#cbd5f5'
+const PREVIEW_COLOR_COLUMN_BORDER = '#d0d5dd'
+const PREVIEW_FACE_CARD_LABELS: Partial<Record<HistoryPreviewCard['rank'], string>> = {
+  1: 'A',
+  11: 'J',
+  12: 'Q',
+  13: 'K',
+}
+const PREVIEW_SUIT_SYMBOLS: Record<HistoryPreviewCard['suit'], string> = {
+  clubs: '♣',
+  diamonds: '♦',
+  hearts: '♥',
+  spades: '♠',
+}
+const PREVIEW_SUIT_COLORS: Record<HistoryPreviewCard['suit'], string> = {
+  clubs: '#111827',
+  spades: '#111827',
+  diamonds: '#c92a2a',
+  hearts: '#c92a2a',
+}
+
+const HistoryPreviewSheet = ({ entry, open, onOpenChange, snapPoints, onSnapPointsChange }: HistoryPreviewSheetProps) => {
+  const insets = useSafeAreaInsets()
+  const [boardWidth, setBoardWidth] = useState<number | null>(null)
+
+  const metrics = useMemo(() => computePreviewMetrics(boardWidth), [boardWidth])
+
+  const handleBoardLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const { width, height } = event.nativeEvent.layout
+      setBoardWidth((previous) => (previous === width ? previous : width))
+
+      const windowHeight = Dimensions.get('window').height
+      if (windowHeight <= 0) {
+        return
+      }
+
+      const verticalPadding = insets.bottom + 96
+      const desiredHeight = height + verticalPadding
+      const top = Math.min(92, Math.max(40, (desiredHeight / windowHeight) * 100))
+      const mid = Math.max(30, Math.min(top - 18, 60))
+      const low = 20
+      const sortedPoints = Array.from(new Set([top, mid, low])).sort((a, b) => b - a)
+
+      onSnapPointsChange((previous) => {
+        if (
+          Array.isArray(previous) &&
+          previous.length === sortedPoints.length &&
+          previous.every((value, index) => Math.abs(value - sortedPoints[index]) < 0.5)
+        ) {
+          return previous
+        }
+        return sortedPoints
+      })
+    },
+    [insets.bottom, onSnapPointsChange],
+  )
+
+  return (
+    <Sheet
+      modal
+      open={open}
+      onOpenChange={onOpenChange}
+      snapPointsMode="percent"
+      snapPoints={snapPoints}
+      dismissOnSnapToBottom
+      animation="medium"
+    >
+      <Sheet.Overlay bg="rgba(0,0,0,0.35)" />
+      <Sheet.Frame
+        px="$4"
+        pt="$3"
+        pb={Math.max(insets.bottom, 16)}
+        background="$background"
+        gap="$4"
+        borderTopLeftRadius="$6"
+        borderTopRightRadius="$6"
+        style={{
+          shadowColor: 'rgba(0,0,0,0.2)',
+          shadowOpacity: 0.2,
+          shadowRadius: 12,
+          elevation: 6,
+        }}
+      >
+        <Sheet.Handle bg="$color5" />
+        {entry ? (
+          <YStack gap="$3">
+            <YStack gap="$1">
+              <Text fontSize={16} fontWeight="700">
+                {entry.displayName}
+              </Text>
+              <Paragraph color="$color10">
+                {formatFinishedAt(entry.finishedAt)} · {entry.solved ? 'Solved' : 'Incomplete'}
+              </Paragraph>
+            </YStack>
+
+            <View
+              style={previewStyles.boardShell}
+              onLayout={handleBoardLayout}
+              pointerEvents="none"
+            >
+              <View style={previewStyles.tableauRow}>
+                {entry.preview.tableau.map((column, index) => (
+                  <PreviewColumn key={`col-${index}`} column={column} metrics={metrics} />
+                ))}
+              </View>
+            </View>
+          </YStack>
+        ) : (
+          <Paragraph color="$color10">Select a game to preview its tableau.</Paragraph>
+        )}
+      </Sheet.Frame>
+    </Sheet>
+  )
+}
+
+type PreviewMetrics = {
+  width: number
+  height: number
+  stackOffset: number
+  radius: number
+}
+
+const computePreviewMetrics = (availableWidth: number | null): PreviewMetrics => {
+  if (!availableWidth || availableWidth <= 0) {
+    return computePreviewMetrics(
+      PREVIEW_BASE_CARD_WIDTH * PREVIEW_TABLEAU_COLUMN_COUNT +
+        PREVIEW_TABLEAU_GAP * (PREVIEW_TABLEAU_COLUMN_COUNT - 1),
+    )
+  }
+
+  const totalGap = PREVIEW_TABLEAU_GAP * (PREVIEW_TABLEAU_COLUMN_COUNT - 1)
+  const widthAvailable = Math.max(
+    availableWidth - totalGap,
+    PREVIEW_MIN_CARD_WIDTH * PREVIEW_TABLEAU_COLUMN_COUNT,
+  )
+  const rawWidth = widthAvailable / PREVIEW_TABLEAU_COLUMN_COUNT
+  const unclampedWidth = Math.max(Math.floor(rawWidth), PREVIEW_MIN_CARD_WIDTH)
+  const constrainedWidth = Math.min(
+    Math.max(unclampedWidth, PREVIEW_MIN_CARD_WIDTH),
+    PREVIEW_MAX_CARD_WIDTH,
+  )
+  const height = Math.round(constrainedWidth * PREVIEW_CARD_ASPECT_RATIO)
+  const stackOffset = Math.max(
+    24,
+    Math.round(constrainedWidth * (PREVIEW_BASE_STACK_OFFSET / PREVIEW_BASE_CARD_WIDTH + 0.12)),
+  )
+  const radius = Math.max(6, Math.round(constrainedWidth * 0.12))
+
+  return {
+    width: constrainedWidth,
+    height,
+    stackOffset,
+    radius,
+  }
+}
+
+const PreviewColumn = ({
+  column,
+  metrics,
+}: {
+  column: HistoryPreviewColumn
+  metrics: PreviewMetrics
+}) => {
+  const totalCards = column.cards.length
+  const height = totalCards
+    ? metrics.height + (totalCards - 1) * metrics.stackOffset
+    : metrics.height
+
+  return (
+    <View
+      style={[
+        previewStyles.column,
+        {
+          width: metrics.width,
+          height,
+          marginHorizontal: PREVIEW_COLUMN_MARGIN,
+        },
+      ]}
+    >
+      {totalCards === 0 && <PreviewEmptySlot metrics={metrics} />}
+      {column.cards.map((card, index) =>
+        card.faceUp ? (
+          <PreviewCard
+            key={`${card.suit}-${card.rank}-${index}`}
+            card={card}
+            metrics={metrics}
+            top={index * metrics.stackOffset}
+          />
+        ) : (
+          <PreviewHiddenCard
+            key={`hidden-${index}`}
+            metrics={metrics}
+            top={index * metrics.stackOffset}
+          />
+        ),
+      )}
+    </View>
+  )
+}
+
+const PreviewCard = ({
+  card,
+  metrics,
+  top,
+}: {
+  card: HistoryPreviewCard
+  metrics: PreviewMetrics
+  top: number
+}) => (
+  <View
+    style={[
+      previewStyles.cardBase,
+      previewStyles.faceUp,
+      {
+        width: metrics.width,
+        height: metrics.height,
+        borderRadius: metrics.radius,
+        top,
+      },
+    ]}
+  >
+    <Text
+      style={[previewStyles.cardCornerRank, { color: PREVIEW_SUIT_COLORS[card.suit] }]}
+      numberOfLines={1}
+      allowFontScaling={false}
+    >
+      {PREVIEW_FACE_CARD_LABELS[card.rank] ?? card.rank}
+    </Text>
+    <Text
+      style={[previewStyles.cardCornerSuit, { color: PREVIEW_SUIT_COLORS[card.suit] }]}
+      numberOfLines={1}
+      allowFontScaling={false}
+    >
+      {PREVIEW_SUIT_SYMBOLS[card.suit]}
+    </Text>
+    <Text
+      style={[previewStyles.cardSymbol, { color: PREVIEW_SUIT_COLORS[card.suit] }]}
+      numberOfLines={1}
+      allowFontScaling={false}
+    >
+      {PREVIEW_SUIT_SYMBOLS[card.suit]}
+    </Text>
+  </View>
+)
+
+const PreviewHiddenCard = ({
+  metrics,
+  top,
+}: {
+  metrics: PreviewMetrics
+  top: number
+}) => (
+  <View
+    style={[
+      previewStyles.cardBase,
+      previewStyles.faceDown,
+      {
+        width: metrics.width,
+        height: metrics.height,
+        borderRadius: metrics.radius,
+        top,
+      },
+    ]}
+  />
+)
+
+const PreviewEmptySlot = ({ metrics }: { metrics: PreviewMetrics }) => (
+  <View
+    style={[
+      previewStyles.emptySlot,
+      {
+        width: metrics.width,
+        height: metrics.height,
+        borderRadius: metrics.radius,
+      },
+    ]}
+  />
+)
+
+const previewStyles = StyleSheet.create({
+  boardShell: {
+    width: '100%',
+    alignSelf: 'stretch',
+    paddingHorizontal: PREVIEW_COLUMN_MARGIN,
+    paddingBottom: 16,
+    position: 'relative',
+  },
+  tableauRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    flexWrap: 'nowrap',
+  },
+  column: {
+    position: 'relative',
+    paddingBottom: 8,
+  },
+  cardBase: {
+    position: 'absolute',
+    shadowColor: 'rgba(0,0,0,0.15)',
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    justifyContent: 'center',
+    backgroundColor: PREVIEW_COLOR_CARD_FACE,
+    overflow: 'hidden',
+  },
+  faceUp: {
+    borderWidth: 1,
+    borderColor: PREVIEW_COLOR_CARD_BORDER,
+  },
+  faceDown: {
+    borderWidth: 1,
+    borderColor: PREVIEW_COLOR_CARD_BORDER,
+    backgroundColor: PREVIEW_COLOR_CARD_BACK,
+  },
+  emptySlot: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: PREVIEW_COLOR_COLUMN_BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  cardCornerRank: {
+    position: 'absolute',
+    top: -2,
+    left: 3,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  cardCornerSuit: {
+    position: 'absolute',
+    top: 0,
+    right: 3,
+    fontSize: 12,
+  },
+  cardSymbol: {
+    textAlign: 'center',
+    fontSize: 28,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+})
 

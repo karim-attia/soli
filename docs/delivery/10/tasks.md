@@ -7,7 +7,7 @@ This document lists all tasks associated with PBI 10.
 
 | Task ID | Name | Status | Description |
 | :------ | :----------------------------------------------- | :------- | :------------------------------------------------------------- |
-| 10-1 | [Create history page UI](./10-1.md) | Review | Build a burger menu history page listing past games. |
+| 10-1 | [Create history page UI](./10-1.md) | InProgress | Build a burger menu history page listing past games. |
 | 10-2 | [Persist shuffle outcomes](./10-2.md) | Review | Save shuffle identifiers and solved status to storage. |
 | 10-3 | [Display solved counts and badges](./10-3.md) | Review | Show aggregate solved totals and highlight solvable badges. |
 | 10-4 | [E2E CoS validation](./10-4.md) | Review | Validate history tracking end-to-end. |

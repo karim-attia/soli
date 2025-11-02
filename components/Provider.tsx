@@ -11,7 +11,7 @@ export function Provider({ children, ...rest }: Omit<TamaguiProviderProps, 'conf
   return (
     <SettingsProvider>
       <HistoryProvider>
-        <TamaguiWithSettings {...rest}>{children}</TamaguiWithSettings>
+      <TamaguiWithSettings {...rest}>{children}</TamaguiWithSettings>
       </HistoryProvider>
     </SettingsProvider>
   )
