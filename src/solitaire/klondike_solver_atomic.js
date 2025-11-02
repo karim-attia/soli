@@ -737,7 +737,7 @@ function isRelevantMove(mv, state, frontiers) {
 }
 
  function solveKlondikeAtomic(deckOrder, options = {}) {
-    const { maxNodes = 2000000, maxTimeMs = 5000, maxLocalNodes = 200000, maxApproachSteps = 20, maxApproachStepsHigh = 80, relaxAtDepth = 17, approachStepsIncrement = 3, avoidEmptyUnlessKing = true, enableBackjump = true, rankingStrategy = 'blended', useNeededRanks = false, useCoverCanonical = false, frontierOnlyMoves = false, frontierStageFirst = false, relevanceStepsCap } = options
+    const { maxNodes = 2000000, maxTimeMs = 5000, maxLocalNodes = 200000, maxApproachSteps = 20, maxApproachStepsHigh = 80, relaxAtDepth = 17, approachStepsIncrement = 3, avoidEmptyUnlessKing = true, enableBackjump = true, rankingStrategy = 'blended', useNeededRanks = false, useCoverCanonical = false, frontierOnlyMoves = false, frontierStageFirst = false, relevanceStepsCap, maxAtomicCache = 200000 } = options
     USE_NEEDED_RANKS = !!useNeededRanks
     USE_COVER_CANONICAL = !!useCoverCanonical
     if (!PRINTED_ATOMIC_CONFIG) {
@@ -817,7 +817,7 @@ function sigOfChangedCols(set) { return Array.from(set).sort().join(',') }
 			localCap = Math.min(high, maxApproachSteps + extra)
 		}
 		const { key, snapshot } = computeAtomicKeyAndSnapshot(state)
-		let entry = atomicCache.get(key)
+        let entry = atomicCache.get(key)
 		if (!entry) {
         const budget = { maxLocalNodes, deadline, maxApproachSteps: localCap, avoidEmptyUnlessKing, relevantOnly: !!frontierOnlyMoves, relevantFirst: !!frontierStageFirst, relevanceStepsCap }
 			const { candidates, nodesUsed } = findNextFlipCandidates(state, budget)
@@ -827,7 +827,12 @@ function sigOfChangedCols(set) { return Array.from(set).sort().join(',') }
 			else if (rankingStrategy === 'mostCovered') sorted = rankCandidatesByMostCovered(state, candidates)
 			else sorted = rankCandidates(state, candidates)
 			entry = { candidates: sorted, tried: new Set() }
-			atomicCache.set(key, entry)
+            // Cap cache growth to avoid memory blow-up
+            if (atomicCache.size >= maxAtomicCache) {
+                // Evict approx 25% oldest entries by clearing (simple but effective)
+                atomicCache.clear()
+            }
+            atomicCache.set(key, entry)
 		}
 		const allTried = entry.candidates.length === 0 || entry.tried.size >= entry.candidates.length
 		if (allTried) { atomicDead += 1; return { solved: false, candidates: [], key, snapshot } }

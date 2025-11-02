@@ -11,7 +11,7 @@ import {
 } from 'react'
 
 import type { GameState, Rank, Suit } from '../solitaire/klondike'
-import { FOUNDATION_SUIT_ORDER } from '../solitaire/klondike'
+import { FOUNDATION_SUIT_ORDER, TABLEAU_COLUMN_COUNT } from '../solitaire/klondike'
 
 export type HistoryEntry = {
   id: string
@@ -44,7 +44,6 @@ export type HistoryPreview = {
 }
 
 export type HistoryPreviewColumn = {
-  hiddenCount: number
   cards: HistoryPreviewCard[]
 }
 
@@ -198,7 +197,7 @@ const mergeEntries = (current: HistoryEntry[], incoming: HistoryEntry[]): Histor
 
   const map = new Map<string, HistoryEntry>()
   incoming.forEach((entry) => {
-    map.set(entry.id, entry)
+    map.set(entry.id, normalizeEntry(entry))
   })
   current.forEach((entry) => {
     map.set(entry.id, normalizeEntry(entry))
@@ -229,4 +228,175 @@ const isValidEntry = (entry: unknown): entry is HistoryEntry => {
 }
 
 const generateHistoryId = () => `hist_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+
+const normalizeEntry = (entry: HistoryEntry): HistoryEntry => {
+  const preview = sanitizePreview(entry.preview)
+  const displayName = entry.displayName || formatShuffleDisplayName(entry.shuffleId)
+
+  return {
+    ...entry,
+    displayName,
+    preview,
+    moves: typeof entry.moves === 'number' ? entry.moves : null,
+    durationMs: typeof entry.durationMs === 'number' ? entry.durationMs : null,
+  }
+}
+
+const sanitizePreview = (preview: HistoryPreview | undefined): HistoryPreview => {
+  if (!preview || typeof preview !== 'object') {
+    return createEmptyPreview()
+  }
+
+  const tableau = Array.isArray((preview as HistoryPreview).tableau)
+    ? ((preview as HistoryPreview).tableau as unknown[]).map((column) => sanitizePreviewColumn(column))
+    : createEmptyPreview().tableau
+
+  return {
+    tableau,
+    wasteTop: isValidCard((preview as HistoryPreview).wasteTop) ? (preview as HistoryPreview).wasteTop : null,
+    foundations: sanitizeFoundationPreview((preview as HistoryPreview).foundations),
+    stockCount:
+      typeof (preview as HistoryPreview).stockCount === 'number' &&
+      Number.isFinite((preview as HistoryPreview).stockCount) &&
+      (preview as HistoryPreview).stockCount >= 0
+        ? Math.floor((preview as HistoryPreview).stockCount)
+        : 0,
+  }
+}
+
+const sanitizePreviewColumn = (column: unknown): HistoryPreviewColumn => {
+  const rawColumn = column as Partial<HistoryPreviewColumn & { hiddenCount?: number }>
+  const rawCards = Array.isArray(rawColumn?.cards) ? rawColumn.cards : []
+  const sanitizedCards: HistoryPreviewCard[] = rawCards
+    .map((card) => (isValidCard(card) ? { ...card, faceUp: Boolean(card.faceUp) } : null))
+    .filter((card): card is HistoryPreviewCard => card !== null)
+
+  const inferredHidden = sanitizedCards.filter((card) => !card.faceUp).length
+  const legacyHidden = typeof (rawColumn as { hiddenCount?: unknown })?.hiddenCount === 'number'
+    ? Math.max(0, Math.floor(((rawColumn as { hiddenCount?: number }).hiddenCount as number) ?? 0))
+    : inferredHidden
+
+  const placeholdersNeeded = Math.max(0, legacyHidden - inferredHidden)
+  if (placeholdersNeeded > 0) {
+    const placeholders = Array.from({ length: placeholdersNeeded }, () => createPlaceholderCard())
+    return {
+      cards: [...placeholders, ...sanitizedCards],
+    }
+  }
+
+  if (!sanitizedCards.length && legacyHidden > 0) {
+    return {
+      cards: Array.from({ length: legacyHidden }, () => createPlaceholderCard()),
+    }
+  }
+
+  return {
+    cards: sanitizedCards,
+  }
+}
+
+const sanitizeFoundationPreview = (foundations: HistoryPreview['foundations'] | undefined) => {
+  const base: Record<Suit, HistoryPreviewCard | null> = FOUNDATION_SUIT_ORDER.reduce((acc, suit) => {
+    acc[suit] = null
+    return acc
+  }, {} as Record<Suit, HistoryPreviewCard | null>)
+
+  if (!foundations || typeof foundations !== 'object') {
+    return base
+  }
+
+  FOUNDATION_SUIT_ORDER.forEach((suit) => {
+    const card = (foundations as Record<Suit, HistoryPreviewCard | null>)[suit]
+    base[suit] = isValidCard(card) ? card : null
+  })
+
+  return base
+}
+
+const isValidCard = (value: unknown): value is HistoryPreviewCard => {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const card = value as HistoryPreviewCard
+  return isSuit(card.suit) && isRank(card.rank) && typeof card.faceUp === 'boolean'
+}
+
+const isSuit = (value: unknown): value is Suit =>
+  value === 'clubs' || value === 'diamonds' || value === 'hearts' || value === 'spades'
+
+const isRank = (value: unknown): value is Rank =>
+  typeof value === 'number' && value >= 1 && value <= 13 && Number.isInteger(value)
+
+const createEmptyPreview = (): HistoryPreview => ({
+  tableau: Array.from({ length: TABLEAU_COLUMN_COUNT }, () => ({ cards: [] })),
+  wasteTop: null,
+  foundations: sanitizeFoundationPreview(undefined),
+  stockCount: 0,
+})
+
+const createPlaceholderCard = (): HistoryPreviewCard => ({
+  suit: FOUNDATION_SUIT_ORDER[0],
+  rank: 1,
+  faceUp: false,
+})
+
+export const createHistoryPreviewFromState = (state: GameState): HistoryPreview => {
+  const tableau = state.tableau.map((column) => ({
+    cards: column.map((card) => ({
+      suit: card.suit,
+      rank: card.rank,
+      faceUp: card.faceUp,
+    })),
+  }))
+
+  const wasteTopCard = state.waste[state.waste.length - 1]
+  const wasteTop = wasteTopCard
+    ? {
+        suit: wasteTopCard.suit,
+        rank: wasteTopCard.rank,
+        faceUp: wasteTopCard.faceUp,
+      }
+    : null
+
+  const foundations: Record<Suit, HistoryPreviewCard | null> = FOUNDATION_SUIT_ORDER.reduce(
+    (acc, suit) => {
+      const pile = state.foundations[suit]
+      const top = pile[pile.length - 1]
+      acc[suit] = top
+        ? {
+            suit: top.suit,
+            rank: top.rank,
+            faceUp: true,
+          }
+        : null
+      return acc
+    },
+    {} as Record<Suit, HistoryPreviewCard | null>,
+  )
+
+  return {
+    tableau,
+    wasteTop,
+    foundations,
+    stockCount: state.stock.length,
+  }
+}
+
+export const formatShuffleDisplayName = (shuffleId: string): string => {
+  if (shuffleId.startsWith('SOLVABLE:')) {
+    const [, remainder] = shuffleId.split(':')
+    if (remainder?.startsWith('solvable-')) {
+      const numeric = remainder.replace(/[^0-9]/g, '').slice(0, 4)
+      return `Solvable #${numeric || '—'}`
+    }
+    return 'Solvable Shuffle'
+  }
+
+  if (shuffleId.startsWith('LEGACY-')) {
+    return `Legacy ${shuffleId.slice(-4).toUpperCase()}`
+  }
+
+  const compact = shuffleId.slice(-5).toUpperCase()
+  return `Game ${compact}`
+}
 

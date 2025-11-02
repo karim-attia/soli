@@ -33,7 +33,7 @@ import Animated, {
 import type { AnimatedRef, SharedValue } from 'react-native-reanimated'
 import { useNavigation } from 'expo-router'
 import { DrawerActions } from '@react-navigation/native'
-import { Button, H2, Paragraph, Text, XStack, YStack } from 'tamagui'
+import { Button, H2, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu, RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
 import { useToastController } from '@tamagui/toast'
 
@@ -61,7 +61,11 @@ import {
   saveGameState,
 } from '../../src/storage/gamePersistence'
 import { SOLVABLE_SHUFFLES, extractSolvableBaseId } from '../../src/data/solvableShuffles'
-import { useHistory } from '../../src/state/history'
+import {
+  createHistoryPreviewFromState,
+  formatShuffleDisplayName,
+  useHistory,
+} from '../../src/state/history'
 import { useAnimationToggles, useSettings } from '../../src/state/settings'
 
 const BASE_CARD_WIDTH = 72
@@ -184,9 +188,11 @@ const DEFAULT_METRICS: CardMetrics = {
   radius: 12,
 }
 
-const CELEBRATION_MODE_COUNT = 10
+const CELEBRATION_MODE_COUNT = 20
 const CELEBRATION_DURATION_MS = 60_000
 const CELEBRATION_DIALOG_DELAY_MS = 30_000
+const CELEBRATION_SPEED_MULTIPLIER = 10.4
+const CELEBRATION_WOBBLE_FREQUENCY = 5.5
 const FOUNDATION_FALLBACK_GAP = 16
 const TAU = Math.PI * 2
 
@@ -289,6 +295,8 @@ export default function TabOneScreen() {
   const previousHasWonRef = useRef(state.hasWon)
   const celebrationDialogTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const celebrationDialogShownRef = useRef(false)
+  const currentStartingPreviewRef = useRef(createHistoryPreviewFromState(state))
+  const currentDisplayNameRef = useRef(formatShuffleDisplayName(state.shuffleId))
   const topRowLayoutRef = useRef<LayoutRectangle | null>(null)
   const foundationLayoutsRef = useRef<Partial<Record<Suit, LayoutRectangle>>>({})
   const boardLockedRef = useRef(false)
@@ -418,6 +426,8 @@ export default function TabOneScreen() {
         solvable: Boolean(current.solvableId),
         finishedAt: new Date().toISOString(),
         moves: current.moveCount,
+        preview: currentStartingPreviewRef.current,
+        displayName: currentDisplayNameRef.current,
       })
       lastRecordedShuffleRef.current = current.shuffleId
     },
@@ -532,6 +542,11 @@ export default function TabOneScreen() {
   useEffect(() => {
     stateRef.current = state
   }, [state])
+
+  useEffect(() => {
+    currentStartingPreviewRef.current = createHistoryPreviewFromState(state)
+    currentDisplayNameRef.current = formatShuffleDisplayName(state.shuffleId)
+  }, [state.shuffleId])
 
   useEffect(() => {
     if (state.hasWon && !previousHasWonRef.current) {
@@ -2062,10 +2077,12 @@ const CelebrationCard = ({
 }: CelebrationCardProps) => {
   const animatedStyle = useAnimatedStyle(() => {
     'worklet'
-    const p = progress.value
+    const rawProgress = progress.value
+    const totalProgress = rawProgress * CELEBRATION_SPEED_MULTIPLIER
+    const loopProgress = totalProgress % 1
+    const launchProgress = Math.min(totalProgress, 1)
     const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
-    const easeInOutQuad = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2)
-    const eased = easeOutCubic(p)
+    const launchEased = easeOutCubic(launchProgress)
 
     const baseX = config.baseX
     const baseY = config.baseY
@@ -2073,125 +2090,266 @@ const CelebrationCard = ({
     const normalizedIndex = (index + 1) / totalCards
     const seed = config.randomSeed
     const stackFactor = config.stackIndex / 13
-
     const centerX = boardWidth / 2 - metrics.width / 2
     const centerY = boardHeight / 2 - metrics.height / 2
+    const boardRadius = Math.min(boardWidth, boardHeight)
 
-    let targetX = baseX
-    let targetY = baseY
+    const theta = TAU * loopProgress
+    const thetaSeed = TAU * (loopProgress + seed)
+    const thetaDouble = TAU * (loopProgress * 2 + seed * 0.5)
+    const direction = index % 2 === 0 ? 1 : -1
+
+    let pathX = centerX
+    let pathY = centerY
     let rotation = 0
     let scale = 1
     let opacity = 1
 
     switch (modeId % CELEBRATION_MODE_COUNT) {
       case 0: {
-        const spread = relativeIndex * metrics.width * 0.4
-        const lift = boardHeight * 0.55
-        const parabola = -4 * (p - 0.5) * (p - 0.5) + 1
-        targetX = baseX + spread
-        targetY = baseY - lift * Math.max(parabola, 0)
-        rotation = relativeIndex * 6 * p
-        scale = 1 + 0.08 * Math.max(parabola, 0)
+        const radius = boardRadius * (0.24 + 0.18 * Math.sin(thetaDouble))
+        pathX = (
+          centerX + Math.cos(thetaSeed) * radius + relativeIndex * metrics.width * 0.25
+        )
+        pathY = (
+          centerY + Math.sin(thetaSeed) * radius - stackFactor * metrics.height * 0.4
+        )
+        rotation = (thetaSeed * 180) / Math.PI
+        scale = 1 + 0.06 * Math.sin(theta * 2 + stackFactor)
         break
       }
       case 1: {
-        const angle = TAU * (p * 1.6 + seed)
-        const radius = p * Math.min(boardWidth, boardHeight) * 0.45
-        targetX = centerX + Math.cos(angle) * radius
-        targetY = centerY + Math.sin(angle) * radius
-        rotation = (angle * 180) / Math.PI
-        scale = 1 + 0.1 * p
+        const ampX = boardRadius * (0.3 + 0.1 * Math.sin(thetaDouble))
+        const ampY = boardRadius * (0.22 + 0.06 * Math.cos(thetaDouble + seed))
+        pathX = centerX + Math.sin(theta) * ampX
+        pathY = centerY + Math.sin(theta * 2 + seed * TAU) * ampY
+        rotation = (Math.sin(theta) * 540) / Math.PI
+        scale = 1 + 0.05 * Math.sin(theta * 2 + normalizedIndex)
         break
       }
       case 2: {
-        const waveSpan = boardWidth * 0.8
-        const baseOffsetX = boardWidth * 0.1
-        const oscillation = Math.sin(p * TAU * 2 + seed * TAU) * boardHeight * 0.12 * p
-        targetX = baseOffsetX + waveSpan * p
-        targetY = baseY - boardHeight * 0.3 * p + oscillation
-        rotation = Math.sin(p * TAU + seed * TAU) * 20
+        const ampX = boardRadius * (0.18 + stackFactor * 0.12)
+        const ampY = boardRadius * 0.38
+        pathX = centerX + Math.sin(theta * 1.5 + seed * TAU) * ampX
+        pathY = centerY - Math.cos(theta + seed * 0.5) * ampY
+        rotation = (theta * 360) / Math.PI
+        scale = 1 + 0.05 * Math.cos(theta * 3 + seed)
         break
       }
       case 3: {
-        const helixRadius = boardWidth * 0.3
-        const helixAngle = TAU * (p * 2 + seed)
-        targetX = centerX + Math.cos(helixAngle) * helixRadius * (0.5 + 0.5 * p)
-        targetY = baseY - boardHeight * 0.45 * p + Math.sin(helixAngle) * boardHeight * 0.05
-        rotation = (helixAngle * 90) / Math.PI
-        scale = 1 + 0.05 * p
+        const angle = theta * 1.5 + seed * TAU
+        const radius = boardRadius * (0.25 + 0.2 * Math.sin(theta * 2 + normalizedIndex))
+        pathX = centerX + Math.cos(angle) * radius
+        pathY = centerY + Math.sin(angle) * radius
+        rotation = (angle * 180) / Math.PI
+        scale = 1 + 0.07 * Math.sin(theta + stackFactor)
         break
       }
       case 4: {
-        const horizontal = seed < 0.5 ? 0 : boardWidth - metrics.width
-        const verticalStart = normalizedIndex < 0.5 ? 0 : boardHeight - metrics.height
-        const sweep = easeInOutQuad(p)
-        targetX = baseX + (horizontal - baseX) * sweep
-        targetY = baseY + (verticalStart - baseY) * sweep
-        rotation = (seed < 0.5 ? -1 : 1) * 45 * sweep
+        const angle = theta + stackFactor
+        const radiusX = boardRadius * (0.3 + 0.1 * Math.sin(thetaDouble + normalizedIndex))
+        const radiusY = boardRadius * (0.2 + 0.08 * Math.cos(thetaDouble + seed))
+        pathX = centerX + Math.cos(angle) * radiusX
+        pathY = centerY + Math.sin(angle) * radiusY
+        rotation = (Math.sin(theta * 2 + seed) * 360) / Math.PI
+        scale = 1 + 0.04 * Math.sin(theta * 4 + seed)
         break
       }
       case 5: {
-        const angle = TAU * (seed + normalizedIndex * 0.5 + p)
-        const burstRadius = Math.min(boardWidth, boardHeight) * (0.2 + 0.6 * p)
-        targetX = centerX + Math.cos(angle) * burstRadius
-        targetY = centerY + Math.sin(angle) * burstRadius - boardHeight * 0.15 * p
-        rotation = (angle * 180) / Math.PI
-        opacity = 1 - p * 0.2
+        const spur = Math.sin(theta * 5 + seed * 3)
+        const radius = boardRadius * (0.18 + 0.22 * Math.abs(spur))
+        const angle = theta + spur * 0.3
+        pathX = centerX + Math.cos(angle) * radius
+        pathY = centerY + Math.sin(angle) * radius
+        rotation = (angle * 180) / Math.PI + spur * 30
+        scale = 1 + 0.05 * Math.sin(theta * 5 + normalizedIndex)
         break
       }
       case 6: {
-        const direction = index % 2 === 0 ? 1 : -1
-        targetX = baseX + direction * boardWidth * 0.45 * p
-        targetY = baseY - boardHeight * 0.4 * p + Math.sin(p * TAU * (2 + seed)) * boardHeight * 0.1 * (1 - p)
-        rotation = direction * 20 * p
+        const angle = theta * 2 + seed * TAU * direction
+        const radius = boardRadius * (0.16 + 0.18 * Math.sin(theta + direction * 0.5))
+        pathX = (
+          centerX +
+          direction * Math.cos(angle) * radius +
+          relativeIndex * metrics.width * 0.2
+        )
+        pathY = centerY + Math.sin(angle) * radius
+        rotation = (angle * 180) / Math.PI
+        scale = 1 + 0.04 * Math.sin(theta * 3 + stackFactor)
         break
       }
       case 7: {
-        const targetColumnX = centerX + (relativeIndex * metrics.width * 0.8)
-        targetX = targetColumnX
-        targetY = boardHeight - metrics.height - stackFactor * metrics.height * 0.4
-        rotation = 180 * p
+        const angle = theta + normalizedIndex
+        const radiusX = boardRadius * 0.22
+        const radiusY = boardRadius * (0.3 + 0.1 * Math.sin(thetaDouble + stackFactor))
+        pathX = centerX + Math.sin(angle) * radiusX
+        pathY = centerY - Math.cos(angle) * radiusY
+        rotation = (Math.cos(theta) * 360) / Math.PI
+        scale = 1 + 0.05 * Math.sin(theta * 2 + normalizedIndex)
         break
       }
       case 8: {
-        const rings = 3
-        const ringIndex = Math.floor(normalizedIndex * rings)
-        const ringRadius = (Math.min(boardWidth, boardHeight) * 0.15) * (ringIndex + 1)
-        const angle = TAU * (seed + p * (0.5 + ringIndex))
-        targetX = centerX + Math.cos(angle) * ringRadius
-        targetY = centerY + Math.sin(angle) * ringRadius
-        rotation = ringIndex * 30 + p * 90
-        scale = 1 + ringIndex * 0.05
+        const ring = Math.floor(normalizedIndex * 4)
+        const radius =
+          boardRadius * (0.15 + 0.12 * ring + 0.05 * Math.sin(theta * 3 + seed))
+        const angle = theta + ring * 0.3
+        pathX = centerX + Math.cos(angle) * radius
+        pathY = centerY + Math.sin(angle) * radius
+        rotation = (angle * 180) / Math.PI + ring * 20
+        scale = 1 + ring * 0.03 + 0.02 * Math.sin(theta * 4 + seed)
         break
       }
-      case 9:
+      case 9: {
+        const angle = theta + seed
+        const drift = Math.sin(thetaDouble) * boardRadius * 0.12
+        pathX = centerX + Math.cos(angle) * boardRadius * 0.28 + drift
+        pathY = centerY - Math.sin(angle) * boardRadius * 0.35 + drift * 0.6
+        rotation = (angle * 180) / Math.PI + drift * 10
+        scale = 1 + 0.05 * Math.sin(theta * 2 + stackFactor)
+        break
+      }
+      case 10: {
+        const angle = theta * 1.5 + stackFactor * 2
+        const radius = boardRadius * (0.2 + 0.18 * Math.sin(theta * 2 + seed))
+        pathX = centerX + Math.cos(angle) * radius
+        pathY = centerY + Math.sin(angle) * radius - stackFactor * metrics.height * 0.3
+        rotation = (angle * 180) / Math.PI
+        scale = 1 + stackFactor * 0.08 + 0.04 * Math.sin(theta)
+        break
+      }
+      case 11: {
+        const ampX = boardRadius * (0.25 + 0.05 * Math.sin(seed * TAU))
+        const ampY = boardRadius * (0.32 + 0.06 * Math.cos(seed * TAU))
+        pathX = centerX + Math.sin(theta * 1.7 + seed) * ampX
+        pathY = centerY + Math.sin(theta * 2.3 + seed * 0.4) * ampY
+        rotation = (Math.sin(theta * 2) * 360) / Math.PI
+        scale = 1 + 0.05 * Math.sin(theta * 3 + normalizedIndex)
+        break
+      }
+      case 12: {
+        const columnOffset = relativeIndex * metrics.width * 0.4
+        const angle = theta * 2 + seed
+        const radiusY = boardRadius * (0.2 + 0.1 * Math.sin(theta + columnOffset * 0.01))
+        pathX = centerX + columnOffset
+        pathY = centerY + Math.sin(angle) * radiusY
+        rotation = (angle * 180) / Math.PI
+        scale = 1 + 0.03 * Math.cos(theta * 4 + columnOffset)
+        break
+      }
+      case 13: {
+        const angle = theta + seed * TAU * 2
+        const radius = boardRadius * (0.18 + 0.25 * Math.sin(theta * 4 + seed))
+        pathX = (
+          centerX +
+          Math.cos(angle) * radius +
+          Math.sin(theta * 3 + seed) * metrics.width * 0.2
+        )
+        pathY = centerY + Math.sin(angle) * radius
+        rotation = (angle * 180) / Math.PI
+        scale = 1 + 0.05 * Math.sin(theta * 5 + seed)
+        opacity = 0.8 + 0.2 * Math.sin(theta * 2 + seed)
+        break
+      }
+      case 14: {
+        const wave = Math.sin(theta + seed)
+        const ampX = boardRadius * 0.4
+        const ampY = boardRadius * (0.2 + 0.1 * Math.sin(theta * 2 + stackFactor))
+        pathX = centerX + wave * ampX
+        pathY = centerY + Math.sin(theta * 3 + seed) * ampY
+        rotation = wave * 270
+        scale = 1 + 0.04 * Math.sin(theta * 3 + normalizedIndex)
+        break
+      }
+      case 15: {
+        const angle = theta * 2 + normalizedIndex * TAU
+        const radius = boardRadius * (0.22 + 0.15 * Math.sin(theta + normalizedIndex))
+        pathX = centerX + Math.cos(angle) * radius
+        pathY = centerY + Math.sin(angle) * radius
+        rotation = (angle * 180) / Math.PI
+        scale = 1 + 0.05 * Math.sin(theta * 2 + stackFactor)
+        opacity = 0.9 + 0.1 * Math.cos(theta * 2 + normalizedIndex)
+        break
+      }
+      case 16: {
+        const pulse = 0.7 + 0.3 * Math.sin(theta * 3 + seed)
+        const angle = theta + stackFactor
+        const radius = boardRadius * 0.28 * pulse
+        pathX = centerX + Math.cos(angle) * radius
+        pathY = centerY + Math.sin(angle) * radius
+        rotation = (angle * 180) / Math.PI + pulse * 45
+        scale = pulse
+        break
+      }
+      case 17: {
+        const clover = Math.sin(theta * 3)
+        const radius = boardRadius * (0.22 + 0.18 * Math.abs(clover))
+        const angle = theta + clover * 0.3 + seed
+        pathX = centerX + Math.cos(angle) * radius
+        pathY = centerY + Math.sin(angle) * radius
+        rotation = (angle * 180) / Math.PI
+        scale = 1 + 0.04 * clover
+        break
+      }
+      case 18: {
+        const angle = theta + seed
+        const radius = boardRadius * (0.35 + 0.12 * Math.sin(theta * 2 + normalizedIndex))
+        pathX = centerX + Math.cos(angle) * radius
+        pathY = centerY - Math.sin(angle) * radius * 0.85
+        rotation = (angle * 180) / Math.PI
+        scale = 1 + 0.05 * Math.sin(theta * 2 + seed)
+        break
+      }
+      case 19: {
+        const jitterAngle = theta * 4 + seed * TAU
+        const radius = boardRadius * (0.2 + 0.1 * Math.sin(theta * 6 + normalizedIndex))
+        pathX = (
+          centerX +
+          Math.cos(jitterAngle) * radius +
+          Math.sin(theta * 2 + seed) * metrics.width * 0.15
+        )
+        pathY = (
+          centerY +
+          Math.sin(jitterAngle) * radius +
+          Math.cos(theta * 2 + seed) * metrics.height * 0.1
+        )
+        rotation = (jitterAngle * 90) / Math.PI
+        scale = 1 + 0.03 * Math.sin(theta * 6 + seed)
+        opacity = 0.85 + 0.15 * Math.sin(theta * 4 + seed)
+        break
+      }
       default: {
-        const explosionRadius = Math.min(boardWidth, boardHeight) * (0.25 + 0.5 * p)
-        const explosionAngle = TAU * (seed + p)
-        targetX = centerX + Math.cos(explosionAngle) * explosionRadius
-        targetY = centerY - Math.abs(Math.sin(explosionAngle)) * explosionRadius
-        rotation = (explosionAngle * 180) / Math.PI
-        opacity = 1 - Math.max(0, p - 0.7) / 0.3
+        const radius = boardRadius * 0.25
+        pathX = centerX + Math.cos(thetaSeed) * radius
+        pathY = centerY + Math.sin(thetaSeed) * radius
+        rotation = (thetaSeed * 180) / Math.PI
         break
       }
     }
 
-    const baseCurrentX = baseX + (targetX - baseX) * eased
-    const baseCurrentY = baseY + (targetY - baseY) * eased
-    const wobbleEnvelope = p * (1 - p)
-    const wobbleX = Math.sin(TAU * (p * (2.2 + seed) + seed)) * metrics.width * 0.1 * wobbleEnvelope
-    const wobbleY = Math.cos(TAU * (p * (2.5 + seed * 0.5) + seed)) * metrics.height * 0.08 * wobbleEnvelope
-    const finalX = baseCurrentX + wobbleX
-    const finalY = baseCurrentY + wobbleY
+    const wobblePhase = rawProgress * TAU * CELEBRATION_WOBBLE_FREQUENCY + seed * TAU
+    const wobbleEnvelope = 0.15 + 0.85 * Math.pow(Math.sin(wobblePhase), 2)
+    const wobbleX = (
+      Math.sin(wobblePhase * 1.25 + relativeIndex * 0.4) * metrics.width * 0.1 * wobbleEnvelope
+    )
+    const wobbleY = (
+      Math.cos(wobblePhase * 0.95 + stackFactor * 4) * metrics.height * 0.11 * wobbleEnvelope
+    )
+
+    const finalX = baseX * (1 - launchEased) + pathX * launchEased + wobbleX
+    const finalY = baseY * (1 - launchEased) + pathY * launchEased + wobbleY
+    const finalScale = 1 + (scale - 1) * launchEased
+    const finalRotation = rotation * launchEased
+    const clampedOpacity = Math.max(0, Math.min(1, opacity))
+    const finalOpacity = Math.min(1, clampedOpacity * (0.5 + 0.5 * launchEased))
 
     return {
       transform: [
         { translateX: finalX },
         { translateY: finalY },
-        { rotate: `${rotation}deg` },
-        { scale: scale * (1 + wobbleEnvelope * 0.05) },
+        { rotate: `${finalRotation}deg` },
+        { scale: finalScale },
       ],
-      opacity,
+      opacity: finalOpacity,
     }
   })
 
@@ -2214,7 +2372,6 @@ const CelebrationCard = ({
     </AnimatedView>
   )
 }
-
 const SelectionHint = ({ state, onClear }: { state: GameState; onClear: () => void }) => {
   if (!state.selected) {
     return null
@@ -2437,8 +2594,8 @@ type HeaderControlsProps = {
 }
 
 const HeaderControls = ({ onMenuPress, onNewGame }: HeaderControlsProps) => (
-  <XStack gap="$2" style={{ alignItems: 'center' }}>
-    <Button size="$2.5" variant="outlined" onPress={onNewGame}>
+  <XStack gap="$4" style={{ alignItems: 'center' }}>
+    <Button size="$4" onPress={onNewGame}>
       New Game
     </Button>
     <HeaderMenuButton onPress={onMenuPress} />
@@ -2483,12 +2640,15 @@ const FeltPattern = () => {
   )
 }
 
-const HeaderMenuButton = ({ onPress }: { onPress: () => void }) => (
-  <Button
-    size="$2.5"
-    circular
-    icon={Menu}
-    onPress={onPress}
-    accessibilityLabel="Open navigation menu"
-  />
-)
+const HeaderMenuButton = ({ onPress }: { onPress: () => void }) => {
+  const theme = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityLabel="Open navigation menu"
+      style={{ padding: 8 }}
+    >
+      <Menu size={32} color={theme.color.val as any} />
+    </Pressable>
+  )
+}

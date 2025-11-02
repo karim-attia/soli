@@ -21,6 +21,8 @@ let HIGH_MAX_NODES = 2_000_000 // override: --dfsNodes=NUMBER
 let HIGH_MAX_TIME_MS = 10_000  // override: --dfsTimeMs=NUMBER
 let ATOMIC_LOCAL_NODES = 200_000 // override: --atomicNodes=NUMBER
 let ATOMIC_TIME_MS = 10_000 // override: --atomicTimeMs=NUMBER
+let DFS_VISITED_CAP = 2_000_000 // override: --dfsVisited=NUMBER
+let ATOMIC_CACHE_CAP = 200_000 // override: --atomicCache=NUMBER
 
 const DATASET_PATH = path.join(__dirname, '..', 'src', 'data', 'solvable-shuffles.json')
 const SHUFFLES_100_PATH = path.join(__dirname, 'shuffles-100.json')
@@ -29,6 +31,7 @@ const SHUFFLES_100_PATH = path.join(__dirname, 'shuffles-100.json')
 const rawArgs = process.argv.slice(2)
 const args = new Set(rawArgs)
 const isTrial = args.has('--trial') || args.has('-t')
+const rngOnly = args.has('--rngOnly')
 const targetSolved = (() => {
 	const flag = rawArgs.find((a) => a.startsWith('--target='))
 	if (!flag) return isTrial ? TRIAL_TARGET_SOLVED : DEFAULT_TARGET_SOLVED
@@ -47,6 +50,8 @@ HIGH_MAX_NODES = intArg('--dfsNodes') ?? HIGH_MAX_NODES
 HIGH_MAX_TIME_MS = intArg('--dfsTimeMs') ?? HIGH_MAX_TIME_MS
 ATOMIC_LOCAL_NODES = intArg('--atomicNodes') ?? ATOMIC_LOCAL_NODES
 ATOMIC_TIME_MS = intArg('--atomicTimeMs') ?? ATOMIC_TIME_MS
+DFS_VISITED_CAP = intArg('--dfsVisited') ?? DFS_VISITED_CAP
+ATOMIC_CACHE_CAP = intArg('--atomicCache') ?? ATOMIC_CACHE_CAP
 
 // ---------- Helpers ----------
 function readJSON(filePath) {
@@ -85,21 +90,55 @@ function tableauConfigFromDeckOrder(deckOrder) {
 	})
 }
 
+function tableauKeyFromConfig(tableau) {
+    const suitCode = (s) => (s === 'clubs' ? 'c' : s === 'diamonds' ? 'd' : s === 'hearts' ? 'h' : 's')
+    const cardCode = (c) => suitCode(c.suit) + c.rank.toString(10)
+    // Canonical string: for each column, encode down then up; columns in order
+    // Example: d:c5,h9|u:d1;d:...|u:...
+    return tableau
+        .map((col) => {
+            const d = col.down.map(cardCode).join(',')
+            const u = col.up.map(cardCode).join(',')
+            return `d:${d}|u:${u}`
+        })
+        .join(';')
+}
+
 function solveWithBudgets(deckOrder) {
-	// Try Atomic first (good at short-to-next-flip), then DFS as fallback
-	const atomic = solveKlondikeAtomic(deckOrder, {
-		maxLocalNodes: ATOMIC_LOCAL_NODES,
-		maxTimeMs: ATOMIC_TIME_MS,
-		strategy: 'blended',
-		maxApproachStepsHigh: 40,
-		relaxAtDepth: 4,
-	})
-	if (atomic && atomic.solvable) return { solver: 'atomic', result: atomic }
+    // Evaluate both solvers so we can report per-mode results
+    const atomic = solveKlondikeAtomic(deckOrder, {
+        maxLocalNodes: ATOMIC_LOCAL_NODES,
+        maxTimeMs: ATOMIC_TIME_MS,
+        strategy: 'blended',
+        maxApproachStepsHigh: 40,
+        relaxAtDepth: 4,
+        maxAtomicCache: ATOMIC_CACHE_CAP,
+    })
 
-	const dfs = solveKlondike(deckOrder, { maxNodes: HIGH_MAX_NODES, maxTimeMs: HIGH_MAX_TIME_MS, strategy: 'dfs' })
-	if (dfs && dfs.solvable) return { solver: 'dfs', result: dfs }
+    const dfs = solveKlondike(deckOrder, {
+        maxNodes: HIGH_MAX_NODES,
+        maxTimeMs: HIGH_MAX_TIME_MS,
+        strategy: 'dfs',
+        maxVisited: DFS_VISITED_CAP,
+    })
 
-	return { solver: 'none', result: { solvable: false } }
+    return {
+        atomic: { solver: 'atomic', result: atomic },
+        dfs: { solver: 'dfs', result: dfs },
+        anySolvable: Boolean((atomic && atomic.solvable) || (dfs && dfs.solvable)),
+        preferred: (atomic && atomic.solvable) ? 'atomic' : (dfs && dfs.solvable) ? 'dfs' : 'none',
+    }
+}
+
+function fmtAttempt(label, attempt) {
+    const r = attempt && attempt.result ? attempt.result : null
+    if (!r) return `${label}:n/a`
+    const tag = r.solvable ? '✅' : '❌'
+    const stats = r.stats || {}
+    const nodes = stats.nodes != null ? stats.nodes : '-'
+    const time = stats.timeMs != null ? stats.timeMs : '-'
+    const cutoff = stats.cutoffReason || '-'
+    return `${label}:${tag}(nodes=${nodes},timeMs=${time},cutoff=${cutoff})`
 }
 
 function randomDeckOrder(rng) {
@@ -127,16 +166,21 @@ function mulberry32(seed) {
     console.log('[harvest] Budgets', {
         dfsNodes: HIGH_MAX_NODES,
         dfsTimeMs: HIGH_MAX_TIME_MS,
+        dfsVisitedCap: DFS_VISITED_CAP,
         atomicNodes: ATOMIC_LOCAL_NODES,
         atomicTimeMs: ATOMIC_TIME_MS,
+        atomicCacheCap: ATOMIC_CACHE_CAP,
         targetSolved,
         trial: isTrial,
     })
-	const dataset = readJSON(DATASET_PATH)
-	const existing = new Set((dataset.shuffles || []).map((s) => s.id))
+    const dataset = readJSON(DATASET_PATH)
+    const existing = new Set((dataset.shuffles || []).map((s) => s.id))
+    const existingTableauKeys = new Set(
+        (dataset.shuffles || []).map((s) => tableauKeyFromConfig(s.tableau)).filter(Boolean),
+    )
 
-	let shuffles = []
-	if (fs.existsSync(SHUFFLES_100_PATH)) {
+    let shuffles = []
+    if (!rngOnly && fs.existsSync(SHUFFLES_100_PATH)) {
 		try {
 			shuffles = readJSON(SHUFFLES_100_PATH)
 			if (!Array.isArray(shuffles)) shuffles = []
@@ -150,13 +194,20 @@ function mulberry32(seed) {
 	let evaluated = 0
 	const EVAL_CAP = isTrial ? TRIAL_MAX_EVALUATIONS : Number.POSITIVE_INFINITY
 
-	const appendEntry = (deckOrder) => {
-		const id = nextSolvableId(dataset.shuffles)
-		const tableau = tableauConfigFromDeckOrder(deckOrder)
+    const appendEntry = (deckOrder) => {
+        const tableau = tableauConfigFromDeckOrder(deckOrder)
+        const key = tableauKeyFromConfig(tableau)
+        if (existingTableauKeys.has(key)) {
+            if (isTrial) console.log('[harvest] Duplicate tableau detected; skipping append')
+            return false
+        }
+        const id = nextSolvableId(dataset.shuffles)
 		dataset.shuffles.push({ id, addedAt: new Date().toISOString().slice(0, 10), source: 'harvested', tableau })
 		existing.add(id)
+        existingTableauKeys.add(key)
 		writeJSON(DATASET_PATH, dataset)
 		console.log(`[harvest] Added ${id} (total ${dataset.shuffles.length})`)
+        return true
 	}
 
 	// Pass 1: evaluate provided shuffles-100 (if present)
@@ -164,28 +215,30 @@ function mulberry32(seed) {
 		const deckOrder = shuffles[i]
 		if (!Array.isArray(deckOrder) || deckOrder.length !== 52) continue
 		evaluated += 1
-		const { solver, result } = solveWithBudgets(deckOrder)
-		if (result.solvable) {
-			appendEntry(deckOrder)
-			found += 1
-			console.log(`[harvest] #${i + 1} solvable via ${solver}; solved ${found}/${targetSolved}`)
-		} else if (isTrial) {
-			console.log(`[harvest] #${i + 1} unsolved (trial logs)`) // keep logs terse
-		}
+        const solved = solveWithBudgets(deckOrder)
+        const atomicLine = fmtAttempt('atomic', solved.atomic)
+        const dfsLine = fmtAttempt('dfs', solved.dfs)
+        let appended = false
+        if (solved.anySolvable) {
+            const ok = appendEntry(deckOrder)
+            if (ok) { found += 1; appended = true }
+        }
+        console.log(`[harvest] #${i + 1} ${atomicLine} | ${dfsLine} | appended=${appended ? 'yes' : 'no'} | solved=${found}/${targetSolved}`)
 	}
 
 	// Pass 2: random search until target reached or cap hit
 	while (found < targetSolved && evaluated < EVAL_CAP) {
 		const deckOrder = randomDeckOrder(rng)
 		evaluated += 1
-		const { solver, result } = solveWithBudgets(deckOrder)
-		if (result.solvable) {
-			appendEntry(deckOrder)
-			found += 1
-			if (isTrial) {
-				console.log(`[harvest] RNG solvable via ${solver}; solved ${found}/${targetSolved}`)
-			}
-		}
+        const solved = solveWithBudgets(deckOrder)
+        const atomicLine = fmtAttempt('atomic', solved.atomic)
+        const dfsLine = fmtAttempt('dfs', solved.dfs)
+        let appended = false
+        if (solved.anySolvable) {
+            const ok = appendEntry(deckOrder)
+            if (ok) { found += 1; appended = true }
+        }
+        console.log(`[harvest] RNG ${atomicLine} | ${dfsLine} | appended=${appended ? 'yes' : 'no'} | solved=${found}/${targetSolved}`)
 	}
 
 	console.log(`[harvest] Completed. Evaluated=${evaluated}, Added=${found}, Target=${targetSolved}`)

@@ -15,6 +15,7 @@
 | 11 | Challenge seeker | As a player I want to opt into solvable shuffles so that each game can be completed with skill. | InProgress | 1. A setting enables "solvable games only" mode.<br>2. A curated list of solvable shuffles is stored (tableau state only) while the stock remains randomized.<br>3. When the setting is enabled, the next game reuses the least-played solvable shuffle that has not been solved yet and history marks solvable games with a badge.<br>[View Details](./11/prd.md) |
 | 12 | Community contributor | As a player I want to share solvable shuffles so that the catalog can grow. | Agreed | 1. A setting allows opting into sharing solved games.<br>2. When enabled, completed solvable games upload their shuffle and solution steps to a backend endpoint (to be defined).<br>3. Shared shuffles are queued for manual review and tagged accordingly in history.<br>[View Details](./12/prd.md) |
 | 14 | Animation systems maintainer | As a developer I want flight animations and foundation feedback to be deterministic so that players always see cards travel from their true origin without stray wiggles. | Proposed | 1. Card flight orchestration is refactored around a single deterministic pipeline that never dispatches a move before origin/target snapshots are ready.<br>2. Automation and manual flows share instrumentation that flags any suppressed flight or fallback path for debugging.<br>3. Foundation piles never wiggle in response to automation while manual invalid taps continue to provide feedback.<br>[View Details](./14/prd.md) |
+| 15 | App visitor | As a visitor I want a friendly Hello screen that explains the app succinctly and links clearly to the source so that I can understand the project and find the code. | InReview | 1. Hello screen uses Tamagui native list components for features.<br>2. Source link reads “View source on GitHub”.<br>3. Copy is concise, typo-free, and layout remains understated.<br>[View Details](./15/prd.md) |
 
 ## History
 
@@ -74,3 +75,7 @@
 | 2025-11-02 12:30:00 | 2 | approve | User approved animation polish implementation after task completion. | user |
 | 2025-11-02 12:35:00 | 1 | approve | User approved Klondike MVP completion, moving solver tasks to PBI 11. | user |
 | 2025-11-02 16:40:00 | 14 | create_pbi | Logged refactor initiative to stabilize card flight animations and foundation feedback. | ai_agent |
+| 2025-11-02 16:58:00 | 15 | create_pbi | Added backlog item for Hello screen polish. | ai_agent |
+| 2025-11-02 16:58:30 | 15 | propose_for_backlog | User approved Hello screen polish scope. | user |
+| 2025-11-02 16:59:00 | 15 | start_implementation | Began implementing Hello screen improvements. | ai_agent |
+| 2025-11-02 17:04:00 | 15 | submit_for_review | Hello screen polish ready for review. | ai_agent |

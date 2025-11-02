@@ -17,7 +17,7 @@ import {
 } from 'react-native'
 import { useFocusEffect, useNavigation } from 'expo-router'
 import { DrawerActions } from '@react-navigation/native'
-import { Button, H2, Paragraph, Text, XStack, YStack } from 'tamagui'
+import { Button, H2, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu, RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
 import { useToastController } from '@tamagui/toast'
 
@@ -367,6 +367,7 @@ const handleFoundationPress = useCallback(
     }
   }, [dispatch, state.selected])
 
+  const theme = useTheme()
   const openDrawer = useCallback(() => {
     navigation.dispatch(DrawerActions.openDrawer())
   }, [navigation])
@@ -375,16 +376,16 @@ const handleFoundationPress = useCallback(
     navigation.setOptions({
       headerTitle: 'Solver Lab',
       headerRight: () => (
-        <Button
-          size="$2.5"
-          circular
-          icon={Menu}
-          accessibilityLabel="Open navigation menu"
+        <Pressable
           onPress={openDrawer}
-        />
+          accessibilityLabel="Open navigation menu"
+          style={{ padding: 8 }}
+        >
+          <Menu size={32} color={theme.color.val as any} />
+        </Pressable>
       ),
     })
-  }, [navigation, openDrawer])
+  }, [navigation, openDrawer, theme])
 
   useEffect(() => {
     if (state.autoCompleteRuns > autoCompleteRunsRef.current) {

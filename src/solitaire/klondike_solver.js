@@ -342,7 +342,7 @@ function tryGreedyFinishIfReady(state) {
 }
 
 function solveKlondike(deckOrder, options = {}) {
-    const { maxNodes = 200000, maxTimeMs = 1000, strategy = 'dfs' } = options
+    const { maxNodes = 200000, maxTimeMs = 1000, strategy = 'dfs', maxVisited = 2000000 } = options
     if (strategy === 'atomic') {
         try {
             // Lazy-require to avoid circular/size issues in mobile bundles
@@ -359,7 +359,7 @@ function solveKlondike(deckOrder, options = {}) {
 	const deadline = Date.now() + maxTimeMs
 	let budgetTimeHit = false
 	let budgetNodesHit = false
-	const bestAtDepth = new Map()
+    const bestAtDepth = new Map()
 
 	const initialMoves = listMoves(state)
 	if (initialMoves.length === 0) {
@@ -367,11 +367,15 @@ function solveKlondike(deckOrder, options = {}) {
 	}
 
 	const stack = []
-	function pushFrame(depth) {
+    function pushFrame(depth) {
 		const key = zobristKey(state)
 		const prev = bestAtDepth.get(key)
 		if (prev !== undefined && prev <= depth) return false
-		bestAtDepth.set(key, depth)
+        // Cap visited cache to avoid unbounded growth under very high budgets
+        if (bestAtDepth.size >= maxVisited) {
+            bestAtDepth.clear()
+        }
+        bestAtDepth.set(key, depth)
 		const moves = listMoves(state)
 		if (!moves.length) return false
 		stack.push({ moves, idx: 0, depth, undo: null })

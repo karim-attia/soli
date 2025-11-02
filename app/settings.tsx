@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect } from 'react'
-import { ScrollView } from 'react-native'
+import { Pressable, ScrollView } from 'react-native'
 import { DrawerActions } from '@react-navigation/native'
 import { useNavigation } from 'expo-router'
 import {
@@ -11,6 +11,7 @@ import {
   Text,
   XStack,
   YStack,
+  useTheme,
 } from 'tamagui'
 import { Menu } from '@tamagui/lucide-icons'
 
@@ -28,6 +29,7 @@ const themeOptions: Array<{ mode: ThemeMode; label: string }> = [
 
 export default function SettingsScreen() {
   const navigation = useNavigation()
+  const theme = useTheme()
 
   const openDrawer = useCallback(() => {
     navigation.dispatch(DrawerActions.openDrawer())
@@ -36,16 +38,16 @@ export default function SettingsScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <Button
-          size="$2.5"
-          circular
-          icon={Menu}
-          accessibilityLabel="Open navigation menu"
+        <Pressable
           onPress={openDrawer}
-        />
+          accessibilityLabel="Open navigation menu"
+          style={{ padding: 8 }}
+        >
+          <Menu size={32} color={theme.color.val as any} />
+        </Pressable>
       ),
     })
-  }, [navigation, openDrawer])
+  }, [navigation, openDrawer, theme])
 
   const {
     state,
