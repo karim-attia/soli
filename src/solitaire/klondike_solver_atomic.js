@@ -6,6 +6,8 @@
   - Stock treated as multiset (unordered availability) like the DFS solver
 */
 
+const { devLog } = require('../utils/devLogger')
+
 const SUITS = ['clubs', 'diamonds', 'hearts', 'spades']
 const RED = new Set(['hearts', 'diamonds'])
 const ACE = 1
@@ -740,10 +742,9 @@ function isRelevantMove(mv, state, frontiers) {
     const { maxNodes = 2000000, maxTimeMs = 5000, maxLocalNodes = 200000, maxApproachSteps = 20, maxApproachStepsHigh = 80, relaxAtDepth = 17, approachStepsIncrement = 3, avoidEmptyUnlessKing = true, enableBackjump = true, rankingStrategy = 'blended', useNeededRanks = false, useCoverCanonical = false, frontierOnlyMoves = false, frontierStageFirst = false, relevanceStepsCap, maxAtomicCache = 200000 } = options
     USE_NEEDED_RANKS = !!useNeededRanks
     USE_COVER_CANONICAL = !!useCoverCanonical
-    if (!PRINTED_ATOMIC_CONFIG) {
-        PRINTED_ATOMIC_CONFIG = true
-        /* eslint-disable no-console */
-        const cfg = {
+	if (!PRINTED_ATOMIC_CONFIG) {
+		PRINTED_ATOMIC_CONFIG = true
+		const cfg = {
             maxNodes,
             maxTimeMs,
             maxLocalNodes,
@@ -760,8 +761,7 @@ function isRelevantMove(mv, state, frontiers) {
             frontierStageFirst,
             relevanceStepsCap,
         }
-        console.log('[atomic-config]\n' + JSON.stringify(cfg, null, 2))
-        /* eslint-enable no-console */
+		devLog('log', '[atomic-config]\n' + JSON.stringify(cfg, null, 2))
     }
 	const state = setupStateFromDeckOrder(deckOrder)
 	let nodes = 0

@@ -1,0 +1,1 @@
+The user wants you to run "npx expo run:android --variant release && npx uri-scheme open "soli://demo-game?auto=1" --android" --android" at any point in the next step. This will install the app on the connected Android device, and automatically launch and complete a very simple game. 

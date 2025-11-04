@@ -12,6 +12,7 @@ import {
   type HistoryPreviewColumn,
   useHistory,
 } from '../src/state/history'
+import { devLog } from '../src/utils/devLogger'
 
 const DEFAULT_SHEET_SNAP_POINTS = [65]
 
@@ -243,7 +244,7 @@ const formatFinishedAt = (isoTimestamp: string | undefined) => {
     }
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(timestamp)
   } catch (error) {
-    console.warn('[history] Failed to format timestamp', error)
+    devLog('warn', '[history] Failed to format timestamp', error)
     return isoTimestamp
   }
 }

@@ -13,6 +13,7 @@ import {
 import type { GameState, Rank, Suit } from '../solitaire/klondike'
 import { FOUNDATION_SUIT_ORDER, TABLEAU_COLUMN_COUNT } from '../solitaire/klondike'
 import { extractSolvableBaseId, SOLVABLE_SHUFFLES } from '../data/solvableShuffles'
+import { devLog } from '../utils/devLogger'
 
 const SOLVABLE_SHUFFLE_NAME_LOOKUP = new Map<string, string>(
   SOLVABLE_SHUFFLES.map((shuffle) => [shuffle.id, shuffle.name]),
@@ -111,7 +112,7 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
         }
       } catch (error) {
         if (!cancelled) {
-          console.warn('[history] Failed to load persisted history entries', error)
+          devLog('warn', '[history] Failed to load persisted history entries', error)
         }
       } finally {
         if (!cancelled) {
@@ -137,7 +138,7 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
     }
 
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload)).catch((error) => {
-      console.warn('[history] Failed to persist history entries', error)
+      devLog('warn', '[history] Failed to persist history entries', error)
     })
   }, [entries, hydrated])
 
@@ -151,7 +152,7 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
   const clearHistory = useCallback(() => {
     setEntries([])
     AsyncStorage.removeItem(STORAGE_KEY).catch((error) => {
-      console.warn('[history] Failed to clear persisted history entries', error)
+      devLog('warn', '[history] Failed to clear persisted history entries', error)
     })
   }, [])
 

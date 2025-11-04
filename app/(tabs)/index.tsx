@@ -12,6 +12,7 @@ import {
   Alert,
   LayoutChangeEvent,
   LayoutRectangle,
+  Linking,
   Pressable,
   StyleSheet,
   View,
@@ -55,6 +56,7 @@ import type {
   Selection,
   Suit,
 } from '../../src/solitaire/klondike'
+import { devLog } from '../../src/utils/devLogger'
 import {
   PersistedGameError,
   clearGameState,
@@ -120,6 +122,7 @@ const CARD_FLIGHT_TIMING = {
   easing: CARD_MOVE_EASING,
 }
 const AUTO_QUEUE_MOVE_DELAY_MS = CARD_ANIMATION_DURATION_MS + 80
+const DEMO_AUTO_STEP_INTERVAL_MS = 300
 
 const CARD_FLIP_HALF_DURATION_MS = 40
 const CARD_FLIP_HALF_TIMING = {
@@ -272,7 +275,7 @@ export default function TabOneScreen() {
   const navigation = useNavigation()
   const colorScheme = useColorScheme()
   const feltBackground = colorScheme === 'dark' ? COLOR_FELT_DARK : COLOR_FELT_LIGHT
-  const { state: settingsState, hydrated: settingsHydrated } = useSettings()
+  const { state: settingsState, hydrated: settingsHydrated, setDeveloperMode } = useSettings()
   const solvableGamesOnly = settingsState.solvableGamesOnly
   const developerModeEnabled = settingsState.developerMode
   const animationToggles = useAnimationToggles()
@@ -302,6 +305,7 @@ export default function TabOneScreen() {
   const topRowLayoutRef = useRef<LayoutRectangle | null>(null)
   const foundationLayoutsRef = useRef<Partial<Record<Suit, LayoutRectangle>>>({})
   const boardLockedRef = useRef(false)
+  const lastDemoLinkRef = useRef<string | null>(null)
   const [boardLocked, setBoardLocked] = useState(false)
   const [celebrationState, setCelebrationState] = useState<CelebrationState | null>(null)
   const updateBoardLocked = useCallback((locked: boolean) => {
@@ -444,41 +448,6 @@ export default function TabOneScreen() {
     }
   }, [])
 
-  const handleLaunchDemoGame = useCallback(() => {
-    if (!developerModeEnabled || boardLockedRef.current) {
-      return
-    }
-
-    clearCelebrationDialogTimer()
-    recordCurrentGameResult()
-    setCelebrationState(null)
-    resetCardFlights()
-    foundationLayoutsRef.current = {}
-    topRowLayoutRef.current = null
-    winCelebrationsRef.current = 0
-    lastRecordedShuffleRef.current = null
-    updateBoardLocked(false)
-
-    const demoState = createDemoGameState()
-    dispatch({ type: 'HYDRATE_STATE', state: demoState })
-
-    void clearGameState().catch((error) => {
-      console.warn('Failed to clear persisted game before demo shuffle', error)
-    })
-
-    toast.show('Demo game', { message: 'Loaded the developer demo layout.' })
-  }, [
-    boardLockedRef,
-    clearCelebrationDialogTimer,
-    clearGameState,
-    developerModeEnabled,
-    dispatch,
-    recordCurrentGameResult,
-    resetCardFlights,
-    setCelebrationState,
-    toast,
-    updateBoardLocked,
-  ])
   const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(() => ({
     ...EMPTY_INVALID_WIGGLE,
     lookup: new Set<string>(),
@@ -504,11 +473,11 @@ export default function TabOneScreen() {
 
         if (snapshotsReady || Date.now() - waitStart >= FLIGHT_WAIT_TIMEOUT_MS) {
           ensureCardFlightsReady()
-          if (!snapshotsReady && __DEV__) {
-            console.warn('[FlightPrep] Timeout waiting for snapshots', {
-              action: action.type,
-              ids,
-            })
+          if (!snapshotsReady) {
+        devLog('warn', '[FlightPrep] Timeout waiting for snapshots', {
+          action: action.type,
+          ids,
+        })
           }
           dispatch(action)
           return
@@ -520,6 +489,117 @@ export default function TabOneScreen() {
       attemptDispatch()
     },
     [cardFlightsEnabled, dispatch, ensureCardFlightsReady],
+  )
+  const runDemoAutoReveal = useCallback(() => {
+    const steps: Array<() => void> = [
+      () =>
+        dispatchWithFlightPrep(
+          {
+            type: 'APPLY_MOVE',
+            selection: { source: 'tableau', columnIndex: 0, cardIndex: 2 },
+            target: { type: 'foundation', suit: 'hearts' },
+            recordHistory: false,
+          },
+          { source: 'tableau', columnIndex: 0, cardIndex: 2 },
+        ),
+      () =>
+        dispatchWithFlightPrep(
+          {
+            type: 'APPLY_MOVE',
+            selection: { source: 'tableau', columnIndex: 0, cardIndex: 1 },
+            target: { type: 'foundation', suit: 'hearts' },
+            recordHistory: false,
+          },
+          { source: 'tableau', columnIndex: 0, cardIndex: 1 },
+        ),
+      () =>
+        dispatchWithFlightPrep(
+          {
+            type: 'APPLY_MOVE',
+            selection: { source: 'tableau', columnIndex: 0, cardIndex: 0 },
+            target: { type: 'foundation', suit: 'hearts' },
+            recordHistory: false,
+          },
+          { source: 'tableau', columnIndex: 0, cardIndex: 0 },
+        ),
+      () =>
+        dispatchWithFlightPrep(
+          {
+            type: 'APPLY_MOVE',
+            selection: { source: 'tableau', columnIndex: 1, cardIndex: 2 },
+            target: { type: 'foundation', suit: 'diamonds' },
+            recordHistory: false,
+          },
+          { source: 'tableau', columnIndex: 1, cardIndex: 2 },
+        ),
+      () =>
+        dispatchWithFlightPrep(
+          {
+            type: 'APPLY_MOVE',
+            selection: { source: 'tableau', columnIndex: 1, cardIndex: 1 },
+            target: { type: 'foundation', suit: 'diamonds' },
+            recordHistory: false,
+          },
+          { source: 'tableau', columnIndex: 1, cardIndex: 1 },
+        ),
+      () =>
+        dispatchWithFlightPrep(
+          {
+            type: 'APPLY_MOVE',
+            selection: { source: 'tableau', columnIndex: 1, cardIndex: 0 },
+            target: { type: 'foundation', suit: 'diamonds' },
+            recordHistory: false,
+          },
+          { source: 'tableau', columnIndex: 1, cardIndex: 0 },
+        ),
+    ]
+
+    steps.forEach((step, index) => {
+      setTimeout(step, DEMO_AUTO_STEP_INTERVAL_MS * index)
+    })
+  }, [dispatchWithFlightPrep])
+  const handleLaunchDemoGame = useCallback(
+    (options?: { autoReveal?: boolean; force?: boolean }) => {
+      if ((!developerModeEnabled && !options?.force) || boardLockedRef.current) {
+        return
+      }
+
+      clearCelebrationDialogTimer()
+      recordCurrentGameResult()
+      setCelebrationState(null)
+      resetCardFlights()
+      foundationLayoutsRef.current = {}
+      topRowLayoutRef.current = null
+      winCelebrationsRef.current = 0
+      lastRecordedShuffleRef.current = null
+      updateBoardLocked(false)
+
+      const demoState = createDemoGameState()
+      dispatch({ type: 'HYDRATE_STATE', state: demoState })
+
+    void clearGameState().catch((error) => {
+      devLog('warn', 'Failed to clear persisted game before demo shuffle', error)
+    })
+
+      toast.show('Demo game', { message: 'Loaded the developer demo layout.' })
+
+      if (options?.autoReveal) {
+        setTimeout(runDemoAutoReveal, DEMO_AUTO_STEP_INTERVAL_MS)
+      }
+    },
+    [
+      boardLockedRef,
+      clearCelebrationDialogTimer,
+      clearGameState,
+      developerModeEnabled,
+      dispatch,
+      recordCurrentGameResult,
+      resetCardFlights,
+      runDemoAutoReveal,
+      setCelebrationState,
+      toast,
+      updateBoardLocked,
+    ],
   )
   const triggerInvalidSelectionWiggle = useCallback(
     (selection?: Selection | null) => {
@@ -566,9 +646,7 @@ export default function TabOneScreen() {
         return
       }
       if (shouldSuppressFoundationWiggle(options?.selection ?? null)) {
-        if (__DEV__) {
-          console.log('[Wiggle] suppressed for recent foundation arrival', options)
-        }
+        devLog('log', '[Wiggle] suppressed for recent foundation arrival', options)
         return
       }
       triggerInvalidSelectionWiggle(options?.selection ?? null)
@@ -578,9 +656,59 @@ export default function TabOneScreen() {
 
   const drawLabel = state.stock.length ? 'Draw' : ''
 
+  const processDemoLink = useCallback(
+    (incomingUrl: string | null | undefined) => {
+      if (!incomingUrl) {
+        return
+      }
+      if (lastDemoLinkRef.current === incomingUrl) {
+        return
+      }
+
+      let parsed: URL
+      try {
+        parsed = new URL(incomingUrl)
+      } catch (error) {
+        return
+      }
+
+      const host = parsed.host.toLowerCase()
+      const pathname = parsed.pathname.toLowerCase()
+
+      if (host === 'demo-game' || pathname === '/demo-game') {
+        lastDemoLinkRef.current = incomingUrl
+        const autoParam = parsed.searchParams.get('auto') ?? parsed.searchParams.get('autoreveal')
+        const autoReveal = autoParam === '1' || autoParam?.toLowerCase() === 'true'
+
+        if (!settingsState.developerMode) {
+          setDeveloperMode(true)
+        }
+
+        setTimeout(() => {
+          handleLaunchDemoGame({ autoReveal, force: true })
+        }, DEMO_AUTO_STEP_INTERVAL_MS)
+      }
+    },
+    [handleLaunchDemoGame, setDeveloperMode, settingsState.developerMode],
+  )
+
   useEffect(() => {
     stateRef.current = state
   }, [state])
+
+  useEffect(() => {
+    void Linking.getInitialURL().then((url) => {
+      processDemoLink(url)
+    })
+
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      processDemoLink(url)
+    })
+
+    return () => {
+      subscription.remove()
+    }
+  }, [processDemoLink])
 
   useEffect(() => {
     if (state.moveCount === 0) {
@@ -624,7 +752,7 @@ export default function TabOneScreen() {
         try {
           await clearGameState()
         } catch (clearError) {
-          console.warn('Failed clearing invalid saved game state', clearError)
+          devLog('warn', 'Failed clearing invalid saved game state', clearError)
         }
 
         if (!isCancelled) {
@@ -655,7 +783,7 @@ export default function TabOneScreen() {
         await saveGameState(state)
       } catch (error) {
         if (!isCancelled) {
-          console.warn('Failed to persist Klondike game state', error)
+          devLog('warn', 'Failed to persist Klondike game state', error)
         }
       }
     })()
@@ -727,7 +855,7 @@ export default function TabOneScreen() {
           topRowLayoutRef.current = null
           winCelebrationsRef.current = 0
           void clearGameState().catch((error) => {
-            console.warn('Failed to clear persisted game before new shuffle', error)
+            devLog('warn', 'Failed to clear persisted game before new shuffle', error)
           })
           dealNewGame()
           updateBoardLocked(false)
@@ -886,7 +1014,7 @@ const handleFoundationPress = useCallback(
         <HeaderControls
           onMenuPress={openDrawer}
           onNewGame={() => requestNewGame({ reason: 'manual' })}
-          onDemoGame={developerModeEnabled ? handleLaunchDemoGame : undefined}
+          onDemoGame={developerModeEnabled ? () => handleLaunchDemoGame() : undefined}
         />
       ),
     })

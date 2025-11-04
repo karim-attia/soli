@@ -9,6 +9,8 @@ import {
   type PropsWithChildren,
 } from 'react'
 
+import { devLog, setDeveloperLoggingEnabled } from '../utils/devLogger'
+
 export type ThemeMode = 'auto' | 'light' | 'dark'
 
 type AnimationPreferences = {
@@ -114,7 +116,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
           setState((previous) => mergeSettings(previous, parsed))
         }
       } catch (error) {
-        console.warn('[settings] Failed to load persisted settings', error)
+        devLog('warn', '[settings] Failed to load persisted settings', error)
       } finally {
         if (!cancelled) {
           setHydrated(true)
@@ -133,7 +135,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     }
 
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch((error) => {
-      console.warn('[settings] Failed to persist settings', error)
+      devLog('warn', '[settings] Failed to persist settings', error)
     })
   }, [hydrated, state])
 
@@ -201,6 +203,10 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       previous.developerMode === enabled ? previous : { ...previous, developerMode: enabled },
     )
   }, [])
+
+  useEffect(() => {
+    setDeveloperLoggingEnabled(hydrated ? state.developerMode : false)
+  }, [hydrated, state.developerMode])
 
   const value = useMemo<SettingsContextValue>(
     () => ({
