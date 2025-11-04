@@ -28,9 +28,11 @@ const logError = (message) => {
 
 const runCommand = (command, args, options = {}) =>
   new Promise((resolve, reject) => {
-    log(`Running: ${command} ${args.join(' ')}`)
+    if (!options.silent) {
+      log(`Running: ${command} ${args.join(' ')}`)
+    }
     const child = spawn(command, args, {
-      stdio: options.capture ? 'pipe' : 'inherit',
+      stdio: options.capture || options.silent ? 'pipe' : 'inherit',
       shell: process.platform === 'win32',
       ...options.spawnOptions,
     })
@@ -38,7 +40,7 @@ const runCommand = (command, args, options = {}) =>
     let stdout = ''
     let stderr = ''
 
-    if (options.capture) {
+    if (options.capture || options.silent) {
       child.stdout.on('data', (data) => {
         stdout += data.toString()
       })
@@ -51,7 +53,7 @@ const runCommand = (command, args, options = {}) =>
       if (code === 0) {
         resolve({ stdout, stderr })
       } else {
-        const errorOutput = options.capture ? `${stdout}\n${stderr}`.trim() : ''
+        const errorOutput = options.capture || options.silent ? `${stdout}\n${stderr}`.trim() : ''
         reject(new Error(`Command failed (${code}): ${command} ${args.join(' ')}${
           errorOutput ? `\n${errorOutput}` : ''
         }`))
@@ -77,7 +79,8 @@ const main = async () => {
   try {
     await ensureDevice()
 
-    await runCommand('npx', ['expo', 'run:android', '--variant', 'release'])
+    log('Building and installing release APK (expo run:android --variant release)...')
+    await runCommand('npx', ['expo', 'run:android', '--variant', 'release'], { silent: true })
 
     await runCommand('adb', ['logcat', '-c'])
 
@@ -153,10 +156,10 @@ const main = async () => {
               return
             }
             if (line.includes(APP_LOG_PREFIX)) {
-              const prefixIndex = line.indexOf(APP_LOG_PREFIX)
-              if (prefixIndex >= 0) {
-                let message = line.slice(prefixIndex + APP_LOG_PREFIX.length)
-                message = message.replace(/^[\s,'"\-:]+/, '')
+              const match = line.match(/\[SoliDev\]'?,?\s*(.*)$/)
+              if (match) {
+                let message = match[1].replace(/^['",\s]+/, '')
+                message = message.replace(/['"]$/g, '')
                 if (message.length > 0) {
                   console.log(message)
                 }
