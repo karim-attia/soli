@@ -13,7 +13,7 @@ import {
   useHistory,
 } from '../src/state/history'
 
-const DEFAULT_SHEET_SNAP_POINTS = [65, 45, 25]
+const DEFAULT_SHEET_SNAP_POINTS = [65]
 
 export default function HistoryScreen() {
   const navigation = useNavigation()
@@ -344,12 +344,11 @@ const HistoryPreviewSheet = ({ entry, open, onOpenChange, snapPoints, onSnapPoin
         return
       }
 
-      const verticalPadding = insets.bottom + 96
+      const HEADER_BUFFER = 160
+      const verticalPadding = insets.bottom + HEADER_BUFFER
       const desiredHeight = height + verticalPadding
-      const top = Math.min(92, Math.max(40, (desiredHeight / windowHeight) * 100))
-      const mid = Math.max(30, Math.min(top - 18, 60))
-      const low = 20
-      const sortedPoints = Array.from(new Set([top, mid, low])).sort((a, b) => b - a)
+      const top = Math.min(99.5, Math.max(40, (desiredHeight / windowHeight) * 100))
+      const sortedPoints = [top]
 
       onSnapPointsChange((previous) => {
         if (

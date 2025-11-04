@@ -12,6 +12,18 @@ import {
 
 import type { GameState, Rank, Suit } from '../solitaire/klondike'
 import { FOUNDATION_SUIT_ORDER, TABLEAU_COLUMN_COUNT } from '../solitaire/klondike'
+import { extractSolvableBaseId, SOLVABLE_SHUFFLES } from '../data/solvableShuffles'
+
+const SOLVABLE_SHUFFLE_NAME_LOOKUP = new Map<string, string>(
+  SOLVABLE_SHUFFLES.map((shuffle) => [shuffle.id, shuffle.name]),
+)
+
+const formatTitleCase = (value: string): string =>
+  value
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
 
 export type HistoryEntry = {
   id: string
@@ -384,12 +396,9 @@ export const createHistoryPreviewFromState = (state: GameState): HistoryPreview 
 
 export const formatShuffleDisplayName = (shuffleId: string): string => {
   if (shuffleId.startsWith('SOLVABLE:')) {
-    const [, remainder] = shuffleId.split(':')
-    if (remainder?.startsWith('solvable-')) {
-      const numeric = remainder.replace(/[^0-9]/g, '').slice(0, 4)
-      return `Solvable #${numeric || '—'}`
-    }
-    return 'Solvable Shuffle'
+    const baseId = extractSolvableBaseId(shuffleId)
+    const lookupName = baseId ? SOLVABLE_SHUFFLE_NAME_LOOKUP.get(baseId) ?? baseId : null
+    return lookupName ? formatTitleCase(lookupName) : 'Solvable Shuffle'
   }
 
   if (shuffleId.startsWith('LEGACY-')) {

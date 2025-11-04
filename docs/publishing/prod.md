@@ -31,3 +31,6 @@ Check device connection: `adb devices`
 - The app will run with production performance characteristics
 - Ready for distribution or testing real-world performance
 
+
+
+

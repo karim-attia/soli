@@ -13,6 +13,7 @@ export type SolvableTableauColumnConfig = {
 
 export type SolvableShuffleConfig = {
   id: string
+  name: string
   addedAt: string
   source?: string
   tableau: SolvableTableauColumnConfig[]
@@ -52,6 +53,18 @@ const RANK_TO_CODE: Record<number, string> = {}
 Object.entries(RANK_FROM_CODE).forEach(([code, rank]) => {
   RANK_TO_CODE[rank] = code
 })
+
+const DEFAULT_SHUFFLE_NAME = 'solvable-shuffle'
+
+function deriveShuffleName(id: string, rawName?: string | null): string {
+  const trimmed = rawName?.trim()
+  if (trimmed) {
+    return trimmed
+  }
+
+  const fallback = id?.trim()
+  return fallback && fallback.length ? fallback : DEFAULT_SHUFFLE_NAME
+}
 
 function validateCard(card: SolvableCard, context: string): void {
   if (!VALID_SUITS.includes(card.suit)) {
@@ -125,6 +138,7 @@ function parseShuffleBlock(block: string): SolvableShuffleConfig | null {
   })
 
   const id = meta.get('id') ?? ''
+  const name = deriveShuffleName(id, meta.get('name'))
   const addedAt = meta.get('addedAt') ?? ''
   const source = meta.get('source') ?? undefined
 
@@ -145,6 +159,7 @@ function parseShuffleBlock(block: string): SolvableShuffleConfig | null {
 
   return {
     id,
+    name,
     addedAt,
     source,
     tableau: columns as SolvableTableauColumnConfig[],
@@ -184,6 +199,10 @@ function parseDataset(raw: string): SolvableShuffleConfig[] {
 function validateShuffle(shuffle: SolvableShuffleConfig): void {
   if (!shuffle.id?.length) {
     throw new Error('Solvable shuffle is missing an id')
+  }
+
+  if (!shuffle.name?.length) {
+    shuffle.name = deriveShuffleName(shuffle.id, shuffle.name)
   }
 
   if (!Array.isArray(shuffle.tableau) || shuffle.tableau.length !== 7) {
