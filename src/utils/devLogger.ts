@@ -10,6 +10,8 @@ const CONSOLE_METHODS: Record<DevLogLevel, (...args: unknown[]) => void> = {
   debug: console.debug ? console.debug.bind(console) : console.log.bind(console),
 }
 
+const LOG_PREFIX = '[SoliDev]'
+
 let developerLoggingEnabled = false
 
 export const setDeveloperLoggingEnabled = (enabled: boolean): void => {
@@ -22,7 +24,11 @@ export const devLog = (level: DevLogLevel, ...args: unknown[]): void => {
   }
 
   const method = CONSOLE_METHODS[level] ?? CONSOLE_METHODS.log
-  method(...args)
+  if (args.length === 0) {
+    method(LOG_PREFIX)
+    return
+  }
+  method(LOG_PREFIX, ...args)
 }
 
 export const getDeveloperLoggingEnabled = (): boolean => developerLoggingEnabled

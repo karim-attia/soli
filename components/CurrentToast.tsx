@@ -1,5 +1,5 @@
-import { Toast, useToastController, useToastState } from '@tamagui/toast'
-import { Button, H4, XStack, YStack, isWeb } from 'tamagui'
+import { Toast, useToastState } from '@tamagui/toast'
+import { YStack, isWeb } from 'tamagui'
 
 export function CurrentToast() {
   const currentToast = useToastState()
@@ -25,33 +25,5 @@ export function CurrentToast() {
         )}
       </YStack>
     </Toast>
-  )
-}
-
-export function ToastControl() {
-  const toast = useToastController()
-
-  return (
-    <YStack gap="$2" items="center">
-      <H4>Toast demo</H4>
-      <XStack gap="$2" justify="center">
-        <Button
-          onPress={() => {
-            toast.show('Successfully saved!', {
-              message: "Don't worry, we've got your data.",
-            })
-          }}
-        >
-          Show
-        </Button>
-        <Button
-          onPress={() => {
-            toast.hide()
-          }}
-        >
-          Hide
-        </Button>
-      </XStack>
-    </YStack>
   )
 }

@@ -19,7 +19,8 @@ import { useFocusEffect, useNavigation } from 'expo-router'
 import { DrawerActions } from '@react-navigation/native'
 import { Button, H2, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu, RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
-import { useToastController } from '@tamagui/toast'
+
+import { devLog } from '../../src/utils/devLogger'
 
 import { useSettings } from '../../src/state/settings'
 
@@ -171,7 +172,6 @@ export default function TabOneScreen() {
   const [state, dispatch] = useReducer(klondikeReducer, undefined, createInitialState)
   const [boardWidth, setBoardWidth] = useState<number | null>(null)
   const cardMetrics = useMemo(() => computeCardMetrics(boardWidth), [boardWidth])
-  const toast = useToastController()
   const navigation = useNavigation()
   const {
     state: { developerMode },
@@ -404,12 +404,13 @@ export default function TabOneScreen() {
       return
     }
     if (state.autoCompleteRuns > autoCompleteRunsRef.current) {
-      toast.show('Auto-complete engaged', {
-        message: 'Finishing the remaining cards for you…',
+      devLog('log', '[Toast suppressed] Auto-complete engaged (solver)', {
+        previousRuns: autoCompleteRunsRef.current,
+        runs: state.autoCompleteRuns,
       })
       autoCompleteRunsRef.current = state.autoCompleteRuns
     }
-  }, [developerModeEnabled, state.autoCompleteRuns, toast])
+  }, [developerModeEnabled, state.autoCompleteRuns])
 
   useEffect(() => {
     if (!developerModeEnabled) {
@@ -417,10 +418,12 @@ export default function TabOneScreen() {
       return
     }
     if (state.winCelebrations > winCelebrationsRef.current) {
-      toast.show('🎉 Tada!', { message: 'Foundations complete!' })
+      devLog('log', '[Toast suppressed] Celebration triggered (solver)', {
+        celebrations: state.winCelebrations,
+      })
       winCelebrationsRef.current = state.winCelebrations
     }
-  }, [developerModeEnabled, state.winCelebrations, toast])
+  }, [developerModeEnabled, state.winCelebrations])
 
   useEffect(() => {
     if (!developerModeEnabled) {

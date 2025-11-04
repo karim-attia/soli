@@ -14,7 +14,8 @@
     "web": "expo start --web",
     "test": "jest --watchAll",
     "harvest:trial": "node scripts/harvest-solvable.js --trial",
-    "harvest:100": "node scripts/harvest-solvable.js --target=100"
+    "harvest:100": "node scripts/harvest-solvable.js --target=100",
+    "demo:auto-solve": "node scripts/run-demo-autosolve.js"
   },
   "jest": {
     "preset": "jest-expo",

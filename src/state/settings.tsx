@@ -199,6 +199,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
   }, [])
 
   const setDeveloperMode = useCallback((enabled: boolean) => {
+    setDeveloperLoggingEnabled(enabled)
     setState((previous) =>
       previous.developerMode === enabled ? previous : { ...previous, developerMode: enabled },
     )

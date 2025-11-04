@@ -36,7 +36,7 @@ import { useNavigation } from 'expo-router'
 import { DrawerActions } from '@react-navigation/native'
 import { Button, H2, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu, RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
-import { useToastController } from '@tamagui/toast'
+// import { useToastController } from '@tamagui/toast'
 
 import {
   FOUNDATION_SUIT_ORDER,
@@ -271,7 +271,6 @@ export default function TabOneScreen() {
     height: null,
   })
   const cardMetrics = useMemo(() => computeCardMetrics(boardLayout.width), [boardLayout.width])
-  const toast = useToastController()
   const navigation = useNavigation()
   const colorScheme = useColorScheme()
   const feltBackground = colorScheme === 'dark' ? COLOR_FELT_DARK : COLOR_FELT_LIGHT
@@ -323,6 +322,17 @@ export default function TabOneScreen() {
     cardFlightMemoryRef.current[cardId] = snapshot
   }, [])
   const registerFoundationArrival = useCallback((cardId: string | null | undefined) => {
+    const snapshot = stateRef.current
+    const pilesSummary = FOUNDATION_SUIT_ORDER.map(
+      (suit) => `${suit[0].toUpperCase()}:${snapshot.foundations[suit].length}`,
+    ).join(', ')
+    devLog(
+      'info',
+      `[Game] Foundation arrival card=${cardId ?? 'unknown'} piles=[${pilesSummary}] hasWon=${String(
+        snapshot.hasWon,
+      )} moves=${snapshot.moveCount}`,
+    )
+
     if (!cardId) {
       return
     }
@@ -458,6 +468,16 @@ export default function TabOneScreen() {
         return
       }
 
+      if (action.type === 'APPLY_MOVE' && action.target?.type === 'foundation') {
+        const destination = action.target.suit
+        const sourceLabel = selection
+          ? selection.source === 'tableau'
+            ? `tableau:${selection.columnIndex}`
+            : selection.source
+          : 'unknown'
+        devLog('info', `[Game] Dispatch APPLY_MOVE → foundation:${destination} from ${sourceLabel}`)
+      }
+
       if (!cardFlightsEnabled) {
         ensureCardFlightsReady()
         dispatch(action)
@@ -490,77 +510,105 @@ export default function TabOneScreen() {
     },
     [cardFlightsEnabled, dispatch, ensureCardFlightsReady],
   )
-  const runDemoAutoReveal = useCallback(() => {
-    const steps: Array<() => void> = [
-      () =>
-        dispatchWithFlightPrep(
-          {
-            type: 'APPLY_MOVE',
-            selection: { source: 'tableau', columnIndex: 0, cardIndex: 2 },
-            target: { type: 'foundation', suit: 'hearts' },
-            recordHistory: false,
-          },
-          { source: 'tableau', columnIndex: 0, cardIndex: 2 },
-        ),
-      () =>
-        dispatchWithFlightPrep(
-          {
-            type: 'APPLY_MOVE',
-            selection: { source: 'tableau', columnIndex: 0, cardIndex: 1 },
-            target: { type: 'foundation', suit: 'hearts' },
-            recordHistory: false,
-          },
-          { source: 'tableau', columnIndex: 0, cardIndex: 1 },
-        ),
-      () =>
-        dispatchWithFlightPrep(
-          {
-            type: 'APPLY_MOVE',
-            selection: { source: 'tableau', columnIndex: 0, cardIndex: 0 },
-            target: { type: 'foundation', suit: 'hearts' },
-            recordHistory: false,
-          },
-          { source: 'tableau', columnIndex: 0, cardIndex: 0 },
-        ),
-      () =>
-        dispatchWithFlightPrep(
-          {
-            type: 'APPLY_MOVE',
-            selection: { source: 'tableau', columnIndex: 1, cardIndex: 2 },
-            target: { type: 'foundation', suit: 'diamonds' },
-            recordHistory: false,
-          },
-          { source: 'tableau', columnIndex: 1, cardIndex: 2 },
-        ),
-      () =>
-        dispatchWithFlightPrep(
-          {
-            type: 'APPLY_MOVE',
-            selection: { source: 'tableau', columnIndex: 1, cardIndex: 1 },
-            target: { type: 'foundation', suit: 'diamonds' },
-            recordHistory: false,
-          },
-          { source: 'tableau', columnIndex: 1, cardIndex: 1 },
-        ),
-      () =>
-        dispatchWithFlightPrep(
-          {
-            type: 'APPLY_MOVE',
-            selection: { source: 'tableau', columnIndex: 1, cardIndex: 0 },
-            target: { type: 'foundation', suit: 'diamonds' },
-            recordHistory: false,
-          },
-          { source: 'tableau', columnIndex: 1, cardIndex: 0 },
-        ),
-    ]
+  const runDemoSequence = useCallback(
+    ({ autoReveal, autoSolve }: { autoReveal?: boolean; autoSolve?: boolean }) => {
+      if (!autoReveal && !autoSolve) {
+        return
+      }
 
-    steps.forEach((step, index) => {
-      setTimeout(step, DEMO_AUTO_STEP_INTERVAL_MS * index)
-    })
-  }, [dispatchWithFlightPrep])
+      devLog(
+        'info',
+        '[Demo] Auto sequence started (autoReveal=' + Boolean(autoReveal) + ', autoSolve=' + Boolean(autoSolve) + ')',
+      )
+
+      const steps: Array<() => void> = []
+
+      const pushTableauToFoundation = (columnIndex: number, suit: Suit) => {
+        steps.push(() => {
+          const column = stateRef.current.tableau[columnIndex]
+          if (!column?.length) {
+            return
+          }
+          const topIndex = column.length - 1
+          dispatchWithFlightPrep(
+            {
+              type: 'APPLY_MOVE',
+              selection: { source: 'tableau', columnIndex, cardIndex: topIndex },
+              target: { type: 'foundation', suit },
+              recordHistory: false,
+            },
+            { source: 'tableau', columnIndex, cardIndex: topIndex },
+          )
+        })
+      }
+
+      const pushTableauSequence = (columnIndex: number, suit: Suit, count: number) => {
+        for (let index = 0; index < count; index += 1) {
+          pushTableauToFoundation(columnIndex, suit)
+        }
+      }
+
+      pushTableauSequence(0, 'hearts', 3)
+      pushTableauSequence(1, 'diamonds', 3)
+
+      if (autoSolve) {
+        pushTableauSequence(4, 'hearts', 5)
+        pushTableauSequence(5, 'diamonds', 5)
+        pushTableauSequence(2, 'clubs', 13)
+        pushTableauSequence(3, 'spades', 13)
+
+        const pushStockToFoundation = (suit: Suit, drawCount: number) => {
+          for (let index = 0; index < drawCount; index += 1) {
+            steps.push(() => {
+              dispatch({ type: 'DRAW_OR_RECYCLE' })
+            })
+            steps.push(() => {
+              dispatchWithFlightPrep(
+                {
+                  type: 'APPLY_MOVE',
+                  selection: { source: 'waste' },
+                  target: { type: 'foundation', suit },
+                  recordHistory: false,
+                },
+                { source: 'waste' },
+              )
+            })
+          }
+        }
+
+        pushStockToFoundation('hearts', 5)
+        pushStockToFoundation('diamonds', 5)
+      }
+
+      if (steps.length === 0) {
+        return
+      }
+
+      devLog('info', `[Demo] Auto sequence queued ${steps.length} steps.`)
+
+      steps.forEach((step, index) => {
+        setTimeout(step, DEMO_AUTO_STEP_INTERVAL_MS * (index + 1))
+      })
+
+      const finalStepIndex = steps.length - 1
+      if (finalStepIndex >= 0) {
+        setTimeout(() => {
+          devLog('info', '[Demo] Auto sequence completed dispatch queue.')
+        }, DEMO_AUTO_STEP_INTERVAL_MS * (finalStepIndex + 2))
+      }
+    },
+    [dispatch, dispatchWithFlightPrep],
+  )
   const handleLaunchDemoGame = useCallback(
-    (options?: { autoReveal?: boolean; force?: boolean }) => {
-      if ((!developerModeEnabled && !options?.force) || boardLockedRef.current) {
+    (options?: { autoReveal?: boolean; autoSolve?: boolean; force?: boolean }) => {
+      const forceLaunch = options?.force === true
+      if (!developerModeEnabled && !forceLaunch) {
+        return
+      }
+      if (forceLaunch && !developerModeEnabled) {
+        setDeveloperMode(true)
+      }
+      if (boardLockedRef.current && !forceLaunch) {
         return
       }
 
@@ -577,14 +625,17 @@ export default function TabOneScreen() {
       const demoState = createDemoGameState()
       dispatch({ type: 'HYDRATE_STATE', state: demoState })
 
-    void clearGameState().catch((error) => {
-      devLog('warn', 'Failed to clear persisted game before demo shuffle', error)
-    })
+      devLog('info', '[Demo] Game loaded (options=' + JSON.stringify(options ?? {}) + ')')
 
-      toast.show('Demo game', { message: 'Loaded the developer demo layout.' })
+      void clearGameState().catch((error) => {
+        console.warn('Failed to clear persisted game before demo shuffle', error)
+      })
 
-      if (options?.autoReveal) {
-        setTimeout(runDemoAutoReveal, DEMO_AUTO_STEP_INTERVAL_MS)
+      const shouldAutoReveal = options?.autoReveal || options?.autoSolve
+      if (shouldAutoReveal) {
+        setTimeout(() => {
+          runDemoSequence({ autoReveal: shouldAutoReveal, autoSolve: options?.autoSolve })
+        }, DEMO_AUTO_STEP_INTERVAL_MS)
       }
     },
     [
@@ -595,9 +646,8 @@ export default function TabOneScreen() {
       dispatch,
       recordCurrentGameResult,
       resetCardFlights,
-      runDemoAutoReveal,
+      runDemoSequence,
       setCelebrationState,
-      toast,
       updateBoardLocked,
     ],
   )
@@ -674,18 +724,27 @@ export default function TabOneScreen() {
 
       const host = parsed.host.toLowerCase()
       const pathname = parsed.pathname.toLowerCase()
+      const demoParam = parsed.searchParams.get('demo') ?? parsed.searchParams.get('demoGame')
 
-      if (host === 'demo-game' || pathname === '/demo-game') {
+      if (
+        host === 'demo-game' ||
+        pathname === '/demo-game' ||
+        pathname === '/demo' ||
+        demoParam === '1' ||
+        demoParam?.toLowerCase() === 'true'
+      ) {
         lastDemoLinkRef.current = incomingUrl
         const autoParam = parsed.searchParams.get('auto') ?? parsed.searchParams.get('autoreveal')
-        const autoReveal = autoParam === '1' || autoParam?.toLowerCase() === 'true'
+        const solveParam = parsed.searchParams.get('solve') ?? parsed.searchParams.get('autosolve')
+        const autoSolve = solveParam === '1' || solveParam?.toLowerCase() === 'true'
+        const autoReveal = autoSolve || autoParam === '1' || autoParam?.toLowerCase() === 'true'
 
         if (!settingsState.developerMode) {
           setDeveloperMode(true)
         }
 
         setTimeout(() => {
-          handleLaunchDemoGame({ autoReveal, force: true })
+          handleLaunchDemoGame({ autoReveal, autoSolve, force: true })
         }, DEMO_AUTO_STEP_INTERVAL_MS)
       }
     },
@@ -718,12 +777,19 @@ export default function TabOneScreen() {
   }, [state.moveCount, state.shuffleId, state.stock.length, state.waste.length])
 
   useEffect(() => {
-    if (state.hasWon && !previousHasWonRef.current) {
+    const wasWon = previousHasWonRef.current
+    const isWon = state.hasWon
+
+    if (!wasWon && isWon) {
+      devLog(
+        'info',
+        `[Game] hasWon set true (moves=${state.moveCount}, winCelebrations=${state.winCelebrations}).`,
+      )
       recordCurrentGameResult({ solved: true })
     }
 
-    previousHasWonRef.current = state.hasWon
-  }, [recordCurrentGameResult, state.hasWon])
+    previousHasWonRef.current = isWon
+  }, [recordCurrentGameResult, state.hasWon, state.moveCount, state.winCelebrations])
 
 
   // Requirement PBI-13: hydrate persisted Klondike state on launch.
@@ -756,7 +822,7 @@ export default function TabOneScreen() {
         }
 
         if (!isCancelled) {
-          toast.show('Game reset', { message })
+          devLog('warn', '[Toast suppressed] Game reset', { message })
         }
       } finally {
         if (!isCancelled) {
@@ -768,7 +834,7 @@ export default function TabOneScreen() {
     return () => {
       isCancelled = true
     }
-  }, [dispatch, toast])
+  }, [dispatch])
 
   // Requirement PBI-13: persist state changes after hydration.
   useEffect(() => {
@@ -859,7 +925,7 @@ export default function TabOneScreen() {
           })
           dealNewGame()
           updateBoardLocked(false)
-          toast.show('New game', { message: 'Shuffled cards and reset the board.' })
+          devLog('log', '[Toast suppressed] New game dealt', { reason, forced })
         },
       })
 
@@ -876,7 +942,6 @@ export default function TabOneScreen() {
       dealNewGame,
       recordCurrentGameResult,
       resetCardFlights,
-      toast,
       updateBoardLocked,
     ],
   )
@@ -1002,7 +1067,8 @@ const handleFoundationPress = useCallback(
     }
   }, [dispatch, state.selected])
 
-  const canUndo = !boardLocked && state.history.length > 0
+  const shouldShowUndo = !state.hasWon && !celebrationState && state.history.length > 0
+  const canUndo = !boardLocked && shouldShowUndo
   const openDrawer = useCallback(() => {
     navigation.dispatch(DrawerActions.openDrawer())
   }, [navigation])
@@ -1023,12 +1089,13 @@ const handleFoundationPress = useCallback(
   // Requirement PBI-13: persist state changes after hydration.
   useEffect(() => {
     if (state.autoCompleteRuns > autoCompleteRunsRef.current) {
-      toast.show('Auto-complete engaged', {
-        message: 'Finishing the remaining cards for you…',
+      devLog('log', '[Toast suppressed] Auto-complete engaged', {
+        previousRuns: autoCompleteRunsRef.current,
+        runs: state.autoCompleteRuns,
       })
       autoCompleteRunsRef.current = state.autoCompleteRuns
     }
-  }, [state.autoCompleteRuns, toast])
+  }, [state.autoCompleteRuns])
 
   useEffect(() => {
     if (!animationsEnabled || !celebrationAnimationsEnabled) {
@@ -1040,7 +1107,10 @@ const handleFoundationPress = useCallback(
     }
 
     winCelebrationsRef.current = state.winCelebrations
-    toast.show('🎉 Tada!', { message: 'Foundations complete!' })
+    devLog('info', '[Game] Foundations complete, player won the game.')
+    devLog('log', '[Toast suppressed] Celebration triggered', {
+      celebrations: state.winCelebrations,
+    })
 
     if (celebrationState) {
       return
@@ -1110,7 +1180,6 @@ const handleFoundationPress = useCallback(
     ensureCardFlightsReady,
     state.foundations,
     state.winCelebrations,
-    toast,
     updateBoardLocked,
   ])
 
@@ -1218,17 +1287,19 @@ const handleFoundationPress = useCallback(
         )}
       </YStack>
 
-      <XStack mt="$3" style={{ justifyContent: 'flex-end' }}>
-        <Button
-          width="50%"
-          icon={Undo2}
-          onPress={handleUndo}
-          disabled={!canUndo}
-          themeInverse
-        >
-          Undo
-        </Button>
-      </XStack>
+      {shouldShowUndo ? (
+        <XStack mt="$3" style={{ justifyContent: 'flex-end' }}>
+          <Button
+            width="50%"
+            icon={Undo2}
+            onPress={handleUndo}
+            disabled={!canUndo}
+            themeInverse
+          >
+            Undo
+          </Button>
+        </XStack>
+      ) : null}
     </YStack>
   )
 }

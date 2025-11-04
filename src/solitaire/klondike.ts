@@ -1,5 +1,6 @@
 import type { SolvableShuffleConfig } from '../data/solvableShuffles'
 import { createSolvableShuffleId } from '../data/solvableShuffles'
+import { devLog } from '../utils/devLogger'
 
 const SUITS = ['clubs', 'diamonds', 'hearts', 'spades'] as const
 const RANKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] as const
@@ -188,6 +189,11 @@ const DEMO_SHUFFLE_CONFIG: SolvableShuffleConfig = {
     {
       down: [],
       up: [
+        { suit: 'clubs', rank: 13 },
+        { suit: 'clubs', rank: 12 },
+        { suit: 'clubs', rank: 11 },
+        { suit: 'clubs', rank: 10 },
+        { suit: 'clubs', rank: 9 },
         { suit: 'clubs', rank: 8 },
         { suit: 'clubs', rank: 7 },
         { suit: 'clubs', rank: 6 },
@@ -201,6 +207,11 @@ const DEMO_SHUFFLE_CONFIG: SolvableShuffleConfig = {
     {
       down: [],
       up: [
+        { suit: 'spades', rank: 13 },
+        { suit: 'spades', rank: 12 },
+        { suit: 'spades', rank: 11 },
+        { suit: 'spades', rank: 10 },
+        { suit: 'spades', rank: 9 },
         { suit: 'spades', rank: 8 },
         { suit: 'spades', rank: 7 },
         { suit: 'spades', rank: 6 },
@@ -235,7 +246,76 @@ const DEMO_SHUFFLE_CONFIG: SolvableShuffleConfig = {
   ],
 }
 
-export const createDemoGameState = (): GameState => createSolvableGameState(DEMO_SHUFFLE_CONFIG)
+const DEMO_STOCK_ORDER: Array<{ suit: Suit; rank: Rank }> = [
+  { suit: 'hearts', rank: 9 },
+  { suit: 'hearts', rank: 10 },
+  { suit: 'hearts', rank: 11 },
+  { suit: 'hearts', rank: 12 },
+  { suit: 'hearts', rank: 13 },
+  { suit: 'diamonds', rank: 9 },
+  { suit: 'diamonds', rank: 10 },
+  { suit: 'diamonds', rank: 11 },
+  { suit: 'diamonds', rank: 12 },
+  { suit: 'diamonds', rank: 13 },
+]
+
+export const createDemoGameState = (): GameState => {
+  const deck = createDeck()
+  const lookup = new Map<string, Card>()
+  deck.forEach((card) => {
+    lookup.set(`${card.suit}-${card.rank}`, card)
+  })
+
+  const takeDemoCard = (suit: Suit, rank: Rank, faceUp: boolean): Card => {
+    const key = `${suit}-${rank}`
+    const card = lookup.get(key)
+    if (!card) {
+      throw new Error(`Demo game is missing card ${key}.`)
+    }
+    lookup.delete(key)
+    return {
+      ...card,
+      faceUp,
+    }
+  }
+
+  const tableau: Tableau = DEMO_SHUFFLE_CONFIG.tableau.map((columnConfig) => {
+    const column: Card[] = []
+
+    columnConfig.down.forEach((cardConfig, downIndex) => {
+      column.push(takeDemoCard(cardConfig.suit, cardConfig.rank, false))
+    })
+
+    columnConfig.up.forEach((cardConfig, upIndex) => {
+      column.push(takeDemoCard(cardConfig.suit, cardConfig.rank, true))
+    })
+
+    return column
+  })
+
+  const stock = DEMO_STOCK_ORDER.map(({ suit, rank }) => takeDemoCard(suit, rank, false))
+
+  const snapshot: GameSnapshot = {
+    stock,
+    waste: [],
+    foundations: createEmptyFoundations(),
+    tableau,
+    moveCount: 0,
+    autoCompleteRuns: 0,
+    autoQueue: [],
+    isAutoCompleting: false,
+    hasWon: false,
+    winCelebrations: 0,
+    shuffleId: 'DEMO-GAME-0001',
+    solvableId: DEMO_SHUFFLE_CONFIG.id,
+  }
+
+  return {
+    ...snapshot,
+    history: [],
+    selected: null,
+  }
+}
 
 const takeCardFromLookup = (
   lookup: Map<string, Card>,
