@@ -41,6 +41,7 @@ import {
   FOUNDATION_SUIT_ORDER,
   TABLEAU_COLUMN_COUNT,
   createInitialState,
+  createDemoGameState,
   createSolvableGameState,
   findAutoMoveTarget,
   getDropHints,
@@ -273,6 +274,7 @@ export default function TabOneScreen() {
   const feltBackground = colorScheme === 'dark' ? COLOR_FELT_DARK : COLOR_FELT_LIGHT
   const { state: settingsState, hydrated: settingsHydrated } = useSettings()
   const solvableGamesOnly = settingsState.solvableGamesOnly
+  const developerModeEnabled = settingsState.developerMode
   const animationToggles = useAnimationToggles()
   const { entries: historyEntries, recordResult } = useHistory()
   const {
@@ -405,6 +407,7 @@ export default function TabOneScreen() {
     dispatch({ type: 'NEW_GAME' })
     lastRecordedShuffleRef.current = null
   }, [dispatch, selectNextSolvableShuffle, settingsHydrated, solvableGamesOnly])
+
   const recordCurrentGameResult = useCallback(
     (options?: { solved?: boolean }) => {
       const current = stateRef.current
@@ -440,6 +443,42 @@ export default function TabOneScreen() {
       celebrationDialogTimeoutRef.current = null
     }
   }, [])
+
+  const handleLaunchDemoGame = useCallback(() => {
+    if (!developerModeEnabled || boardLockedRef.current) {
+      return
+    }
+
+    clearCelebrationDialogTimer()
+    recordCurrentGameResult()
+    setCelebrationState(null)
+    resetCardFlights()
+    foundationLayoutsRef.current = {}
+    topRowLayoutRef.current = null
+    winCelebrationsRef.current = 0
+    lastRecordedShuffleRef.current = null
+    updateBoardLocked(false)
+
+    const demoState = createDemoGameState()
+    dispatch({ type: 'HYDRATE_STATE', state: demoState })
+
+    void clearGameState().catch((error) => {
+      console.warn('Failed to clear persisted game before demo shuffle', error)
+    })
+
+    toast.show('Demo game', { message: 'Loaded the developer demo layout.' })
+  }, [
+    boardLockedRef,
+    clearCelebrationDialogTimer,
+    clearGameState,
+    developerModeEnabled,
+    dispatch,
+    recordCurrentGameResult,
+    resetCardFlights,
+    setCelebrationState,
+    toast,
+    updateBoardLocked,
+  ])
   const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(() => ({
     ...EMPTY_INVALID_WIGGLE,
     lookup: new Set<string>(),
@@ -847,10 +886,11 @@ const handleFoundationPress = useCallback(
         <HeaderControls
           onMenuPress={openDrawer}
           onNewGame={() => requestNewGame({ reason: 'manual' })}
+          onDemoGame={developerModeEnabled ? handleLaunchDemoGame : undefined}
         />
       ),
     })
-  }, [navigation, openDrawer, requestNewGame])
+  }, [developerModeEnabled, handleLaunchDemoGame, navigation, openDrawer, requestNewGame])
 
   // Requirement PBI-13: persist state changes after hydration.
   useEffect(() => {
@@ -2593,10 +2633,16 @@ const styles = StyleSheet.create({
 type HeaderControlsProps = {
   onMenuPress: () => void
   onNewGame: () => void
+  onDemoGame?: () => void
 }
 
-const HeaderControls = ({ onMenuPress, onNewGame }: HeaderControlsProps) => (
+const HeaderControls = ({ onMenuPress, onNewGame, onDemoGame }: HeaderControlsProps) => (
   <XStack gap="$4" style={{ alignItems: 'center' }}>
+    {onDemoGame ? (
+      <Button size="$4" onPress={onDemoGame}>
+        Demo Game
+      </Button>
+    ) : null}
     <Button size="$4" onPress={onNewGame}>
       New Game
     </Button>

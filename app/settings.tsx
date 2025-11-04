@@ -56,6 +56,7 @@ export default function SettingsScreen() {
     setAnimationPreference,
     setThemeMode,
     setSolvableGamesOnly,
+    setDeveloperMode,
   } = useSettings()
 
   return (
@@ -109,6 +110,22 @@ export default function SettingsScreen() {
             description="Use curated solvable layouts when starting a new game."
             value={state.solvableGamesOnly}
             onValueChange={setSolvableGamesOnly}
+            disabled={!hydrated}
+          />
+        </YStack>
+
+        <YStack gap="$3">
+          <Text fontSize={16} fontWeight="700">
+            Advanced
+          </Text>
+          <Paragraph color="$color10">
+            Developer tooling for internal builds. Toggle to reveal experimental utilities in the app.
+          </Paragraph>
+          <ToggleRow
+            label="Developer mode"
+            description="Expose internal tooling such as solver experiments and demo games."
+            value={state.developerMode}
+            onValueChange={setDeveloperMode}
             disabled={!hydrated}
           />
         </YStack>

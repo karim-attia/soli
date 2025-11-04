@@ -165,6 +165,31 @@ export const createSolvableGameState = (shuffleConfig: SolvableShuffleConfig): G
   }
 }
 
+const DEMO_RANK_SEQUENCE: Rank[] = [...RANKS].reverse() as Rank[]
+
+const createDemoColumn = (suit: Suit): SolvableShuffleConfig['tableau'][number] => ({
+  down: [],
+  up: DEMO_RANK_SEQUENCE.map((rank) => ({ suit, rank })),
+})
+
+const DEMO_SHUFFLE_CONFIG: SolvableShuffleConfig = {
+  id: 'developer-demo-0001',
+  name: 'Developer Demo',
+  addedAt: '2025-11-04',
+  source: 'developer-mode',
+  tableau: [
+    createDemoColumn('hearts'),
+    createDemoColumn('diamonds'),
+    createDemoColumn('clubs'),
+    createDemoColumn('spades'),
+    { down: [], up: [] },
+    { down: [], up: [] },
+    { down: [], up: [] },
+  ],
+}
+
+export const createDemoGameState = (): GameState => createSolvableGameState(DEMO_SHUFFLE_CONFIG)
+
 const takeCardFromLookup = (
   lookup: Map<string, Card>,
   suit: Suit,

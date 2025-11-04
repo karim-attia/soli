@@ -28,6 +28,7 @@ export type SettingsState = {
   themeMode: ThemeMode
   shareSolvedGames: boolean
   solvableGamesOnly: boolean
+  developerMode: boolean
 }
 
 type SettingsContextValue = {
@@ -38,6 +39,7 @@ type SettingsContextValue = {
   setAnimationPreference: (key: AnimationPreferenceKey, enabled: boolean) => void
   setShareSolvedGames: (enabled: boolean) => void
   setSolvableGamesOnly: (enabled: boolean) => void
+  setDeveloperMode: (enabled: boolean) => void
 }
 
 const STORAGE_KEY = '@soli/settings/v1'
@@ -55,6 +57,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   themeMode: 'auto',
   shareSolvedGames: false,
   solvableGamesOnly: false,
+  developerMode: false,
 }
 
 export const animationPreferenceDescriptors: Array<{
@@ -193,6 +196,12 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     )
   }, [])
 
+  const setDeveloperMode = useCallback((enabled: boolean) => {
+    setState((previous) =>
+      previous.developerMode === enabled ? previous : { ...previous, developerMode: enabled },
+    )
+  }, [])
+
   const value = useMemo<SettingsContextValue>(
     () => ({
       state,
@@ -202,6 +211,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setAnimationPreference,
       setShareSolvedGames,
       setSolvableGamesOnly,
+      setDeveloperMode,
     }),
     [
       hydrated,
@@ -210,6 +220,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setShareSolvedGames,
       setSolvableGamesOnly,
       setThemeMode,
+      setDeveloperMode,
       state,
     ],
   )
@@ -270,6 +281,7 @@ const mergeSettings = (current: SettingsState, incoming?: Partial<SettingsState>
     themeMode: isThemeMode(incoming.themeMode) ? incoming.themeMode : current.themeMode,
     shareSolvedGames: getBoolean(incoming.shareSolvedGames, current.shareSolvedGames),
     solvableGamesOnly: getBoolean(incoming.solvableGamesOnly, current.solvableGamesOnly),
+    developerMode: getBoolean(incoming.developerMode, current.developerMode),
   }
 }
 

@@ -3,10 +3,16 @@ import { useTheme } from 'tamagui'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Atom, AudioWaveform, Clock, Settings, Smile } from '@tamagui/lucide-icons'
 
+import { useSettings } from '../../src/state/settings'
+
 export default function DrawerLayout() {
   const theme = useTheme()
   const insets = useSafeAreaInsets()
   const headerRightPadding = 16
+  const {
+    state: { developerMode },
+  } = useSettings()
+  const developerModeEnabled = developerMode
 
   return (
     <Drawer
@@ -43,6 +49,7 @@ export default function DrawerLayout() {
           title: 'Solver Lab',
           drawerLabel: 'Solver Lab',
           drawerIcon: ({ color, size }) => <AudioWaveform color={color as any} size={size} />,
+          drawerItemStyle: developerModeEnabled ? undefined : { display: 'none' },
         }}
       />
       <Drawer.Screen

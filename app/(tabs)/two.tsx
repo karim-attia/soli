@@ -21,6 +21,8 @@ import { Button, H2, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu, RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
 import { useToastController } from '@tamagui/toast'
 
+import { useSettings } from '../../src/state/settings'
+
 // @ts-ignore - JSON import for predefined shuffles
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
@@ -171,6 +173,10 @@ export default function TabOneScreen() {
   const cardMetrics = useMemo(() => computeCardMetrics(boardWidth), [boardWidth])
   const toast = useToastController()
   const navigation = useNavigation()
+  const {
+    state: { developerMode },
+  } = useSettings()
+  const developerModeEnabled = developerMode
   const dropHints = useMemo(() => getDropHints(state), [state])
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
   const winCelebrationsRef = useRef(state.winCelebrations)
@@ -271,11 +277,16 @@ export default function TabOneScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      if (!developerModeEnabled) {
+        navigation.navigate('index' as never)
+        return undefined
+      }
+
       const cleanup = initializeSolver()
       return () => {
         cleanup()
       }
-    }, [initializeSolver]),
+    }, [developerModeEnabled, initializeSolver, navigation]),
   )
 
   const drawLabel = state.stock.length ? 'Draw' : ''
@@ -344,22 +355,22 @@ export default function TabOneScreen() {
     [dispatch, dropHints.tableau, notifyInvalidMove, state.selected],
   )
 
-const handleFoundationPress = useCallback(
-  (suit: Suit) => {
-    if (!state.selected) {
-      if (state.foundations[suit].length) {
-        attemptAutoMove({ source: 'foundation', suit })
+  const handleFoundationPress = useCallback(
+    (suit: Suit) => {
+      if (!state.selected) {
+        if (state.foundations[suit].length) {
+          attemptAutoMove({ source: 'foundation', suit })
+        }
+        return
       }
-      return
-    }
-    if (dropHints.foundations[suit]) {
-      dispatch({ type: 'PLACE_ON_FOUNDATION', suit })
-    } else {
-      notifyInvalidMove({ selection: state.selected })
-    }
-  },
-  [attemptAutoMove, dispatch, dropHints.foundations, notifyInvalidMove, state.foundations, state.selected],
-)
+      if (dropHints.foundations[suit]) {
+        dispatch({ type: 'PLACE_ON_FOUNDATION', suit })
+      } else {
+        notifyInvalidMove({ selection: state.selected })
+      }
+    },
+    [attemptAutoMove, dispatch, dropHints.foundations, notifyInvalidMove, state.foundations, state.selected],
+  )
 
   const clearSelection = useCallback(() => {
     if (state.selected) {
@@ -374,7 +385,7 @@ const handleFoundationPress = useCallback(
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: 'Solver Lab',
+      headerTitle: developerModeEnabled ? 'Solver Lab' : 'Solver Lab (locked)',
       headerRight: () => (
         <Pressable
           onPress={openDrawer}
@@ -385,25 +396,36 @@ const handleFoundationPress = useCallback(
         </Pressable>
       ),
     })
-  }, [navigation, openDrawer, theme])
+  }, [developerModeEnabled, navigation, openDrawer, theme])
 
   useEffect(() => {
+    if (!developerModeEnabled) {
+      autoCompleteRunsRef.current = state.autoCompleteRuns
+      return
+    }
     if (state.autoCompleteRuns > autoCompleteRunsRef.current) {
       toast.show('Auto-complete engaged', {
         message: 'Finishing the remaining cards for you…',
       })
       autoCompleteRunsRef.current = state.autoCompleteRuns
     }
-  }, [state.autoCompleteRuns, toast])
+  }, [developerModeEnabled, state.autoCompleteRuns, toast])
 
   useEffect(() => {
+    if (!developerModeEnabled) {
+      winCelebrationsRef.current = state.winCelebrations
+      return
+    }
     if (state.winCelebrations > winCelebrationsRef.current) {
       toast.show('🎉 Tada!', { message: 'Foundations complete!' })
       winCelebrationsRef.current = state.winCelebrations
     }
-  }, [state.winCelebrations, toast])
+  }, [developerModeEnabled, state.winCelebrations, toast])
 
   useEffect(() => {
+    if (!developerModeEnabled) {
+      return
+    }
     if (!state.isAutoCompleting || state.autoQueue.length === 0) {
       return
     }
@@ -411,7 +433,22 @@ const handleFoundationPress = useCallback(
       dispatch({ type: 'ADVANCE_AUTO_QUEUE' })
     }, AUTO_QUEUE_INTERVAL_MS)
     return () => clearTimeout(timer)
-  }, [dispatch, state.autoQueue.length, state.isAutoCompleting])
+  }, [developerModeEnabled, dispatch, state.autoQueue.length, state.isAutoCompleting])
+
+  if (!developerModeEnabled) {
+    return (
+      <YStack
+        flex={1}
+        bg="$background"
+        px="$4"
+        style={{ alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Paragraph color="$color10" style={{ textAlign: 'center' }}>
+          Enable developer mode in Settings to access solver tools.
+        </Paragraph>
+      </YStack>
+    )
+  }
 
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
