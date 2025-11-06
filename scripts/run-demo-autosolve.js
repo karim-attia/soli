@@ -15,7 +15,7 @@ const COMPLETION_TOKEN = 'Foundations complete'
 const APP_LOG_PREFIX = '[SoliDev]'
 const AUTO_SEQUENCE_TIMEOUT_MS = 60000
 const AUTO_SEQUENCE_START_TIMEOUT_MS = 20000
-const TOTAL_TIMEOUT_MS = 120000
+const TOTAL_TIMEOUT_MS = 60000
 const PACKAGE_NAME = 'com.soli.klondike'
 const MS_PER_SECOND = 1000
 const SECONDS_PER_MINUTE = 60
@@ -80,6 +80,7 @@ const createProgressTracker = (label, expectedDurationMs = DEFAULT_EXPECTED_BUIL
     forceComplete = false,
     overrideElapsed,
     appendText = '',
+    overrideMessage,
   } = {}) => {
     const elapsed = overrideElapsed ?? Date.now() - startTime
     if (!forceComplete) {
@@ -99,23 +100,24 @@ const createProgressTracker = (label, expectedDurationMs = DEFAULT_EXPECTED_BUIL
     const baseLine = `${renderProgressBar(segments)} ${segments}/${PROGRESS_BAR_WIDTH} elapsed ${formatClockDuration(
       elapsed,
     )} remaining ${formatClockDuration(remainingMs, { roundUp: true })}`
-    const decoratedLine = appendText ? `${baseLine} ${appendText}` : baseLine
+    const decoratedBaseLine = appendText ? `${baseLine} ${appendText}` : baseLine
+    const finalLine = overrideMessage ?? decoratedBaseLine
 
     if (process.stdout.isTTY && typeof process.stdout.clearLine === 'function') {
       process.stdout.clearLine(0)
       process.stdout.cursorTo(0)
-      process.stdout.write(decoratedLine)
+      process.stdout.write(finalLine)
       if (final) {
         process.stdout.write('\n')
       }
-    } else if (decoratedLine !== lastPrintedLine || final) {
-      console.log(decoratedLine)
+    } else if (finalLine !== lastPrintedLine || final) {
+      console.log(finalLine)
       if (final) {
         console.log('')
       }
     }
 
-    lastPrintedLine = decoratedLine
+    lastPrintedLine = finalLine
 
     return { elapsed }
   }
@@ -134,7 +136,9 @@ const createProgressTracker = (label, expectedDurationMs = DEFAULT_EXPECTED_BUIL
         final: true,
         forceComplete: true,
         overrideElapsed: elapsed,
-        appendText: `completed in ${formatClockDuration(elapsed)}`,
+        overrideMessage: `${renderProgressBar(PROGRESS_BAR_WIDTH)} ${PROGRESS_BAR_WIDTH}/${PROGRESS_BAR_WIDTH} - completed in ${formatClockDuration(
+          elapsed,
+        )}`,
       })
       log(`Measured ${label} duration: ${formatVerboseDuration(elapsed)} (${formatClockDuration(elapsed)}).`)
       return elapsed
