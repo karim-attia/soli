@@ -78,13 +78,14 @@ const startLogcatListener = () => spawn('adb', ['logcat'], { stdio: ['ignore', '
 const main = async () => {
   try {
     await ensureDevice()
+    await runCommand('adb', ['shell', 'am', 'force-stop', PACKAGE_NAME])
 
     log('Building and installing release APK (expo run:android --variant release)...')
     await runCommand('npx', ['expo', 'run:android', '--variant', 'release'], { silent: true })
 
     await runCommand('adb', ['logcat', '-c'])
 
-    await runCommand('adb', ['shell', 'am', 'force-stop', PACKAGE_NAME])
+    // await runCommand('adb', ['shell', 'am', 'force-stop', PACKAGE_NAME])
 
     const logcat = startLogcatListener()
 
