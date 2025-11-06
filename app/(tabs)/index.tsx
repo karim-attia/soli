@@ -58,6 +58,15 @@ import type {
   Suit,
 } from '../../src/solitaire/klondike'
 import { useFlightController, type CardFlightSnapshot } from '../../src/animation/flightController'
+import {
+  CELEBRATION_DURATION_MS,
+  CELEBRATION_MODE_COUNT,
+  CELEBRATION_WOBBLE_FREQUENCY,
+  TAU,
+  computeCelebrationFrame,
+  getCelebrationModeMetadata,
+  type CelebrationAssignment,
+} from '../../src/animation/celebrationModes'
 import { devLog } from '../../src/utils/devLogger'
 import {
   PersistedGameError,
@@ -81,8 +90,9 @@ const TABLEAU_GAP = 10
 const MAX_CARD_WIDTH = 96
 const MIN_CARD_WIDTH = 24
 const WASTE_FAN_OVERLAP_RATIO = 0.35
-const WASTE_ENTER_EXTRA_RATIO = 0.25
 const WASTE_FAN_MAX_OFFSET = 28
+const WASTE_ENTRY_BACKTRACK_RATIO = 0.45
+const WASTE_ENTRY_BACKTRACK_MAX = 24
 const AUTO_QUEUE_INTERVAL_MS = 200
 const COLUMN_MARGIN = TABLEAU_GAP / 2
 const COLOR_CARD_FACE = '#ffffff'
@@ -187,14 +197,8 @@ const DEFAULT_METRICS: CardMetrics = {
   radius: 12,
 }
 
-const CELEBRATION_MODE_COUNT = 20
-const CELEBRATION_DURATION_MS = 60_000
 const CELEBRATION_DIALOG_DELAY_MS = 30_000
-const CELEBRATION_SPEED_MULTIPLIER = 10.4
-const CELEBRATION_WOBBLE_FREQUENCY = 5.5
 const FOUNDATION_FALLBACK_GAP = 16
-const FOUNDATION_STACK_MAX = 13
-const TAU = Math.PI * 2
 
 type CelebrationCardConfig = {
   card: Card
@@ -204,15 +208,6 @@ type CelebrationCardConfig = {
   baseX: number
   baseY: number
   randomSeed: number
-}
-
-type CelebrationAssignment = {
-  baseX: number
-  baseY: number
-  stackIndex: number
-  suitIndex: number
-  randomSeed: number
-  index: number
 }
 
 type CelebrationBindings = {
@@ -324,6 +319,15 @@ export default function TabOneScreen() {
     setBoardLocked(locked)
   }, [])
   const isCelebrationActive = celebrationState !== null
+  const celebrationLabel = useMemo(() => {
+    if (!developerModeEnabled || !celebrationState) {
+      return null
+    }
+    const metadata = getCelebrationModeMetadata(celebrationState.modeId)
+    const modeNumber = metadata ? metadata.id + 1 : celebrationState.modeId + 1
+    const padded = modeNumber.toString().padStart(2, '0')
+    return `Celebration ${padded} · ${metadata?.name ?? 'Unknown'}`
+  }, [celebrationState, developerModeEnabled])
   const handleTopRowLayout = useCallback((layout: LayoutRectangle) => {
     topRowLayoutRef.current = layout
   }, [])
@@ -1383,6 +1387,11 @@ const handleFoundationPress = useCallback(
         {celebrationState ? (
           <CelebrationTouchBlocker onAbort={handleCelebrationAbort} />
         ) : null}
+        {celebrationLabel ? (
+          <View pointerEvents="none" style={styles.celebrationDebugBadge}>
+            <Text style={styles.celebrationDebugBadgeText}>{celebrationLabel}</Text>
+          </View>
+        ) : null}
       </YStack>
 
       {shouldShowUndo ? (
@@ -1763,278 +1772,61 @@ const CardView = ({
     if (celebrationActiveValue > 0 && celebrationBindings) {
       const assignment = celebrationBindings.assignments.value?.[card.id]
       if (assignment) {
-        const board = celebrationBindings.board.value
-        const progressValue = celebrationBindings.progress.value
-        const totalCards = Math.max(celebrationBindings.total.value, 1)
-        const mode = celebrationBindings.mode.value % CELEBRATION_MODE_COUNT
-        const boardWidth = board?.width ?? metrics.width
-        const boardHeight = board?.height ?? metrics.height
-        const centerX = boardWidth / 2 - metrics.width / 2
-        const centerY = boardHeight / 2 - metrics.height / 2
-        const boardRadius = Math.min(boardWidth, boardHeight)
-        const totalProgress = progressValue * CELEBRATION_SPEED_MULTIPLIER
-        const rawProgress = totalProgress % 1
-        const launchProgress = totalProgress > 1 ? 1 : totalProgress
-        const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
-        const launchEased = easeOutCubic(launchProgress)
-        const seed = assignment.randomSeed
-        const relativeIndex = assignment.index - totalCards / 2
-        const normalizedIndex = (assignment.index + 1) / totalCards
-        const stackFactor = assignment.stackIndex / FOUNDATION_STACK_MAX
-        const direction = assignment.index % 2 === 0 ? 1 : -1
-        const theta = TAU * rawProgress
-        const thetaSeed = TAU * (rawProgress + seed)
-        const thetaDouble = TAU * (rawProgress * 2 + seed * 0.5)
+        const frame = computeCelebrationFrame({
+          modeId: celebrationBindings.mode.value,
+          assignment,
+          metrics,
+          board: celebrationBindings.board.value,
+          totalCards: celebrationBindings.total.value,
+          progress: celebrationBindings.progress.value,
+        })
 
-        let pathX = assignment.baseX
-        let pathY = assignment.baseY
-        let rotation = 0
-        let targetScale = 1
-        let targetOpacity = 1
+        if (frame) {
+          const {
+            pathX,
+            pathY,
+            rotation,
+            targetScale,
+            targetOpacity,
+            launchEased,
+            rawProgress,
+            relativeIndex,
+            stackFactor,
+          } = frame
+          const seed = assignment.randomSeed
+          const wobblePhase =
+            rawProgress * TAU * CELEBRATION_WOBBLE_FREQUENCY + seed * TAU
+          const wobbleEnvelope = 0.15 + 0.85 * Math.pow(Math.sin(wobblePhase), 2)
+          const wobbleX =
+            Math.sin(wobblePhase * 1.25 + relativeIndex * 0.4) *
+            metrics.width *
+            0.1 *
+            wobbleEnvelope
+          const wobbleY =
+            Math.cos(wobblePhase * 0.95 + stackFactor * 4) *
+            metrics.height *
+            0.11 *
+            wobbleEnvelope
 
-        switch (mode) {
-          case 0: {
-            const radius = boardRadius * (0.24 + 0.18 * Math.sin(thetaDouble))
-            pathX =
-              centerX + Math.cos(thetaSeed) * radius + relativeIndex * metrics.width * 0.25
-            pathY =
-              centerY + Math.sin(thetaSeed) * radius - stackFactor * metrics.height * 0.4
-            rotation = (thetaSeed * 180) / Math.PI
-            targetScale = 1 + 0.06 * Math.sin(theta * 2 + stackFactor)
-            break
-          }
-          case 1: {
-            const ampX = boardRadius * (0.3 + 0.1 * Math.sin(thetaDouble))
-            const ampY = boardRadius * (0.22 + 0.06 * Math.cos(thetaDouble + seed))
-            pathX = centerX + Math.sin(theta) * ampX
-            pathY = centerY + Math.sin(theta * 2 + seed * TAU) * ampY
-            rotation = (Math.sin(theta) * 540) / Math.PI
-            targetScale = 1 + 0.05 * Math.sin(theta * 2 + normalizedIndex)
-            break
-          }
-          case 2: {
-            const ampX = boardRadius * (0.18 + stackFactor * 0.12)
-            const ampY = boardRadius * 0.38
-            pathX = centerX + Math.sin(theta * 1.5 + seed * TAU) * ampX
-            pathY = centerY - Math.cos(theta + seed * 0.5) * ampY
-            rotation = (theta * 360) / Math.PI
-            targetScale = 1 + 0.05 * Math.cos(theta * 3 + seed)
-            break
-          }
-          case 3: {
-            const angle = theta * 1.5 + seed * TAU
-            const radius = boardRadius * (0.25 + 0.2 * Math.sin(theta * 2 + normalizedIndex))
-            pathX = centerX + Math.cos(angle) * radius
-            pathY = centerY + Math.sin(angle) * radius
-            rotation = (angle * 180) / Math.PI
-            targetScale = 1 + 0.07 * Math.sin(theta + stackFactor)
-            break
-          }
-          case 4: {
-            const angle = theta + stackFactor
-            const radiusX =
-              boardRadius * (0.3 + 0.1 * Math.sin(thetaDouble + normalizedIndex))
-            const radiusY = boardRadius * (0.2 + 0.08 * Math.cos(thetaDouble + seed))
-            pathX = centerX + Math.cos(angle) * radiusX
-            pathY = centerY + Math.sin(angle) * radiusY
-            rotation = (Math.sin(theta * 2 + seed) * 360) / Math.PI
-            targetScale = 1 + 0.04 * Math.sin(theta * 4 + seed)
-            break
-          }
-          case 5: {
-            const spur = Math.sin(theta * 5 + seed * 3)
-            const radius = boardRadius * (0.18 + 0.22 * Math.abs(spur))
-            const angle = theta + spur * 0.3
-            pathX = centerX + Math.cos(angle) * radius
-            pathY = centerY + Math.sin(angle) * radius
-            rotation = (angle * 180) / Math.PI + spur * 30
-            targetScale = 1 + 0.05 * Math.sin(theta * 5 + normalizedIndex)
-            break
-          }
-          case 6: {
-            const angle = theta * 2 + seed * TAU * direction
-            const radius =
-              boardRadius * (0.16 + 0.18 * Math.sin(theta + direction * 0.5))
-            pathX =
-              centerX +
-              direction * Math.cos(angle) * radius +
-              relativeIndex * metrics.width * 0.2
-            pathY = centerY + Math.sin(angle) * radius
-            rotation = (angle * 180) / Math.PI
-            targetScale = 1 + 0.04 * Math.sin(theta * 3 + stackFactor)
-            break
-          }
-          case 7: {
-            const angle = theta + normalizedIndex
-            const radiusX = boardRadius * 0.22
-            const radiusY = boardRadius * (0.3 + 0.1 * Math.sin(thetaDouble + stackFactor))
-            pathX = centerX + Math.sin(angle) * radiusX
-            pathY = centerY - Math.cos(angle) * radiusY
-            rotation = (Math.cos(theta) * 360) / Math.PI
-            targetScale = 1 + 0.05 * Math.sin(theta * 2 + normalizedIndex)
-            break
-          }
-          case 8: {
-            const ring = Math.floor(normalizedIndex * 4)
-            const radius =
-              boardRadius * (0.15 + 0.12 * ring + 0.05 * Math.sin(theta * 3 + seed))
-            const angle = theta + ring * 0.3
-            pathX = centerX + Math.cos(angle) * radius
-            pathY = centerY + Math.sin(angle) * radius
-            rotation = (angle * 180) / Math.PI + ring * 20
-            targetScale = 1 + ring * 0.03 + 0.02 * Math.sin(theta * 4 + seed)
-            break
-          }
-          case 9: {
-            const angle = theta + seed
-            const drift = Math.sin(thetaDouble) * boardRadius * 0.12
-            pathX = centerX + Math.cos(angle) * boardRadius * 0.28 + drift
-            pathY = centerY - Math.sin(angle) * boardRadius * 0.35 + drift * 0.6
-            rotation = (angle * 180) / Math.PI + drift * 10
-            targetScale = 1 + 0.05 * Math.sin(theta * 2 + stackFactor)
-            break
-          }
-          case 10: {
-            const angle = theta * 1.5 + stackFactor * 2
-            const radius = boardRadius * (0.2 + 0.18 * Math.sin(theta * 2 + seed))
-            pathX = centerX + Math.cos(angle) * radius
-            pathY = centerY + Math.sin(angle) * radius - stackFactor * metrics.height * 0.3
-            rotation = (angle * 180) / Math.PI
-            targetScale = 1 + stackFactor * 0.08 + 0.04 * Math.sin(theta)
-            break
-          }
-          case 11: {
-            const ampX = boardRadius * (0.25 + 0.05 * Math.sin(seed * TAU))
-            const ampY = boardRadius * (0.32 + 0.06 * Math.cos(seed * TAU))
-            pathX = centerX + Math.sin(theta * 1.7 + seed) * ampX
-            pathY = centerY + Math.sin(theta * 2.3 + seed * 0.4) * ampY
-            rotation = (Math.sin(theta * 2) * 360) / Math.PI
-            targetScale = 1 + 0.05 * Math.sin(theta * 3 + normalizedIndex)
-            break
-          }
-          case 12: {
-            const columnOffset = relativeIndex * metrics.width * 0.4
-            const angle = theta * 2 + seed
-            const radiusY = boardRadius * (0.2 + 0.1 * Math.sin(theta + columnOffset * 0.01))
-            pathX = centerX + columnOffset
-            pathY = centerY + Math.sin(angle) * radiusY
-            rotation = (angle * 180) / Math.PI
-            targetScale = 1 + 0.03 * Math.cos(theta * 4 + columnOffset)
-            break
-          }
-          case 13: {
-            const angle = theta + seed * TAU * 2
-            const radius = boardRadius * (0.18 + 0.25 * Math.sin(theta * 4 + seed))
-            pathX =
-              centerX +
-              Math.cos(angle) * radius +
-              Math.sin(theta * 3 + seed) * metrics.width * 0.2
-            pathY = centerY + Math.sin(angle) * radius
-            rotation = (angle * 180) / Math.PI
-            targetScale = 1 + 0.05 * Math.sin(theta * 5 + seed)
-            targetOpacity = 0.8 + 0.2 * Math.sin(theta * 2 + seed)
-            break
-          }
-          case 14: {
-            const wave = Math.sin(theta + seed)
-            const ampX = boardRadius * 0.4
-            const ampY = boardRadius * (0.2 + 0.1 * Math.sin(theta * 2 + stackFactor))
-            pathX = centerX + wave * ampX
-            pathY = centerY + Math.sin(theta * 3 + seed) * ampY
-            rotation = wave * 270
-            targetScale = 1 + 0.04 * Math.sin(theta * 3 + normalizedIndex)
-            break
-          }
-          case 15: {
-            const angle = theta * 2 + normalizedIndex * TAU
-            const radius = boardRadius * (0.22 + 0.15 * Math.sin(theta + normalizedIndex))
-            pathX = centerX + Math.cos(angle) * radius
-            pathY = centerY + Math.sin(angle) * radius
-            rotation = (angle * 180) / Math.PI
-            targetScale = 1 + 0.05 * Math.sin(theta * 2 + stackFactor)
-            targetOpacity = 0.9 + 0.1 * Math.cos(theta * 2 + normalizedIndex)
-            break
-          }
-          case 16: {
-            const pulse = 0.7 + 0.3 * Math.sin(theta * 3 + seed)
-            const angle = theta + stackFactor
-            const radius = boardRadius * 0.28 * pulse
-            pathX = centerX + Math.cos(angle) * radius
-            pathY = centerY + Math.sin(angle) * radius
-            rotation = (angle * 180) / Math.PI + pulse * 45
-            targetScale = pulse
-            break
-          }
-          case 17: {
-            const clover = Math.sin(theta * 3)
-            const radius = boardRadius * (0.22 + 0.18 * Math.abs(clover))
-            const angle = theta + clover * 0.3 + seed
-            pathX = centerX + Math.cos(angle) * radius
-            pathY = centerY + Math.sin(angle) * radius
-            rotation = (angle * 180) / Math.PI
-            targetScale = 1 + 0.04 * clover
-            break
-          }
-          case 18: {
-            const angle = theta + seed
-            const radius = boardRadius * (0.35 + 0.12 * Math.sin(theta * 2 + normalizedIndex))
-            pathX = centerX + Math.cos(angle) * radius
-            pathY = centerY - Math.sin(angle) * radius * 0.85
-            rotation = (angle * 180) / Math.PI
-            targetScale = 1 + 0.05 * Math.sin(theta * 2 + seed)
-            break
-          }
-          case 19: {
-            const jitterAngle = theta * 4 + seed * TAU
-            const radius = boardRadius * (0.2 + 0.1 * Math.sin(theta * 6 + normalizedIndex))
-            pathX =
-              centerX +
-              Math.cos(jitterAngle) * radius +
-              Math.sin(theta * 2 + seed) * metrics.width * 0.15
-            pathY =
-              centerY +
-              Math.sin(jitterAngle) * radius +
-              Math.cos(theta * 2 + seed) * metrics.height * 0.1
-            rotation = (jitterAngle * 90) / Math.PI
-            targetScale = 1 + 0.03 * Math.sin(theta * 6 + seed)
-            targetOpacity = 0.85 + 0.15 * Math.sin(theta * 4 + seed)
-            break
-          }
-          default: {
-            const radius = boardRadius * 0.25
-            pathX = centerX + Math.cos(thetaSeed) * radius
-            pathY = centerY + Math.sin(thetaSeed) * radius
-            rotation = (thetaSeed * 180) / Math.PI
-            break
-          }
+          const finalX =
+            assignment.baseX * (1 - launchEased) + pathX * launchEased + wobbleX
+          const finalY =
+            assignment.baseY * (1 - launchEased) + pathY * launchEased + wobbleY
+          const finalScale = 1 + (targetScale - 1) * launchEased
+          const finalRotation = rotation * launchEased
+          const clampedOpacity = targetOpacity < 0 ? 0 : targetOpacity
+          const finalOpacity = Math.min(
+            1,
+            clampedOpacity * (0.5 + 0.5 * launchEased),
+          )
+
+          translateX = wiggle.value + flightX.value + (finalX - assignment.baseX)
+          translateY = flightY.value + (finalY - assignment.baseY)
+          scale = finalScale
+          rotationDeg = finalRotation
+          opacity = Math.min(opacity, finalOpacity)
+          zIndex = Math.max(zIndex, 4000 + assignment.index)
         }
-
-        const wobblePhase = rawProgress * TAU * CELEBRATION_WOBBLE_FREQUENCY + seed * TAU
-        const wobbleEnvelope = 0.15 + 0.85 * Math.pow(Math.sin(wobblePhase), 2)
-        const wobbleX =
-          Math.sin(wobblePhase * 1.25 + relativeIndex * 0.4) *
-          metrics.width *
-          0.1 *
-          wobbleEnvelope
-        const wobbleY =
-          Math.cos(wobblePhase * 0.95 + stackFactor * 4) *
-          metrics.height *
-          0.11 *
-          wobbleEnvelope
-
-        const finalX = assignment.baseX * (1 - launchEased) + pathX * launchEased + wobbleX
-        const finalY = assignment.baseY * (1 - launchEased) + pathY * launchEased + wobbleY
-        const finalScale = 1 + (targetScale - 1) * launchEased
-        const finalRotation = rotation * launchEased
-        const clampedOpacity = targetOpacity < 0 ? 0 : targetOpacity
-        const finalOpacity = Math.min(1, clampedOpacity * (0.5 + 0.5 * launchEased))
-
-        translateX = wiggle.value + flightX.value + (finalX - assignment.baseX)
-        translateY = flightY.value + (finalY - assignment.baseY)
-        scale = finalScale
-        rotationDeg = finalRotation
-        opacity = Math.min(opacity, finalOpacity)
-        zIndex = Math.max(zIndex, 4000 + assignment.index)
       }
     }
 
@@ -2415,8 +2207,16 @@ const WasteFanCard = ({
   cardFlightMemory,
 }: WasteFanCardProps) => {
   const { wasteFan: wasteFanEnabled } = useAnimationToggles()
-  const enterOffset = targetOffset + metrics.width * WASTE_ENTER_EXTRA_RATIO
-  const translateX = useSharedValue(!wasteFanEnabled ? targetOffset : isEntering ? enterOffset : targetOffset)
+  const entryBacktrack = Math.min(
+    Math.min(metrics.width * WASTE_ENTRY_BACKTRACK_RATIO, WASTE_ENTRY_BACKTRACK_MAX),
+    targetOffset,
+  )
+  const initialOffset = !wasteFanEnabled
+    ? targetOffset
+    : isEntering
+      ? targetOffset - entryBacktrack
+      : targetOffset
+  const translateX = useSharedValue(initialOffset)
   const positionStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
   }))
@@ -2427,7 +2227,9 @@ const WasteFanCard = ({
       translateX.value = targetOffset
       return
     }
-    translateX.value = withTiming(targetOffset, WASTE_TIMING_CONFIG)
+    translateX.value = withTiming(targetOffset, WASTE_TIMING_CONFIG, () => {
+      translateX.value = targetOffset
+    })
   }, [targetOffset, translateX, wasteFanEnabled])
 
   return (
@@ -2858,6 +2660,23 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     pointerEvents: 'auto',
+  },
+  celebrationDebugBadge: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.45)',
+  },
+  celebrationDebugBadgeText: {
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   hiddenCard: {
     opacity: 0,

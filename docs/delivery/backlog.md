@@ -18,6 +18,7 @@
 | 15 | App visitor | As a visitor I want a friendly Hello screen that explains the app succinctly and links clearly to the source so that I can understand the project and find the code. | InReview | 1. Hello screen uses Tamagui native list components for features.<br>2. Source link reads “View source on GitHub”.<br>3. Copy is concise, typo-free, and layout remains understated.<br>[View Details](./15/prd.md) |
 | 16 | Developer experience | As a developer I want a developer mode toggle that unlocks internal tooling so that I can access debugging aids without shipping them broadly. | Proposed | 1. Settings include a persisted developer-mode toggle exposed only to internal builds.<br>2. Solver menu entries stay hidden whenever developer mode is off.<br>3. The Klondike header provides a “Demo Game” control that starts a hardcoded easy shuffle when developer mode is enabled.<br>[View Details](./16/prd.md) |
 | 17 | Returning player | As a player I want startup and control polish so that the game feels stable and responsive. | Proposed | 1. Waste fan draw animation no longer overshoots and eases smoothly.<br>2. App launch avoids layout shifts before the first frame becomes interactive.<br>3. Undo button remains hidden until the first move occurs.<br>4. Session resumes ongoing games without replaying animations while completed games start fresh.<br>5. Toast notifications are disabled until redesigned.<br>[View Details](./17/prd.md) |
+| 18 | Developer tools maintainer | As a developer I want celebration metadata surfaced during wins so that I can identify and iterate on animations quickly. | InReview | 1. Celebration mode logic lives in a dedicated module referenced by the Klondike screen.<br>2. Every celebration mode exposes a human-readable name alongside its numeric identifier.<br>3. When developer mode is enabled and a celebration runs, the UI shows the current celebration number and name in the bottom-right corner.<br>[View Details](./18/prd.md) |
 
 ## History
 
@@ -85,3 +86,7 @@
 | 2025-11-02 17:04:00 | 15 | submit_for_review | Hello screen polish ready for review. | ai_agent |
 | 2025-11-04 09:05:00 | 16 | create_pbi | Logged developer mode toggle and demo game backlog item. | ai_agent |
 | 2025-11-04 10:20:00 | 17 | create_pbi | Created startup polish and control quality backlog item. | ai_agent |
+| 20251106-143000 | 18 | create_pbi | Created PBI 18 for developer-mode celebration metadata overlays. | ai_agent |
+| 20251106-143100 | 18 | propose_for_backlog | User approved developer-mode celebration debug overlay scope. | user |
+| 20251106-143200 | 18 | start_implementation | Began implementation work on PBI 18 tasks 18-1 and 18-2. | ai_agent |
+| 20251106-151000 | 18 | submit_for_review | Celebration metadata module and developer overlay ready for review. | ai_agent |

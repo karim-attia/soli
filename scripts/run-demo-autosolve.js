@@ -30,6 +30,9 @@ const PROGRESS_BAR_PREFIX = '['
 const PROGRESS_BAR_SUFFIX = ']'
 const PROGRESS_EXPECTATION_MULTIPLIER = 1.25
 const DEFAULT_EXPECTED_BUILD_TIME_MS = TOTAL_TIMEOUT_MS
+const CRASH_PREFIX = '[CRASH]'
+const CRASH_KEYWORDS = ['FATAL', 'AndroidRuntime', 'Exception', 'crash', 'SIGSEGV', 'SIGABRT', 'SIGBUS']
+const MAX_CRASH_CONTEXT_LINES = 8
 
 const log = (message) => {
   console.log(`\x1b[36m[demo]\x1b[0m ${message}`)
@@ -290,6 +293,8 @@ const main = async () => {
 
         scheduleAutoStartTimeout()
 
+        const crashContext = []
+
         logcat.stdout.on('data', (data) => {
           buffer += data.toString()
           const lines = buffer.split('\n')
@@ -297,6 +302,17 @@ const main = async () => {
           lines.forEach((line) => {
             if (!line) {
               return
+            }
+            crashContext.push(line)
+            if (crashContext.length > MAX_CRASH_CONTEXT_LINES) {
+              crashContext.shift()
+            }
+            const hasAppContext =
+              line.includes(PACKAGE_NAME) ||
+              crashContext.some((recentLine) => recentLine.includes(PACKAGE_NAME))
+            const isCrashLine = CRASH_KEYWORDS.some((keyword) => line.includes(keyword))
+            if (isCrashLine && hasAppContext) {
+              console.log(`${CRASH_PREFIX} ${line}`)
             }
             if (line.includes(APP_LOG_PREFIX)) {
               const match = line.match(/\[SoliDev\]'?,?\s*(.*)$/)
