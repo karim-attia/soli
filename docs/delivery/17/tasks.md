@@ -12,4 +12,5 @@ This document lists all tasks associated with PBI 17.
 | 17-3 | [Hide undo button for fresh games](./17-3.md) | Review | Difficulty: Easy. Show undo only after the first reversible move exists. |
 | 17-4 | [Resume sessions without replay animations](./17-4.md) | Proposed | Difficulty: Medium. Resume in-progress games without animations and auto-start fresh games when the previous one finished. |
 | 17-5 | [Disable toast notifications](./17-5.md) | Done | Difficulty: Easy. Remove or stub all toast emissions across the app. |
+| 17-6 | [Instrument demo auto-solve build timing](./17-6.md) | InProgress | Difficulty: Easy. Time the build/install step and show a 1-10 progress bar. |
 

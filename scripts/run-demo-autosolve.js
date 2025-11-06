@@ -75,8 +75,13 @@ const createProgressTracker = (label, expectedDurationMs = DEFAULT_EXPECTED_BUIL
   let lastPrintedLine = ''
   const maxSegmentsBeforeCompletion = PROGRESS_BAR_WIDTH - 1
 
-  const render = ({ final = false, forceComplete = false } = {}) => {
-    const elapsed = Date.now() - startTime
+  const render = ({
+    final = false,
+    forceComplete = false,
+    overrideElapsed,
+    appendText = '',
+  } = {}) => {
+    const elapsed = overrideElapsed ?? Date.now() - startTime
     if (!forceComplete) {
       const scaledElapsed = Math.ceil(elapsed * PROGRESS_EXPECTATION_MULTIPLIER)
       expectedTotal = Math.max(expectedTotal, scaledElapsed, PROGRESS_UPDATE_INTERVAL_MS)
@@ -91,25 +96,26 @@ const createProgressTracker = (label, expectedDurationMs = DEFAULT_EXPECTED_BUIL
     }
 
     const remainingMs = forceComplete ? 0 : Math.max(0, expectedTotal - elapsed)
-    const line = `${renderProgressBar(segments)} ${segments}/${PROGRESS_BAR_WIDTH} elapsed ${formatClockDuration(
+    const baseLine = `${renderProgressBar(segments)} ${segments}/${PROGRESS_BAR_WIDTH} elapsed ${formatClockDuration(
       elapsed,
     )} remaining ${formatClockDuration(remainingMs, { roundUp: true })}`
+    const decoratedLine = appendText ? `${baseLine} ${appendText}` : baseLine
 
     if (process.stdout.isTTY && typeof process.stdout.clearLine === 'function') {
       process.stdout.clearLine(0)
       process.stdout.cursorTo(0)
-      process.stdout.write(line)
+      process.stdout.write(decoratedLine)
       if (final) {
         process.stdout.write('\n')
       }
-    } else if (line !== lastPrintedLine || final) {
-      console.log(line)
+    } else if (decoratedLine !== lastPrintedLine || final) {
+      console.log(decoratedLine)
       if (final) {
         console.log('')
       }
     }
 
-    lastPrintedLine = line
+    lastPrintedLine = decoratedLine
 
     return { elapsed }
   }
@@ -123,7 +129,13 @@ const createProgressTracker = (label, expectedDurationMs = DEFAULT_EXPECTED_BUIL
   return {
     complete: () => {
       clearInterval(intervalId)
-      const { elapsed } = render({ final: true, forceComplete: true })
+      const elapsed = Date.now() - startTime
+      render({
+        final: true,
+        forceComplete: true,
+        overrideElapsed: elapsed,
+        appendText: `completed in ${formatClockDuration(elapsed)}`,
+      })
       log(`Measured ${label} duration: ${formatVerboseDuration(elapsed)} (${formatClockDuration(elapsed)}).`)
       return elapsed
     },

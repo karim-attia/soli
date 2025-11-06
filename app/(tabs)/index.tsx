@@ -18,6 +18,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native'
+import type { ViewStyle } from 'react-native'
 import Animated, {
   Easing,
   cancelAnimation,
@@ -56,6 +57,7 @@ import type {
   Selection,
   Suit,
 } from '../../src/solitaire/klondike'
+import { useFlightController, type CardFlightSnapshot } from '../../src/animation/flightController'
 import { devLog } from '../../src/utils/devLogger'
 import {
   PersistedGameError,
@@ -159,13 +161,6 @@ const FOUNDATION_WIGGLE_SUPPRESS_MS = 250
 const FLIGHT_WAIT_TIMEOUT_MS = 160
 
 const AnimatedView = Animated.createAnimatedComponent(View)
-type CardFlightSnapshot = {
-  pageX: number
-  pageY: number
-  width: number
-  height: number
-}
-
 type CardFlightRegistry = SharedValue<Record<string, CardFlightSnapshot>>
 
 type CardMetrics = {
@@ -198,6 +193,7 @@ const CELEBRATION_DIALOG_DELAY_MS = 30_000
 const CELEBRATION_SPEED_MULTIPLIER = 10.4
 const CELEBRATION_WOBBLE_FREQUENCY = 5.5
 const FOUNDATION_FALLBACK_GAP = 16
+const FOUNDATION_STACK_MAX = 13
 const TAU = Math.PI * 2
 
 type CelebrationCardConfig = {
@@ -208,6 +204,24 @@ type CelebrationCardConfig = {
   baseX: number
   baseY: number
   randomSeed: number
+}
+
+type CelebrationAssignment = {
+  baseX: number
+  baseY: number
+  stackIndex: number
+  suitIndex: number
+  randomSeed: number
+  index: number
+}
+
+type CelebrationBindings = {
+  active: SharedValue<number>
+  progress: SharedValue<number>
+  assignments: SharedValue<Record<string, CelebrationAssignment>>
+  mode: SharedValue<number>
+  board: SharedValue<{ width: number; height: number }>
+  total: SharedValue<number>
 }
 
 type CelebrationState = {
@@ -291,8 +305,6 @@ export default function TabOneScreen() {
   const dropHints = useMemo(() => getDropHints(state), [state])
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
   const winCelebrationsRef = useRef(state.winCelebrations)
-  const cardFlights = useSharedValue<Record<string, CardFlightSnapshot>>({})
-  const cardFlightMemoryRef = useRef<Record<string, CardFlightSnapshot>>({})
   const recentFoundationArrivalsRef = useRef<Map<string, number>>(new Map())
   const stateRef = useRef(state)
   const lastRecordedShuffleRef = useRef<string | null>(null)
@@ -318,9 +330,50 @@ export default function TabOneScreen() {
   const handleFoundationLayout = useCallback((suit: Suit, layout: LayoutRectangle) => {
     foundationLayoutsRef.current[suit] = layout
   }, [])
-  const handleCardMeasured = useCallback((cardId: string, snapshot: CardFlightSnapshot) => {
-    cardFlightMemoryRef.current[cardId] = snapshot
-  }, [])
+  const resolveSelectionCardIds = useCallback(
+    (selection?: Selection | null) => collectSelectionCardIds(stateRef.current, selection),
+    [],
+  )
+  const {
+    cardFlights,
+    cardFlightMemoryRef,
+    registerSnapshot: handleCardMeasured,
+    ensureReady: ensureCardFlightsReady,
+    reset: resetCardFlights,
+    dispatchWithFlight: dispatchWithFlightInternal,
+  } = useFlightController({
+    enabled: cardFlightsEnabled,
+    waitTimeoutMs: FLIGHT_WAIT_TIMEOUT_MS,
+    getSelectionCardIds: resolveSelectionCardIds,
+  })
+  const celebrationAssignments = useSharedValue<Record<string, CelebrationAssignment>>({})
+  const celebrationProgress = useSharedValue(0)
+  const celebrationActive = useSharedValue(0)
+  const celebrationMode = useSharedValue(0)
+  const celebrationBoard = useSharedValue<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  })
+  const celebrationTotal = useSharedValue(0)
+  const celebrationAbortRef = useRef(false)
+  const celebrationBindings = useMemo(
+    () => ({
+      active: celebrationActive,
+      progress: celebrationProgress,
+      assignments: celebrationAssignments,
+      mode: celebrationMode,
+      board: celebrationBoard,
+      total: celebrationTotal,
+    }),
+    [
+      celebrationActive,
+      celebrationAssignments,
+      celebrationBoard,
+      celebrationMode,
+      celebrationProgress,
+      celebrationTotal,
+    ],
+  )
   const registerFoundationArrival = useCallback((cardId: string | null | undefined) => {
     const snapshot = stateRef.current
     const pilesSummary = FOUNDATION_SUIT_ORDER.map(
@@ -345,22 +398,6 @@ export default function TabOneScreen() {
       }
     }, FOUNDATION_WIGGLE_SUPPRESS_MS)
   }, [])
-  const ensureCardFlightsReady = useCallback(() => {
-    if (!cardFlightsEnabled) {
-      return
-    }
-    if (!Object.keys(cardFlightMemoryRef.current).length) {
-      return
-    }
-    cardFlights.value = {
-      ...cardFlights.value,
-      ...cardFlightMemoryRef.current,
-    }
-  }, [cardFlights, cardFlightsEnabled])
-  const resetCardFlights = useCallback(() => {
-    cardFlightMemoryRef.current = {}
-    cardFlights.value = {}
-  }, [cardFlights])
   const selectNextSolvableShuffle = useCallback(() => {
     if (!SOLVABLE_SHUFFLES.length) {
       return null
@@ -462,12 +499,11 @@ export default function TabOneScreen() {
     ...EMPTY_INVALID_WIGGLE,
     lookup: new Set<string>(),
   }))
-  const dispatchWithFlightPrep = useCallback(
+  const dispatchWithFlight = useCallback(
     (action: GameAction, selection?: Selection | null) => {
       if (boardLockedRef.current) {
         return
       }
-
       if (action.type === 'APPLY_MOVE' && action.target?.type === 'foundation') {
         const destination = action.target.suit
         const sourceLabel = selection
@@ -477,38 +513,9 @@ export default function TabOneScreen() {
           : 'unknown'
         devLog('info', `[Game] Dispatch APPLY_MOVE → foundation:${destination} from ${sourceLabel}`)
       }
-
-      if (!cardFlightsEnabled) {
-        ensureCardFlightsReady()
-        dispatch(action)
-        return
-      }
-
-      const waitStart = Date.now()
-
-      const attemptDispatch = () => {
-        const ids = selection ? collectSelectionCardIds(stateRef.current, selection) : []
-        const snapshotsReady =
-          ids.length === 0 || ids.every((id) => !!cardFlightMemoryRef.current[id])
-
-        if (snapshotsReady || Date.now() - waitStart >= FLIGHT_WAIT_TIMEOUT_MS) {
-          ensureCardFlightsReady()
-          if (!snapshotsReady) {
-        devLog('warn', '[FlightPrep] Timeout waiting for snapshots', {
-          action: action.type,
-          ids,
-        })
-          }
-          dispatch(action)
-          return
-        }
-
-        requestAnimationFrame(attemptDispatch)
-      }
-
-      attemptDispatch()
+      dispatchWithFlightInternal({ action, selection, dispatch })
     },
-    [cardFlightsEnabled, dispatch, ensureCardFlightsReady],
+    [dispatch, dispatchWithFlightInternal],
   )
   const runDemoSequence = useCallback(
     ({ autoReveal, autoSolve }: { autoReveal?: boolean; autoSolve?: boolean }) => {
@@ -530,7 +537,7 @@ export default function TabOneScreen() {
             return
           }
           const topIndex = column.length - 1
-          dispatchWithFlightPrep(
+          dispatchWithFlight(
             {
               type: 'APPLY_MOVE',
               selection: { source: 'tableau', columnIndex, cardIndex: topIndex },
@@ -563,7 +570,7 @@ export default function TabOneScreen() {
               dispatch({ type: 'DRAW_OR_RECYCLE' })
             })
             steps.push(() => {
-              dispatchWithFlightPrep(
+              dispatchWithFlight(
                 {
                   type: 'APPLY_MOVE',
                   selection: { source: 'waste' },
@@ -597,7 +604,7 @@ export default function TabOneScreen() {
         }, DEMO_AUTO_STEP_INTERVAL_MS * (finalStepIndex + 2))
       }
     },
-    [dispatch, dispatchWithFlightPrep],
+    [dispatch, dispatchWithFlight],
   )
   const handleLaunchDemoGame = useCallback(
     (options?: { autoReveal?: boolean; autoSolve?: boolean; force?: boolean }) => {
@@ -657,6 +664,14 @@ export default function TabOneScreen() {
       if (!ids.length) {
         return
       }
+      const selectionLabel = selection
+        ? selection.source === 'tableau'
+          ? `tableau:${selection.columnIndex}#${selection.cardIndex}`
+          : selection.source === 'foundation'
+            ? `foundation:${selection.suit}`
+            : selection.source
+        : 'none'
+      devLog('info', '[Wiggle] trigger', { cards: ids, selection: selectionLabel })
       setInvalidWiggle({
         key: Date.now(),
         lookup: new Set(ids),
@@ -956,31 +971,121 @@ export default function TabOneScreen() {
   }, [clearCelebrationDialogTimer, requestNewGame])
 
   const handleCelebrationComplete = useCallback(() => {
+    devLog('info', '[Celebration] complete')
+    updateBoardLocked(false)
     setCelebrationState(null)
     openCelebrationDialog()
-  }, [openCelebrationDialog])
+  }, [openCelebrationDialog, updateBoardLocked])
 
   const handleCelebrationAbort = useCallback(() => {
+    celebrationAbortRef.current = true
+    devLog('info', '[Celebration] abort requested')
+    runOnUI(() => {
+      'worklet'
+      celebrationActive.value = 0
+      cancelAnimation(celebrationProgress)
+    })()
     clearCelebrationDialogTimer()
+    updateBoardLocked(false)
     setCelebrationState(null)
     openCelebrationDialog()
-  }, [clearCelebrationDialogTimer, openCelebrationDialog])
+  }, [
+    celebrationActive,
+    celebrationProgress,
+    clearCelebrationDialogTimer,
+    openCelebrationDialog,
+    updateBoardLocked,
+  ])
 
   useEffect(() => {
     if (!celebrationState) {
+      celebrationAbortRef.current = false
       celebrationDialogShownRef.current = false
+      celebrationAssignments.value = {}
+      celebrationTotal.value = 0
+      celebrationMode.value = 0
+      celebrationBoard.value = { width: 0, height: 0 }
+      runOnUI(() => {
+        'worklet'
+        celebrationActive.value = 0
+        cancelAnimation(celebrationProgress)
+      })()
       clearCelebrationDialogTimer()
+    updateBoardLocked(false)
       return
     }
 
+    celebrationAbortRef.current = false
     celebrationDialogShownRef.current = false
     clearCelebrationDialogTimer()
-    celebrationDialogTimeoutRef.current = setTimeout(openCelebrationDialog, CELEBRATION_DIALOG_DELAY_MS)
+
+    const assignmentMap: Record<string, CelebrationAssignment> = {}
+    celebrationState.cards.forEach((config, index) => {
+      assignmentMap[config.card.id] = {
+        baseX: config.baseX,
+        baseY: config.baseY,
+        stackIndex: config.stackIndex,
+        suitIndex: config.suitIndex,
+        randomSeed: config.randomSeed,
+        index,
+      }
+    })
+
+    celebrationAssignments.value = assignmentMap
+    celebrationTotal.value = celebrationState.cards.length
+    celebrationMode.value = celebrationState.modeId
+    celebrationBoard.value = {
+      width: celebrationState.boardWidth,
+      height: celebrationState.boardHeight,
+    }
+
+    devLog('info', '[Celebration] start', {
+      cards: celebrationState.cards.length,
+      mode: celebrationState.modeId,
+    })
+
+    runOnUI(() => {
+      'worklet'
+      celebrationActive.value = 1
+      celebrationProgress.value = 0
+      celebrationProgress.value = withTiming(
+        1,
+        { duration: celebrationState.durationMs, easing: Easing.linear },
+        (finished) => {
+          if (finished && !celebrationAbortRef.current) {
+            runOnJS(handleCelebrationComplete)()
+          }
+        },
+      )
+    })()
+
+    celebrationDialogTimeoutRef.current = setTimeout(
+      openCelebrationDialog,
+      CELEBRATION_DIALOG_DELAY_MS,
+    )
 
     return () => {
+      celebrationAbortRef.current = true
       clearCelebrationDialogTimer()
+      runOnUI(() => {
+        'worklet'
+        celebrationActive.value = 0
+        cancelAnimation(celebrationProgress)
+      })()
     }
-  }, [celebrationState, clearCelebrationDialogTimer, openCelebrationDialog])
+  }, [
+    celebrationActive,
+    celebrationAssignments,
+    celebrationBoard,
+    celebrationMode,
+    celebrationProgress,
+    celebrationState,
+    celebrationTotal,
+    clearCelebrationDialogTimer,
+    handleCelebrationComplete,
+    openCelebrationDialog,
+    updateBoardLocked,
+  ])
 
   const attemptAutoMove = useCallback(
     (selection: Selection) => {
@@ -989,9 +1094,9 @@ export default function TabOneScreen() {
         notifyInvalidMove({ selection })
         return
       }
-      dispatchWithFlightPrep({ type: 'APPLY_MOVE', selection, target }, selection)
+      dispatchWithFlight({ type: 'APPLY_MOVE', selection, target }, selection)
     },
-    [dispatchWithFlightPrep, notifyInvalidMove, state],
+    [dispatchWithFlight, notifyInvalidMove, state],
   )
 
   const handleManualSelectTableau = useCallback(
@@ -1030,12 +1135,12 @@ export default function TabOneScreen() {
         return
       }
       if (dropHints.tableau[columnIndex]) {
-        dispatchWithFlightPrep({ type: 'PLACE_ON_TABLEAU', columnIndex }, state.selected)
+        dispatchWithFlight({ type: 'PLACE_ON_TABLEAU', columnIndex }, state.selected)
       } else {
         notifyInvalidMove({ selection: state.selected })
       }
     },
-    [dispatchWithFlightPrep, dropHints.tableau, notifyInvalidMove, state.selected],
+    [dispatchWithFlight, dropHints.tableau, notifyInvalidMove, state.selected],
   )
 
 const handleFoundationPress = useCallback(
@@ -1050,12 +1155,12 @@ const handleFoundationPress = useCallback(
       return
     }
     if (dropHints.foundations[suit]) {
-        dispatchWithFlightPrep({ type: 'PLACE_ON_FOUNDATION', suit }, state.selected)
+        dispatchWithFlight({ type: 'PLACE_ON_FOUNDATION', suit }, state.selected)
     } else {
       notifyInvalidMove({ selection: state.selected })
     }
   },
-    [attemptAutoMove, dispatchWithFlightPrep, dropHints.foundations, notifyInvalidMove, state.foundations, state.selected],
+    [attemptAutoMove, dispatchWithFlight, dropHints.foundations, notifyInvalidMove, state.foundations, state.selected],
 )
 
   const clearSelection = useCallback(() => {
@@ -1198,13 +1303,13 @@ const handleFoundationPress = useCallback(
     const selection = nextAction.type === 'move' ? nextAction.selection : null
 
     const timeoutId = setTimeout(() => {
-      dispatchWithFlightPrep({ type: 'ADVANCE_AUTO_QUEUE' }, selection)
+      dispatchWithFlight({ type: 'ADVANCE_AUTO_QUEUE' }, selection)
     }, delay)
 
     return () => {
       clearTimeout(timeoutId)
     }
-  }, [dispatchWithFlightPrep, state.autoQueue, state.isAutoCompleting])
+  }, [dispatchWithFlight, state.autoQueue, state.isAutoCompleting])
 
   return (
     <YStack
@@ -1246,9 +1351,11 @@ const handleFoundationPress = useCallback(
           cardFlightMemory={cardFlightMemoryRef.current}
           onFoundationArrival={registerFoundationArrival}
           interactionsLocked={boardLocked}
-          hideFoundations={isCelebrationActive}
+          hideFoundations={false}
           onTopRowLayout={handleTopRowLayout}
           onFoundationLayout={handleFoundationLayout}
+          celebrationBindings={celebrationBindings}
+          celebrationActive={Boolean(celebrationState)}
         />
 
         <TableauSection
@@ -1273,18 +1380,9 @@ const handleFoundationPress = useCallback(
           <Text style={styles.movesLabel}>Moves</Text>
           <Text style={styles.movesValue}>{state.moveCount}</Text>
         </XStack>
-        {celebrationState && (
-          <CelebrationOverlay
-            cards={celebrationState.cards}
-            cardMetrics={cardMetrics}
-            boardWidth={celebrationState.boardWidth}
-            boardHeight={celebrationState.boardHeight}
-            modeId={celebrationState.modeId}
-            durationMs={celebrationState.durationMs}
-            onComplete={handleCelebrationComplete}
-            onAbort={handleCelebrationAbort}
-          />
-        )}
+        {celebrationState ? (
+          <CelebrationTouchBlocker onAbort={handleCelebrationAbort} />
+        ) : null}
       </YStack>
 
       {shouldShowUndo ? (
@@ -1324,6 +1422,8 @@ type TopRowProps = {
   hideFoundations?: boolean
   onTopRowLayout?: (layout: LayoutRectangle) => void
   onFoundationLayout?: (suit: Suit, layout: LayoutRectangle) => void
+  celebrationBindings?: CelebrationBindings
+  celebrationActive?: boolean
 }
 
 const TopRow = ({
@@ -1346,6 +1446,8 @@ const TopRow = ({
   hideFoundations,
   onTopRowLayout,
   onFoundationLayout,
+  celebrationBindings,
+  celebrationActive = false,
 }: TopRowProps) => {
   const handleFoundationArrival = onFoundationArrival ?? (() => {})
   const stockDisabled = (!state.stock.length && !state.waste.length) || interactionsLocked
@@ -1401,7 +1503,9 @@ const TopRow = ({
             cardFlightMemory={cardFlightMemory}
             onCardArrived={handleFoundationArrival}
             disableInteractions={interactionsLocked}
-            hideTopCard={hideFoundations}
+            hideTopCard={hideFoundations && !celebrationActive}
+            celebrationBindings={celebrationBindings}
+            celebrationActive={celebrationActive}
             onLayout={createFoundationLayoutHandler(suit)}
           />
         ))}
@@ -1604,6 +1708,7 @@ type CardViewProps = {
   cardFlights: CardFlightRegistry
   onCardMeasured?: (cardId: string, snapshot: CardFlightSnapshot) => void
   cardFlightMemory?: Record<string, CardFlightSnapshot>
+  celebrationBindings?: CelebrationBindings
 }
 
 const CardView = ({
@@ -1618,6 +1723,7 @@ const CardView = ({
   cardFlights,
   onCardMeasured,
   cardFlightMemory,
+  celebrationBindings,
 }: CardViewProps) => {
   const {
     cardFlights: cardFlightsEnabled,
@@ -1645,14 +1751,316 @@ const CardView = ({
   const lastTriggerRef = useRef(invalidWiggle.key)
   const shouldAnimateInvalid = invalidWiggle.lookup.has(card.id)
   const baseZIndex = shouldFloat ? 2 : 0
-  const motionStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: wiggle.value + flightX.value },
-      { translateY: flightY.value },
-    ],
-    opacity: flightOpacity.value,
-    zIndex: flightZ.value > 0 ? flightZ.value : baseZIndex,
-  }))
+  const motionStyle = useAnimatedStyle<ViewStyle>(() => {
+    let translateX = wiggle.value + flightX.value
+    let translateY = flightY.value
+    let rotationDeg = 0
+    let scale = 1
+    let opacity = flightOpacity.value
+    let zIndex = flightZ.value > 0 ? flightZ.value : baseZIndex
+
+    const celebrationActiveValue = celebrationBindings?.active.value ?? 0
+    if (celebrationActiveValue > 0 && celebrationBindings) {
+      const assignment = celebrationBindings.assignments.value?.[card.id]
+      if (assignment) {
+        const board = celebrationBindings.board.value
+        const progressValue = celebrationBindings.progress.value
+        const totalCards = Math.max(celebrationBindings.total.value, 1)
+        const mode = celebrationBindings.mode.value % CELEBRATION_MODE_COUNT
+        const boardWidth = board?.width ?? metrics.width
+        const boardHeight = board?.height ?? metrics.height
+        const centerX = boardWidth / 2 - metrics.width / 2
+        const centerY = boardHeight / 2 - metrics.height / 2
+        const boardRadius = Math.min(boardWidth, boardHeight)
+        const totalProgress = progressValue * CELEBRATION_SPEED_MULTIPLIER
+        const rawProgress = totalProgress % 1
+        const launchProgress = totalProgress > 1 ? 1 : totalProgress
+        const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
+        const launchEased = easeOutCubic(launchProgress)
+        const seed = assignment.randomSeed
+        const relativeIndex = assignment.index - totalCards / 2
+        const normalizedIndex = (assignment.index + 1) / totalCards
+        const stackFactor = assignment.stackIndex / FOUNDATION_STACK_MAX
+        const direction = assignment.index % 2 === 0 ? 1 : -1
+        const theta = TAU * rawProgress
+        const thetaSeed = TAU * (rawProgress + seed)
+        const thetaDouble = TAU * (rawProgress * 2 + seed * 0.5)
+
+        let pathX = assignment.baseX
+        let pathY = assignment.baseY
+        let rotation = 0
+        let targetScale = 1
+        let targetOpacity = 1
+
+        switch (mode) {
+          case 0: {
+            const radius = boardRadius * (0.24 + 0.18 * Math.sin(thetaDouble))
+            pathX =
+              centerX + Math.cos(thetaSeed) * radius + relativeIndex * metrics.width * 0.25
+            pathY =
+              centerY + Math.sin(thetaSeed) * radius - stackFactor * metrics.height * 0.4
+            rotation = (thetaSeed * 180) / Math.PI
+            targetScale = 1 + 0.06 * Math.sin(theta * 2 + stackFactor)
+            break
+          }
+          case 1: {
+            const ampX = boardRadius * (0.3 + 0.1 * Math.sin(thetaDouble))
+            const ampY = boardRadius * (0.22 + 0.06 * Math.cos(thetaDouble + seed))
+            pathX = centerX + Math.sin(theta) * ampX
+            pathY = centerY + Math.sin(theta * 2 + seed * TAU) * ampY
+            rotation = (Math.sin(theta) * 540) / Math.PI
+            targetScale = 1 + 0.05 * Math.sin(theta * 2 + normalizedIndex)
+            break
+          }
+          case 2: {
+            const ampX = boardRadius * (0.18 + stackFactor * 0.12)
+            const ampY = boardRadius * 0.38
+            pathX = centerX + Math.sin(theta * 1.5 + seed * TAU) * ampX
+            pathY = centerY - Math.cos(theta + seed * 0.5) * ampY
+            rotation = (theta * 360) / Math.PI
+            targetScale = 1 + 0.05 * Math.cos(theta * 3 + seed)
+            break
+          }
+          case 3: {
+            const angle = theta * 1.5 + seed * TAU
+            const radius = boardRadius * (0.25 + 0.2 * Math.sin(theta * 2 + normalizedIndex))
+            pathX = centerX + Math.cos(angle) * radius
+            pathY = centerY + Math.sin(angle) * radius
+            rotation = (angle * 180) / Math.PI
+            targetScale = 1 + 0.07 * Math.sin(theta + stackFactor)
+            break
+          }
+          case 4: {
+            const angle = theta + stackFactor
+            const radiusX =
+              boardRadius * (0.3 + 0.1 * Math.sin(thetaDouble + normalizedIndex))
+            const radiusY = boardRadius * (0.2 + 0.08 * Math.cos(thetaDouble + seed))
+            pathX = centerX + Math.cos(angle) * radiusX
+            pathY = centerY + Math.sin(angle) * radiusY
+            rotation = (Math.sin(theta * 2 + seed) * 360) / Math.PI
+            targetScale = 1 + 0.04 * Math.sin(theta * 4 + seed)
+            break
+          }
+          case 5: {
+            const spur = Math.sin(theta * 5 + seed * 3)
+            const radius = boardRadius * (0.18 + 0.22 * Math.abs(spur))
+            const angle = theta + spur * 0.3
+            pathX = centerX + Math.cos(angle) * radius
+            pathY = centerY + Math.sin(angle) * radius
+            rotation = (angle * 180) / Math.PI + spur * 30
+            targetScale = 1 + 0.05 * Math.sin(theta * 5 + normalizedIndex)
+            break
+          }
+          case 6: {
+            const angle = theta * 2 + seed * TAU * direction
+            const radius =
+              boardRadius * (0.16 + 0.18 * Math.sin(theta + direction * 0.5))
+            pathX =
+              centerX +
+              direction * Math.cos(angle) * radius +
+              relativeIndex * metrics.width * 0.2
+            pathY = centerY + Math.sin(angle) * radius
+            rotation = (angle * 180) / Math.PI
+            targetScale = 1 + 0.04 * Math.sin(theta * 3 + stackFactor)
+            break
+          }
+          case 7: {
+            const angle = theta + normalizedIndex
+            const radiusX = boardRadius * 0.22
+            const radiusY = boardRadius * (0.3 + 0.1 * Math.sin(thetaDouble + stackFactor))
+            pathX = centerX + Math.sin(angle) * radiusX
+            pathY = centerY - Math.cos(angle) * radiusY
+            rotation = (Math.cos(theta) * 360) / Math.PI
+            targetScale = 1 + 0.05 * Math.sin(theta * 2 + normalizedIndex)
+            break
+          }
+          case 8: {
+            const ring = Math.floor(normalizedIndex * 4)
+            const radius =
+              boardRadius * (0.15 + 0.12 * ring + 0.05 * Math.sin(theta * 3 + seed))
+            const angle = theta + ring * 0.3
+            pathX = centerX + Math.cos(angle) * radius
+            pathY = centerY + Math.sin(angle) * radius
+            rotation = (angle * 180) / Math.PI + ring * 20
+            targetScale = 1 + ring * 0.03 + 0.02 * Math.sin(theta * 4 + seed)
+            break
+          }
+          case 9: {
+            const angle = theta + seed
+            const drift = Math.sin(thetaDouble) * boardRadius * 0.12
+            pathX = centerX + Math.cos(angle) * boardRadius * 0.28 + drift
+            pathY = centerY - Math.sin(angle) * boardRadius * 0.35 + drift * 0.6
+            rotation = (angle * 180) / Math.PI + drift * 10
+            targetScale = 1 + 0.05 * Math.sin(theta * 2 + stackFactor)
+            break
+          }
+          case 10: {
+            const angle = theta * 1.5 + stackFactor * 2
+            const radius = boardRadius * (0.2 + 0.18 * Math.sin(theta * 2 + seed))
+            pathX = centerX + Math.cos(angle) * radius
+            pathY = centerY + Math.sin(angle) * radius - stackFactor * metrics.height * 0.3
+            rotation = (angle * 180) / Math.PI
+            targetScale = 1 + stackFactor * 0.08 + 0.04 * Math.sin(theta)
+            break
+          }
+          case 11: {
+            const ampX = boardRadius * (0.25 + 0.05 * Math.sin(seed * TAU))
+            const ampY = boardRadius * (0.32 + 0.06 * Math.cos(seed * TAU))
+            pathX = centerX + Math.sin(theta * 1.7 + seed) * ampX
+            pathY = centerY + Math.sin(theta * 2.3 + seed * 0.4) * ampY
+            rotation = (Math.sin(theta * 2) * 360) / Math.PI
+            targetScale = 1 + 0.05 * Math.sin(theta * 3 + normalizedIndex)
+            break
+          }
+          case 12: {
+            const columnOffset = relativeIndex * metrics.width * 0.4
+            const angle = theta * 2 + seed
+            const radiusY = boardRadius * (0.2 + 0.1 * Math.sin(theta + columnOffset * 0.01))
+            pathX = centerX + columnOffset
+            pathY = centerY + Math.sin(angle) * radiusY
+            rotation = (angle * 180) / Math.PI
+            targetScale = 1 + 0.03 * Math.cos(theta * 4 + columnOffset)
+            break
+          }
+          case 13: {
+            const angle = theta + seed * TAU * 2
+            const radius = boardRadius * (0.18 + 0.25 * Math.sin(theta * 4 + seed))
+            pathX =
+              centerX +
+              Math.cos(angle) * radius +
+              Math.sin(theta * 3 + seed) * metrics.width * 0.2
+            pathY = centerY + Math.sin(angle) * radius
+            rotation = (angle * 180) / Math.PI
+            targetScale = 1 + 0.05 * Math.sin(theta * 5 + seed)
+            targetOpacity = 0.8 + 0.2 * Math.sin(theta * 2 + seed)
+            break
+          }
+          case 14: {
+            const wave = Math.sin(theta + seed)
+            const ampX = boardRadius * 0.4
+            const ampY = boardRadius * (0.2 + 0.1 * Math.sin(theta * 2 + stackFactor))
+            pathX = centerX + wave * ampX
+            pathY = centerY + Math.sin(theta * 3 + seed) * ampY
+            rotation = wave * 270
+            targetScale = 1 + 0.04 * Math.sin(theta * 3 + normalizedIndex)
+            break
+          }
+          case 15: {
+            const angle = theta * 2 + normalizedIndex * TAU
+            const radius = boardRadius * (0.22 + 0.15 * Math.sin(theta + normalizedIndex))
+            pathX = centerX + Math.cos(angle) * radius
+            pathY = centerY + Math.sin(angle) * radius
+            rotation = (angle * 180) / Math.PI
+            targetScale = 1 + 0.05 * Math.sin(theta * 2 + stackFactor)
+            targetOpacity = 0.9 + 0.1 * Math.cos(theta * 2 + normalizedIndex)
+            break
+          }
+          case 16: {
+            const pulse = 0.7 + 0.3 * Math.sin(theta * 3 + seed)
+            const angle = theta + stackFactor
+            const radius = boardRadius * 0.28 * pulse
+            pathX = centerX + Math.cos(angle) * radius
+            pathY = centerY + Math.sin(angle) * radius
+            rotation = (angle * 180) / Math.PI + pulse * 45
+            targetScale = pulse
+            break
+          }
+          case 17: {
+            const clover = Math.sin(theta * 3)
+            const radius = boardRadius * (0.22 + 0.18 * Math.abs(clover))
+            const angle = theta + clover * 0.3 + seed
+            pathX = centerX + Math.cos(angle) * radius
+            pathY = centerY + Math.sin(angle) * radius
+            rotation = (angle * 180) / Math.PI
+            targetScale = 1 + 0.04 * clover
+            break
+          }
+          case 18: {
+            const angle = theta + seed
+            const radius = boardRadius * (0.35 + 0.12 * Math.sin(theta * 2 + normalizedIndex))
+            pathX = centerX + Math.cos(angle) * radius
+            pathY = centerY - Math.sin(angle) * radius * 0.85
+            rotation = (angle * 180) / Math.PI
+            targetScale = 1 + 0.05 * Math.sin(theta * 2 + seed)
+            break
+          }
+          case 19: {
+            const jitterAngle = theta * 4 + seed * TAU
+            const radius = boardRadius * (0.2 + 0.1 * Math.sin(theta * 6 + normalizedIndex))
+            pathX =
+              centerX +
+              Math.cos(jitterAngle) * radius +
+              Math.sin(theta * 2 + seed) * metrics.width * 0.15
+            pathY =
+              centerY +
+              Math.sin(jitterAngle) * radius +
+              Math.cos(theta * 2 + seed) * metrics.height * 0.1
+            rotation = (jitterAngle * 90) / Math.PI
+            targetScale = 1 + 0.03 * Math.sin(theta * 6 + seed)
+            targetOpacity = 0.85 + 0.15 * Math.sin(theta * 4 + seed)
+            break
+          }
+          default: {
+            const radius = boardRadius * 0.25
+            pathX = centerX + Math.cos(thetaSeed) * radius
+            pathY = centerY + Math.sin(thetaSeed) * radius
+            rotation = (thetaSeed * 180) / Math.PI
+            break
+          }
+        }
+
+        const wobblePhase = rawProgress * TAU * CELEBRATION_WOBBLE_FREQUENCY + seed * TAU
+        const wobbleEnvelope = 0.15 + 0.85 * Math.pow(Math.sin(wobblePhase), 2)
+        const wobbleX =
+          Math.sin(wobblePhase * 1.25 + relativeIndex * 0.4) *
+          metrics.width *
+          0.1 *
+          wobbleEnvelope
+        const wobbleY =
+          Math.cos(wobblePhase * 0.95 + stackFactor * 4) *
+          metrics.height *
+          0.11 *
+          wobbleEnvelope
+
+        const finalX = assignment.baseX * (1 - launchEased) + pathX * launchEased + wobbleX
+        const finalY = assignment.baseY * (1 - launchEased) + pathY * launchEased + wobbleY
+        const finalScale = 1 + (targetScale - 1) * launchEased
+        const finalRotation = rotation * launchEased
+        const clampedOpacity = targetOpacity < 0 ? 0 : targetOpacity
+        const finalOpacity = Math.min(1, clampedOpacity * (0.5 + 0.5 * launchEased))
+
+        translateX = wiggle.value + flightX.value + (finalX - assignment.baseX)
+        translateY = flightY.value + (finalY - assignment.baseY)
+        scale = finalScale
+        rotationDeg = finalRotation
+        opacity = Math.min(opacity, finalOpacity)
+        zIndex = Math.max(zIndex, 4000 + assignment.index)
+      }
+    }
+
+    const transforms: Array<
+      | { translateX: number }
+      | { translateY: number }
+      | { rotate: string }
+      | { scale: number }
+    > = [
+      { translateX },
+      { translateY },
+    ]
+
+    if (scale !== 1) {
+      transforms.push({ scale })
+    }
+    if (rotationDeg !== 0) {
+      transforms.push({ rotate: `${rotationDeg}deg` })
+    }
+
+    return {
+      transform: transforms,
+      opacity,
+      zIndex,
+    }
+  })
   const flipStyle = useAnimatedStyle(() => {
     if (!cardFlipEnabled) {
       return {}
@@ -1844,6 +2252,10 @@ const CardView = ({
     </AnimatedView>
   )
 }
+
+const CelebrationTouchBlocker = ({ onAbort }: { onAbort: () => void }) => (
+  <Pressable style={styles.celebrationOverlay} onPress={onAbort} />
+)
 
 const EmptySlot = ({
   label,
@@ -2089,6 +2501,8 @@ type FoundationPileProps = {
   disableInteractions?: boolean
   hideTopCard?: boolean
   onLayout?: (layout: LayoutRectangle) => void
+  celebrationBindings?: CelebrationBindings
+  celebrationActive?: boolean
 }
 
 const FoundationPile = ({
@@ -2107,6 +2521,8 @@ const FoundationPile = ({
   disableInteractions = false,
   hideTopCard = false,
   onLayout,
+  celebrationBindings,
+  celebrationActive = false,
 }: FoundationPileProps) => {
   const { foundationGlow: foundationGlowEnabled } = useAnimationToggles()
   const handleCardArrived = onCardArrived ?? (() => {})
@@ -2197,21 +2613,34 @@ const FoundationPile = ({
         ]}
       />
       {topCard ? (
-        <AnimatedView
-          pointerEvents="none"
-          style={hideTopCard ? styles.hiddenCard : undefined}
-        >
-          <CardView
-            card={topCard}
-            metrics={cardMetrics}
-            invalidWiggle={invalidWiggle}
-            cardFlights={cardFlights}
-            onCardMeasured={onCardMeasured}
-            cardFlightMemory={cardFlightMemory}
-            onPress={disableInteractions ? undefined : onPress}
-            onLongPress={disableInteractions ? undefined : onLongPress}
-          />
-        </AnimatedView>
+        cards.map((card, index) => {
+          const isTopCard = index === cards.length - 1
+          return (
+            <AnimatedView
+              // PBI 14-1: keep every foundation card mounted so flights persist through rapid sequences.
+              key={card.id}
+              pointerEvents="none"
+              style={[
+                styles.foundationCard,
+                !isTopCard && !celebrationActive ? styles.foundationStackedCard : undefined,
+                hideTopCard && isTopCard ? styles.hiddenCard : undefined,
+                { zIndex: index + 1 },
+              ]}
+            >
+              <CardView
+                card={card}
+                metrics={cardMetrics}
+                invalidWiggle={isTopCard ? invalidWiggle : EMPTY_INVALID_WIGGLE}
+                cardFlights={cardFlights}
+                onCardMeasured={onCardMeasured}
+                cardFlightMemory={cardFlightMemory}
+                onPress={disableInteractions ? undefined : onPress}
+                onLongPress={disableInteractions ? undefined : onLongPress}
+                celebrationBindings={celebrationBindings}
+              />
+            </AnimatedView>
+          )
+        })
       ) : (
         <Text
           style={[
@@ -2226,393 +2655,6 @@ const FoundationPile = ({
   )
 }
 
-type CelebrationOverlayProps = {
-  cards: CelebrationCardConfig[]
-  cardMetrics: CardMetrics
-  boardWidth: number
-  boardHeight: number
-  modeId: number
-  durationMs: number
-  onComplete: () => void
-  onAbort: () => void
-}
-
-const CelebrationOverlay = ({
-  cards,
-  cardMetrics,
-  boardWidth,
-  boardHeight,
-  modeId,
-  durationMs,
-  onComplete,
-  onAbort,
-}: CelebrationOverlayProps) => {
-  const progress = useSharedValue(0)
-  const overlayFlights = useSharedValue<Record<string, CardFlightSnapshot>>({})
-  const abortedRef = useRef(false)
-
-  useEffect(() => {
-    abortedRef.current = false
-    progress.value = 0
-    progress.value = withTiming(1, { duration: durationMs, easing: Easing.linear }, (finished) => {
-      if (finished && !abortedRef.current) {
-        runOnJS(onComplete)()
-      }
-    })
-  }, [durationMs, onComplete, progress])
-
-  const handleAbort = useCallback(() => {
-    if (abortedRef.current) {
-      return
-    }
-    abortedRef.current = true
-    runOnUI(() => {
-      'worklet'
-      cancelAnimation(progress)
-    })()
-    runOnJS(onAbort)()
-  }, [onAbort, progress])
-
-  return (
-    <Pressable style={styles.celebrationOverlay} onPress={handleAbort}>
-      {cards.map((config, index) => (
-        <CelebrationCard
-          key={config.card.id}
-          config={config}
-          metrics={cardMetrics}
-          totalCards={cards.length}
-          index={index}
-          boardWidth={boardWidth}
-          boardHeight={boardHeight}
-          modeId={modeId}
-          progress={progress}
-          cardFlights={overlayFlights}
-        />
-      ))}
-    </Pressable>
-  )
-}
-
-type CelebrationCardProps = {
-  config: CelebrationCardConfig
-  metrics: CardMetrics
-  totalCards: number
-  index: number
-  boardWidth: number
-  boardHeight: number
-  modeId: number
-  progress: SharedValue<number>
-  cardFlights: SharedValue<Record<string, CardFlightSnapshot>>
-}
-
-const CelebrationCard = ({
-  config,
-  metrics,
-  totalCards,
-  index,
-  boardWidth,
-  boardHeight,
-  modeId,
-  progress,
-  cardFlights,
-}: CelebrationCardProps) => {
-  const animatedStyle = useAnimatedStyle(() => {
-    'worklet'
-    const rawProgress = progress.value
-    const totalProgress = rawProgress * CELEBRATION_SPEED_MULTIPLIER
-    const loopProgress = totalProgress % 1
-    const launchProgress = Math.min(totalProgress, 1)
-    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
-    const launchEased = easeOutCubic(launchProgress)
-
-    const baseX = config.baseX
-    const baseY = config.baseY
-    const relativeIndex = index - totalCards / 2
-    const normalizedIndex = (index + 1) / totalCards
-    const seed = config.randomSeed
-    const stackFactor = config.stackIndex / 13
-    const centerX = boardWidth / 2 - metrics.width / 2
-    const centerY = boardHeight / 2 - metrics.height / 2
-    const boardRadius = Math.min(boardWidth, boardHeight)
-
-    const theta = TAU * loopProgress
-    const thetaSeed = TAU * (loopProgress + seed)
-    const thetaDouble = TAU * (loopProgress * 2 + seed * 0.5)
-    const direction = index % 2 === 0 ? 1 : -1
-
-    let pathX = centerX
-    let pathY = centerY
-    let rotation = 0
-    let scale = 1
-    let opacity = 1
-
-    switch (modeId % CELEBRATION_MODE_COUNT) {
-      case 0: {
-        const radius = boardRadius * (0.24 + 0.18 * Math.sin(thetaDouble))
-        pathX = (
-          centerX + Math.cos(thetaSeed) * radius + relativeIndex * metrics.width * 0.25
-        )
-        pathY = (
-          centerY + Math.sin(thetaSeed) * radius - stackFactor * metrics.height * 0.4
-        )
-        rotation = (thetaSeed * 180) / Math.PI
-        scale = 1 + 0.06 * Math.sin(theta * 2 + stackFactor)
-        break
-      }
-      case 1: {
-        const ampX = boardRadius * (0.3 + 0.1 * Math.sin(thetaDouble))
-        const ampY = boardRadius * (0.22 + 0.06 * Math.cos(thetaDouble + seed))
-        pathX = centerX + Math.sin(theta) * ampX
-        pathY = centerY + Math.sin(theta * 2 + seed * TAU) * ampY
-        rotation = (Math.sin(theta) * 540) / Math.PI
-        scale = 1 + 0.05 * Math.sin(theta * 2 + normalizedIndex)
-        break
-      }
-      case 2: {
-        const ampX = boardRadius * (0.18 + stackFactor * 0.12)
-        const ampY = boardRadius * 0.38
-        pathX = centerX + Math.sin(theta * 1.5 + seed * TAU) * ampX
-        pathY = centerY - Math.cos(theta + seed * 0.5) * ampY
-        rotation = (theta * 360) / Math.PI
-        scale = 1 + 0.05 * Math.cos(theta * 3 + seed)
-        break
-      }
-      case 3: {
-        const angle = theta * 1.5 + seed * TAU
-        const radius = boardRadius * (0.25 + 0.2 * Math.sin(theta * 2 + normalizedIndex))
-        pathX = centerX + Math.cos(angle) * radius
-        pathY = centerY + Math.sin(angle) * radius
-        rotation = (angle * 180) / Math.PI
-        scale = 1 + 0.07 * Math.sin(theta + stackFactor)
-        break
-      }
-      case 4: {
-        const angle = theta + stackFactor
-        const radiusX = boardRadius * (0.3 + 0.1 * Math.sin(thetaDouble + normalizedIndex))
-        const radiusY = boardRadius * (0.2 + 0.08 * Math.cos(thetaDouble + seed))
-        pathX = centerX + Math.cos(angle) * radiusX
-        pathY = centerY + Math.sin(angle) * radiusY
-        rotation = (Math.sin(theta * 2 + seed) * 360) / Math.PI
-        scale = 1 + 0.04 * Math.sin(theta * 4 + seed)
-        break
-      }
-      case 5: {
-        const spur = Math.sin(theta * 5 + seed * 3)
-        const radius = boardRadius * (0.18 + 0.22 * Math.abs(spur))
-        const angle = theta + spur * 0.3
-        pathX = centerX + Math.cos(angle) * radius
-        pathY = centerY + Math.sin(angle) * radius
-        rotation = (angle * 180) / Math.PI + spur * 30
-        scale = 1 + 0.05 * Math.sin(theta * 5 + normalizedIndex)
-        break
-      }
-      case 6: {
-        const angle = theta * 2 + seed * TAU * direction
-        const radius = boardRadius * (0.16 + 0.18 * Math.sin(theta + direction * 0.5))
-        pathX = (
-          centerX +
-          direction * Math.cos(angle) * radius +
-          relativeIndex * metrics.width * 0.2
-        )
-        pathY = centerY + Math.sin(angle) * radius
-        rotation = (angle * 180) / Math.PI
-        scale = 1 + 0.04 * Math.sin(theta * 3 + stackFactor)
-        break
-      }
-      case 7: {
-        const angle = theta + normalizedIndex
-        const radiusX = boardRadius * 0.22
-        const radiusY = boardRadius * (0.3 + 0.1 * Math.sin(thetaDouble + stackFactor))
-        pathX = centerX + Math.sin(angle) * radiusX
-        pathY = centerY - Math.cos(angle) * radiusY
-        rotation = (Math.cos(theta) * 360) / Math.PI
-        scale = 1 + 0.05 * Math.sin(theta * 2 + normalizedIndex)
-        break
-      }
-      case 8: {
-        const ring = Math.floor(normalizedIndex * 4)
-        const radius =
-          boardRadius * (0.15 + 0.12 * ring + 0.05 * Math.sin(theta * 3 + seed))
-        const angle = theta + ring * 0.3
-        pathX = centerX + Math.cos(angle) * radius
-        pathY = centerY + Math.sin(angle) * radius
-        rotation = (angle * 180) / Math.PI + ring * 20
-        scale = 1 + ring * 0.03 + 0.02 * Math.sin(theta * 4 + seed)
-        break
-      }
-      case 9: {
-        const angle = theta + seed
-        const drift = Math.sin(thetaDouble) * boardRadius * 0.12
-        pathX = centerX + Math.cos(angle) * boardRadius * 0.28 + drift
-        pathY = centerY - Math.sin(angle) * boardRadius * 0.35 + drift * 0.6
-        rotation = (angle * 180) / Math.PI + drift * 10
-        scale = 1 + 0.05 * Math.sin(theta * 2 + stackFactor)
-        break
-      }
-      case 10: {
-        const angle = theta * 1.5 + stackFactor * 2
-        const radius = boardRadius * (0.2 + 0.18 * Math.sin(theta * 2 + seed))
-        pathX = centerX + Math.cos(angle) * radius
-        pathY = centerY + Math.sin(angle) * radius - stackFactor * metrics.height * 0.3
-        rotation = (angle * 180) / Math.PI
-        scale = 1 + stackFactor * 0.08 + 0.04 * Math.sin(theta)
-        break
-      }
-      case 11: {
-        const ampX = boardRadius * (0.25 + 0.05 * Math.sin(seed * TAU))
-        const ampY = boardRadius * (0.32 + 0.06 * Math.cos(seed * TAU))
-        pathX = centerX + Math.sin(theta * 1.7 + seed) * ampX
-        pathY = centerY + Math.sin(theta * 2.3 + seed * 0.4) * ampY
-        rotation = (Math.sin(theta * 2) * 360) / Math.PI
-        scale = 1 + 0.05 * Math.sin(theta * 3 + normalizedIndex)
-        break
-      }
-      case 12: {
-        const columnOffset = relativeIndex * metrics.width * 0.4
-        const angle = theta * 2 + seed
-        const radiusY = boardRadius * (0.2 + 0.1 * Math.sin(theta + columnOffset * 0.01))
-        pathX = centerX + columnOffset
-        pathY = centerY + Math.sin(angle) * radiusY
-        rotation = (angle * 180) / Math.PI
-        scale = 1 + 0.03 * Math.cos(theta * 4 + columnOffset)
-        break
-      }
-      case 13: {
-        const angle = theta + seed * TAU * 2
-        const radius = boardRadius * (0.18 + 0.25 * Math.sin(theta * 4 + seed))
-        pathX = (
-          centerX +
-          Math.cos(angle) * radius +
-          Math.sin(theta * 3 + seed) * metrics.width * 0.2
-        )
-        pathY = centerY + Math.sin(angle) * radius
-        rotation = (angle * 180) / Math.PI
-        scale = 1 + 0.05 * Math.sin(theta * 5 + seed)
-        opacity = 0.8 + 0.2 * Math.sin(theta * 2 + seed)
-        break
-      }
-      case 14: {
-        const wave = Math.sin(theta + seed)
-        const ampX = boardRadius * 0.4
-        const ampY = boardRadius * (0.2 + 0.1 * Math.sin(theta * 2 + stackFactor))
-        pathX = centerX + wave * ampX
-        pathY = centerY + Math.sin(theta * 3 + seed) * ampY
-        rotation = wave * 270
-        scale = 1 + 0.04 * Math.sin(theta * 3 + normalizedIndex)
-        break
-      }
-      case 15: {
-        const angle = theta * 2 + normalizedIndex * TAU
-        const radius = boardRadius * (0.22 + 0.15 * Math.sin(theta + normalizedIndex))
-        pathX = centerX + Math.cos(angle) * radius
-        pathY = centerY + Math.sin(angle) * radius
-        rotation = (angle * 180) / Math.PI
-        scale = 1 + 0.05 * Math.sin(theta * 2 + stackFactor)
-        opacity = 0.9 + 0.1 * Math.cos(theta * 2 + normalizedIndex)
-        break
-      }
-      case 16: {
-        const pulse = 0.7 + 0.3 * Math.sin(theta * 3 + seed)
-        const angle = theta + stackFactor
-        const radius = boardRadius * 0.28 * pulse
-        pathX = centerX + Math.cos(angle) * radius
-        pathY = centerY + Math.sin(angle) * radius
-        rotation = (angle * 180) / Math.PI + pulse * 45
-        scale = pulse
-        break
-      }
-      case 17: {
-        const clover = Math.sin(theta * 3)
-        const radius = boardRadius * (0.22 + 0.18 * Math.abs(clover))
-        const angle = theta + clover * 0.3 + seed
-        pathX = centerX + Math.cos(angle) * radius
-        pathY = centerY + Math.sin(angle) * radius
-        rotation = (angle * 180) / Math.PI
-        scale = 1 + 0.04 * clover
-        break
-      }
-      case 18: {
-        const angle = theta + seed
-        const radius = boardRadius * (0.35 + 0.12 * Math.sin(theta * 2 + normalizedIndex))
-        pathX = centerX + Math.cos(angle) * radius
-        pathY = centerY - Math.sin(angle) * radius * 0.85
-        rotation = (angle * 180) / Math.PI
-        scale = 1 + 0.05 * Math.sin(theta * 2 + seed)
-        break
-      }
-      case 19: {
-        const jitterAngle = theta * 4 + seed * TAU
-        const radius = boardRadius * (0.2 + 0.1 * Math.sin(theta * 6 + normalizedIndex))
-        pathX = (
-          centerX +
-          Math.cos(jitterAngle) * radius +
-          Math.sin(theta * 2 + seed) * metrics.width * 0.15
-        )
-        pathY = (
-          centerY +
-          Math.sin(jitterAngle) * radius +
-          Math.cos(theta * 2 + seed) * metrics.height * 0.1
-        )
-        rotation = (jitterAngle * 90) / Math.PI
-        scale = 1 + 0.03 * Math.sin(theta * 6 + seed)
-        opacity = 0.85 + 0.15 * Math.sin(theta * 4 + seed)
-        break
-      }
-      default: {
-        const radius = boardRadius * 0.25
-        pathX = centerX + Math.cos(thetaSeed) * radius
-        pathY = centerY + Math.sin(thetaSeed) * radius
-        rotation = (thetaSeed * 180) / Math.PI
-        break
-      }
-    }
-
-    const wobblePhase = rawProgress * TAU * CELEBRATION_WOBBLE_FREQUENCY + seed * TAU
-    const wobbleEnvelope = 0.15 + 0.85 * Math.pow(Math.sin(wobblePhase), 2)
-    const wobbleX = (
-      Math.sin(wobblePhase * 1.25 + relativeIndex * 0.4) * metrics.width * 0.1 * wobbleEnvelope
-    )
-    const wobbleY = (
-      Math.cos(wobblePhase * 0.95 + stackFactor * 4) * metrics.height * 0.11 * wobbleEnvelope
-    )
-
-    const finalX = baseX * (1 - launchEased) + pathX * launchEased + wobbleX
-    const finalY = baseY * (1 - launchEased) + pathY * launchEased + wobbleY
-    const finalScale = 1 + (scale - 1) * launchEased
-    const finalRotation = rotation * launchEased
-    const clampedOpacity = Math.max(0, Math.min(1, opacity))
-    const finalOpacity = Math.min(1, clampedOpacity * (0.5 + 0.5 * launchEased))
-
-    return {
-      transform: [
-        { translateX: finalX },
-        { translateY: finalY },
-        { rotate: `${finalRotation}deg` },
-        { scale: finalScale },
-      ],
-      opacity: finalOpacity,
-    }
-  })
-
-  return (
-    <AnimatedView
-      pointerEvents="none"
-      style={[
-        styles.celebrationCard,
-        animatedStyle,
-        { width: metrics.width, height: metrics.height },
-      ]}
-    >
-      <CardView
-        card={config.card}
-        metrics={metrics}
-        invalidWiggle={EMPTY_INVALID_WIGGLE}
-        cardFlights={cardFlights}
-        cardFlightMemory={{}}
-      />
-    </AnimatedView>
-  )
-}
 const SelectionHint = ({ state, onClear }: { state: GameState; onClear: () => void }) => {
   if (!state.selected) {
     return null
@@ -2790,6 +2832,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 12,
   },
+  foundationCard: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  foundationStackedCard: {
+    opacity: 0,
+  },
   foundationSymbol: {
     fontSize: 28,
     color: COLOR_FELT_TEXT_PRIMARY,
@@ -2806,9 +2858,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     pointerEvents: 'auto',
-  },
-  celebrationCard: {
-    position: 'absolute',
   },
   hiddenCard: {
     opacity: 0,
