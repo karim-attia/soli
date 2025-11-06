@@ -19,6 +19,7 @@
 | 16 | Developer experience | As a developer I want a developer mode toggle that unlocks internal tooling so that I can access debugging aids without shipping them broadly. | Proposed | 1. Settings include a persisted developer-mode toggle exposed only to internal builds.<br>2. Solver menu entries stay hidden whenever developer mode is off.<br>3. The Klondike header provides a “Demo Game” control that starts a hardcoded easy shuffle when developer mode is enabled.<br>[View Details](./16/prd.md) |
 | 17 | Returning player | As a player I want startup and control polish so that the game feels stable and responsive. | Proposed | 1. Waste fan draw animation no longer overshoots and eases smoothly.<br>2. App launch avoids layout shifts before the first frame becomes interactive.<br>3. Undo button remains hidden until the first move occurs.<br>4. Session resumes ongoing games without replaying animations while completed games start fresh.<br>5. Toast notifications are disabled until redesigned.<br>[View Details](./17/prd.md) |
 | 18 | Developer tools maintainer | As a developer I want celebration metadata surfaced during wins so that I can identify and iterate on animations quickly. | InReview | 1. Celebration mode logic lives in a dedicated module referenced by the Klondike screen.<br>2. Every celebration mode exposes a human-readable name alongside its numeric identifier.<br>3. When developer mode is enabled and a celebration runs, the UI shows the current celebration number and name in the bottom-right corner.<br>[View Details](./18/prd.md) |
+| 19 | Performance-focused player | As a player I want configurable in-game statistics so that I can monitor moves and elapsed time without clutter when disabled. | InProgress | 1. Settings includes a “Game Statistics” group with toggles for move count and elapsed time visibility, persisting selections.<br>2. The Klondike screen shows move/time HUD elements in the top-right only when enabled, starting the timer after the first move and stopping on completion.<br>3. Starting a new game reveals the first stock card while leaving the timer idle until the player makes a move.<br>[View Details](./19/prd.md) |
 
 ## History
 
@@ -90,3 +91,6 @@
 | 20251106-143100 | 18 | propose_for_backlog | User approved developer-mode celebration debug overlay scope. | user |
 | 20251106-143200 | 18 | start_implementation | Began implementation work on PBI 18 tasks 18-1 and 18-2. | ai_agent |
 | 20251106-151000 | 18 | submit_for_review | Celebration metadata module and developer overlay ready for review. | ai_agent |
+| 20251106-132000 | 19 | create_pbi | Created PBI 19 for configurable in-game statistics and timer controls. | ai_agent |
+| 20251106-132100 | 19 | propose_for_backlog | User approved PBI 19 scope for statistics toggles and timer behaviour. | user |
+| 20251106-132200 | 19 | start_implementation | Began implementation work on PBI 19 tasks 19-1 through 19-3. | ai_agent |
