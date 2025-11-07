@@ -141,6 +141,8 @@ const AUTO_QUEUE_MOVE_BUFFER_MS = 50
 const AUTO_QUEUE_MOVE_DELAY_MS = CARD_ANIMATION_DURATION_MS + AUTO_QUEUE_MOVE_BUFFER_MS
 const UNDO_SCRUB_BUTTON_DIM_OPACITY = 0.25
 const UNDO_BUTTON_DISABLED_OPACITY = 0.55
+const STAT_VERTICAL_MARGIN = 10
+const STAT_BADGE_MIN_WIDTH = 104
 const DEMO_AUTO_STEP_INTERVAL_MS = 300
 
 const CARD_FLIP_HALF_DURATION_MS = 40
@@ -323,7 +325,7 @@ export default function TabOneScreen() {
     return rows
   }, [formattedElapsed, showMoves, state.moveCount, showTime])
   const statsVisible = statisticsRows.length > 0
-  const headerPaddingTop = safeArea.top + 16
+  const headerPaddingTop = safeArea.top + STAT_VERTICAL_MARGIN
   const headerPaddingLeft = safeArea.left + 24
   const headerPaddingRight = safeArea.right + 24
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
@@ -1616,7 +1618,7 @@ const handleFoundationPress = useCallback(
       <YStack
         flex={1}
         onLayout={handleBoardLayout}
-        style={styles.boardShell}
+        style={[styles.boardShell, { marginTop: STAT_VERTICAL_MARGIN }]}
         px="$2"
         py="$3"
         gap="$3"
@@ -2829,7 +2831,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   statisticsPlaceholder: {
-    minHeight: 48,
+    minHeight: 52,
   },
   statisticsHudRow: {
     flexDirection: 'row',
@@ -2837,7 +2839,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   statisticsBadge: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 18,
     backgroundColor: 'rgba(15, 23, 42, 0.72)',
@@ -2847,26 +2849,30 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
+    minWidth: STAT_BADGE_MIN_WIDTH,
+    alignItems: 'center',
   },
   statisticsBadgeSpacing: {
-    marginLeft: 12,
+    marginLeft: 10,
   },
   statisticsBadgeLabel: {
     fontSize: 10,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    color: 'rgba(226, 242, 217, 0.85)',
+    color: 'rgba(226, 242, 217, 0.82)',
     marginBottom: 2,
     fontWeight: '600',
+    textAlign: 'center',
   },
   statisticsBadgeValue: {
     fontSize: 20,
     fontWeight: '700',
     color: '#f8fafc',
+    textAlign: 'center',
   },
   undoScrubContainer: {
     marginTop: 12,
-    paddingHorizontal: 16,
+    // paddingHorizontal: 16,
     width: '100%',
     minHeight: 72,
     position: 'relative',
@@ -2876,7 +2882,7 @@ const styles = StyleSheet.create({
   undoScrubOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
-    paddingHorizontal: 28,
+    paddingHorizontal:40,
     paddingVertical: 18,
     borderRadius: 24,
     backgroundColor: 'rgba(15, 23, 42, 0.55)',
