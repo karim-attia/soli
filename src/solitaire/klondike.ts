@@ -68,6 +68,7 @@ export interface GameSnapshot {
 
 export interface GameState extends GameSnapshot {
   history: GameSnapshot[]
+  future: GameSnapshot[]
   selected: Selection | null
 }
 
@@ -75,6 +76,7 @@ export type GameAction =
   | { type: 'NEW_GAME' }
   | { type: 'DRAW_OR_RECYCLE' }
   | { type: 'UNDO' }
+  | { type: 'SCRUB_TO_INDEX'; index: number }
   | { type: 'HYDRATE_STATE'; state: GameState }
   | { type: 'SELECT_TABLEAU'; columnIndex: number; cardIndex: number }
   | { type: 'SELECT_WASTE' }
@@ -140,6 +142,7 @@ export const createInitialState = (): GameState => {
   return {
     ...snapshot,
     history: [],
+    future: [],
     selected: null,
   }
 }
@@ -192,6 +195,7 @@ export const createSolvableGameState = (shuffleConfig: SolvableShuffleConfig): G
   return {
     ...snapshot,
     history: [],
+    future: [],
     selected: null,
   }
 }
@@ -347,6 +351,7 @@ export const createDemoGameState = (): GameState => {
   return {
     ...snapshot,
     history: [],
+    future: [],
     selected: null,
   }
 }
@@ -383,6 +388,11 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
       return finalizeState(drawFromStock(haltAutoQueue(state)))
     case 'UNDO':
       return finalizeState(handleUndo(haltAutoQueue(state)))
+    case 'SCRUB_TO_INDEX': {
+      const workingState = haltAutoQueue(state)
+      const nextState = scrubToIndex(workingState, action.index)
+      return nextState === workingState ? workingState : finalizeState(nextState)
+    }
     case 'HYDRATE_STATE':
       return finalizeState({
         ...action.state,
@@ -540,6 +550,7 @@ const drawFromStock = (
     stock: nextStock,
     waste: nextWaste,
     history,
+    future: history === state.history ? state.future : [],
     selected: null,
     moveCount: state.moveCount + 1,
   }
@@ -565,6 +576,7 @@ const recycleWasteToStock = (
     stock: recycled,
     waste: [],
     history,
+    future: history === state.history ? state.future : [],
     selected: null,
     moveCount: state.moveCount + 1,
   }
@@ -577,13 +589,58 @@ const handleUndo = (state: GameState): GameState => {
 
   const previousSnapshot = state.history[state.history.length - 1]
   const nextHistory = state.history.slice(0, -1)
+  const nextFuture = [snapshotFromState(state), ...state.future]
+  if (nextFuture.length > MAX_UNDO_HISTORY) {
+    nextFuture.length = MAX_UNDO_HISTORY
+  }
 
   return {
     ...cloneSnapshot(previousSnapshot),
     history: nextHistory,
+    future: nextFuture,
     selected: null,
     autoQueue: [],
     isAutoCompleting: false,
+    moveCount: state.moveCount + 1,
+  }
+}
+
+const scrubToIndex = (state: GameState, targetIndex: number): GameState => {
+  const totalHistory = state.history.length
+  const totalFuture = state.future.length
+  const maxIndex = totalHistory + totalFuture
+  const clampedIndex = Math.max(0, Math.min(targetIndex, maxIndex))
+
+  if (clampedIndex === totalHistory) {
+    return state
+  }
+
+  const timeline: GameSnapshot[] = [
+    ...state.history,
+    snapshotFromState(state),
+    ...state.future,
+  ]
+
+  const nextSnapshot = timeline[clampedIndex]
+  if (!nextSnapshot) {
+    return state
+  }
+
+  const nextHistory = timeline.slice(0, clampedIndex)
+  const nextFuture = timeline.slice(clampedIndex + 1)
+
+  const cappedHistory =
+    nextHistory.length > MAX_UNDO_HISTORY
+      ? nextHistory.slice(nextHistory.length - MAX_UNDO_HISTORY)
+      : nextHistory
+  const cappedFuture =
+    nextFuture.length > MAX_UNDO_HISTORY ? nextFuture.slice(0, MAX_UNDO_HISTORY) : nextFuture
+
+  const baseState = cloneSnapshot(nextSnapshot)
+  return {
+    ...baseState,
+    history: cappedHistory,
+    future: cappedFuture,
     moveCount: state.moveCount + 1,
   }
 }
@@ -700,6 +757,7 @@ const applyMove = (
     foundations: nextFoundations,
     waste: nextWaste,
     history,
+    future: history === state.history ? state.future : [],
     selected: null,
     moveCount: state.moveCount + 1,
   }
@@ -838,6 +896,7 @@ const scheduleAutoQueue = (state: GameState): GameState => {
     autoQueue: planned,
     isAutoCompleting: true,
     history: pushHistory(state),
+    future: [],
   }
 }
 
@@ -1087,6 +1146,7 @@ const cloneSnapshot = (snapshot: GameSnapshot): GameState => ({
   timerState: snapshot.timerState,
   timerStartedAt: snapshot.timerStartedAt,
   history: [],
+  future: [],
   selected: null,
 })
 

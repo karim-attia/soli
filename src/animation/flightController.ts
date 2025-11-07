@@ -67,6 +67,8 @@ const describeTarget = (action: GameAction): string => {
       return 'stock→waste'
     case 'UNDO':
       return 'undo'
+    case 'SCRUB_TO_INDEX':
+      return `scrub:${action.index}`
     case 'ADVANCE_AUTO_QUEUE':
       return 'auto-queue'
     default:

@@ -10,6 +10,7 @@ import {
 } from 'react'
 import {
   Alert,
+  Dimensions,
   LayoutChangeEvent,
   LayoutRectangle,
   Linking,
@@ -36,8 +37,9 @@ import Animated, {
 import type { AnimatedRef, SharedValue } from 'react-native-reanimated'
 import { useNavigation } from 'expo-router'
 import { DrawerActions } from '@react-navigation/native'
-import { Button, H2, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
+import { Button, Paragraph, Slider, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu, RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
+import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 // import { useToastController } from '@tamagui/toast'
 
 import {
@@ -137,6 +139,8 @@ const CARD_FLIGHT_TIMING = {
 }
 const AUTO_QUEUE_MOVE_BUFFER_MS = 50
 const AUTO_QUEUE_MOVE_DELAY_MS = CARD_ANIMATION_DURATION_MS + AUTO_QUEUE_MOVE_BUFFER_MS
+const UNDO_SCRUB_BUTTON_DIM_OPACITY = 0.25
+const UNDO_BUTTON_DISABLED_OPACITY = 0.55
 const DEMO_AUTO_STEP_INTERVAL_MS = 300
 
 const CARD_FLIP_HALF_DURATION_MS = 40
@@ -319,6 +323,9 @@ export default function TabOneScreen() {
     return rows
   }, [formattedElapsed, showMoves, state.moveCount, showTime])
   const statsVisible = statisticsRows.length > 0
+  const headerPaddingTop = safeArea.top + 16
+  const headerPaddingLeft = safeArea.left + 24
+  const headerPaddingRight = safeArea.right + 24
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
   const winCelebrationsRef = useRef(state.winCelebrations)
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -546,7 +553,7 @@ export default function TabOneScreen() {
             ? `tableau:${selection.columnIndex}`
             : selection.source
           : 'unknown'
-        devLog('info', `[Game] Dispatch APPLY_MOVE → foundation:${destination} from ${sourceLabel}`)
+        // devLog('info', `[Game] Dispatch APPLY_MOVE → foundation:${destination} from ${sourceLabel}`)
       }
       dispatchWithFlightInternal({ action, selection, dispatch })
     },
@@ -706,7 +713,7 @@ export default function TabOneScreen() {
             ? `foundation:${selection.suit}`
             : selection.source
         : 'none'
-      devLog('info', '[Wiggle] trigger', { cards: ids, selection: selectionLabel })
+      // devLog('info', '[Wiggle] trigger', { cards: ids, selection: selectionLabel })
       setInvalidWiggle({
         key: Date.now(),
         lookup: new Set(ids),
@@ -745,10 +752,10 @@ export default function TabOneScreen() {
       if (boardLockedRef.current) {
         return
       }
-      if (shouldSuppressFoundationWiggle(options?.selection ?? null)) {
-        devLog('log', '[Wiggle] suppressed for recent foundation arrival', options)
-        return
-      }
+      // if (shouldSuppressFoundationWiggle(options?.selection ?? null)) {
+      //   devLog('log', '[Wiggle] suppressed for recent foundation arrival', options)
+      //   return
+      // }
       triggerInvalidSelectionWiggle(options?.selection ?? null)
     },
     [autoPlayActive, shouldSuppressFoundationWiggle, triggerInvalidSelectionWiggle],
@@ -1279,8 +1286,169 @@ const handleFoundationPress = useCallback(
     }
   }, [dispatch, state.selected])
 
-  const shouldShowUndo = !state.hasWon && !celebrationState && state.history.length > 0
-  const canUndo = !boardLocked && shouldShowUndo
+  const hasUndo = state.history.length > 0
+  const timelineRange = state.history.length + state.future.length
+  const shouldShowUndo = !state.hasWon && !celebrationState && timelineRange > 0
+  const canUndo = !boardLocked && hasUndo
+  const [isScrubbing, setIsScrubbing] = useState(false)
+  const [scrubValue, setScrubValue] = useState(0)
+  const isScrubbingRef = useRef(false)
+  const scrubPointerRef = useRef(0)
+  const scrubPendingIndexRef = useRef<number | null>(null)
+  const scrubDispatchRafRef = useRef<number | null>(null)
+  const lastDispatchedScrubIndexRef = useRef(state.history.length)
+
+  useEffect(() => {
+    isScrubbingRef.current = isScrubbing
+  }, [isScrubbing])
+
+  useEffect(() => {
+    if (!isScrubbing) {
+      lastDispatchedScrubIndexRef.current = state.history.length
+    }
+  }, [isScrubbing, state.history.length])
+
+  useEffect(() => {
+    if (!shouldShowUndo && isScrubbing) {
+      setIsScrubbing(false)
+      scrubPointerRef.current = 0
+      setScrubValue(0)
+    }
+  }, [shouldShowUndo, isScrubbing])
+
+  useEffect(() => {
+    if (isScrubbing) {
+      return
+    }
+    const pointer = state.history.length
+    if (scrubPointerRef.current !== pointer) {
+      scrubPointerRef.current = pointer
+    }
+    setScrubValue((current) => (current === pointer ? current : pointer))
+  }, [isScrubbing, state.history.length])
+
+  const scrubSliderMax = useMemo(() => Math.max(timelineRange, 1), [timelineRange])
+  const scrubSliderValue = useMemo(() => [scrubValue], [scrubValue])
+
+  const cancelScheduledScrub = useCallback(() => {
+    if (scrubDispatchRafRef.current !== null) {
+      cancelAnimationFrame(scrubDispatchRafRef.current)
+      scrubDispatchRafRef.current = null
+    }
+    scrubPendingIndexRef.current = null
+  }, [])
+
+  useEffect(() => cancelScheduledScrub, [cancelScheduledScrub])
+
+  const computeScrubIndexFromAbsolute = useCallback(
+    (absoluteX: number): number => {
+      const totalRange = timelineRange
+      if (totalRange <= 0) {
+        return 0
+      }
+      const windowWidth = Dimensions.get('window').width || 1
+      const usableWidth = Math.max(windowWidth - safeArea.left - safeArea.right, 1)
+      const relativeX = Math.min(
+        Math.max(absoluteX - safeArea.left, 0),
+        usableWidth,
+      )
+      const normalized = relativeX / usableWidth
+      return Math.max(0, Math.min(Math.round(normalized * totalRange), totalRange))
+    },
+    [safeArea.left, safeArea.right, timelineRange],
+  )
+
+  const scheduleScrubDispatch = useCallback(
+    (index: number) => {
+      scrubPendingIndexRef.current = index
+      if (scrubDispatchRafRef.current !== null) {
+        return
+      }
+      scrubDispatchRafRef.current = requestAnimationFrame(() => {
+        scrubDispatchRafRef.current = null
+        const pending = scrubPendingIndexRef.current
+        scrubPendingIndexRef.current = null
+        if (pending === null || pending === lastDispatchedScrubIndexRef.current) {
+          return
+        }
+        lastDispatchedScrubIndexRef.current = pending
+        dispatch({ type: 'SCRUB_TO_INDEX', index: pending })
+      })
+    },
+    [dispatch],
+  )
+
+  const handleScrubGestureStart = useCallback(
+    (absoluteX: number) => {
+      if (boardLocked || !shouldShowUndo) {
+        return
+      }
+      const pointer = computeScrubIndexFromAbsolute(absoluteX)
+      scrubPointerRef.current = pointer
+      lastDispatchedScrubIndexRef.current = pointer
+      isScrubbingRef.current = true
+      setScrubValue(pointer)
+      setIsScrubbing(true)
+    },
+    [boardLocked, computeScrubIndexFromAbsolute, shouldShowUndo],
+  )
+
+  const handleScrubGestureUpdate = useCallback(
+    (absoluteX: number) => {
+      if (!shouldShowUndo || !isScrubbingRef.current) {
+        return
+      }
+      const totalRange = timelineRange
+      if (totalRange <= 0) {
+        return
+      }
+      const nextIndex = computeScrubIndexFromAbsolute(absoluteX)
+      if (nextIndex === scrubPointerRef.current) {
+        return
+      }
+      scrubPointerRef.current = nextIndex
+      setScrubValue(nextIndex)
+      scheduleScrubDispatch(nextIndex)
+    },
+    [computeScrubIndexFromAbsolute, scheduleScrubDispatch, shouldShowUndo, timelineRange],
+  )
+
+  const handleScrubGestureEnd = useCallback(() => {
+    if (!isScrubbingRef.current) {
+      return
+    }
+    const finalIndex = scrubPointerRef.current
+    scheduleScrubDispatch(finalIndex)
+    isScrubbingRef.current = false
+    setIsScrubbing(false)
+  }, [scheduleScrubDispatch])
+
+  const undoScrubGesture = useMemo(() => {
+    return Gesture.Pan()
+      .enabled(!boardLocked && shouldShowUndo)
+      .minDistance(2)
+      .activeOffsetY([-20, 20])
+      .onStart((event) => {
+        runOnJS(handleScrubGestureStart)(event.absoluteX)
+      })
+      .onUpdate((event) => {
+        runOnJS(handleScrubGestureUpdate)(event.absoluteX)
+      })
+      .onEnd(() => {
+        runOnJS(handleScrubGestureEnd)()
+      })
+      .onFinalize(() => {
+        runOnJS(handleScrubGestureEnd)()
+      })
+      .maxPointers(1)
+  }, [boardLocked, handleScrubGestureEnd, handleScrubGestureStart, handleScrubGestureUpdate, shouldShowUndo])
+
+  const handleUndoTap = useCallback(() => {
+    if (isScrubbingRef.current || !canUndo) {
+      return
+    }
+    handleUndo()
+  }, [canUndo, handleUndo])
   const openDrawer = useCallback(() => {
     navigation.dispatch(DrawerActions.openDrawer())
   }, [navigation])
@@ -1422,23 +1590,35 @@ const handleFoundationPress = useCallback(
     <YStack
       flex={1}
       px="$2"
-      pt="$6"
+      pt="$2"
       pb="$2"
-      gap="$4"
+      gap="$3"
       style={{ backgroundColor: feltBackground }}
     >
       <FeltPattern />
-      <H2 style={styles.centeredHeading}>Klondike Solitaire</H2>
-      <Paragraph style={styles.centeredParagraph}>
-        Tap to auto-move cards; long-press to pick one up and choose a destination.
-      </Paragraph>
+      <View
+        style={[
+          styles.headerRow,
+          {
+            paddingTop: headerPaddingTop,
+            paddingLeft: headerPaddingLeft,
+            paddingRight: headerPaddingRight,
+          },
+        ]}
+      >
+        {statsVisible ? (
+          <StatisticsHud rows={statisticsRows} />
+        ) : (
+          <View style={styles.statisticsPlaceholder} />
+        )}
+      </View>
 
       <YStack
         flex={1}
         onLayout={handleBoardLayout}
         style={styles.boardShell}
         px="$2"
-        py="$2"
+        py="$3"
         gap="$3"
       >
         <TopRow
@@ -1478,14 +1658,6 @@ const handleFoundationPress = useCallback(
           cardFlightMemory={cardFlightMemoryRef.current}
           interactionsLocked={boardLocked}
         />
-
-        {statsVisible ? (
-          <StatisticsHud
-            rows={statisticsRows}
-            topInset={safeArea.top}
-            rightInset={safeArea.right}
-          />
-        ) : null}
         <SelectionHint state={state} onClear={clearSelection} />
         {celebrationState ? (
           <CelebrationTouchBlocker onAbort={handleCelebrationAbort} />
@@ -1498,17 +1670,48 @@ const handleFoundationPress = useCallback(
       </YStack>
 
       {shouldShowUndo ? (
-        <XStack mt="$3" style={{ justifyContent: 'flex-end' }}>
-          <Button
-            width="50%"
-            icon={Undo2}
-            onPress={handleUndo}
-            disabled={!canUndo}
-            themeInverse
+        <View style={styles.undoScrubContainer}>
+          <AnimatedView
+            pointerEvents="none"
+            style={[
+              styles.undoScrubOverlay,
+              { opacity: isScrubbing ? 1 : 0 },
+            ]}
           >
-            Undo
-          </Button>
-        </XStack>
+            <Slider
+              value={scrubSliderValue}
+              min={0}
+              max={scrubSliderMax}
+              step={1}
+              size="$4"
+              style={styles.undoScrubSlider}
+            >
+              <Slider.Track style={styles.undoScrubTrack}>
+                <Slider.TrackActive style={styles.undoScrubTrackActive} />
+              </Slider.Track>
+              <Slider.Thumb circular size="$3" index={0} style={styles.undoScrubThumb} />
+            </Slider>
+          </AnimatedView>
+          <GestureDetector gesture={undoScrubGesture}>
+            <Button
+              width="50%"
+              icon={Undo2}
+              onPress={handleUndoTap}
+              disabled={boardLocked}
+              themeInverse
+              style={styles.undoButton}
+              opacity={
+                isScrubbing
+                  ? UNDO_SCRUB_BUTTON_DIM_OPACITY
+                  : canUndo
+                    ? 1
+                    : UNDO_BUTTON_DISABLED_OPACITY
+              }
+            >
+              Undo
+            </Button>
+          </GestureDetector>
+        </View>
       ) : null}
     </YStack>
   )
@@ -2560,28 +2763,23 @@ const FoundationPile = ({
   )
 }
 
-const StatisticsHud = ({
-  rows,
-  topInset,
-  rightInset,
-}: {
-  rows: Array<{ label: string; value: string }>
-  topInset: number
-  rightInset: number
-}) => {
+const StatisticsHud = ({ rows }: { rows: Array<{ label: string; value: string }> }) => {
   if (!rows.length) {
     return null
   }
 
-  const top = Math.max(12, topInset + 8)
-  const right = Math.max(12, rightInset + 12)
-
   return (
-    <View pointerEvents="none" style={[styles.statisticsHud, { top, right }]}>
-      {rows.map((row) => (
-        <View key={row.label} style={styles.statisticsRow}>
-          <Text style={styles.statisticsLabel}>{row.label}</Text>
-          <Text style={styles.statisticsValue}>{row.value}</Text>
+    <View style={styles.statisticsHudRow}>
+      {rows.map((row, index) => (
+        <View
+          key={row.label}
+          style={[
+            styles.statisticsBadge,
+            index > 0 ? styles.statisticsBadgeSpacing : undefined,
+          ]}
+        >
+          <Text style={styles.statisticsBadgeLabel}>{row.label}</Text>
+          <Text style={styles.statisticsBadgeValue}>{row.value}</Text>
         </View>
       ))}
     </View>
@@ -2625,13 +2823,93 @@ const describeSelection = (state: GameState): string => {
 const rankToLabel = (rank: Rank): string => FACE_CARD_LABELS[rank] ?? String(rank)
 
 const styles = StyleSheet.create({
-  centeredHeading: {
-    textAlign: 'center',
-    color: COLOR_FELT_TEXT_PRIMARY,
+  headerRow: {
+    width: '100%',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
   },
-  centeredParagraph: {
-    textAlign: 'center',
-    color: COLOR_FELT_TEXT_SECONDARY,
+  statisticsPlaceholder: {
+    minHeight: 48,
+  },
+  statisticsHudRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  statisticsBadge: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 18,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: 'rgba(148, 163, 184, 0.35)',
+    shadowColor: 'rgba(0, 0, 0, 0.25)',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  statisticsBadgeSpacing: {
+    marginLeft: 12,
+  },
+  statisticsBadgeLabel: {
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: 'rgba(226, 242, 217, 0.85)',
+    marginBottom: 2,
+    fontWeight: '600',
+  },
+  statisticsBadgeValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#f8fafc',
+  },
+  undoScrubContainer: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    width: '100%',
+    minHeight: 72,
+    position: 'relative',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+  },
+  undoScrubOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingVertical: 18,
+    borderRadius: 24,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    zIndex: 1,
+    shadowColor: 'rgba(0, 0, 0, 0.35)',
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  undoButton: {
+    alignSelf: 'flex-end',
+    zIndex: 2,
+  },
+  undoScrubSlider: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  undoScrubTrack: {
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+  },
+  undoScrubTrackActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+  },
+  undoScrubThumb: {
+    backgroundColor: '#ffffff',
+    borderWidth: 2,
+    borderColor: 'rgba(148, 163, 184, 0.45)',
+    shadowColor: 'rgba(0, 0, 0, 0.28)',
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
   boardShell: {
     width: '100%',
@@ -2698,32 +2976,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '600',
     marginTop: 16,
-  },
-  statisticsHud: {
-    position: 'absolute',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
-    gap: 4,
-  },
-  statisticsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  statisticsLabel: {
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    color: COLOR_FELT_TEXT_SECONDARY,
-    fontWeight: '600',
-  },
-  statisticsValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: COLOR_FELT_TEXT_PRIMARY,
   },
   emptySlot: {
     borderWidth: 2,

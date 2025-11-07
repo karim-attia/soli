@@ -18,7 +18,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.soli.klondike",
+      "bundleIdentifier": "ch.karimattia.soli",
       "buildNumber": "0.1.0"
     },
     "android": {
@@ -26,7 +26,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0b8b3c"
       },
-      "package": "com.soli.klondike",
+      "package": "ch.karimattia.soli",
       "versionCode": 1,
       "permissions": []
     },
@@ -56,11 +56,6 @@
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "supportEmail": "support@soli.app",
-      "marketingUrl": "https://soli.app",
-      "releaseNotes": "Initial public preview with polished animations, history tracking, and solvable shuffle options."
     }
   }
 }

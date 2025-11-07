@@ -13,4 +13,6 @@ This document lists all tasks associated with PBI 17.
 | 17-4 | [Resume sessions without replay animations](./17-4.md) | InProgress | Difficulty: Medium. Resume in-progress games without animations and auto-start fresh games when the previous one finished. |
 | 17-5 | [Disable toast notifications](./17-5.md) | Done | Difficulty: Easy. Remove or stub all toast emissions across the app. |
 | 17-6 | [Instrument demo auto-solve build timing](./17-6.md) | InProgress | Difficulty: Easy. Time the build/install step and show a 1-10 progress bar. |
+| 17-7 | [Make auto-complete slightly faster](./17-7.md) | Review | Difficulty: Easy. Reduce auto-complete queue delay to speed up endgame resolution. |
+| 17-8 | [Add prod install mode to demo script](./17-8.md) | Review | Difficulty: Medium. Add a prod CLI mode that installs the app, freezes progress, and streams logs. |
 

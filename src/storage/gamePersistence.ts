@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-import type { GameState, TimerState } from '../solitaire/klondike'
+import type { GameSnapshot, GameState, TimerState } from '../solitaire/klondike'
 
 // Requirement PBI-13: persist in-progress Klondike sessions locally.
 export const KLONDIKE_STORAGE_KEY = 'soli/klondike/v1'
@@ -82,6 +82,7 @@ const isPersistedGamePayload = (value: unknown): value is PersistedGamePayload =
     candidate.foundations !== undefined &&
     Array.isArray(candidate.tableau) &&
     Array.isArray(candidate.history ?? []) &&
+    Array.isArray(candidate.future ?? []) &&
     typeof candidate.shuffleId === 'string'
   )
 }
@@ -152,6 +153,10 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
     timerStartedAt = rawTimerStartedAt
   }
 
+  const futureSnapshots = Array.isArray((parsed.state as { future?: unknown }).future)
+    ? ((parsed.state as { future: GameSnapshot[] }).future ?? [])
+    : []
+
   const sanitizedState: GameState = {
     ...parsed.state,
     elapsedMs,
@@ -159,6 +164,7 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
     timerStartedAt,
     selected: null,
     history: Array.isArray(parsed.state.history) ? parsed.state.history : [],
+    future: futureSnapshots,
     shuffleId,
     solvableId: solvableIdValue,
   }
