@@ -19,6 +19,7 @@ import {
   useColorScheme,
 } from 'react-native'
 import type { ViewStyle } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, {
   Easing,
   cancelAnimation,
@@ -81,6 +82,7 @@ import {
   useHistory,
 } from '../../src/state/history'
 import { useAnimationToggles, useSettings } from '../../src/state/settings'
+import { computeElapsedWithReference, formatElapsedDuration, TIMER_TICK_INTERVAL_MS } from '../../src/utils/time'
 
 const BASE_CARD_WIDTH = 72
 const BASE_CARD_HEIGHT = 102
@@ -93,7 +95,7 @@ const WASTE_FAN_OVERLAP_RATIO = 0.35
 const WASTE_FAN_MAX_OFFSET = 28
 const WASTE_ENTRY_BACKTRACK_RATIO = 0.45
 const WASTE_ENTRY_BACKTRACK_MAX = 24
-const AUTO_QUEUE_INTERVAL_MS = 160
+const AUTO_QUEUE_INTERVAL_MS = 100
 const COLUMN_MARGIN = TABLEAU_GAP / 2
 const COLOR_CARD_FACE = '#ffffff'
 const COLOR_CARD_BACK = '#3b4d75'
@@ -285,6 +287,8 @@ export default function TabOneScreen() {
   const colorScheme = useColorScheme()
   const feltBackground = colorScheme === 'dark' ? COLOR_FELT_DARK : COLOR_FELT_LIGHT
   const { state: settingsState, hydrated: settingsHydrated, setDeveloperMode } = useSettings()
+  const { showMoves, showTime } = settingsState.statistics
+  const safeArea = useSafeAreaInsets()
   const solvableGamesOnly = settingsState.solvableGamesOnly
   const developerModeEnabled = settingsState.developerMode
   const animationToggles = useAnimationToggles()
@@ -299,8 +303,26 @@ export default function TabOneScreen() {
     celebrations: celebrationAnimationsEnabled,
   } = animationToggles
   const dropHints = useMemo(() => getDropHints(state), [state])
+  const effectiveElapsedMs = useMemo(
+    () => computeElapsedWithReference(state.elapsedMs, state.timerState, state.timerStartedAt, Date.now()),
+    [state.elapsedMs, state.timerStartedAt, state.timerState],
+  )
+  const formattedElapsed = useMemo(() => formatElapsedDuration(effectiveElapsedMs), [effectiveElapsedMs])
+  const statisticsRows = useMemo(() => {
+    const rows: Array<{ label: string; value: string }> = []
+    if (showMoves) {
+      rows.push({ label: 'Moves', value: String(state.moveCount) })
+    }
+    if (showTime) {
+      rows.push({ label: 'Time', value: formattedElapsed })
+    }
+    return rows
+  }, [formattedElapsed, showMoves, state.moveCount, showTime])
+  const statsVisible = statisticsRows.length > 0
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
   const winCelebrationsRef = useRef(state.winCelebrations)
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const previousMoveCountRef = useRef(state.moveCount)
   const recentFoundationArrivalsRef = useRef<Map<string, number>>(new Map())
   const stateRef = useRef(state)
   const lastRecordedShuffleRef = useRef<string | null>(null)
@@ -479,12 +501,20 @@ export default function TabOneScreen() {
         return
       }
 
+      const elapsedForRecord = computeElapsedWithReference(
+        current.elapsedMs,
+        current.timerState,
+        current.timerStartedAt,
+        Date.now(),
+      )
+
       recordResult({
         shuffleId: current.shuffleId,
         solved,
         solvable: Boolean(current.solvableId),
         finishedAt: new Date().toISOString(),
         moves: current.moveCount,
+        durationMs: elapsedForRecord,
         preview: currentStartingPreviewRef.current,
         displayName: currentDisplayNameRef.current,
       })
@@ -776,6 +806,54 @@ export default function TabOneScreen() {
   }, [state])
 
   useEffect(() => {
+    const previousMoveCount = previousMoveCountRef.current
+    const moveIncreased = state.moveCount > previousMoveCount
+    if (moveIncreased && state.timerState !== 'running') {
+      dispatch({ type: 'TIMER_START', startedAt: Date.now() })
+    }
+    previousMoveCountRef.current = state.moveCount
+  }, [dispatch, state.moveCount, state.timerState])
+
+  useEffect(() => {
+    if (state.timerState === 'running' && state.timerStartedAt === null) {
+      dispatch({ type: 'TIMER_START', startedAt: Date.now() })
+    }
+  }, [dispatch, state.timerStartedAt, state.timerState])
+
+  useEffect(() => {
+    if (state.timerState !== 'running') {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
+      }
+      return
+    }
+
+    if (!timerIntervalRef.current) {
+      timerIntervalRef.current = setInterval(() => {
+        dispatch({ type: 'TIMER_TICK', timestamp: Date.now() })
+      }, TIMER_TICK_INTERVAL_MS)
+      dispatch({ type: 'TIMER_TICK', timestamp: Date.now() })
+    }
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
+      }
+    }
+  }, [dispatch, state.timerState])
+
+  useEffect(() => {
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     void Linking.getInitialURL().then((url) => {
       processDemoLink(url)
     })
@@ -801,6 +879,9 @@ export default function TabOneScreen() {
     const isWon = state.hasWon
 
     if (!wasWon && isWon) {
+      if (state.timerState === 'running') {
+        dispatch({ type: 'TIMER_STOP', timestamp: Date.now() })
+      }
       devLog(
         'info',
         `[Game] hasWon set true (moves=${state.moveCount}, winCelebrations=${state.winCelebrations}).`,
@@ -809,7 +890,7 @@ export default function TabOneScreen() {
     }
 
     previousHasWonRef.current = isWon
-  }, [recordCurrentGameResult, state.hasWon, state.moveCount, state.winCelebrations])
+  }, [dispatch, recordCurrentGameResult, state.hasWon, state.moveCount, state.timerState, state.winCelebrations])
 
 
   // Requirement PBI-13: hydrate persisted Klondike state on launch.
@@ -818,13 +899,34 @@ export default function TabOneScreen() {
 
     ;(async () => {
       try {
-        const persistedState = await loadGameState()
+        const persisted = await loadGameState()
         if (isCancelled) {
           return
         }
-        if (persistedState) {
-          dispatch({ type: 'HYDRATE_STATE', state: persistedState })
+
+        if (!persisted) {
+          return
         }
+
+        if (persisted.status === 'won') {
+          devLog('info', '[Game] Cleared completed session on startup; starting new shuffle.')
+          try {
+            await clearGameState()
+          } catch (clearError) {
+            devLog('warn', 'Failed clearing completed saved game state', clearError)
+          }
+          resetCardFlights()
+          previousHasWonRef.current = false
+          return
+        }
+
+        devLog('info', '[Game] Hydrating saved in-progress session.', {
+          savedAt: persisted.savedAt,
+          shuffleId: persisted.state.shuffleId,
+        })
+        previousHasWonRef.current = persisted.state.hasWon
+        resetCardFlights()
+        dispatch({ type: 'HYDRATE_STATE', state: persisted.state })
       } catch (error) {
         if (isCancelled) {
           return
@@ -854,7 +956,7 @@ export default function TabOneScreen() {
     return () => {
       isCancelled = true
     }
-  }, [dispatch])
+  }, [dispatch, resetCardFlights])
 
   // Requirement PBI-13: persist state changes after hydration.
   useEffect(() => {
@@ -1377,14 +1479,14 @@ const handleFoundationPress = useCallback(
           interactionsLocked={boardLocked}
         />
 
+        {statsVisible ? (
+          <StatisticsHud
+            rows={statisticsRows}
+            topInset={safeArea.top}
+            rightInset={safeArea.right}
+          />
+        ) : null}
         <SelectionHint state={state} onClear={clearSelection} />
-        <XStack
-          gap="$2"
-          style={{ justifyContent: 'flex-start', alignItems: 'center' }}
-        >
-          <Text style={styles.movesLabel}>Moves</Text>
-          <Text style={styles.movesValue}>{state.moveCount}</Text>
-        </XStack>
         {celebrationState ? (
           <CelebrationTouchBlocker onAbort={handleCelebrationAbort} />
         ) : null}
@@ -2458,6 +2560,34 @@ const FoundationPile = ({
   )
 }
 
+const StatisticsHud = ({
+  rows,
+  topInset,
+  rightInset,
+}: {
+  rows: Array<{ label: string; value: string }>
+  topInset: number
+  rightInset: number
+}) => {
+  if (!rows.length) {
+    return null
+  }
+
+  const top = Math.max(12, topInset + 8)
+  const right = Math.max(12, rightInset + 12)
+
+  return (
+    <View pointerEvents="none" style={[styles.statisticsHud, { top, right }]}>
+      {rows.map((row) => (
+        <View key={row.label} style={styles.statisticsRow}>
+          <Text style={styles.statisticsLabel}>{row.label}</Text>
+          <Text style={styles.statisticsValue}>{row.value}</Text>
+        </View>
+      ))}
+    </View>
+  )
+}
+
 const SelectionHint = ({ state, onClear }: { state: GameState; onClear: () => void }) => {
   if (!state.selected) {
     return null
@@ -2569,14 +2699,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 16,
   },
-  movesLabel: {
-    fontSize: 12,
-    color: COLOR_FELT_TEXT_SECONDARY,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  statisticsHud: {
+    position: 'absolute',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    gap: 4,
   },
-  movesValue: {
-    fontSize: 24,
+  statisticsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  statisticsLabel: {
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    color: COLOR_FELT_TEXT_SECONDARY,
+    fontWeight: '600',
+  },
+  statisticsValue: {
+    fontSize: 20,
     fontWeight: '700',
     color: COLOR_FELT_TEXT_PRIMARY,
   },

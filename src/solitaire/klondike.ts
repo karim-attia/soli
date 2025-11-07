@@ -42,6 +42,8 @@ export type Selection =
   | { source: 'waste' }
   | { source: 'foundation'; suit: Suit }
 
+export type TimerState = 'idle' | 'running' | 'paused'
+
 export type MoveTarget =
   | { type: 'tableau'; columnIndex: number }
   | { type: 'foundation'; suit: Suit }
@@ -59,6 +61,9 @@ export interface GameSnapshot {
   winCelebrations: number
   shuffleId: string
   solvableId: string | null
+  elapsedMs: number
+  timerState: TimerState
+  timerStartedAt: number | null
 }
 
 export interface GameState extends GameSnapshot {
@@ -79,6 +84,10 @@ export type GameAction =
   | { type: 'PLACE_ON_FOUNDATION'; suit: Suit }
   | { type: 'ADVANCE_AUTO_QUEUE' }
   | { type: 'APPLY_MOVE'; selection: Selection; target: MoveTarget; recordHistory?: boolean }
+  | { type: 'TIMER_START'; startedAt: number }
+  | { type: 'TIMER_TICK'; timestamp: number }
+  | { type: 'TIMER_STOP'; timestamp: number }
+  | { type: 'TIMER_RESET' }
 
 export interface DropHints {
   tableau: boolean[]
@@ -92,13 +101,27 @@ export type AutoAction =
 
 let cardIdCounter = 0
 
+const revealInitialWaste = (stock: Card[]): { stock: Card[]; waste: Card[] } => {
+  if (!stock.length) {
+    return { stock, waste: [] }
+  }
+
+  const nextStock = stock.slice(0, -1)
+  const topCard = stock[stock.length - 1]
+  return {
+    stock: nextStock,
+    waste: [{ ...topCard, faceUp: true }],
+  }
+}
+
 export const createInitialState = (): GameState => {
   const deck = shuffle(createDeck())
   const shuffleId = computeShuffleId(deck)
-  const { tableau, stock } = dealTableau(deck)
+  const { tableau, stock: dealtStock } = dealTableau(deck)
+  const { stock, waste } = revealInitialWaste(dealtStock)
   const snapshot: GameSnapshot = {
     stock,
-    waste: [],
+    waste,
     foundations: createEmptyFoundations(),
     tableau,
     moveCount: 0,
@@ -109,6 +132,9 @@ export const createInitialState = (): GameState => {
     winCelebrations: 0,
     shuffleId,
     solvableId: null,
+    elapsedMs: 0,
+    timerState: 'idle',
+    timerStartedAt: null,
   }
 
   return {
@@ -142,11 +168,12 @@ export const createSolvableGameState = (shuffleConfig: SolvableShuffleConfig): G
   })
 
   const remainingCards = Array.from(lookup.values()).map((card) => ({ ...card, faceUp: false }))
-  const stock = shuffle(remainingCards)
+  const stockShuffled = shuffle(remainingCards)
+  const { stock, waste } = revealInitialWaste(stockShuffled)
 
   const snapshot: GameSnapshot = {
     stock,
-    waste: [],
+    waste,
     foundations: createEmptyFoundations(),
     tableau,
     moveCount: 0,
@@ -157,6 +184,9 @@ export const createSolvableGameState = (shuffleConfig: SolvableShuffleConfig): G
     winCelebrations: 0,
     shuffleId: createSolvableShuffleId(shuffleConfig.id),
     solvableId: shuffleConfig.id,
+    elapsedMs: 0,
+    timerState: 'idle',
+    timerStartedAt: null,
   }
 
   return {
@@ -293,11 +323,12 @@ export const createDemoGameState = (): GameState => {
     return column
   })
 
-  const stock = DEMO_STOCK_ORDER.map(({ suit, rank }) => takeDemoCard(suit, rank, false))
+  const demoStock = DEMO_STOCK_ORDER.map(({ suit, rank }) => takeDemoCard(suit, rank, false))
+  const { stock, waste } = revealInitialWaste(demoStock)
 
   const snapshot: GameSnapshot = {
     stock,
-    waste: [],
+    waste,
     foundations: createEmptyFoundations(),
     tableau,
     moveCount: 0,
@@ -308,6 +339,9 @@ export const createDemoGameState = (): GameState => {
     winCelebrations: 0,
     shuffleId: 'DEMO-GAME-0001',
     solvableId: DEMO_SHUFFLE_CONFIG.id,
+    elapsedMs: 0,
+    timerState: 'idle',
+    timerStartedAt: null,
   }
 
   return {
@@ -399,6 +433,14 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
         })
         return nextState ? finalizeState(nextState) : workingState
       }
+    case 'TIMER_START':
+      return startTimer(state, action.startedAt)
+    case 'TIMER_TICK':
+      return tickTimer(state, action.timestamp)
+    case 'TIMER_STOP':
+      return stopTimer(state, action.timestamp)
+    case 'TIMER_RESET':
+      return resetTimer(state)
     default:
       return state
   }
@@ -951,6 +993,65 @@ const pushHistory = (state: GameState): GameSnapshot[] => {
   return nextHistory
 }
 
+const startTimer = (state: GameState, startedAt: number): GameState => {
+  if (!Number.isFinite(startedAt)) {
+    return state
+  }
+  if (state.timerState === 'running' && state.timerStartedAt !== null) {
+    return state
+  }
+
+  return {
+    ...state,
+    timerState: 'running',
+    timerStartedAt: Number.isFinite(state.timerStartedAt ?? NaN) ? state.timerStartedAt : startedAt,
+  }
+}
+
+const tickTimer = (state: GameState, timestamp: number): GameState => {
+  if (state.timerState !== 'running' || state.timerStartedAt === null || !Number.isFinite(timestamp)) {
+    return state
+  }
+
+  const delta = timestamp - state.timerStartedAt
+  if (!Number.isFinite(delta) || delta <= 0) {
+    return state
+  }
+
+  return {
+    ...state,
+    elapsedMs: state.elapsedMs + delta,
+    timerStartedAt: timestamp,
+  }
+}
+
+const stopTimer = (state: GameState, timestamp: number): GameState => {
+  if (state.timerState === 'idle') {
+    return state
+  }
+
+  const updated = state.timerState === 'running' ? tickTimer(state, timestamp) : state
+
+  return {
+    ...updated,
+    timerState: 'paused',
+    timerStartedAt: null,
+  }
+}
+
+const resetTimer = (state: GameState): GameState => {
+  if (state.timerState === 'idle' && state.elapsedMs === 0 && state.timerStartedAt === null) {
+    return state
+  }
+
+  return {
+    ...state,
+    elapsedMs: 0,
+    timerState: 'idle',
+    timerStartedAt: null,
+  }
+}
+
 const snapshotFromState = (state: GameState): GameSnapshot => ({
   stock: cloneCards(state.stock),
   waste: cloneCards(state.waste),
@@ -964,6 +1065,9 @@ const snapshotFromState = (state: GameState): GameSnapshot => ({
   winCelebrations: state.winCelebrations,
   shuffleId: state.shuffleId,
   solvableId: state.solvableId ?? null,
+  elapsedMs: state.elapsedMs,
+  timerState: state.timerState,
+  timerStartedAt: state.timerStartedAt,
 })
 
 const cloneSnapshot = (snapshot: GameSnapshot): GameState => ({
@@ -979,6 +1083,9 @@ const cloneSnapshot = (snapshot: GameSnapshot): GameState => ({
   winCelebrations: snapshot.winCelebrations,
   shuffleId: snapshot.shuffleId,
   solvableId: snapshot.solvableId,
+  elapsedMs: snapshot.elapsedMs,
+  timerState: snapshot.timerState,
+  timerStartedAt: snapshot.timerStartedAt,
   history: [],
   selected: null,
 })

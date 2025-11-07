@@ -13,6 +13,7 @@ import {
   useHistory,
 } from '../src/state/history'
 import { devLog } from '../src/utils/devLogger'
+import { formatElapsedDuration } from '../src/utils/time'
 
 const DEFAULT_SHEET_SNAP_POINTS = [65]
 
@@ -125,6 +126,9 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
     const segments = [`Finished ${finishedLabel}`]
     if (typeof entry.moves === 'number' && entry.moves >= 0) {
       segments.push(`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`)
+    }
+    if (typeof entry.durationMs === 'number' && entry.durationMs >= 0) {
+      segments.push(`Time ${formatElapsedDuration(entry.durationMs)}`)
     }
     return segments.join(' · ')
   }, [entry.moves, finishedLabel])
@@ -402,6 +406,17 @@ const HistoryPreviewSheet = ({ entry, open, onOpenChange, snapPoints, onSnapPoin
                 {formatFinishedAt(entry.finishedAt)} · {entry.solved ? 'Solved' : 'Incomplete'}
               </Paragraph>
             </YStack>
+            <XStack gap="$2" flexWrap="wrap">
+              {typeof entry.moves === 'number' && entry.moves >= 0 ? (
+                <Badge
+                  label={`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`}
+                  tone="neutral"
+                />
+              ) : null}
+              {typeof entry.durationMs === 'number' && entry.durationMs >= 0 ? (
+                <Badge label={formatElapsedDuration(entry.durationMs)} tone="info" />
+              ) : null}
+            </XStack>
 
             <View
               style={previewStyles.boardShell}

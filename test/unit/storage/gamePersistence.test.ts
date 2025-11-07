@@ -39,6 +39,7 @@ describe('gamePersistence', () => {
     const payload = {
       version: PERSISTENCE_VERSION,
       savedAt: new Date().toISOString(),
+      status: 'in-progress' as const,
       state: {
         ...initial,
         selected: { source: 'waste' } as const,
@@ -50,7 +51,7 @@ describe('gamePersistence', () => {
     const restored = await loadGameState()
 
     expect(restored).not.toBeNull()
-    expect(restored?.selected).toBeNull()
+    expect(restored?.state.selected).toBeNull()
   })
 
   it('throws PersistedGameError for invalid JSON', async () => {

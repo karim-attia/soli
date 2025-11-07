@@ -19,6 +19,7 @@ import {
   animationPreferenceDescriptors,
   type ThemeMode,
   useSettings,
+  statisticsPreferenceDescriptors,
 } from '../src/state/settings'
 
 const themeOptions: Array<{ mode: ThemeMode; label: string }> = [
@@ -57,6 +58,7 @@ export default function SettingsScreen() {
     setThemeMode,
     setSolvableGamesOnly,
     setDeveloperMode,
+    setStatisticsPreference,
   } = useSettings()
 
   return (
@@ -112,6 +114,25 @@ export default function SettingsScreen() {
             onValueChange={setSolvableGamesOnly}
             disabled={!hydrated}
           />
+        </YStack>
+
+        <YStack gap="$3">
+          <Text fontSize={16} fontWeight="700">
+            Game statistics
+          </Text>
+          <Paragraph color="$color10">
+            Select which in-game statistics are visible while playing Klondike.
+          </Paragraph>
+          {statisticsPreferenceDescriptors.map(({ key, label, description }) => (
+            <ToggleRow
+              key={key}
+              label={label}
+              description={description}
+              value={state.statistics[key]}
+              onValueChange={(enabled) => setStatisticsPreference(key, enabled)}
+              disabled={!hydrated}
+            />
+          ))}
         </YStack>
 
         <YStack gap="$3">

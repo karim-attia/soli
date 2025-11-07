@@ -25,12 +25,20 @@ type AnimationPreferences = {
 
 export type AnimationPreferenceKey = Exclude<keyof AnimationPreferences, 'master'>
 
+type StatisticsPreferences = {
+  showMoves: boolean
+  showTime: boolean
+}
+
+export type StatisticsPreferenceKey = keyof StatisticsPreferences
+
 export type SettingsState = {
   animations: AnimationPreferences
   themeMode: ThemeMode
   shareSolvedGames: boolean
   solvableGamesOnly: boolean
   developerMode: boolean
+  statistics: StatisticsPreferences
 }
 
 type SettingsContextValue = {
@@ -42,6 +50,7 @@ type SettingsContextValue = {
   setShareSolvedGames: (enabled: boolean) => void
   setSolvableGamesOnly: (enabled: boolean) => void
   setDeveloperMode: (enabled: boolean) => void
+  setStatisticsPreference: (key: StatisticsPreferenceKey, enabled: boolean) => void
 }
 
 const STORAGE_KEY = '@soli/settings/v1'
@@ -60,6 +69,10 @@ const DEFAULT_SETTINGS: SettingsState = {
   shareSolvedGames: false,
   solvableGamesOnly: false,
   developerMode: false,
+  statistics: {
+    showMoves: true,
+    showTime: true,
+  },
 }
 
 export const animationPreferenceDescriptors: Array<{
@@ -96,6 +109,23 @@ export const animationPreferenceDescriptors: Array<{
     key: 'celebrations',
     label: 'Win celebrations',
     description: 'Play the victory sequence after completing a game.',
+  },
+]
+
+export const statisticsPreferenceDescriptors: Array<{
+  key: StatisticsPreferenceKey
+  label: string
+  description: string
+}> = [
+  {
+    key: 'showMoves',
+    label: 'Move counter',
+    description: 'Display how many moves you have taken this game.',
+  },
+  {
+    key: 'showTime',
+    label: 'Game timer',
+    description: 'Track elapsed time, starting after your first move.',
   },
 ]
 
@@ -205,6 +235,22 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     )
   }, [])
 
+  const setStatisticsPreference = useCallback((key: StatisticsPreferenceKey, enabled: boolean) => {
+    setState((previous) => {
+      if (previous.statistics[key] === enabled) {
+        return previous
+      }
+
+      return {
+        ...previous,
+        statistics: {
+          ...previous.statistics,
+          [key]: enabled,
+        },
+      }
+    })
+  }, [])
+
   useEffect(() => {
     setDeveloperLoggingEnabled(hydrated ? state.developerMode : false)
   }, [hydrated, state.developerMode])
@@ -219,11 +265,13 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setShareSolvedGames,
       setSolvableGamesOnly,
       setDeveloperMode,
+      setStatisticsPreference,
     }),
     [
       hydrated,
       setAnimationPreference,
       setGlobalAnimationsEnabled,
+      setStatisticsPreference,
       setShareSolvedGames,
       setSolvableGamesOnly,
       setThemeMode,
@@ -265,12 +313,21 @@ export function useAnimationToggles(): AnimationPreferences {
   }, [animations])
 }
 
+export function useStatisticsPreferences(): StatisticsPreferences {
+  const {
+    state: { statistics },
+  } = useSettings()
+
+  return statistics
+}
+
 const mergeSettings = (current: SettingsState, incoming?: Partial<SettingsState>): SettingsState => {
   if (!incoming) {
     return current
   }
 
   const animations: Partial<AnimationPreferences> = incoming.animations ?? {}
+  const statistics: Partial<StatisticsPreferences> = incoming.statistics ?? {}
 
   return {
     animations: {
@@ -289,6 +346,10 @@ const mergeSettings = (current: SettingsState, incoming?: Partial<SettingsState>
     shareSolvedGames: getBoolean(incoming.shareSolvedGames, current.shareSolvedGames),
     solvableGamesOnly: getBoolean(incoming.solvableGamesOnly, current.solvableGamesOnly),
     developerMode: getBoolean(incoming.developerMode, current.developerMode),
+    statistics: {
+      showMoves: getBoolean(statistics.showMoves, current.statistics.showMoves),
+      showTime: getBoolean(statistics.showTime, current.statistics.showTime),
+    },
   }
 }
 

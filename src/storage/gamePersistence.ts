@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-import type { GameState } from '../solitaire/klondike'
+import type { GameState, TimerState } from '../solitaire/klondike'
 
 // Requirement PBI-13: persist in-progress Klondike sessions locally.
 export const KLONDIKE_STORAGE_KEY = 'soli/klondike/v1'
@@ -21,15 +21,27 @@ export class PersistedGameError extends Error {
   }
 }
 
+export type PersistedGameStatus = 'in-progress' | 'won'
+
+export type LoadedGameState = {
+  status: PersistedGameStatus
+  state: GameState
+  savedAt: string
+}
+
 interface PersistedGamePayload {
   version: number
   savedAt: string
+  status?: PersistedGameStatus
   state: GameState
 }
+
+const deriveStatus = (state: GameState): PersistedGameStatus => (state.hasWon ? 'won' : 'in-progress')
 
 const serializeState = (state: GameState): PersistedGamePayload => ({
   version: PERSISTENCE_VERSION,
   savedAt: new Date().toISOString(),
+  status: deriveStatus(state),
   state: {
     ...state,
     selected: null,
@@ -54,6 +66,15 @@ const isPersistedGamePayload = (value: unknown): value is PersistedGamePayload =
     return false
   }
 
+  if (
+    'status' in payload &&
+    payload.status !== undefined &&
+    payload.status !== 'in-progress' &&
+    payload.status !== 'won'
+  ) {
+    return false
+  }
+
   const candidate = state as Partial<GameState>
   return (
     Array.isArray(candidate.stock) &&
@@ -71,7 +92,7 @@ export const saveGameState = async (state: GameState): Promise<void> => {
   await AsyncStorage.setItem(KLONDIKE_STORAGE_KEY, serialized)
 }
 
-export const loadGameState = async (): Promise<GameState | null> => {
+export const loadGameState = async (): Promise<LoadedGameState | null> => {
   const serialized = await AsyncStorage.getItem(KLONDIKE_STORAGE_KEY)
   if (!serialized) {
     return null
@@ -104,12 +125,51 @@ export const loadGameState = async (): Promise<GameState | null> => {
       ? (parsed.state as { solvableId: string }).solvableId
       : null
 
-  return {
+  const parsedState = parsed.state as Partial<GameState> & {
+    elapsedMs?: unknown
+    timerState?: unknown
+    timerStartedAt?: unknown
+  }
+
+  const elapsedMs =
+    typeof parsedState.elapsedMs === 'number' && Number.isFinite(parsedState.elapsedMs) && parsedState.elapsedMs >= 0
+      ? parsedState.elapsedMs
+      : 0
+
+  const rawTimerState = isTimerState(parsedState.timerState) ? parsedState.timerState : 'idle'
+  const rawTimerStartedAt =
+    typeof parsedState.timerStartedAt === 'number' && Number.isFinite(parsedState.timerStartedAt)
+      ? parsedState.timerStartedAt
+      : null
+
+  let timerState: TimerState
+  let timerStartedAt: number | null
+  if (rawTimerState === 'running') {
+    timerState = 'paused'
+    timerStartedAt = null
+  } else {
+    timerState = rawTimerState
+    timerStartedAt = rawTimerStartedAt
+  }
+
+  const sanitizedState: GameState = {
     ...parsed.state,
+    elapsedMs,
+    timerState,
+    timerStartedAt,
     selected: null,
     history: Array.isArray(parsed.state.history) ? parsed.state.history : [],
     shuffleId,
     solvableId: solvableIdValue,
+  }
+
+  const status: PersistedGameStatus =
+    parsed.status === 'won' || sanitizedState.hasWon ? 'won' : 'in-progress'
+
+  return {
+    status,
+    state: sanitizedState,
+    savedAt: parsed.savedAt,
   }
 }
 
@@ -120,4 +180,7 @@ export const clearGameState = async (): Promise<void> => {
 const createLegacyShuffleId = (): string => `LEGACY-${Date.now().toString(36).toUpperCase()}-${
   Math.random().toString(36).slice(2, 6).toUpperCase()
 }`
+
+const isTimerState = (value: unknown): value is TimerState =>
+  value === 'idle' || value === 'running' || value === 'paused'
 
