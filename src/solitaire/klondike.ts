@@ -7,7 +7,6 @@ const RANKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] as const
 
 export const FOUNDATION_SUIT_ORDER = ['hearts', 'diamonds', 'clubs', 'spades'] as const
 export const TABLEAU_COLUMN_COUNT = 7
-export const MAX_UNDO_HISTORY = 200
 const MAX_AUTO_COMPLETE_ITERATIONS = 500
 
 const ACE_RANK = 1
@@ -590,18 +589,14 @@ const handleUndo = (state: GameState): GameState => {
   const previousSnapshot = state.history[state.history.length - 1]
   const nextHistory = state.history.slice(0, -1)
   const nextFuture = [snapshotFromState(state), ...state.future]
-  if (nextFuture.length > MAX_UNDO_HISTORY) {
-    nextFuture.length = MAX_UNDO_HISTORY
-  }
 
+  const restoredState = cloneSnapshot(previousSnapshot)
   return {
-    ...cloneSnapshot(previousSnapshot),
+    ...restoredState,
     history: nextHistory,
     future: nextFuture,
     selected: null,
-    autoQueue: [],
-    isAutoCompleting: false,
-    moveCount: state.moveCount + 1,
+    moveCount: state.moveCount,
   }
 }
 
@@ -629,19 +624,15 @@ const scrubToIndex = (state: GameState, targetIndex: number): GameState => {
   const nextHistory = timeline.slice(0, clampedIndex)
   const nextFuture = timeline.slice(clampedIndex + 1)
 
-  const cappedHistory =
-    nextHistory.length > MAX_UNDO_HISTORY
-      ? nextHistory.slice(nextHistory.length - MAX_UNDO_HISTORY)
-      : nextHistory
-  const cappedFuture =
-    nextFuture.length > MAX_UNDO_HISTORY ? nextFuture.slice(0, MAX_UNDO_HISTORY) : nextFuture
-
   const baseState = cloneSnapshot(nextSnapshot)
   return {
     ...baseState,
-    history: cappedHistory,
-    future: cappedFuture,
-    moveCount: state.moveCount + 1,
+    history: nextHistory,
+    future: nextFuture,
+    moveCount: state.moveCount,
+    timerState: state.timerState,
+    timerStartedAt: state.timerStartedAt,
+    elapsedMs: state.elapsedMs,
   }
 }
 
@@ -1045,11 +1036,7 @@ const getCardColor = (suit: Suit): 'red' | 'black' =>
 
 const pushHistory = (state: GameState): GameSnapshot[] => {
   const snapshot = snapshotFromState(state)
-  const nextHistory = [...state.history, snapshot]
-  if (nextHistory.length > MAX_UNDO_HISTORY) {
-    nextHistory.shift()
-  }
-  return nextHistory
+  return [...state.history, snapshot]
 }
 
 const startTimer = (state: GameState, startedAt: number): GameState => {

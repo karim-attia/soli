@@ -15,4 +15,5 @@ This document lists all tasks associated with PBI 17.
 | 17-6 | [Instrument demo auto-solve build timing](./17-6.md) | InProgress | Difficulty: Easy. Time the build/install step and show a 1-10 progress bar. |
 | 17-7 | [Make auto-complete slightly faster](./17-7.md) | Review | Difficulty: Easy. Reduce auto-complete queue delay to speed up endgame resolution. |
 | 17-8 | [Add prod install mode to demo script](./17-8.md) | Review | Difficulty: Medium. Add a prod CLI mode that installs the app, freezes progress, and streams logs. |
+| 17-9 | [Undo scrub should preserve move count](./17-9.md) | Review | Difficulty: Easy. Ensure scrub-based undo/redo keeps move totals accurate and allows unlimited history depth. |
 

@@ -10,6 +10,8 @@ import {
 } from 'react'
 import {
   Alert,
+  AppState,
+  type AppStateStatus,
   Dimensions,
   LayoutChangeEvent,
   LayoutRectangle,
@@ -36,7 +38,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import type { AnimatedRef, SharedValue } from 'react-native-reanimated'
 import { useNavigation } from 'expo-router'
-import { DrawerActions } from '@react-navigation/native'
+import { DrawerActions, useFocusEffect } from '@react-navigation/native'
 import { Button, Paragraph, Slider, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu, RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
 import { GestureDetector, Gesture } from 'react-native-gesture-handler'
@@ -99,6 +101,8 @@ const WASTE_ENTRY_BACKTRACK_RATIO = 0.45
 const WASTE_ENTRY_BACKTRACK_MAX = 24
 const AUTO_QUEUE_INTERVAL_MS = 100
 const COLUMN_MARGIN = TABLEAU_GAP / 2
+const STACK_PADDING = 8 // matches px="$2" in layout spacing
+const EDGE_GUTTER = STACK_PADDING + COLUMN_MARGIN
 const COLOR_CARD_FACE = '#ffffff'
 const COLOR_CARD_BACK = '#3b4d75'
 const COLOR_CARD_BORDER = '#cbd5f5'
@@ -141,8 +145,8 @@ const AUTO_QUEUE_MOVE_BUFFER_MS = 50
 const AUTO_QUEUE_MOVE_DELAY_MS = CARD_ANIMATION_DURATION_MS + AUTO_QUEUE_MOVE_BUFFER_MS
 const UNDO_SCRUB_BUTTON_DIM_OPACITY = 0.25
 const UNDO_BUTTON_DISABLED_OPACITY = 0.55
-const STAT_VERTICAL_MARGIN = 10
-const STAT_BADGE_MIN_WIDTH = 104
+const STAT_VERTICAL_MARGIN = EDGE_GUTTER
+const STAT_BADGE_MIN_WIDTH = 96
 const DEMO_AUTO_STEP_INTERVAL_MS = 300
 
 const CARD_FLIP_HALF_DURATION_MS = 40
@@ -325,9 +329,9 @@ export default function TabOneScreen() {
     return rows
   }, [formattedElapsed, showMoves, state.moveCount, showTime])
   const statsVisible = statisticsRows.length > 0
-  const headerPaddingTop = safeArea.top + STAT_VERTICAL_MARGIN
-  const headerPaddingLeft = safeArea.left + 24
-  const headerPaddingRight = safeArea.right + 24
+  const headerPaddingTop = EDGE_GUTTER
+  const headerPaddingLeft = safeArea.left + COLUMN_MARGIN
+  const headerPaddingRight = safeArea.right + COLUMN_MARGIN
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
   const winCelebrationsRef = useRef(state.winCelebrations)
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -410,6 +414,25 @@ export default function TabOneScreen() {
       celebrationTotal,
     ],
   )
+
+  const pauseTimer = useCallback(() => {
+    const snapshot = stateRef.current
+    if (snapshot.timerState === 'running') {
+      dispatch({ type: 'TIMER_STOP', timestamp: Date.now() })
+    }
+  }, [dispatch])
+
+  const resumeTimerIfNeeded = useCallback(() => {
+    const snapshot = stateRef.current
+    if (
+      snapshot.timerState === 'paused' &&
+      snapshot.moveCount > 0 &&
+      !snapshot.hasWon &&
+      !snapshot.isAutoCompleting
+    ) {
+      dispatch({ type: 'TIMER_START', startedAt: Date.now() })
+    }
+  }, [dispatch])
   const registerFoundationArrival = useCallback((cardId: string | null | undefined) => {
     const snapshot = stateRef.current
     const pilesSummary = FOUNDATION_SUIT_ORDER.map(
@@ -810,9 +833,34 @@ export default function TabOneScreen() {
     [handleLaunchDemoGame, setDeveloperMode, settingsState.developerMode],
   )
 
+  useFocusEffect(
+    useCallback(() => {
+      resumeTimerIfNeeded()
+      return () => {
+        pauseTimer()
+      }
+    }, [pauseTimer, resumeTimerIfNeeded]),
+  )
+
   useEffect(() => {
     stateRef.current = state
   }, [state])
+
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        resumeTimerIfNeeded()
+      } else if (nextState === 'inactive' || nextState === 'background') {
+        pauseTimer()
+      }
+    }
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange)
+
+    return () => {
+      subscription.remove()
+    }
+  }, [pauseTimer, resumeTimerIfNeeded])
 
   useEffect(() => {
     const previousMoveCount = previousMoveCountRef.current
@@ -1592,7 +1640,6 @@ const handleFoundationPress = useCallback(
     <YStack
       flex={1}
       px="$2"
-      pt="$2"
       pb="$2"
       gap="$3"
       style={{ backgroundColor: feltBackground }}
@@ -1618,7 +1665,7 @@ const handleFoundationPress = useCallback(
       <YStack
         flex={1}
         onLayout={handleBoardLayout}
-        style={[styles.boardShell, { marginTop: STAT_VERTICAL_MARGIN }]}
+        style={[styles.boardShell, { marginTop: STAT_VERTICAL_MARGIN + 6 }]}
         px="$2"
         py="$3"
         gap="$3"
@@ -2831,7 +2878,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   statisticsPlaceholder: {
-    minHeight: 52,
+    minHeight: 48,
   },
   statisticsHudRow: {
     flexDirection: 'row',
