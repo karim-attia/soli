@@ -61,7 +61,7 @@ const DEFAULT_SETTINGS: SettingsState = {
     cardFlights: true,
     wasteFan: true,
     invalidMoveWiggle: true,
-    cardFlip: false,
+    cardFlip: true,
     foundationGlow: true,
     celebrations: true,
   },
