@@ -79,7 +79,11 @@ import {
   loadGameState,
   saveGameState,
 } from '../../src/storage/gamePersistence'
-import { SOLVABLE_SHUFFLES, extractSolvableBaseId } from '../../src/data/solvableShuffles'
+import {
+  SOLVABLE_SHUFFLES,
+  extractSolvableBaseId,
+  type SolvableShuffleConfig,
+} from '../../src/data/solvableShuffles'
 import {
   createHistoryPreviewFromState,
   formatShuffleDisplayName,
@@ -97,8 +101,6 @@ const MAX_CARD_WIDTH = 96
 const MIN_CARD_WIDTH = 24
 const WASTE_FAN_OVERLAP_RATIO = 0.35
 const WASTE_FAN_MAX_OFFSET = 28
-const WASTE_ENTRY_BACKTRACK_RATIO = 0.45
-const WASTE_ENTRY_BACKTRACK_MAX = 24
 const AUTO_QUEUE_INTERVAL_MS = 100
 const COLUMN_MARGIN = TABLEAU_GAP / 2
 const STACK_PADDING = 8 // matches px="$2" in layout spacing
@@ -490,24 +492,49 @@ export default function TabOneScreen() {
       return null
     }
 
-    let candidate = pool[0]
-    let candidatePlays = stats.get(candidate.id)?.plays ?? 0
+    let minimumPlayCount = Number.POSITIVE_INFINITY
+    const candidates: SolvableShuffleConfig[] = []
 
     for (const shuffle of pool) {
       const plays = stats.get(shuffle.id)?.plays ?? 0
-      if (plays < candidatePlays || (plays === candidatePlays && shuffle.id < candidate.id)) {
-        candidate = shuffle
-        candidatePlays = plays
+      if (plays < minimumPlayCount) {
+        minimumPlayCount = plays
+        candidates.length = 0
+        candidates.push(shuffle)
+      } else if (plays === minimumPlayCount) {
+        candidates.push(shuffle)
       }
     }
 
-    return candidate
+    if (!candidates.length) {
+      return pool[0]
+    }
+
+    const randomIndex = Math.floor(Math.random() * candidates.length)
+    return candidates[randomIndex]
   }, [historyEntries])
   const dealNewGame = useCallback(() => {
     if (settingsHydrated && solvableGamesOnly) {
       const solvableShuffle = selectNextSolvableShuffle()
       if (solvableShuffle) {
         const solvableState = createSolvableGameState(solvableShuffle)
+        const solvablePreview = createHistoryPreviewFromState(solvableState)
+        const solvableDisplayName = formatShuffleDisplayName(solvableState.shuffleId)
+
+        currentStartingPreviewRef.current = solvablePreview
+        currentDisplayNameRef.current = solvableDisplayName
+
+        recordResult({
+          shuffleId: solvableState.shuffleId,
+          solved: false,
+          solvable: true,
+          finishedAt: new Date().toISOString(),
+          moves: 0,
+          durationMs: 0,
+          preview: solvablePreview,
+          displayName: solvableDisplayName,
+        })
+
         dispatch({ type: 'HYDRATE_STATE', state: solvableState })
         lastRecordedShuffleRef.current = null
         return
@@ -516,7 +543,13 @@ export default function TabOneScreen() {
 
     dispatch({ type: 'NEW_GAME' })
     lastRecordedShuffleRef.current = null
-  }, [dispatch, selectNextSolvableShuffle, settingsHydrated, solvableGamesOnly])
+  }, [
+    dispatch,
+    recordResult,
+    selectNextSolvableShuffle,
+    settingsHydrated,
+    solvableGamesOnly,
+  ])
 
   const recordCurrentGameResult = useCallback(
     (options?: { solved?: boolean }) => {
@@ -1902,12 +1935,24 @@ const TopRow = ({
 
         {!state.hasWon && (
           <PileButton label={`${state.stock.length}`} onPress={onDraw} disabled={stockDisabled}>
-            <CardBack
-              label={state.stock.length ? drawLabel : undefined}
-              metrics={cardMetrics}
-              variant={drawVariant}
-              icon={showRecycle ? <RefreshCcw color="#0f172a" size={18} /> : undefined}
-            />
+            {drawVariant === 'stock' ? (
+              <StockStack
+                cards={state.stock}
+                metrics={cardMetrics}
+                invalidWiggle={invalidWiggle}
+                cardFlights={cardFlights}
+                onCardMeasured={onCardMeasured}
+                cardFlightMemory={cardFlightMemory}
+                label={state.stock.length ? drawLabel : undefined}
+              />
+            ) : (
+              <CardBack
+                label={state.stock.length ? drawLabel : undefined}
+                metrics={cardMetrics}
+                variant={drawVariant}
+                icon={showRecycle ? <RefreshCcw color="#0f172a" size={18} /> : undefined}
+              />
+            )}
           </PileButton>
         )}
       </XStack>
@@ -2460,6 +2505,85 @@ const CardBack = ({ label, metrics, variant, icon }: CardBackProps) => {
   )
 }
 
+type StockStackProps = {
+  cards: Card[]
+  metrics: CardMetrics
+  invalidWiggle: InvalidWiggleConfig
+  cardFlights: CardFlightRegistry
+  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  cardFlightMemory: Record<string, CardFlightSnapshot>
+  label?: string
+}
+
+const StockStack = ({
+  cards,
+  metrics,
+  invalidWiggle,
+  cardFlights,
+  onCardMeasured,
+  cardFlightMemory,
+  label,
+}: StockStackProps) => {
+  if (!cards.length) {
+    return (
+      <View
+        pointerEvents="none"
+        style={[
+          styles.stockContainer,
+          {
+            width: metrics.width,
+            height: metrics.height,
+            borderRadius: metrics.radius,
+          },
+        ]}
+      />
+    )
+  }
+
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.stockContainer,
+        {
+          width: metrics.width,
+          height: metrics.height,
+          borderRadius: metrics.radius,
+        },
+      ]}
+    >
+      {cards.map((card, index) => {
+        const isTopCard = index === cards.length - 1
+        return (
+          <View
+            key={card.id}
+            pointerEvents="none"
+            style={[
+              styles.stockCardWrapper,
+              { zIndex: index + 1 },
+              !isTopCard ? styles.hiddenCard : undefined,
+            ]}
+          >
+            <CardView
+              card={card}
+              metrics={metrics}
+              invalidWiggle={isTopCard ? invalidWiggle : EMPTY_INVALID_WIGGLE}
+              cardFlights={cardFlights}
+              onCardMeasured={onCardMeasured}
+              cardFlightMemory={cardFlightMemory}
+            />
+          </View>
+        )
+      })}
+      {label ? (
+        <Text pointerEvents="none" style={[styles.cardBackText, styles.stockLabel]}>
+          {label}
+        </Text>
+      ) : null}
+    </View>
+  )
+}
+
 type WasteFanProps = {
   cards: Card[]
   metrics: CardMetrics
@@ -2488,23 +2612,6 @@ const WasteFan = ({
   const visible = cards.slice(-3)
   const overlap = Math.min(metrics.width * WASTE_FAN_OVERLAP_RATIO, WASTE_FAN_MAX_OFFSET)
   const width = metrics.width + overlap * (visible.length - 1)
-  const previousVisibleIdsRef = useRef<Set<string>>(new Set())
-  const animationSignature = `${cards[cards.length - 1]?.id ?? 'none'}-${cards.length}`
-  const enteringLookup = useMemo(() => {
-    const prev = previousVisibleIdsRef.current
-    const entering = new Set<string>()
-    visible.forEach((card) => {
-      if (!prev.has(card.id)) {
-        entering.add(card.id)
-      }
-    })
-    return entering
-  }, [visible])
-
-  useEffect(() => {
-    previousVisibleIdsRef.current = new Set(visible.map((card) => card.id))
-  }, [animationSignature, visible])
-
   return (
     <View style={{ width, height: metrics.height, position: 'relative' }}>
       {visible.map((card, index) => {
@@ -2520,7 +2627,6 @@ const WasteFan = ({
             onPress={enableInteractions ? onPress : undefined}
             onLongPress={enableInteractions ? onLongPress : undefined}
             invalidWiggle={invalidWiggle}
-            isEntering={enteringLookup.has(card.id)}
             zIndex={index}
             cardFlights={cardFlights}
             onCardMeasured={onCardMeasured}
@@ -2540,7 +2646,6 @@ type WasteFanCardProps = {
   onPress?: () => void
   onLongPress?: () => void
   invalidWiggle: InvalidWiggleConfig
-  isEntering: boolean
   zIndex: number
   cardFlights: CardFlightRegistry
   onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
@@ -2555,23 +2660,13 @@ const WasteFanCard = ({
   onPress,
   onLongPress,
   invalidWiggle,
-  isEntering,
   zIndex,
   cardFlights,
   onCardMeasured,
   cardFlightMemory,
 }: WasteFanCardProps) => {
   const { wasteFan: wasteFanEnabled } = useAnimationToggles()
-  const entryBacktrack = Math.min(
-    Math.min(metrics.width * WASTE_ENTRY_BACKTRACK_RATIO, WASTE_ENTRY_BACKTRACK_MAX),
-    targetOffset,
-  )
-  const initialOffset = !wasteFanEnabled
-    ? targetOffset
-    : isEntering
-      ? targetOffset - entryBacktrack
-      : targetOffset
-  const translateX = useSharedValue(initialOffset)
+  const translateX = useSharedValue(targetOffset)
   const positionStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
   }))
@@ -3062,6 +3157,23 @@ const styles = StyleSheet.create({
   cardBackText: {
     color: '#ffffff',
     fontWeight: '600',
+  },
+  stockContainer: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stockCardWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  stockLabel: {
+    position: 'relative',
+    zIndex: 5000,
+    textAlign: 'center',
   },
   pilePressable: {
     opacity: 1,
