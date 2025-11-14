@@ -19,6 +19,7 @@ export default function DrawerLayout() {
       screenOptions={{
         drawerActiveTintColor: theme.red10.val,
         drawerInactiveTintColor: theme.color.val,
+        swipeEnabled: false,
         drawerStyle: {
           backgroundColor: theme.background.val,
         },

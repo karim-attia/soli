@@ -1,6 +1,5 @@
-import { useCallback, useLayoutEffect } from 'react'
+import { useLayoutEffect } from 'react'
 import { Pressable, ScrollView } from 'react-native'
-import { DrawerActions } from '@react-navigation/native'
 import { useNavigation } from 'expo-router'
 import {
   Button,
@@ -21,6 +20,7 @@ import {
   useSettings,
   statisticsPreferenceDescriptors,
 } from '../src/state/settings'
+import { useDrawerOpener } from '../src/navigation/useDrawerOpener'
 
 const themeOptions: Array<{ mode: ThemeMode; label: string }> = [
   { mode: 'auto', label: 'Auto' },
@@ -31,10 +31,7 @@ const themeOptions: Array<{ mode: ThemeMode; label: string }> = [
 export default function SettingsScreen() {
   const navigation = useNavigation()
   const theme = useTheme()
-
-  const openDrawer = useCallback(() => {
-    navigation.dispatch(DrawerActions.openDrawer())
-  }, [navigation])
+  const openDrawer = useDrawerOpener()
 
   useLayoutEffect(() => {
     navigation.setOptions({

@@ -1,17 +1,14 @@
-import { useCallback, useLayoutEffect } from 'react'
+import { useLayoutEffect } from 'react'
 import { Pressable } from 'react-native'
-import { DrawerActions } from '@react-navigation/native'
 import { useNavigation } from 'expo-router'
 import { Anchor, Button, Paragraph, View, XStack, YStack, YGroup, ListItem, Separator, useTheme } from 'tamagui'
 import { Menu } from '@tamagui/lucide-icons'
+import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
 
 export default function HelloScreen() {
   const navigation = useNavigation()
   const theme = useTheme()
-
-  const openDrawer = useCallback(() => {
-    navigation.dispatch(DrawerActions.openDrawer())
-  }, [navigation])
+  const openDrawer = useDrawerOpener()
 
   useLayoutEffect(() => {
     navigation.setOptions({

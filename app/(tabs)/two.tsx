@@ -16,7 +16,6 @@ import {
   ScrollView,
 } from 'react-native'
 import { useFocusEffect, useNavigation } from 'expo-router'
-import { DrawerActions } from '@react-navigation/native'
 import { Button, H2, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu, RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
 
@@ -46,6 +45,8 @@ import type {
   Selection,
   Suit,
 } from '../../src/solitaire/klondike'
+import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
+import { SelectionHint } from '../../src/features/klondike/components/SelectionHint'
 
 // Atomic solver types for visualization
 type AtomicSnapshot = {
@@ -379,9 +380,7 @@ export default function TabOneScreen() {
   }, [dispatch, state.selected])
 
   const theme = useTheme()
-  const openDrawer = useCallback(() => {
-    navigation.dispatch(DrawerActions.openDrawer())
-  }, [navigation])
+  const openDrawer = useDrawerOpener()
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -1368,23 +1367,6 @@ const FoundationPile = ({
   )
 }
 
-const SelectionHint = ({ state, onClear }: { state: GameState; onClear: () => void }) => {
-  if (!state.selected) {
-    return null
-  }
-
-  const selectionLabel = describeSelection(state)
-
-  return (
-    <XStack gap="$2" items="center">
-      <Paragraph color="$color11">Selected: {selectionLabel}</Paragraph>
-      <Button size="$2" variant="outlined" onPress={onClear}>
-        Clear
-      </Button>
-    </XStack>
-  )
-}
-
 type ControlBarProps = {
   onDraw: () => void
   drawLabel: string
@@ -1403,23 +1385,6 @@ const ControlBar = ({ onDraw, drawLabel, onUndo, canUndo, canDraw }: ControlBarP
     </Button>
   </XStack>
 )
-
-const describeSelection = (state: GameState): string => {
-  const selection = state.selected
-  if (!selection) {
-    return 'None'
-  }
-  if (selection.source === 'waste') {
-    return 'Waste top card'
-  }
-  if (selection.source === 'foundation') {
-    return `${selection.suit.toUpperCase()} foundation top`
-  }
-  const columnLabel = selection.columnIndex + 1
-  const card = state.tableau[selection.columnIndex]?.[selection.cardIndex]
-  const cardLabel = card ? `${rankToLabel(card.rank)}${SUIT_SYMBOLS[card.suit]}` : 'card'
-  return `Column ${columnLabel} – ${cardLabel}`
-}
 
 const rankToLabel = (rank: Rank): string => FACE_CARD_LABELS[rank] ?? String(rank)
 

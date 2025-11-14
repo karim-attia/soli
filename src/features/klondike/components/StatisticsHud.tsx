@@ -3,7 +3,7 @@ import { StyleSheet, View, Text } from 'react-native'
 
 import { STAT_BADGE_MIN_WIDTH } from '../constants'
 
-type StatisticsRow = {
+export type StatisticsRow = {
   label: string
   value: string
 }
@@ -33,6 +33,29 @@ export const StatisticsHud: React.FC<StatisticsHudProps> = ({ rows }) => {
 }
 
 export const StatisticsPlaceholder: React.FC = () => <View style={styles.placeholder} />
+
+type BuildStatisticsRowsParams = {
+  showMoves: boolean
+  showTime: boolean
+  moveCount: number
+  formattedElapsed: string
+}
+
+export const buildStatisticsRows = ({
+  showMoves,
+  showTime,
+  moveCount,
+  formattedElapsed,
+}: BuildStatisticsRowsParams): StatisticsRow[] => {
+  const rows: StatisticsRow[] = []
+  if (showMoves) {
+    rows.push({ label: 'Moves', value: String(moveCount) })
+  }
+  if (showTime) {
+    rows.push({ label: 'Time', value: formattedElapsed })
+  }
+  return rows
+}
 
 const styles = StyleSheet.create({
   row: {

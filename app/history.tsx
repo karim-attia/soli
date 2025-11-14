@@ -1,6 +1,5 @@
 import { Dispatch, SetStateAction, useCallback, useLayoutEffect, useMemo, useState } from 'react'
 import { Dimensions, FlatList, LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native'
-import { DrawerActions } from '@react-navigation/native'
 import { useNavigation } from 'expo-router'
 import { Button, Paragraph, Separator, Sheet, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu } from '@tamagui/lucide-icons'
@@ -14,11 +13,13 @@ import {
 } from '../src/state/history'
 import { devLog } from '../src/utils/devLogger'
 import { formatElapsedDuration } from '../src/utils/time'
+import { useDrawerOpener } from '../src/navigation/useDrawerOpener'
 
 const DEFAULT_SHEET_SNAP_POINTS = [65]
 
 export default function HistoryScreen() {
   const navigation = useNavigation()
+  const openDrawer = useDrawerOpener()
   const { entries, solvedCount, hydrated } = useHistory()
   const totalEntries = entries.length
   const incompleteCount = useMemo(
@@ -28,10 +29,6 @@ export default function HistoryScreen() {
   const [selectedEntry, setSelectedEntry] = useState<HistoryEntry | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetSnapPoints, setSheetSnapPoints] = useState<number[]>([...DEFAULT_SHEET_SNAP_POINTS])
-
-  const openDrawer = useCallback(() => {
-    navigation.dispatch(DrawerActions.openDrawer())
-  }, [navigation])
 
   const handleEntryPress = useCallback((entry: HistoryEntry) => {
     setSelectedEntry(entry)

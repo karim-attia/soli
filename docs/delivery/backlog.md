@@ -24,6 +24,7 @@
 | 21 | Solvable-mode player | As a player I want solvable deals to rotate fairly even if I skip immediately so that I don’t repeat the same layout back-to-back. | InProgress | 1. When selecting the next solvable shuffle, the app samples uniformly at random among shuffles tied for the lowest play count.<br>2. Newly dealt solvable shuffles are added to history immediately, even before any moves occur.<br>3. Documentation and tasks stay synchronized with this behaviour.<br>[View Details](./21/prd.md) |
 | 22 | Animation enthusiast | As a player I want stock draws to animate from the true top card so that gameplay feels consistent and responsive. | Done | 1. Stock stack renders each card individually, matching foundation rendering granularity.<br>2. Drawing uncovers the next stock card and animates the drawn card directly from the stack with a short flip-and-flight that never overshoots.<br>3. Waste fan updates slide the first two cards left while the third card fades out without shifting positions.<br>[View Details](./22/prd.md) |
 | 23 | Codebase maintainer | As a developer I want the Klondike screen modularized into focused components so that the file stays maintainable and approachable. | InProgress | 1. Klondike screen orchestrates state and routing while delegating visuals to extracted components.<br>2. Shared UI elements (cards, top row, tableau, overlays) live in dedicated modules with documented responsibilities and exported prop types.<br>3. Animation hooks and persistence helpers continue working after the refactor with updated integration notes.<br>[View Details](./23/prd.md) |
+| 24 | Store marketing designer | As a marketer I want a reusable feature graphic composition screen so that I can capture up-to-date Google Play artwork easily. | InProgress | 1. Safe area requirements for Google Play feature graphics are documented with current references under Task 24-1.<br>2. A static Tamagui-based screen renders the Klondike layout within a 1024×500 composition using existing game components and the app icon.<br>3. The composition showcases copy blocks for “Free & no ads”, “Solvable games”, and “Quick undo time travel”.<br>[View Details](./24/prd.md) |
 
 ## History
 
@@ -113,3 +114,6 @@
 | 20251112-130500 | 23 | create_pbi | Created PBI 23 for Klondike screen modular refactor. | ai_agent |
 | 20251112-130600 | 23 | propose_for_backlog | User approved modular refactor scope requested via refactor brief. | user |
 | 20251112-130700 | 23 | start_implementation | Began analysis task 23-1 for Klondike screen refactor. | ai_agent |
+| 2025-11-14 10:05:00 | 24 | create_pbi | Logged PBI 24 for reusable Google Play feature graphic composition. | ai_agent |
+| 2025-11-14 10:06:00 | 24 | propose_for_backlog | User approved scope for feature graphic composition workflow. | user |
+| 2025-11-14 10:07:00 | 24 | start_implementation | Began work on PBI 24 tasks 24-1 and 24-2. | ai_agent |

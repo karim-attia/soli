@@ -3,4 +3,5 @@ alwaysApply: true
 ---
 you can launch the app and see logs by running `yarn demo:auto-solve`
 this runs 'run-demo-autosolve.js'
+it will emit a message if there is a connected device, just try it.
 when analyzing an issue, you might want to add logs first with 'devLog' from 'src/utils/devLogger.ts' to see them
