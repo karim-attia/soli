@@ -22,3 +22,7 @@ This document lists all tasks associated with PBI 23.
 | 23-12 | [Document Klondike orchestration functions](./23-12.md) | Review | Add concise descriptions above each local function. |
 | 23-13 | [Assess further screen decoupling](./23-13.md) | Review | Analyze remaining logic for potential extraction of auto-complete/UI-state split. |
 | 23-14 | [Normalize card visuals](./23-14.md) | Review | Remove card border overrides, restore static styling, and expose reusable visuals. |
+| 23-15 | [Extract auto-queue runner hook](./23-15.md) | Review | Move auto-complete queue orchestration into a dedicated hook. |
+| 23-16 | [Move game result recording helper](./23-16.md) | Review | Relocate result-recording logic into the history module. |
+| 23-17 | [Consolidate statistics view-model](./23-17.md) | Review | Let statistics helpers compute elapsed time and row visibility. |
+| 23-18 | [Refresh inline function documentation](./23-18.md) | Review | Ensure each local function/effect has a concise descriptive comment. |

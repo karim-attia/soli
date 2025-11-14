@@ -20,7 +20,7 @@ import {
 import type { ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from 'expo-router'
-import { Button, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
+import { Button, XStack, YStack, useTheme } from 'tamagui'
 import { Menu, RefreshCcw } from '@tamagui/lucide-icons'
 // import { useToastController } from '@tamagui/toast'
 
@@ -33,31 +33,25 @@ import {
   getDropHints,
   klondikeReducer,
 } from '../../src/solitaire/klondike'
-import type {
-  Card,
-  GameAction,
-  GameState,
-  Rank,
-  Selection,
-  Suit,
-} from '../../src/solitaire/klondike'
+import type { GameAction, GameState, Selection, Suit } from '../../src/solitaire/klondike'
 import { useFlightController, type CardFlightSnapshot } from '../../src/animation/flightController'
 import { devLog } from '../../src/utils/devLogger'
 import { clearGameState } from '../../src/storage/gamePersistence'
 import {
   createHistoryPreviewFromState,
   formatShuffleDisplayName,
+  recordGameResultFromState,
+  type RecordGameResultOptions,
   useHistory,
 } from '../../src/state/history'
 import { useAnimationToggles, useSettings } from '../../src/state/settings'
-import { computeElapsedWithReference, formatElapsedDuration } from '../../src/utils/time'
 import {
   FeltBackground,
 } from '../../src/features/klondike/components/FeltBackground'
 import {
   StatisticsHud,
   StatisticsPlaceholder,
-  buildStatisticsRows,
+  buildStatisticsRowsForState,
 } from '../../src/features/klondike/components/StatisticsHud'
 import { UndoScrubber } from '../../src/features/klondike/components/UndoScrubber'
 import { TopRow, TableauSection, CelebrationTouchBlocker } from '../../src/features/klondike/components/cards'
@@ -70,6 +64,7 @@ import {
   useDemoGameLauncher,
   DEMO_AUTO_STEP_INTERVAL_MS,
 } from '../../src/features/klondike/hooks/useDemoGameLauncher'
+import { useAutoQueueRunner } from '../../src/features/klondike/hooks/useAutoQueueRunner'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
 import { CelebrationDebugBadge } from '../../src/features/klondike/components/CelebrationDebugBadge'
 import {
@@ -91,7 +86,9 @@ const STAT_VERTICAL_MARGIN = EDGE_GUTTER
 
 const FLIGHT_WAIT_TIMEOUT_MS = 160
 
-// Maps a selection descriptor to the card IDs involved for animation flights.
+// Maps a selection descriptor to the card IDs required for animation-flight tracking.
+// The flight controller waits for these IDs to have layout snapshots before animating moves.
+// Auto-move, waste taps, and auto-complete still raise selections even after manual selection removal.
 function collectSelectionCardIds(state: GameState, selection?: Selection | null): string[] {
   if (!selection) {
     return []
@@ -143,21 +140,17 @@ export default function TabOneScreen() {
     foundationGlow: foundationGlowEnabled,
     celebrations: celebrationAnimationsEnabled,
   } = animationToggles
+  // Precomputes drop targets for auto-move and hint rendering.
   const dropHints = useMemo(() => getDropHints(state), [state])
-  const effectiveElapsedMs = useMemo(
-    () => computeElapsedWithReference(state.elapsedMs, state.timerState, state.timerStartedAt, Date.now()),
-    [state.elapsedMs, state.timerStartedAt, state.timerState],
-  )
-  const formattedElapsed = useMemo(() => formatElapsedDuration(effectiveElapsedMs), [effectiveElapsedMs])
+  // Builds the statistics badges based on current settings and elapsed time.
   const statisticsRows = useMemo(
     () =>
-      buildStatisticsRows({
+      buildStatisticsRowsForState({
+        state,
         showMoves,
         showTime,
-        moveCount: state.moveCount,
-        formattedElapsed,
       }),
-    [formattedElapsed, showMoves, showTime, state.moveCount],
+    [showMoves, showTime, state],
   )
   const headerPaddingTop = EDGE_GUTTER
   const headerPaddingLeft = safeArea.left + COLUMN_MARGIN
@@ -189,10 +182,12 @@ export default function TabOneScreen() {
     foundationLayoutsRef.current[suit] = layout
   }, [])
   // Resolves a selection into its corresponding card IDs for flight animations.
+  // Provides the flight controller with a stable resolver for fetching selection card IDs.
   const resolveSelectionCardIds = useCallback(
     (selection?: Selection | null) => collectSelectionCardIds(stateRef.current, selection),
     [],
   )
+  // Manages layout snapshot tracking for card-flight animations.
   const {
     cardFlights,
     cardFlightMemoryRef,
@@ -275,38 +270,15 @@ export default function TabOneScreen() {
 
   // Records the current game result once per shuffle for history analytics.
   const recordCurrentGameResult = useCallback(
-    (options?: { solved?: boolean }) => {
-      const current = stateRef.current
-      if (!current.shuffleId) {
-        return
-      }
-      if (lastRecordedShuffleRef.current === current.shuffleId) {
-        return
-      }
-
-      const solved = options?.solved ?? current.hasWon
-      if (!solved && current.moveCount === 0) {
-        return
-      }
-
-      const elapsedForRecord = computeElapsedWithReference(
-        current.elapsedMs,
-        current.timerState,
-        current.timerStartedAt,
-        Date.now(),
-      )
-
-      recordResult({
-        shuffleId: current.shuffleId,
-        solved,
-        solvable: Boolean(current.solvableId),
-        finishedAt: new Date().toISOString(),
-        moves: current.moveCount,
-        durationMs: elapsedForRecord,
+    (options?: RecordGameResultOptions) => {
+      recordGameResultFromState({
+        state: stateRef.current,
+        lastRecordedShuffleRef,
+        recordResult,
         preview: currentStartingPreviewRef.current,
         displayName: currentDisplayNameRef.current,
+        options,
       })
-      lastRecordedShuffleRef.current = current.shuffleId
     },
     [recordResult],
   )
@@ -388,6 +360,7 @@ export default function TabOneScreen() {
     [autoPlayActive, triggerInvalidSelectionWiggle],
   )
 
+  // Sets the stock button label, fading when the stock is empty.
   const drawLabel = state.stock.length ? 'Draw' : ''
 
   // Parses inbound deep links to trigger the demo shuffle workflow.
@@ -521,9 +494,7 @@ export default function TabOneScreen() {
     ensureCardFlightsReady()
     dispatch({ type: 'UNDO' })
   }, [dispatch, ensureCardFlightsReady, notifyInvalidMove, state.history.length])
-  // Placeholder column press handler retained for legacy component API compatibility.
-  const noopColumnPress = useCallback((_: number) => {}, [])
-
+  // Presents a confirmation dialog and seeds state for a new shuffled game.
   const requestNewGame = useCallback(
     (options?: { reason?: 'manual' | 'celebration' }) => {
       clearCelebrationDialogTimer()
@@ -600,20 +571,35 @@ export default function TabOneScreen() {
     [dispatchWithFlight, notifyInvalidMove, state],
   )
 
-  // Attempts an auto move from a tapped foundation stack.
-const handleFoundationPress = useCallback(
-  (suit: Suit) => {
-    if (boardLockedRef.current) {
-      return
-    }
-      if (!state.foundations[suit].length) {
-      return
-    }
-      attemptAutoMove({ source: 'foundation', suit })
-  },
-    [attemptAutoMove, state.foundations],
-)
+  // Attempts an auto move from a tapped foundation stack or routes a selection to the foundation.
+  const handleFoundationPress = useCallback(
+    (suit: Suit) => {
+      if (boardLockedRef.current) {
+        return
+      }
+      if (!state.selected) {
+        if (state.foundations[suit].length) {
+          attemptAutoMove({ source: 'foundation', suit })
+        }
+        return
+      }
+      if (dropHints.foundations[suit]) {
+        dispatchWithFlight({ type: 'PLACE_ON_FOUNDATION', suit }, state.selected)
+      } else {
+        notifyInvalidMove({ selection: state.selected })
+      }
+    },
+    [
+      attemptAutoMove,
+      dispatchWithFlight,
+      dropHints.foundations,
+      notifyInvalidMove,
+      state.foundations,
+      state.selected,
+    ],
+  )
 
+  // Flags whether a celebration is currently playing to lock UI where needed.
   const celebrationActive = Boolean(celebrationState)
   const {
     shouldShowUndo,
@@ -656,29 +642,13 @@ const handleFoundationPress = useCallback(
     }
   }, [state.autoCompleteRuns])
 
-  // Advances queued auto moves once the configured delay has elapsed.
-  useEffect(() => {
-    if (!state.isAutoCompleting || state.autoQueue.length === 0) {
-      return
-    }
-
-    const [nextAction] = state.autoQueue
-    if (!nextAction) {
-      return
-    }
-
-    const delay =
-      nextAction.type === 'move' ? AUTO_QUEUE_MOVE_DELAY_MS : AUTO_QUEUE_INTERVAL_MS
-    const selection = nextAction.type === 'move' ? nextAction.selection : null
-
-    const timeoutId = setTimeout(() => {
-      dispatchWithFlight({ type: 'ADVANCE_AUTO_QUEUE' }, selection)
-    }, delay)
-
-    return () => {
-      clearTimeout(timeoutId)
-    }
-  }, [dispatchWithFlight, state.autoQueue, state.isAutoCompleting])
+  // Runs the auto-queue orchestrator so auto-complete advances at the configured cadence.
+  useAutoQueueRunner({
+    state,
+    dispatchWithFlight,
+    moveDelayMs: AUTO_QUEUE_MOVE_DELAY_MS,
+    intervalMs: AUTO_QUEUE_INTERVAL_MS,
+  })
 
   return (
     <YStack
@@ -746,7 +716,6 @@ const handleFoundationPress = useCallback(
           cardMetrics={cardMetrics}
           dropHints={dropHints}
           onAutoMove={attemptAutoMove}
-          onColumnPress={noopColumnPress}
           invalidWiggle={invalidWiggle}
           cardFlights={cardFlights}
           onCardMeasured={handleCardMeasured}

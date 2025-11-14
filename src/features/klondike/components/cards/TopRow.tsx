@@ -1,6 +1,5 @@
 import React, { useCallback } from 'react'
 import { LayoutChangeEvent, LayoutRectangle, View } from 'react-native'
-import { RefreshCcw } from '@tamagui/lucide-icons'
 import { XStack } from 'tamagui'
 
 import {
@@ -169,7 +168,6 @@ export const TopRow = ({
                 label={state.stock.length ? drawLabel : undefined}
                 metrics={cardMetrics}
                 variant={drawVariant}
-                icon={showRecycle ? <RefreshCcw color="#0f172a" size={24} /> : undefined}
               />
             )}
           </PileButton>

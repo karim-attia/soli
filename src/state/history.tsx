@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MutableRefObject,
   type PropsWithChildren,
 } from 'react'
 
@@ -14,6 +15,7 @@ import type { GameState, Rank, Suit } from '../solitaire/klondike'
 import { FOUNDATION_SUIT_ORDER, TABLEAU_COLUMN_COUNT } from '../solitaire/klondike'
 import { extractSolvableBaseId, SOLVABLE_SHUFFLES } from '../data/solvableShuffles'
 import { devLog } from '../utils/devLogger'
+import { computeElapsedWithReference } from '../utils/time'
 
 const SOLVABLE_SHUFFLE_NAME_LOOKUP = new Map<string, string>(
   SOLVABLE_SHUFFLES.map((shuffle) => [shuffle.id, shuffle.name]),
@@ -47,6 +49,19 @@ export type RecordGameResultInput = {
   durationMs?: number
   preview: HistoryPreview
   displayName?: string
+}
+
+export type RecordGameResultOptions = {
+  solved?: boolean
+}
+
+export type RecordGameResultFromStateParams = {
+  state: GameState
+  lastRecordedShuffleRef: MutableRefObject<string | null>
+  recordResult: (input: RecordGameResultInput) => void
+  preview: HistoryPreview
+  displayName: string
+  options?: RecordGameResultOptions
 }
 
 export type HistoryPreview = {
@@ -184,6 +199,48 @@ export const useHistory = (): HistoryContextValue => {
     throw new Error('useHistory must be used within a HistoryProvider')
   }
   return context
+}
+
+export const recordGameResultFromState = ({
+  state,
+  lastRecordedShuffleRef,
+  recordResult,
+  preview,
+  displayName,
+  options,
+}: RecordGameResultFromStateParams) => {
+  if (!state.shuffleId) {
+    return
+  }
+
+  if (lastRecordedShuffleRef.current === state.shuffleId) {
+    return
+  }
+
+  const solved = options?.solved ?? state.hasWon
+  if (!solved && state.moveCount === 0) {
+    return
+  }
+
+  const elapsedForRecord = computeElapsedWithReference(
+    state.elapsedMs,
+    state.timerState,
+    state.timerStartedAt,
+    Date.now(),
+  )
+
+  recordResult({
+    shuffleId: state.shuffleId,
+    solved,
+    solvable: Boolean(state.solvableId),
+    finishedAt: new Date().toISOString(),
+    moves: state.moveCount,
+    durationMs: elapsedForRecord,
+    preview,
+    displayName,
+  })
+
+  lastRecordedShuffleRef.current = state.shuffleId
 }
 
 const createEntry = (input: RecordGameResultInput): HistoryEntry => {

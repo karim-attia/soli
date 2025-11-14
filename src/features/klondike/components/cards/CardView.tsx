@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
 import { Text } from 'tamagui'
 import Animated from 'react-native-reanimated'
+import { RefreshCcw } from '@tamagui/lucide-icons'
 
 import type { Card } from '../../../../solitaire/klondike'
 import type { CardFlightSnapshot } from '../../../../animation/flightController'
@@ -177,11 +178,12 @@ export const CardBack = ({ label, metrics, variant }: CardBackProps) => {
       borderRadius: metrics.radius,
     },
   ]
+  const recycleIconSize = Math.max(16, Math.round(metrics.width * 0.22))
 
   return (
     <View style={containerStyle}>
       {variant === 'recycle' ? (
-        <Text style={[styles.cardBackText, { fontSize: 18 }]}>⟲</Text>
+        <RefreshCcw color="#0f172a" size={recycleIconSize} />
       ) : label ? (
         <Text style={styles.cardBackText}>{label}</Text>
       ) : null}

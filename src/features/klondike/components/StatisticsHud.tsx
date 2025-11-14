@@ -1,6 +1,8 @@
 import React from 'react'
 import { StyleSheet, View, Text } from 'react-native'
 
+import type { GameState } from '../../../solitaire/klondike'
+import { computeElapsedWithReference, formatElapsedDuration } from '../../../utils/time'
 import { STAT_BADGE_MIN_WIDTH } from '../constants'
 
 export type StatisticsRow = {
@@ -35,24 +37,28 @@ export const StatisticsHud: React.FC<StatisticsHudProps> = ({ rows }) => {
 export const StatisticsPlaceholder: React.FC = () => <View style={styles.placeholder} />
 
 type BuildStatisticsRowsParams = {
+  state: GameState
   showMoves: boolean
   showTime: boolean
-  moveCount: number
-  formattedElapsed: string
 }
 
-export const buildStatisticsRows = ({
+export const buildStatisticsRowsForState = ({
+  state,
   showMoves,
   showTime,
-  moveCount,
-  formattedElapsed,
 }: BuildStatisticsRowsParams): StatisticsRow[] => {
   const rows: StatisticsRow[] = []
   if (showMoves) {
-    rows.push({ label: 'Moves', value: String(moveCount) })
+    rows.push({ label: 'Moves', value: String(state.moveCount) })
   }
   if (showTime) {
-    rows.push({ label: 'Time', value: formattedElapsed })
+    const effectiveElapsedMs = computeElapsedWithReference(
+      state.elapsedMs,
+      state.timerState,
+      state.timerStartedAt,
+      Date.now(),
+    )
+    rows.push({ label: 'Time', value: formatElapsedDuration(effectiveElapsedMs) })
   }
   return rows
 }

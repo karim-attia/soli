@@ -1,5 +1,4 @@
-import React, { useCallback } from 'react'
-import { Pressable } from 'react-native'
+import React from 'react'
 import { View } from 'react-native'
 
 import type { Card } from '../../../../solitaire/klondike'
@@ -25,7 +24,6 @@ export type TableauSectionProps = {
   cardMetrics: CardMetrics
   dropHints: DropHints
   onAutoMove: (selection: Selection) => void
-  onColumnPress: (columnIndex: number) => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
   onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
@@ -38,7 +36,6 @@ export const TableauSection = ({
   cardMetrics,
   dropHints,
   onAutoMove,
-  onColumnPress,
   invalidWiggle,
   cardFlights,
   onCardMeasured,
@@ -55,7 +52,6 @@ export const TableauSection = ({
         cardMetrics={cardMetrics}
         isDroppable={dropHints.tableau[columnIndex]}
         onCardPress={(cardIndex) => onAutoMove({ source: 'tableau', columnIndex, cardIndex })}
-        onColumnPress={() => onColumnPress(columnIndex)}
         invalidWiggle={invalidWiggle}
         cardFlights={cardFlights}
         onCardMeasured={onCardMeasured}
@@ -73,7 +69,6 @@ export type TableauColumnProps = {
   cardMetrics: CardMetrics
   isDroppable: boolean
   onCardPress: (cardIndex: number) => void
-  onColumnPress: () => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
   onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
@@ -88,7 +83,6 @@ export const TableauColumn = ({
   cardMetrics,
   isDroppable,
   onCardPress,
-  onColumnPress,
   invalidWiggle,
   cardFlights,
   onCardMeasured,
@@ -105,14 +99,8 @@ export const TableauColumn = ({
   const columnSelected = Boolean(tableauSelection)
   const selectedCardIndex = tableauSelection ? tableauSelection.cardIndex : null
 
-  const handleColumnPress = useCallback(() => {
-    if (!disableInteractions) {
-      onColumnPress()
-    }
-  }, [disableInteractions, onColumnPress])
-
   return (
-    <Pressable
+    <View
       style={[
         styles.column,
         {
@@ -128,8 +116,7 @@ export const TableauColumn = ({
           marginHorizontal: COLUMN_MARGIN,
         },
       ]}
-      onPress={handleColumnPress}
-      disabled={disableInteractions}
+      pointerEvents={disableInteractions ? 'none' : 'auto'}
     >
       {column.length === 0 && <EmptySlot highlight={isDroppable} metrics={cardMetrics} />}
       {column.map((card, cardIndex) => (
@@ -153,6 +140,6 @@ export const TableauColumn = ({
           cardFlightMemory={cardFlightMemory}
         />
       ))}
-    </Pressable>
+    </View>
   )
 }
