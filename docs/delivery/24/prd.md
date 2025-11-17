@@ -38,3 +38,4 @@ We currently lack a dedicated composition that matches Google Play’s feature g
 
 ## Related Tasks
 - [View task list](./tasks.md)
+

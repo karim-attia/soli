@@ -26,3 +26,6 @@ This document lists all tasks associated with PBI 23.
 | 23-16 | [Move game result recording helper](./23-16.md) | Review | Relocate result-recording logic into the history module. |
 | 23-17 | [Consolidate statistics view-model](./23-17.md) | Review | Let statistics helpers compute elapsed time and row visibility. |
 | 23-18 | [Refresh inline function documentation](./23-18.md) | Review | Ensure each local function/effect has a concise descriptive comment. |
+| 23-19 | [Plan container/view split](./23-19.md) | Review | Decide what lives in useKlondikeGame, KlondikeGameView, and base logic. |
+| 23-20 | [Implement container/view split](./23-20.md) | Review | Reintroduce useKlondikeGame + presentational view and slim the screen. |
+| 23-21 | [Audit container follow-ups](./23-21.md) | Review | Review useKlondikeGame, animations, and note further cleanups. |

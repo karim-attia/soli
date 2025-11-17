@@ -8,6 +8,8 @@ import { RefreshCcw } from '@tamagui/lucide-icons'
 import type { Card } from '../../../../solitaire/klondike'
 import type { CardFlightSnapshot } from '../../../../animation/flightController'
 import {
+  CARD_REFERENCE_HEIGHT,
+  CARD_REFERENCE_WIDTH,
   COLOR_CARD_BORDER,
   COLOR_COLUMN_BORDER,
   COLOR_DROP_BORDER,
@@ -25,6 +27,25 @@ import { AnimatedView } from './common'
 import { styles } from './styles'
 import { rankToLabel } from './utils'
 
+const CARD_PADDING_HORIZONTAL = 4
+const CARD_PADDING_VERTICAL = 6
+const CARD_CORNER_RANK_TOP = -2
+const CARD_CORNER_RANK_LEFT = 3
+const CARD_CORNER_RANK_FONT = 16
+const CARD_CORNER_SUIT_FONT = 12
+const CARD_SYMBOL_FONT = 28
+const CARD_SYMBOL_MARGIN_TOP = 16
+
+const deriveCardScale = (metrics: CardMetrics) => {
+  if (metrics.width) {
+    return metrics.width / CARD_REFERENCE_WIDTH
+  }
+  if (metrics.height) {
+    return metrics.height / CARD_REFERENCE_HEIGHT
+  }
+  return 1
+}
+
 export type CardVisualProps = {
   card: Card
   metrics: CardMetrics
@@ -33,6 +54,24 @@ export type CardVisualProps = {
 }
 
 export const CardVisual = ({ card, metrics, onPress, disabled }: CardVisualProps) => {
+  // PBI-25: keep cards proportional via a single reference scale
+  const cardScale = deriveCardScale(metrics)
+  const scaleValue = (value: number) => value * cardScale
+  const paddingHorizontal = scaleValue(CARD_PADDING_HORIZONTAL)
+  const paddingVertical = scaleValue(CARD_PADDING_VERTICAL)
+  const cornerRankStyle = {
+    top: scaleValue(CARD_CORNER_RANK_TOP),
+    left: scaleValue(CARD_CORNER_RANK_LEFT),
+    fontSize: scaleValue(CARD_CORNER_RANK_FONT),
+  }
+  const cornerSuitStyle = {
+    fontSize: scaleValue(CARD_CORNER_SUIT_FONT),
+  }
+  const centerSymbolStyle = {
+    fontSize: scaleValue(CARD_SYMBOL_FONT),
+    marginTop: scaleValue(CARD_SYMBOL_MARGIN_TOP),
+  }
+
   const baseStyle: StyleProp<ViewStyle> = [
     styles.cardBase,
     styles.faceUp,
@@ -41,29 +80,34 @@ export const CardVisual = ({ card, metrics, onPress, disabled }: CardVisualProps
       height: '100%',
       borderRadius: metrics.radius,
       borderColor: COLOR_CARD_BORDER,
+      paddingHorizontal,
+      paddingVertical,
     },
   ]
 
   const body = (
     <>
+      {/* Small rank label | top left */}
       <Text
-        style={[styles.cardCornerRank, { color: SUIT_COLORS[card.suit] }]}
+        style={[styles.cardCornerRank, cornerRankStyle, { color: SUIT_COLORS[card.suit] }]}
         ellipsizeMode="clip"
         numberOfLines={1}
         allowFontScaling={false}
       >
         {rankToLabel(card.rank)}
       </Text>
+      {/* Small suit symbol | top right */}
       <Text
-        style={[styles.cardCornerSuit, { color: SUIT_COLORS[card.suit] }]}
+        style={[styles.cardCornerSuit, cornerSuitStyle, { color: SUIT_COLORS[card.suit] }]}
         ellipsizeMode="clip"
         numberOfLines={1}
         allowFontScaling={false}
       >
         {SUIT_SYMBOLS[card.suit]}
       </Text>
+      {/* Large suit symbol | center */}
       <Text
-        style={[styles.cardSymbol, { color: SUIT_COLORS[card.suit] }]}
+        style={[styles.cardSymbol, centerSymbolStyle, { color: SUIT_COLORS[card.suit] }]}
         ellipsizeMode="clip"
         numberOfLines={1}
         allowFontScaling={false}

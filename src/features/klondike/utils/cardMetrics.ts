@@ -3,6 +3,8 @@ import {
   BASE_CARD_WIDTH,
   BASE_STACK_OFFSET,
   CARD_ASPECT_RATIO,
+  CARD_REFERENCE_STACK_OFFSET,
+  CARD_REFERENCE_WIDTH,
   MAX_CARD_WIDTH,
   MIN_CARD_WIDTH,
   TABLEAU_GAP,
@@ -29,9 +31,10 @@ export const computeCardMetrics = (availableWidth: number | null): CardMetrics =
   const unclampedWidth = Math.max(Math.floor(rawWidth), MIN_CARD_WIDTH)
   const constrainedWidth = Math.min(Math.max(unclampedWidth, MIN_CARD_WIDTH), MAX_CARD_WIDTH)
   const height = Math.round(constrainedWidth * CARD_ASPECT_RATIO)
+  const stackOffsetRatio = CARD_REFERENCE_STACK_OFFSET / CARD_REFERENCE_WIDTH
   const stackOffset = Math.max(
-    24,
-    Math.round(constrainedWidth * (BASE_STACK_OFFSET / BASE_CARD_WIDTH + 0.12)),
+    CARD_REFERENCE_STACK_OFFSET,
+    Math.round(constrainedWidth * stackOffsetRatio),
   )
   const radius = Math.max(6, Math.round(constrainedWidth * 0.12))
 

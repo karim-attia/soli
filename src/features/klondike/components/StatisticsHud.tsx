@@ -1,7 +1,7 @@
 import React from 'react'
 import { StyleSheet, View, Text } from 'react-native'
 
-import type { GameState } from '../../../solitaire/klondike'
+import type { TimerState } from '../../../solitaire/klondike'
 import { computeElapsedWithReference, formatElapsedDuration } from '../../../utils/time'
 import { STAT_BADGE_MIN_WIDTH } from '../constants'
 
@@ -37,25 +37,31 @@ export const StatisticsHud: React.FC<StatisticsHudProps> = ({ rows }) => {
 export const StatisticsPlaceholder: React.FC = () => <View style={styles.placeholder} />
 
 type BuildStatisticsRowsParams = {
-  state: GameState
   showMoves: boolean
   showTime: boolean
+  moveCount: number
+  elapsedMs: number
+  timerState: TimerState
+  timerStartedAt: number | null
 }
 
-export const buildStatisticsRowsForState = ({
-  state,
+export const buildStatisticsRows = ({
   showMoves,
   showTime,
+  moveCount,
+  elapsedMs,
+  timerState,
+  timerStartedAt,
 }: BuildStatisticsRowsParams): StatisticsRow[] => {
   const rows: StatisticsRow[] = []
   if (showMoves) {
-    rows.push({ label: 'Moves', value: String(state.moveCount) })
+    rows.push({ label: 'Moves', value: String(moveCount) })
   }
   if (showTime) {
     const effectiveElapsedMs = computeElapsedWithReference(
-      state.elapsedMs,
-      state.timerState,
-      state.timerStartedAt,
+      elapsedMs,
+      timerState,
+      timerStartedAt,
       Date.now(),
     )
     rows.push({ label: 'Time', value: formatElapsedDuration(effectiveElapsedMs) })

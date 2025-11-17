@@ -7,7 +7,7 @@ import { Undo2 } from '@tamagui/lucide-icons'
 
 import { UNDO_BUTTON_DISABLED_OPACITY, UNDO_SCRUB_BUTTON_DIM_OPACITY } from '../constants'
 
-type UndoScrubberProps = {
+export type UndoScrubberProps = {
   visible: boolean
   isScrubbing: boolean
   sliderValue: number[]

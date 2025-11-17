@@ -10,3 +10,4 @@ This document lists all tasks associated with PBI 24.
 | :------ | :--- | :----- | :---------- |
 | 24-1 | [Document Google Play feature graphic safe areas](./24-1.md) | Review | Research and capture safe area guidelines with references. |
 | 24-2 | [Build static feature graphic composition screen](./24-2.md) | Review | Implement the 1024×500 Tamagui screen reusing Klondike components and copy. |
+| 24-3 | [Author feature graphic concept variants](./24-3.md) | InProgress | Compile marketing inspiration, variant concepts, and guardrails before redesign. |

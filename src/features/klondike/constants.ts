@@ -3,10 +3,21 @@ import { Easing } from 'react-native-reanimated'
 import type { Rank, Suit } from '../../solitaire/klondike'
 
 // Card dimensions and spacing
-export const BASE_CARD_WIDTH = 72
-export const BASE_CARD_HEIGHT = 102
-export const CARD_ASPECT_RATIO = BASE_CARD_HEIGHT / BASE_CARD_WIDTH
-export const BASE_STACK_OFFSET = 28
+export const CARD_REFERENCE_WIDTH = 48
+export const CARD_REFERENCE_HEIGHT = 68
+export const CARD_REFERENCE_RADIUS = 6
+export const CARD_REFERENCE_STACK_OFFSET = 24
+export const CARD_REFERENCE_METRICS = Object.freeze({
+  width: CARD_REFERENCE_WIDTH,
+  height: CARD_REFERENCE_HEIGHT,
+  stackOffset: CARD_REFERENCE_STACK_OFFSET,
+  radius: CARD_REFERENCE_RADIUS,
+})
+
+export const BASE_CARD_WIDTH = CARD_REFERENCE_WIDTH
+export const BASE_CARD_HEIGHT = CARD_REFERENCE_HEIGHT
+export const CARD_ASPECT_RATIO = CARD_REFERENCE_HEIGHT / CARD_REFERENCE_WIDTH
+export const BASE_STACK_OFFSET = CARD_REFERENCE_STACK_OFFSET
 export const TABLEAU_GAP = 10
 export const COLUMN_MARGIN = TABLEAU_GAP / 2
 export const STACK_PADDING = 8 // matches px="$2" in layout spacing
