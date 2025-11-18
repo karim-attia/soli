@@ -640,6 +640,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     scrubSliderMax,
     undoScrubGesture,
     handleUndoTap,
+    handleTrackMetrics,
   } = useUndoScrubber({
     state,
     boardLocked,
@@ -710,6 +711,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     onUndoPress: handleUndoTap,
     boardLocked,
     canUndo,
+    onTrackMetrics: handleTrackMetrics,
   }
 
   const viewProps: KlondikeGameViewProps = {

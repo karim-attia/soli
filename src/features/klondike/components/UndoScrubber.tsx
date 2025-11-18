@@ -1,11 +1,15 @@
-import React from 'react'
-import { StyleSheet, View } from 'react-native'
+import React, { useCallback, useEffect, useRef } from 'react'
+import { type LayoutChangeEvent, StyleSheet, View } from 'react-native'
 import Animated from 'react-native-reanimated'
 import { GestureDetector, type GestureType } from 'react-native-gesture-handler'
 import { Button, Slider } from 'tamagui'
 import { Undo2 } from '@tamagui/lucide-icons'
 
-import { UNDO_BUTTON_DISABLED_OPACITY, UNDO_SCRUB_BUTTON_DIM_OPACITY } from '../constants'
+import {
+  UNDO_BUTTON_DISABLED_OPACITY,
+  UNDO_SCRUB_BUTTON_DIM_OPACITY,
+  UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING,
+} from '../constants'
 
 export type UndoScrubberProps = {
   visible: boolean
@@ -16,6 +20,7 @@ export type UndoScrubberProps = {
   onUndoPress: () => void
   boardLocked: boolean
   canUndo: boolean
+  onTrackMetrics: (metrics: { left: number; right: number }) => void
 }
 
 const AnimatedView = Animated.createAnimatedComponent(View)
@@ -29,7 +34,37 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
   onUndoPress,
   boardLocked,
   canUndo,
+  onTrackMetrics,
 }) => {
+  const trackRef = useRef<View>(null)
+
+  const measureTrack = useCallback(() => {
+    const track = trackRef.current
+    if (!track) {
+      return
+    }
+    track.measureInWindow((x, _y, width) => {
+      if (width <= 0) {
+        return
+      }
+      onTrackMetrics({ left: x, right: x + width })
+    })
+  }, [onTrackMetrics])
+
+  const handleTrackLayout = useCallback(
+    (_event: LayoutChangeEvent) => {
+      measureTrack()
+    },
+    [measureTrack],
+  )
+
+  useEffect(() => {
+    if (!visible) {
+      return
+    }
+    measureTrack()
+  }, [measureTrack, sliderMax, visible])
+
   if (!visible) {
     return null
   }
@@ -45,7 +80,7 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
       <AnimatedView pointerEvents="none" style={[styles.overlay, { opacity: isScrubbing ? 1 : 0 }]}
       >
         <Slider value={sliderValue} min={0} max={sliderMax} step={1} size="$4" style={styles.slider}>
-          <Slider.Track style={styles.track}>
+          <Slider.Track ref={trackRef} onLayout={handleTrackLayout} style={styles.track}>
             <Slider.TrackActive style={styles.trackActive} />
           </Slider.Track>
           <Slider.Thumb circular size="$3" index={0} style={styles.thumb} />
@@ -84,7 +119,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     justifyContent: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING,
     paddingVertical: 18,
     borderRadius: 24,
     backgroundColor: 'rgba(15, 23, 42, 0.55)',
