@@ -406,34 +406,43 @@ const renderBadgesRemixVariant = (ctx: VariantContext) => {
 
   // Same premium cards as 'premium-badges'
   const REMIX_CARDS: Card[] = [
-    createCard('spades', 1, 'remix-1'),
-    createCard('hearts', 13, 'remix-2'),
-    createCard('clubs', 12, 'remix-3'),
-    createCard('diamonds', 11, 'remix-4'),
+    createCard('spades', 1, 'prem-1'),
+    createCard('hearts', 13, 'prem-2'),
+    createCard('clubs', 12, 'prem-3'),
+    createCard('diamonds', 11, 'prem-4'),
   ]
 
   const leftSide = (
     <YStack gap="$3" alignItems="center">
       {iconBadge}
-      {/* Same layout structure as 'badges' (XStack gap) but adapted for 4 cards */}
-      <XStack gap="$2" alignItems="center">
-        {REMIX_CARDS.map((card, index) => (
-          <Stack
-            key={card.id}
-            width={cardMetrics.width}
-            height={cardMetrics.height}
-            style={{
-              // Adapted rotation for 4 cards to be symmetric: -12, -4, 4, 12
-              transform: [{ rotate: `${(index - 1.5) * 8}deg` }],
-              shadowColor: 'rgba(15, 23, 42, 0.4)',
-              shadowOpacity: 0.4,
-              shadowRadius: 16,
-              shadowOffset: { width: 0, height: 8 },
-            }}
-          >
-            <CardVisual card={card} metrics={cardMetrics} />
-          </Stack>
-        ))}
+      <XStack alignItems="center" justifyContent="center">
+        {REMIX_CARDS.map((card, index) => {
+          // Tighter fan with slight vertical arc (Same as Premium Badges)
+          const rotation = -15 + index * 10
+          const yOffset = Math.abs(index - 1.5) * 8
+
+          return (
+            <Stack
+              key={card.id}
+              width={cardMetrics.width}
+              height={cardMetrics.height}
+              marginLeft={index === 0 ? 0 : -40} // Overlap cards
+              style={{
+                transform: [
+                  { rotate: `${rotation}deg` },
+                  { translateY: yOffset }
+                ],
+                shadowColor: 'rgba(15, 23, 42, 0.5)',
+                shadowOpacity: 0.5,
+                shadowRadius: 20,
+                shadowOffset: { width: 0, height: 10 },
+                zIndex: index,
+              }}
+            >
+              <CardVisual card={card} metrics={cardMetrics} />
+            </Stack>
+          )
+        })}
       </XStack>
     </YStack>
   )
@@ -444,7 +453,7 @@ const renderBadgesRemixVariant = (ctx: VariantContext) => {
     <FixedWidthTwoColumnLayout
       leftContent={leftSide}
       rightContent={rightSide}
-      leftWidth={360} // Slightly wider to accommodate 4 cards
+      leftWidth={320}
       rightWidth={360}
     />
   )
@@ -524,9 +533,9 @@ const VARIANT_DEFINITIONS: VariantDefinition[] = [
       subtitle: 'Classic solitaire, thoughtfully refined.',
       body: '',
     },
-    cardWidth: 82,
+    cardWidth: 88,
     stackMultiplier: 1,
-    radius: 13,
+    radius: 14,
     infoWidthRatio: 0.4,
     statsRows: null,
     showIconInPanel: false,
