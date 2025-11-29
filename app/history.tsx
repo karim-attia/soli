@@ -70,12 +70,8 @@ export default function HistoryScreen() {
     ]
 
     return (
-      <YStack gap="$4" px="$3" pt="$4">
+      <YStack gap="$4" px="$3" pt="$4" pb="$4">
         <HistoryStatsRow stats={stats} />
-
-        <Paragraph color="$color10">
-          Finished games and abandoned shuffles are saved automatically. Solvable decks are marked so you can revisit them later.
-        </Paragraph>
 
         <Separator />
       </YStack>
@@ -137,9 +133,9 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
       borderRadius: 12,
       borderWidth: StyleSheet.hairlineWidth * 2,
       borderColor: theme.borderColor?.val ?? '#cbd5f5',
-      backgroundColor: theme.backgroundStrong?.val ?? '#f8fafc',
+      backgroundColor: '$color2',
     }),
-    [theme.backgroundStrong?.val, theme.borderColor?.val],
+    [theme.borderColor?.val],
   )
 
   return (
@@ -161,7 +157,6 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
 
         <XStack gap="$2" flexWrap="wrap">
           {entry.solvable ? <Badge label="Solvable" tone="info" /> : null}
-          {!entry.solved ? <Badge label="Incomplete" tone="warning" /> : null}
         </XStack>
       </YStack>
     </Pressable>
@@ -271,11 +266,11 @@ const HistoryStatTile = ({ stat }: { stat: HistoryStat }) => {
       paddingVertical: 14,
       paddingHorizontal: 16,
       borderRadius: 16,
-      backgroundColor: theme.backgroundStrong?.val ?? '#f8fafc',
+      backgroundColor: '$color2',
       borderWidth: StyleSheet.hairlineWidth * 2,
       borderColor: theme.borderColor?.val ?? '#cbd5f5',
     }),
-    [theme.backgroundStrong?.val, theme.borderColor?.val],
+    [theme.borderColor?.val],
   )
 
   return (
