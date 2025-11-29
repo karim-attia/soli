@@ -114,24 +114,9 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
   const theme = useTheme()
   const finishedLabel = useMemo(() => formatFinishedAt(entry.finishedAt), [entry.finishedAt])
   const statusLabel = entry.solved ? 'Solved' : 'Incomplete'
-  
-  const { accentColor, statusColor, cardBg } = useMemo(() => {
-    if (entry.solved) {
-      return {
-        accentColor: theme.green9?.val ?? '#15803d',
-        statusColor: theme.green10?.val ?? '#166534',
-        cardBg: '$background',
-      }
-    }
-    return {
-      accentColor: theme.yellow9?.val ?? '#a16207',
-      statusColor: theme.yellow10?.val ?? '#854d0e',
-      cardBg: '$background',
-    }
-  }, [entry.solved, theme])
-
+  const statusColor = entry.solved ? theme.green10?.val ?? '#15803d' : theme.yellow11?.val ?? '#854d0e'
   const metadata = useMemo(() => {
-    const segments = [`${finishedLabel}`]
+    const segments = [`Finished ${finishedLabel}`]
     if (typeof entry.moves === 'number' && entry.moves >= 0) {
       segments.push(`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`)
     }
@@ -143,14 +128,10 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
 
   const cardStyle = useMemo(
     () => ({
-      marginHorizontal: 12,
-      padding: 16,
+      padding: 14,
       borderRadius: 16,
-      backgroundColor: cardBg,
-      borderLeftWidth: 6,
-      borderLeftColor: accentColor,
       borderWidth: 1,
-      borderColor: theme.borderColor?.val ?? '#e5e7eb',
+      borderColor: theme.color6?.val ?? '#cbd5f5',
       // Shadow for elevation
       shadowColor: theme.color10?.val ?? '#000',
       shadowOffset: { width: 0, height: 2 },
@@ -158,29 +139,27 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
       shadowRadius: 8,
       elevation: 2,
     }),
-    [accentColor, cardBg, theme.borderColor?.val, theme.color10?.val],
+    [theme.color6?.val, theme.color10?.val],
   )
 
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={{ width: '100%' }}>
-      <YStack gap="$2" style={cardStyle}>
+      <YStack gap="$2" style={cardStyle} mx="$3" backgroundColor="$color3">
         <XStack
           gap="$2"
           style={{ alignItems: 'center', justifyContent: 'space-between' }}
         >
-          <Text fontSize={17} fontWeight="700" numberOfLines={1} flex={1}>
+          <Text fontSize={16} fontWeight="700">
             {entry.displayName}
           </Text>
-          <Text fontSize={13} fontWeight="700" style={{ color: statusColor }}>
+          <Text fontSize={14} fontWeight="600" style={{ color: statusColor }}>
             {statusLabel}
           </Text>
         </XStack>
 
-        <Paragraph color="$color11" fontSize={14} fontWeight="500">
-          {metadata}
-        </Paragraph>
+        <Paragraph color="$color10">{metadata}</Paragraph>
 
-        <XStack gap="$2" flexWrap="wrap" marginTop={4}>
+        <XStack gap="$2" flexWrap="wrap">
           {entry.solvable ? <Badge label="Solvable" tone="info" /> : null}
         </XStack>
       </YStack>
