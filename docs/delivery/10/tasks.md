@@ -11,4 +11,5 @@ This document lists all tasks associated with PBI 10.
 | 10-2 | [Persist shuffle outcomes](./10-2.md) | Review | Save shuffle identifiers and solved status to storage. |
 | 10-3 | [Display solved counts and badges](./10-3.md) | Review | Show aggregate solved totals and highlight solvable badges. |
 | 10-4 | [E2E CoS validation](./10-4.md) | Review | Validate history tracking end-to-end. |
+| 10-5 | [Refine history page visual design](./10-5.md) | Review | Improve color contrast and card visuals in light mode. |
 

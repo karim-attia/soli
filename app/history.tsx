@@ -64,9 +64,9 @@ export default function HistoryScreen() {
 
   const listHeader = useMemo(() => {
     const stats: HistoryStat[] = [
-      { label: 'Games logged', value: totalEntries },
-      { label: 'Solved', value: solvedCount },
-      { label: 'Incomplete', value: incompleteCount },
+      { label: 'Games', value: totalEntries, tone: 'neutral' },
+      { label: 'Solved', value: solvedCount, tone: 'success' },
+      { label: 'Incomplete', value: incompleteCount, tone: 'warning' },
     ]
 
     return (
@@ -114,9 +114,24 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
   const theme = useTheme()
   const finishedLabel = useMemo(() => formatFinishedAt(entry.finishedAt), [entry.finishedAt])
   const statusLabel = entry.solved ? 'Solved' : 'Incomplete'
-  const statusColor = entry.solved ? theme.green10?.val ?? '#15803d' : theme.yellow11?.val ?? '#854d0e'
+  
+  const { accentColor, statusColor, cardBg } = useMemo(() => {
+    if (entry.solved) {
+      return {
+        accentColor: theme.green9?.val ?? '#15803d',
+        statusColor: theme.green10?.val ?? '#166534',
+        cardBg: '$background',
+      }
+    }
+    return {
+      accentColor: theme.yellow9?.val ?? '#a16207',
+      statusColor: theme.yellow10?.val ?? '#854d0e',
+      cardBg: '$background',
+    }
+  }, [entry.solved, theme])
+
   const metadata = useMemo(() => {
-    const segments = [`Finished ${finishedLabel}`]
+    const segments = [`${finishedLabel}`]
     if (typeof entry.moves === 'number' && entry.moves >= 0) {
       segments.push(`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`)
     }
@@ -128,14 +143,22 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
 
   const cardStyle = useMemo(
     () => ({
-      marginHorizontal: 8,
-      padding: 14,
-      borderRadius: 12,
-      borderWidth: StyleSheet.hairlineWidth * 2,
-      borderColor: theme.borderColor?.val ?? '#cbd5f5',
-      backgroundColor: '$color2',
+      marginHorizontal: 12,
+      padding: 16,
+      borderRadius: 16,
+      backgroundColor: cardBg,
+      borderLeftWidth: 6,
+      borderLeftColor: accentColor,
+      borderWidth: 1,
+      borderColor: theme.borderColor?.val ?? '#e5e7eb',
+      // Shadow for elevation
+      shadowColor: theme.color10?.val ?? '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 2,
     }),
-    [theme.borderColor?.val],
+    [accentColor, cardBg, theme.borderColor?.val, theme.color10?.val],
   )
 
   return (
@@ -145,17 +168,19 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
           gap="$2"
           style={{ alignItems: 'center', justifyContent: 'space-between' }}
         >
-          <Text fontSize={16} fontWeight="700">
+          <Text fontSize={17} fontWeight="700" numberOfLines={1} flex={1}>
             {entry.displayName}
           </Text>
-          <Text fontSize={14} fontWeight="600" style={{ color: statusColor }}>
+          <Text fontSize={13} fontWeight="700" style={{ color: statusColor }}>
             {statusLabel}
           </Text>
         </XStack>
 
-        <Paragraph color="$color10">{metadata}</Paragraph>
+        <Paragraph color="$color11" fontSize={14} fontWeight="500">
+          {metadata}
+        </Paragraph>
 
-        <XStack gap="$2" flexWrap="wrap">
+        <XStack gap="$2" flexWrap="wrap" marginTop={4}>
           {entry.solvable ? <Badge label="Solvable" tone="info" /> : null}
         </XStack>
       </YStack>
@@ -248,6 +273,7 @@ const formatFinishedAt = (isoTimestamp: string | undefined) => {
 type HistoryStat = {
   label: string
   value: number
+  tone: 'neutral' | 'success' | 'warning'
 }
 
 const HistoryStatsRow = ({ stats }: { stats: HistoryStat[] }) => (
@@ -260,25 +286,49 @@ const HistoryStatsRow = ({ stats }: { stats: HistoryStat[] }) => (
 
 const HistoryStatTile = ({ stat }: { stat: HistoryStat }) => {
   const theme = useTheme()
+  const { backgroundColor, borderColor, textColor } = useMemo(() => {
+    switch (stat.tone) {
+      case 'success':
+        return {
+          backgroundColor: theme.green3?.val ?? '#dcfce7',
+          borderColor: theme.green7?.val ?? '#15803d',
+          textColor: theme.green11?.val ?? '#14532d',
+        }
+      case 'warning':
+        return {
+          backgroundColor: theme.yellow3?.val ?? '#fef9c3',
+          borderColor: theme.yellow7?.val ?? '#a16207',
+          textColor: theme.yellow11?.val ?? '#713f12',
+        }
+      default:
+        return {
+          backgroundColor: theme.color3?.val ?? '#f1f5f9',
+          borderColor: theme.color7?.val ?? '#334155',
+          textColor: theme.color11?.val ?? '#0f172a',
+        }
+    }
+  }, [stat.tone, theme])
+
   const tileStyle = useMemo(
     () => ({
-      minWidth: 136,
-      paddingVertical: 14,
+      minWidth: 100,
+      flex: 1,
+      paddingVertical: 16,
       paddingHorizontal: 16,
       borderRadius: 16,
-      backgroundColor: '$color2',
-      borderWidth: StyleSheet.hairlineWidth * 2,
-      borderColor: theme.borderColor?.val ?? '#cbd5f5',
+      backgroundColor,
+      borderWidth: 1,
+      borderColor,
     }),
-    [theme.borderColor?.val],
+    [backgroundColor, borderColor],
   )
 
   return (
     <YStack gap="$1" style={tileStyle}>
-      <Text fontSize={12} fontWeight="600" color="$color10">
+      <Text fontSize={13} fontWeight="600" style={{ color: textColor, opacity: 0.8 }}>
         {stat.label}
       </Text>
-      <Text fontSize={20} fontWeight="700">
+      <Text fontSize={24} fontWeight="800" style={{ color: textColor }}>
         {stat.value}
       </Text>
     </YStack>
