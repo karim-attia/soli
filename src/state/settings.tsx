@@ -67,7 +67,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   },
   themeMode: 'auto',
   shareSolvedGames: false,
-  solvableGamesOnly: false,
+  solvableGamesOnly: true,
   developerMode: false,
   statistics: {
     showMoves: true,
