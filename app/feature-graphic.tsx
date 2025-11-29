@@ -31,7 +31,7 @@ const LAYOUT_GAP = 24
 const ICON_SOURCE: ImageSourcePropType = require('../assets/images/icon.png')
 const BENEFITS = ['Free & no ads', 'Solvable games', 'Undo time travel']
 
-type FeatureVariant = 'badges' | 'icon' | 'premium-badges' | 'badges-remix'
+type FeatureVariant = 'badges' | 'icon' | 'premium-badges' | 'badges-remix' | 'glass-modern'
 
 type VariantCopy = {
   headline: string
@@ -198,6 +198,45 @@ const BadgeHighlightsRightSide = ({ palette, copy }: { palette: Palette; copy: V
             </XStack>
           </Stack>
         </LinearGradient>
+      ))}
+    </YStack>
+  </YStack>
+)
+
+const GlassBadgesRightSide = ({ palette, copy }: { palette: Palette; copy: VariantCopy }) => (
+  <YStack gap="$5" maxWidth={360}>
+    <YStack gap="$1">
+      <Text color={palette.infoTextPrimary} fontSize={64} fontWeight="900" letterSpacing={-2} style={{ textShadowColor: 'rgba(0,0,0,0.1)', textShadowRadius: 10, textShadowOffset: { width: 0, height: 4 } }}>
+        {copy.headline}
+      </Text>
+      <Paragraph color={palette.infoTextSecondary} fontSize={24} lineHeight={30} fontWeight="500" letterSpacing={-0.2}>
+        {copy.subtitle}
+      </Paragraph>
+    </YStack>
+    <YStack gap="$3" paddingTop="$2">
+      {BENEFITS.map((benefit) => (
+        <Stack
+          key={benefit}
+          style={{
+            backgroundColor: palette.infoBackground,
+            borderColor: palette.infoBorder,
+            borderWidth: 1,
+            borderRadius: 20,
+            paddingHorizontal: 24,
+            paddingVertical: 16,
+            shadowColor: palette.accent,
+            shadowOpacity: 0.1,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 6 },
+          }}
+        >
+          <XStack alignItems="center" gap="$3">
+            <Stack width={8} height={8} borderRadius={999} backgroundColor={palette.accent} style={{ shadowColor: palette.accent, shadowOpacity: 0.6, shadowRadius: 6 }} />
+            <Text fontSize={20} fontWeight="700" color={palette.infoTextPrimary} letterSpacing={-0.3}>
+              {benefit}
+            </Text>
+          </XStack>
+        </Stack>
       ))}
     </YStack>
   </YStack>
@@ -459,11 +498,89 @@ const renderBadgesRemixVariant = (ctx: VariantContext) => {
   )
 }
 
+const renderGlassModernVariant = (ctx: VariantContext) => {
+  const { cardMetrics, palette, iconBadge } = ctx
+
+  // Same premium cards
+  const GLASS_CARDS: Card[] = [
+    createCard('spades', 1, 'glass-1'),
+    createCard('hearts', 13, 'glass-2'),
+    createCard('clubs', 12, 'glass-3'),
+    createCard('diamonds', 11, 'glass-4'),
+  ]
+
+  const leftSide = (
+    <YStack gap="$3" alignItems="center">
+      {/* Glow behind the icon */}
+      <Stack position="relative">
+        <Stack
+          position="absolute"
+          width={200}
+          height={200}
+          x={-30}
+          y={-30}
+          borderRadius={999}
+          backgroundColor={palette.accent}
+          opacity={0.15}
+          style={{
+            filter: 'blur(40px)', // Note: standard RN might not support filter, but we can try or rely on shadow
+            shadowColor: palette.accent,
+            shadowOpacity: 0.4,
+            shadowRadius: 60,
+          }}
+        />
+        {iconBadge}
+      </Stack>
+      
+      <XStack alignItems="center" justifyContent="center">
+        {GLASS_CARDS.map((card, index) => {
+          const rotation = -15 + index * 10
+          const yOffset = Math.abs(index - 1.5) * 8
+
+          return (
+            <Stack
+              key={card.id}
+              width={cardMetrics.width}
+              height={cardMetrics.height}
+              marginLeft={index === 0 ? 0 : -40}
+              style={{
+                transform: [
+                  { rotate: `${rotation}deg` },
+                  { translateY: yOffset }
+                ],
+                shadowColor: 'rgba(0, 0, 0, 0.6)', // Stronger shadow for depth
+                shadowOpacity: 0.6,
+                shadowRadius: 24,
+                shadowOffset: { width: 0, height: 12 },
+                zIndex: index,
+              }}
+            >
+              <CardVisual card={card} metrics={cardMetrics} />
+            </Stack>
+          )
+        })}
+      </XStack>
+    </YStack>
+  )
+
+  const rightSide = <GlassBadgesRightSide palette={palette} copy={ctx.definition.copy} />
+
+  return (
+    <FixedWidthTwoColumnLayout
+      leftContent={leftSide}
+      rightContent={rightSide}
+      leftWidth={320}
+      rightWidth={360}
+    />
+  )
+}
+
 const VARIANT_RENDERERS: Record<FeatureVariant, (ctx: VariantContext) => JSX.Element> = {
   badges: renderBadgesVariant,
   icon: renderIconVariant,
   'premium-badges': renderPremiumBadgesVariant,
   'badges-remix': renderBadgesRemixVariant,
+  'glass-modern': renderGlassModernVariant,
 }
 
 const VARIANT_DEFINITIONS: VariantDefinition[] = [
@@ -528,6 +645,24 @@ const VARIANT_DEFINITIONS: VariantDefinition[] = [
     summary: 'Best of both: Premium cards with the classic Badge Highlights layout.',
     description:
       'Combines the rich 4-card selection of the Premium variant with the clean, icon-topped layout of the original Badge Highlights.',
+    copy: {
+      headline: 'Soli',
+      subtitle: 'Classic solitaire, thoughtfully refined.',
+      body: '',
+    },
+    cardWidth: 88,
+    stackMultiplier: 1,
+    radius: 14,
+    infoWidthRatio: 0.4,
+    statsRows: null,
+    showIconInPanel: false,
+  },
+  {
+    id: 'glass-modern',
+    label: 'Glass Modern',
+    summary: 'Ultra-premium look with glassmorphism and depth.',
+    description:
+      'A visual upgrade to the Badges Remix layout, featuring sleek glass-panel badges, refined typography, and enhanced depth effects.',
     copy: {
       headline: 'Soli',
       subtitle: 'Classic solitaire, thoughtfully refined.',
