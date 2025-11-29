@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Soli Klondike",
-    "slug": "soli-klondike",
+    "name": "Soli",
+    "slug": "soli",
     "version": "0.1.0",
     "description": "A polished Klondike Solitaire experience with responsive animations and a solvable shuffle catalog.",
     "orientation": "portrait",

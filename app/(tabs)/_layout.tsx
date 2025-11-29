@@ -38,8 +38,8 @@ export default function DrawerLayout() {
       <Drawer.Screen
         name="index"
         options={{
-          title: 'Klondike',
-          headerTitle: 'Klondike',
+          title: 'Soli',
+          headerTitle: 'Soli',
           drawerLabel: 'Play Klondike',
           drawerIcon: ({ color, size }) => <Atom color={color as any} size={size} />,
         }}

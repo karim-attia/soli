@@ -144,3 +144,4 @@ Incrementally raise `zIndex` on piles believed to conflict (statistics HUD, undo
 [^vocal-stacking]: Aishwarya Kumar, “The Real Culprit: Why Your z-index isn’t Working (and 5 Fixes)” (https://vocal.media/geeks/the-real-culprit-why-your-z-index-isn-t-working-and-5-fixes) – discusses stacking context triggers such as `opacity` and `transform`.
 [^tamagui-portal]: Tamagui Portal package README, “@tamagui/portal” (https://github.com/tamagui/tamagui/tree/master/packages/portal) – documents the Portal component for rendering content outside the normal tree.
 [^cardview-usecardanimations]: `useCardAnimations` sets `flightZ` inside the column wrapper, keeping flights in the source stacking context. See snippet above.
+

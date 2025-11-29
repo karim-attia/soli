@@ -31,7 +31,7 @@ const LAYOUT_GAP = 24
 const ICON_SOURCE: ImageSourcePropType = require('../assets/images/icon.png')
 const BENEFITS = ['Free & no ads', 'Solvable games', 'Undo time travel']
 
-type FeatureVariant = 'badges' | 'icon'
+type FeatureVariant = 'badges' | 'icon' | 'premium-badges' | 'badges-remix'
 
 type VariantCopy = {
   headline: string
@@ -343,9 +343,118 @@ const renderIconVariant = (ctx: VariantContext) => {
   )
 }
 
+const renderPremiumBadgesVariant = (ctx: VariantContext) => {
+  const { cardMetrics, palette, iconBadge } = ctx
+
+  const PREMIUM_FAN_CARDS: Card[] = [
+    createCard('spades', 1, 'prem-1'),
+    createCard('hearts', 13, 'prem-2'),
+    createCard('clubs', 12, 'prem-3'),
+    createCard('diamonds', 11, 'prem-4'),
+  ]
+
+  const leftSide = (
+    <YStack gap="$4" alignItems="center" justifyContent="center">
+      {iconBadge}
+      <Stack height={20} />
+      <XStack alignItems="center" justifyContent="center">
+        {PREMIUM_FAN_CARDS.map((card, index) => {
+          // Tighter fan with slight vertical arc
+          const rotation = -15 + index * 10
+          const yOffset = Math.abs(index - 1.5) * 8
+
+          return (
+            <Stack
+              key={card.id}
+              width={cardMetrics.width}
+              height={cardMetrics.height}
+              marginLeft={index === 0 ? 0 : -40} // Overlap cards
+              style={{
+                transform: [
+                  { rotate: `${rotation}deg` },
+                  { translateY: yOffset }
+                ],
+                shadowColor: 'rgba(15, 23, 42, 0.5)',
+                shadowOpacity: 0.5,
+                shadowRadius: 20,
+                shadowOffset: { width: 0, height: 10 },
+                zIndex: index,
+              }}
+            >
+              <CardVisual card={card} metrics={cardMetrics} />
+            </Stack>
+          )
+        })}
+      </XStack>
+    </YStack>
+  )
+
+  const rightSide = <BadgeHighlightsRightSide palette={palette} copy={ctx.definition.copy} />
+
+  return (
+    <FixedWidthTwoColumnLayout
+      leftContent={leftSide}
+      rightContent={rightSide}
+      leftWidth={340}
+      rightWidth={360}
+    />
+  )
+}
+
+const renderBadgesRemixVariant = (ctx: VariantContext) => {
+  const { cardMetrics, palette, iconBadge } = ctx
+
+  // Same premium cards as 'premium-badges'
+  const REMIX_CARDS: Card[] = [
+    createCard('spades', 1, 'remix-1'),
+    createCard('hearts', 13, 'remix-2'),
+    createCard('clubs', 12, 'remix-3'),
+    createCard('diamonds', 11, 'remix-4'),
+  ]
+
+  const leftSide = (
+    <YStack gap="$3" alignItems="center">
+      {iconBadge}
+      {/* Same layout structure as 'badges' (XStack gap) but adapted for 4 cards */}
+      <XStack gap="$2" alignItems="center">
+        {REMIX_CARDS.map((card, index) => (
+          <Stack
+            key={card.id}
+            width={cardMetrics.width}
+            height={cardMetrics.height}
+            style={{
+              // Adapted rotation for 4 cards to be symmetric: -12, -4, 4, 12
+              transform: [{ rotate: `${(index - 1.5) * 8}deg` }],
+              shadowColor: 'rgba(15, 23, 42, 0.4)',
+              shadowOpacity: 0.4,
+              shadowRadius: 16,
+              shadowOffset: { width: 0, height: 8 },
+            }}
+          >
+            <CardVisual card={card} metrics={cardMetrics} />
+          </Stack>
+        ))}
+      </XStack>
+    </YStack>
+  )
+
+  const rightSide = <BadgeHighlightsRightSide palette={palette} copy={ctx.definition.copy} />
+
+  return (
+    <FixedWidthTwoColumnLayout
+      leftContent={leftSide}
+      rightContent={rightSide}
+      leftWidth={360} // Slightly wider to accommodate 4 cards
+      rightWidth={360}
+    />
+  )
+}
+
 const VARIANT_RENDERERS: Record<FeatureVariant, (ctx: VariantContext) => JSX.Element> = {
   badges: renderBadgesVariant,
   icon: renderIconVariant,
+  'premium-badges': renderPremiumBadgesVariant,
+  'badges-remix': renderBadgesRemixVariant,
 }
 
 const VARIANT_DEFINITIONS: VariantDefinition[] = [
@@ -384,6 +493,42 @@ const VARIANT_DEFINITIONS: VariantDefinition[] = [
     infoWidthRatio: 0.33,
     minInfoWidth: 260,
     statsRows: [],
+    showIconInPanel: false,
+  },
+  {
+    id: 'premium-badges',
+    label: 'Premium Badges',
+    summary: 'Refined version of Badge Highlights with richer composition.',
+    description:
+      'An evolution of the badge layout featuring a tighter, more dynamic 4-card fan and polished spacing for a premium feel.',
+    copy: {
+      headline: 'Soli',
+      subtitle: 'Classic solitaire, thoughtfully refined.',
+      body: '',
+    },
+    cardWidth: 88,
+    stackMultiplier: 1,
+    radius: 14,
+    infoWidthRatio: 0.4,
+    statsRows: null,
+    showIconInPanel: false,
+  },
+  {
+    id: 'badges-remix',
+    label: 'Badges Remix',
+    summary: 'Best of both: Premium cards with the classic Badge Highlights layout.',
+    description:
+      'Combines the rich 4-card selection of the Premium variant with the clean, icon-topped layout of the original Badge Highlights.',
+    copy: {
+      headline: 'Soli',
+      subtitle: 'Classic solitaire, thoughtfully refined.',
+      body: '',
+    },
+    cardWidth: 82,
+    stackMultiplier: 1,
+    radius: 13,
+    infoWidthRatio: 0.4,
+    statsRows: null,
     showIconInPanel: false,
   },
 ]
@@ -429,7 +574,9 @@ const computePalette = (scheme: 'light' | 'dark'): Palette =>
       }
 
 export default function FeatureGraphicScreen() {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light'
+  const systemScheme = useColorScheme()
+  const [schemeOverride, setSchemeOverride] = useState<'light' | 'dark' | null>(null)
+  const scheme = schemeOverride ?? (systemScheme === 'dark' ? 'dark' : 'light')
   const palette = useMemo(() => computePalette(scheme), [scheme])
   const [activeVariantId, setActiveVariantId] = useState<FeatureVariant>('badges')
   const [showSafeFrame, setShowSafeFrame] = useState(false)
@@ -540,9 +687,18 @@ export default function FeatureGraphicScreen() {
             </Button>
           ))}
         </XStack>
-        <Button size="$2" variant="outlined" onPress={() => setShowSafeFrame((prev) => !prev)}>
-          {showSafeFrame ? 'Hide safe frame' : 'Show safe frame'}
-        </Button>
+        <XStack gap="$2">
+          <Button
+            size="$2"
+            variant="outlined"
+            onPress={() => setSchemeOverride((prev) => ((prev ?? scheme) === 'dark' ? 'light' : 'dark'))}
+          >
+            {scheme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+          </Button>
+          <Button size="$2" variant="outlined" onPress={() => setShowSafeFrame((prev) => !prev)}>
+            {showSafeFrame ? 'Hide safe frame' : 'Show safe frame'}
+          </Button>
+        </XStack>
       </XStack>
 
       <Stack
@@ -551,8 +707,6 @@ export default function FeatureGraphicScreen() {
         alignSelf="center"
         backgroundColor={palette.canvasBackground}
         overflow="hidden"
-        borderWidth={1}
-        borderColor={palette.panelBorder}
       >
         {/* Safe-area padding derived from Task 24-1 (15% bleed documented). */}
         <FeltBackground />
