@@ -110,10 +110,10 @@ SOLI_UPLOAD_STORE_PASSWORD=your_secure_store_password
 SOLI_UPLOAD_KEY_PASSWORD=your_secure_key_password
 ```
 
-The build.gradle automatically reads these environment variables. Just run:
+**Recommended: Use the build script** (loads .env automatically):
 
 ```bash
-cd android && ./gradlew bundleRelease
+./build-android.sh
 ```
 
 **Alternative methods:**
