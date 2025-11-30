@@ -46,4 +46,10 @@ node_modules
 .expo
 ios
 android
+!android/app/build.gradle
+!android/app/proguard-rules.pro
+!android/gradle.properties
+# Never commit keystore files
+*.keystore
+*.jks
 .venv
