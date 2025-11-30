@@ -46,9 +46,9 @@ signingConfigs {
     release {
         if (project.hasProperty('SOLI_UPLOAD_STORE_FILE')) {
             storeFile file(SOLI_UPLOAD_STORE_FILE)
-            storePassword SOLI_UPLOAD_STORE_PASSWORD
+            storePassword System.getenv('SOLI_UPLOAD_STORE_PASSWORD') ?: SOLI_UPLOAD_STORE_PASSWORD
             keyAlias SOLI_UPLOAD_KEY_ALIAS
-            keyPassword SOLI_UPLOAD_KEY_PASSWORD
+            keyPassword System.getenv('SOLI_UPLOAD_KEY_PASSWORD') ?: SOLI_UPLOAD_KEY_PASSWORD
         }
     }
 }
@@ -147,11 +147,20 @@ defaultConfig {
 
 ### Step 2: Build the Release Bundle
 
-Navigate to the android directory and build:
+**Recommended: Use the automated build script** (loads .env automatically):
 
 ```bash
-cd android
-./gradlew bundleRelease
+./build-android.sh
+```
+
+**Manual build** (if you prefer):
+
+```bash
+# Load environment variables and build
+source .env && cd android && ./gradlew bundleRelease
+
+# Or set them inline
+cd android && SOLI_UPLOAD_STORE_PASSWORD="your_password" SOLI_UPLOAD_KEY_PASSWORD="your_key_password" ./gradlew bundleRelease
 ```
 
 ### Step 3: Verify the Build
@@ -224,34 +233,60 @@ android
 !android/app/proguard-rules.pro
 !android/gradle.properties
 
-# Never commit keystore files
+# Never commit keystore files or environment files
 *.keystore
 *.jks
+.env
 ```
 
 **What to commit:**
 - ✅ `android/app/build.gradle` - Contains version codes, signing config, build settings
-- ✅ `android/gradle.properties` - Contains build properties (but remove sensitive passwords for production)
+- ✅ `android/gradle.properties` - Contains build properties (passwords commented out)
 - ✅ `android/app/proguard-rules.pro` - ProGuard/R8 optimization rules
+- ✅ `build-android.sh` - Automated build script
+- ✅ Documentation files
 
 **What NOT to commit:**
 - ❌ `*.keystore` / `*.jks` files - Contains private signing keys
 - ❌ `android/app/build/` - Build artifacts and generated files
 - ❌ `android/app/debug.keystore` - Auto-generated debug keystore
+- ❌ `.env` - Contains sensitive passwords (ignored by git)
+- ❌ `*.aab` / `*.apk` - Build outputs
 
-**For production**: Move sensitive passwords from `gradle.properties` to environment variables or a separate secure properties file.
+**Current secure setup**: Passwords are stored in local `.env` file (ignored by git) and loaded automatically by the build script.
 
-### Recommended Security Setup
+### Current Implementation (Recommended)
 
-Instead of storing passwords in `gradle.properties`, use environment variables:
+This project uses a secure setup with environment variables loaded from a local `.env` file:
 
+**1. Local `.env` file** (ignored by git):
 ```bash
-export SOLI_UPLOAD_STORE_PASSWORD="your_secure_password"
-export SOLI_UPLOAD_KEY_PASSWORD="your_secure_key_password"
-./gradlew bundleRelease
+# Generate secure passwords with: openssl rand -hex 16
+SOLI_UPLOAD_STORE_PASSWORD=your_secure_store_password
+SOLI_UPLOAD_KEY_PASSWORD=your_secure_key_password
 ```
 
-Or use a separate properties file (not committed to version control):
+**2. Automated build script** (`build-android.sh`):
+```bash
+#!/bin/bash
+# Loads .env and builds automatically
+set -a
+source .env
+set +a
+cd android && ./gradlew bundleRelease
+```
+
+**3. Build.gradle configuration**:
+```gradle
+release {
+    storePassword System.getenv('SOLI_UPLOAD_STORE_PASSWORD') ?: SOLI_UPLOAD_STORE_PASSWORD
+    keyPassword System.getenv('SOLI_UPLOAD_KEY_PASSWORD') ?: SOLI_UPLOAD_KEY_PASSWORD
+}
+```
+
+### Alternative Security Setup
+
+If you prefer a separate properties file approach instead of environment variables:
 
 ```gradle
 // In build.gradle
