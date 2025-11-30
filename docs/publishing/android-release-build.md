@@ -120,30 +120,45 @@ SOLI_UPLOAD_KEY_PASSWORD=your_secure_key_password
 - Set environment variables directly: `export SOLI_UPLOAD_STORE_PASSWORD="password" && ./gradlew bundleRelease`
 - Pass inline: `SOLI_UPLOAD_STORE_PASSWORD="password" SOLI_UPLOAD_KEY_PASSWORD="key_password" ./gradlew bundleRelease`
 
-### Step 1.4: Bump Version Code (Important!)
+### Step 1.4: Bump Version Code and Name (Important!)
 
-**Before each release**, you must increment the version code in `android/app/build.gradle`:
+**Before each release**, you must update version information in TWO places:
 
+#### 1. Update `android/app/build.gradle`:
 ```gradle
 defaultConfig {
     applicationId 'ch.karimattia.soli'
     minSdkVersion rootProject.ext.minSdkVersion
     targetSdkVersion rootProject.ext.targetSdkVersion
-    versionCode 2  // ← Increment this number for each release
-    versionName "0.1.0"  // ← Update version name as needed
+    versionCode 4  // ← Increment this integer for each release
+    versionName "0.1.1"  // ← Update user-visible version string
+}
+```
+
+#### 2. Update `app.json` (Expo configuration):
+```json
+{
+  "expo": {
+    "version": "0.1.1",  // ← Update main version
+    "android": {
+      "versionCode": 4  // ← Must match build.gradle versionCode
+    }
+  }
 }
 ```
 
 **Why this matters:**
-- Google Play Store requires each release to have a higher version code than previous releases
-- `versionCode` is an integer that must increase with each update
-- `versionName` is the user-visible version string (can stay the same or be updated)
-- Failing to increment versionCode will result in Google Play rejecting your upload
+- **Google Play Store** requires each release to have a higher `versionCode` than previous releases
+- **`versionCode`** is an integer that must increase with each update (used internally)
+- **`versionName`** is the user-visible version string (displayed to users)
+- **`app.json`** version is used by Expo for both Android and iOS
+- Failing to increment `versionCode` will result in Google Play rejecting your upload
 
-**Example progression:**
+**Version progression example:**
 - First release: `versionCode 1`, `versionName "1.0.0"`
-- Second release: `versionCode 2`, `versionName "1.0.1"` (or keep "1.0.0")
+- Second release: `versionCode 2`, `versionName "1.0.1"`
 - Third release: `versionCode 3`, `versionName "1.1.0"`
+- Fourth release: `versionCode 4`, `versionName "0.1.1"`
 
 ### Step 2: Build the Release Bundle
 
