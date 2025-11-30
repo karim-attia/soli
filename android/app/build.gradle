@@ -105,9 +105,9 @@ android {
         release {
             if (project.hasProperty('SOLI_UPLOAD_STORE_FILE')) {
                 storeFile file(SOLI_UPLOAD_STORE_FILE)
-                storePassword SOLI_UPLOAD_STORE_PASSWORD
+                storePassword System.getenv('SOLI_UPLOAD_STORE_PASSWORD') ?: SOLI_UPLOAD_STORE_PASSWORD
                 keyAlias SOLI_UPLOAD_KEY_ALIAS
-                keyPassword SOLI_UPLOAD_KEY_PASSWORD
+                keyPassword System.getenv('SOLI_UPLOAD_KEY_PASSWORD') ?: SOLI_UPLOAD_KEY_PASSWORD
             }
         }
     }
