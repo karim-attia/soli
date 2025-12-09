@@ -1,5 +1,5 @@
-import { useLayoutEffect } from 'react'
-import { Pressable, ScrollView } from 'react-native'
+import { useLayoutEffect, useEffect, useState } from 'react'
+import { Platform, Pressable, ScrollView } from 'react-native'
 import { useNavigation } from 'expo-router'
 import {
   Button,
@@ -16,6 +16,7 @@ import { Menu } from '@tamagui/lucide-icons'
 
 import {
   animationPreferenceDescriptors,
+  type RefreshRateMode,
   type ThemeMode,
   useSettings,
   statisticsPreferenceDescriptors,
@@ -26,6 +27,12 @@ const themeOptions: Array<{ mode: ThemeMode; label: string }> = [
   { mode: 'auto', label: 'Auto' },
   { mode: 'light', label: 'Light' },
   { mode: 'dark', label: 'Dark' },
+]
+
+// PBI-27: Refresh rate mode options
+const refreshRateOptions: Array<{ mode: RefreshRateMode; label: string; description: string }> = [
+  { mode: 'high', label: 'High', description: 'Use maximum refresh rate for smoothest animations' },
+  { mode: 'auto', label: 'Auto', description: 'Let Android decide based on content and battery' },
 ]
 
 export default function SettingsScreen() {
@@ -56,7 +63,25 @@ export default function SettingsScreen() {
     setSolvableGamesOnly,
     setDeveloperMode,
     setStatisticsPreference,
+    setRefreshRateMode,
   } = useSettings()
+
+  // PBI-27: Check if high refresh rate is supported (Android only)
+  const [isHighRefreshRateSupported, setIsHighRefreshRateSupported] = useState(false)
+  const [maxRefreshRate, setMaxRefreshRate] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return
+
+    import('../modules/expo-refresh-rate/src')
+      .then((module) => {
+        setIsHighRefreshRateSupported(module.isHighRefreshRateSupported())
+        setMaxRefreshRate(module.getMaxRefreshRate())
+      })
+      .catch(() => {
+        // Module not available
+      })
+  }, [])
 
   return (
     <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 48 }}>
@@ -146,6 +171,38 @@ export default function SettingsScreen() {
             onValueChange={setDeveloperMode}
             disabled={!hydrated}
           />
+
+          {/* PBI-27: Refresh rate control - Android only, devices with >60Hz support */}
+          {Platform.OS === 'android' && isHighRefreshRateSupported && maxRefreshRate !== null && maxRefreshRate > 60 && (
+            <>
+              <Separator marginVertical="$2" />
+              <YStack gap="$2">
+                <Text fontWeight="600">Display refresh rate</Text>
+                <Paragraph color="$color10">
+                  Higher refresh rates provide smoother animations but use more battery.
+                  {maxRefreshRate ? ` Your display supports up to ${Math.round(maxRefreshRate)}Hz.` : ''}
+                </Paragraph>
+                <XStack gap="$2" flexWrap="wrap" marginTop="$1">
+                  {refreshRateOptions.map((option) => (
+                    <Button
+                      key={option.mode}
+                      size="$2"
+                      variant={state.refreshRateMode === option.mode ? undefined : 'outlined'}
+                      onPress={() => setRefreshRateMode(option.mode)}
+                      disabled={!hydrated}
+                    >
+                      {option.mode === 'high' && maxRefreshRate
+                        ? `High (${Math.round(maxRefreshRate)}Hz)`
+                        : option.label}
+                    </Button>
+                  ))}
+                </XStack>
+                <Paragraph color="$color9" fontSize={12}>
+                  {refreshRateOptions.find((o) => o.mode === state.refreshRateMode)?.description}
+                </Paragraph>
+              </YStack>
+            </>
+          )}
         </YStack>
 
         <YStack gap="$3">

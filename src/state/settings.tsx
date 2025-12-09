@@ -13,6 +13,9 @@ import { devLog, setDeveloperLoggingEnabled } from '../utils/devLogger'
 
 export type ThemeMode = 'auto' | 'light' | 'dark'
 
+// PBI-27: Android High Refresh Rate Control
+export type RefreshRateMode = 'auto' | 'high'
+
 type AnimationPreferences = {
   master: boolean
   cardFlights: boolean
@@ -39,6 +42,7 @@ export type SettingsState = {
   solvableGamesOnly: boolean
   developerMode: boolean
   statistics: StatisticsPreferences
+  refreshRateMode: RefreshRateMode // PBI-27
 }
 
 type SettingsContextValue = {
@@ -51,6 +55,7 @@ type SettingsContextValue = {
   setSolvableGamesOnly: (enabled: boolean) => void
   setDeveloperMode: (enabled: boolean) => void
   setStatisticsPreference: (key: StatisticsPreferenceKey, enabled: boolean) => void
+  setRefreshRateMode: (mode: RefreshRateMode) => void // PBI-27
 }
 
 const STORAGE_KEY = '@soli/settings/v1'
@@ -73,6 +78,7 @@ const DEFAULT_SETTINGS: SettingsState = {
     showMoves: true,
     showTime: true,
   },
+  refreshRateMode: 'high', // PBI-27: Default to max refresh rate for smooth animations
 }
 
 export const animationPreferenceDescriptors: Array<{
@@ -251,9 +257,32 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     })
   }, [])
 
+  // PBI-27: Refresh rate mode setter
+  const setRefreshRateMode = useCallback((mode: RefreshRateMode) => {
+    setState((previous) =>
+      previous.refreshRateMode === mode ? previous : { ...previous, refreshRateMode: mode },
+    )
+  }, [])
+
   useEffect(() => {
     setDeveloperLoggingEnabled(hydrated ? state.developerMode : false)
   }, [hydrated, state.developerMode])
+
+  // PBI-27: Apply refresh rate preference when it changes or on startup
+  useEffect(() => {
+    if (!hydrated) return
+
+    // Dynamic import to avoid bundling issues on iOS/web
+    import('../../modules/expo-refresh-rate/src')
+      .then(({ setRefreshRateMode: applyRefreshRate }) => {
+        applyRefreshRate(state.refreshRateMode).catch(() => {
+          // Silently ignore errors - refresh rate is a hint, not critical
+        })
+      })
+      .catch(() => {
+        // Module not available on this platform
+      })
+  }, [hydrated, state.refreshRateMode])
 
   const value = useMemo<SettingsContextValue>(
     () => ({
@@ -266,6 +295,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setSolvableGamesOnly,
       setDeveloperMode,
       setStatisticsPreference,
+      setRefreshRateMode,
     }),
     [
       hydrated,
@@ -276,6 +306,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setSolvableGamesOnly,
       setThemeMode,
       setDeveloperMode,
+      setRefreshRateMode,
       state,
     ],
   )
@@ -350,8 +381,14 @@ const mergeSettings = (current: SettingsState, incoming?: Partial<SettingsState>
       showMoves: getBoolean(statistics.showMoves, current.statistics.showMoves),
       showTime: getBoolean(statistics.showTime, current.statistics.showTime),
     },
+    refreshRateMode: isRefreshRateMode(incoming.refreshRateMode)
+      ? incoming.refreshRateMode
+      : current.refreshRateMode,
   }
 }
+
+const isRefreshRateMode = (value: unknown): value is RefreshRateMode =>
+  value === 'auto' || value === 'high'
 
 const getBoolean = (value: unknown, fallback: boolean): boolean =>
   typeof value === 'boolean' ? value : fallback
