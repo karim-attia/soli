@@ -28,12 +28,11 @@ import {
 } from '../../../solitaire/klondike'
 import { useFlightController } from '../../../animation/flightController'
 import { devLog } from '../../../utils/devLogger'
+import { computeElapsedWithReference } from '../../../utils/time'
 import { clearGameState } from '../../../storage/gamePersistence'
 import {
   createHistoryPreviewFromState,
   formatShuffleDisplayName,
-  recordGameResultFromState,
-  type RecordGameResultOptions,
   useHistory,
 } from '../../../state/history'
 import { useAnimationToggles, useSettings } from '../../../state/settings'
@@ -143,7 +142,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const developerModeEnabled = settingsState.developerMode
 
   const animationToggles = useAnimationToggles()
-  const { entries: historyEntries, recordResult } = useHistory()
+  const { entries: historyEntries, recordResult, updateEntry } = useHistory()
   const {
     master: animationsEnabled,
     cardFlights: cardFlightsEnabled,
@@ -183,7 +182,8 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
   const winCelebrationsRef = useRef(state.winCelebrations)
   const stateRef = useRef(state)
-  const lastRecordedShuffleRef = useRef<string | null>(null)
+  // Task 10-6: Track the current game's history entry ID for updates
+  const currentGameEntryIdRef = useRef<string | null>(null)
   const previousHasWonRef = useRef(state.hasWon)
   const requestNewGameRef = useRef<RequestNewGameFn | null>(null)
   const currentStartingPreviewRef = useRef(createHistoryPreviewFromState(state))
@@ -274,25 +274,28 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         currentStartingPreviewRef.current = solvablePreview
         currentDisplayNameRef.current = solvableDisplayName
 
-        recordResult({
+        // Task 10-6: Store entry ID for later updates when game ends
+        const entryId = recordResult({
           shuffleId: solvableState.shuffleId,
           solved: false,
           solvable: true,
-          finishedAt: new Date().toISOString(),
+          startedAt: new Date().toISOString(),
+          finishedAt: null, // Not finished yet
           moves: 0,
           durationMs: 0,
           preview: solvablePreview,
           displayName: solvableDisplayName,
+          status: 'active',
         })
+        currentGameEntryIdRef.current = entryId
 
         dispatch({ type: 'HYDRATE_STATE', state: solvableState })
-        lastRecordedShuffleRef.current = null
         return
       }
     }
 
     dispatch({ type: 'NEW_GAME' })
-    lastRecordedShuffleRef.current = null
+    currentGameEntryIdRef.current = null
   }, [
     dispatch,
     recordResult,
@@ -301,19 +304,57 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     solvableGamesOnly,
   ])
 
-  // Records the current game result once per shuffle for history analytics.
+  // Task 10-6: Updates or records game result in history
   const recordCurrentGameResult = useCallback(
-    (options?: RecordGameResultOptions) => {
-      recordGameResultFromState({
-        state: stateRef.current,
-        lastRecordedShuffleRef,
-        recordResult,
-        preview: currentStartingPreviewRef.current,
-        displayName: currentDisplayNameRef.current,
-        options,
-      })
+    (options?: { solved?: boolean }) => {
+      const state = stateRef.current
+      if (!state.shuffleId) {
+        return
+      }
+
+      const solved = options?.solved ?? state.hasWon
+      const status = solved ? 'solved' : 'incomplete'
+      const elapsedForRecord = computeElapsedWithReference(
+        state.elapsedMs,
+        state.timerState,
+        state.timerStartedAt,
+        Date.now(),
+      )
+
+      // Task 10-6: finishedAt only set when solved, null for incomplete
+      const finishedAt = solved ? new Date().toISOString() : null
+
+      // If we have a tracked entry ID, update it; otherwise create new
+      if (currentGameEntryIdRef.current) {
+        updateEntry(currentGameEntryIdRef.current, {
+          solved,
+          status,
+          moves: state.moveCount,
+          durationMs: elapsedForRecord,
+          finishedAt,
+          preview: createHistoryPreviewFromState(state),
+        })
+        currentGameEntryIdRef.current = null
+      } else {
+        // No tracked entry - only record if there's been meaningful play
+        if (!solved && state.moveCount === 0) {
+          return
+        }
+        recordResult({
+          shuffleId: state.shuffleId,
+          solved,
+          solvable: Boolean(state.solvableId),
+          startedAt: new Date().toISOString(), // Best approximation when no tracked entry
+          finishedAt,
+          moves: state.moveCount,
+          durationMs: elapsedForRecord,
+          preview: createHistoryPreviewFromState(state),
+          displayName: currentDisplayNameRef.current,
+          status,
+        })
+      }
     },
-    [recordResult],
+    [recordResult, updateEntry],
   )
 
   const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(() => ({
@@ -354,7 +395,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     foundationLayoutsRef,
     topRowLayoutRef,
     winCelebrationsRef,
-    lastRecordedShuffleRef,
+    currentGameEntryIdRef,
     updateBoardLocked,
     clearGameState,
   })
@@ -546,7 +587,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         text: 'Deal Again',
         style: forced ? 'default' : 'destructive',
         onPress: () => {
-          recordCurrentGameResult()
+          // Task 10-6: Only record if game wasn't already won (winning already records)
+          if (!stateRef.current.hasWon) {
+            recordCurrentGameResult()
+          }
           setCelebrationState(null)
           resetCardFlights()
           foundationLayoutsRef.current = {}

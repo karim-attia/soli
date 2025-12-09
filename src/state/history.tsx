@@ -28,31 +28,48 @@ const formatTitleCase = (value: string): string =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
 
+// Task 10-6: Game status - 'active' for in-progress, 'incomplete' for abandoned, 'solved' for won
+export type HistoryEntryStatus = 'active' | 'incomplete' | 'solved'
+
 export type HistoryEntry = {
   id: string
   shuffleId: string
   displayName: string
-  finishedAt: string
+  startedAt: string // Task 10-6: When game started
+  finishedAt: string | null // Task 10-6: When game completed (null if still active/incomplete)
   solved: boolean
   solvable: boolean
   moves: number | null
   durationMs: number | null
   preview: HistoryPreview
+  status: HistoryEntryStatus
 }
 
 export type RecordGameResultInput = {
   shuffleId: string
   solved: boolean
   solvable?: boolean
-  finishedAt?: string | Date
+  startedAt?: string | Date // Task 10-6: When game started
+  finishedAt?: string | Date | null // Task 10-6: When game completed
   moves?: number
   durationMs?: number
   preview: HistoryPreview
   displayName?: string
+  status?: HistoryEntryStatus
 }
 
 export type RecordGameResultOptions = {
   solved?: boolean
+}
+
+// Task 10-6: Partial updates for existing entries
+export type UpdateEntryInput = {
+  solved?: boolean
+  status?: HistoryEntryStatus
+  moves?: number
+  durationMs?: number
+  finishedAt?: string | Date | null
+  preview?: HistoryPreview
 }
 
 export type RecordGameResultFromStateParams = {
@@ -85,7 +102,9 @@ type HistoryContextValue = {
   entries: HistoryEntry[]
   hydrated: boolean
   solvedCount: number
-  recordResult: (input: RecordGameResultInput) => void
+  activeCount: number
+  recordResult: (input: RecordGameResultInput) => string // Task 10-6: returns entry ID
+  updateEntry: (id: string, updates: UpdateEntryInput) => void // Task 10-6: update existing entry
   clearHistory: () => void
   getEntryById: (id: string) => HistoryEntry | undefined
 }
@@ -157,10 +176,51 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
     })
   }, [entries, hydrated])
 
-  const recordResult = useCallback((input: RecordGameResultInput) => {
+  // Task 10-6: recordResult now returns the entry ID for later updates
+  const recordResult = useCallback((input: RecordGameResultInput): string => {
+    const entry = createEntry(input)
     setEntries((previous) => {
-      const next = [createEntry(input), ...previous]
+      const next = [entry, ...previous]
       return next.slice(0, MAX_HISTORY_ENTRIES)
+    })
+    return entry.id
+  }, [])
+
+  // Task 10-6: updateEntry allows updating an existing entry by its ID
+  const updateEntry = useCallback((id: string, updates: UpdateEntryInput) => {
+    setEntries((previous) => {
+      const index = previous.findIndex((entry) => entry.id === id)
+      if (index === -1) {
+        devLog('warn', `[history] Attempted to update non-existent entry: ${id}`)
+        return previous
+      }
+
+      const existing = previous[index]
+      // Handle finishedAt: can be Date, string, null, or undefined (keep existing)
+      let finishedAt: string | null = existing.finishedAt
+      if (updates.finishedAt !== undefined) {
+        if (updates.finishedAt === null) {
+          finishedAt = null
+        } else if (typeof updates.finishedAt === 'string') {
+          finishedAt = updates.finishedAt
+        } else {
+          finishedAt = updates.finishedAt.toISOString()
+        }
+      }
+
+      const updated: HistoryEntry = {
+        ...existing,
+        solved: updates.solved ?? existing.solved,
+        status: updates.status ?? existing.status,
+        moves: updates.moves ?? existing.moves,
+        durationMs: updates.durationMs ?? existing.durationMs,
+        finishedAt,
+        preview: updates.preview ?? existing.preview,
+      }
+
+      const next = [...previous]
+      next[index] = updated
+      return next
     })
   }, [])
 
@@ -172,6 +232,7 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
   }, [])
 
   const solvedCount = useMemo(() => entries.filter((entry) => entry.solved).length, [entries])
+  const activeCount = useMemo(() => entries.filter((entry) => entry.status === 'active').length, [entries])
 
   const getEntryById = useCallback(
     (id: string) => entries.find((entry) => entry.id === id),
@@ -183,11 +244,13 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
       entries,
       hydrated,
       solvedCount,
+      activeCount,
       recordResult,
+      updateEntry,
       clearHistory,
       getEntryById,
     }),
-    [clearHistory, entries, getEntryById, hydrated, recordResult, solvedCount],
+    [activeCount, clearHistory, entries, getEntryById, hydrated, recordResult, solvedCount, updateEntry],
   )
 
   return <HistoryContext.Provider value={value}>{children}</HistoryContext.Provider>
@@ -244,19 +307,38 @@ export const recordGameResultFromState = ({
 }
 
 const createEntry = (input: RecordGameResultInput): HistoryEntry => {
-  const finishedAt = typeof input.finishedAt === 'string' ? input.finishedAt : input.finishedAt?.toISOString()
+  const now = new Date().toISOString()
+  const startedAt = input.startedAt
+    ? typeof input.startedAt === 'string'
+      ? input.startedAt
+      : input.startedAt.toISOString()
+    : now
+  // Task 10-6: finishedAt is null for active/incomplete games, set when solved
+  const finishedAt = input.finishedAt === null
+    ? null
+    : input.finishedAt
+      ? typeof input.finishedAt === 'string'
+        ? input.finishedAt
+        : input.finishedAt.toISOString()
+      : input.solved
+        ? now
+        : null
   const preview = sanitizePreview(input.preview)
   const displayName = input.displayName ?? formatShuffleDisplayName(input.shuffleId)
+  // Task 10-6: derive status from input or solved boolean
+  const status: HistoryEntryStatus = input.status ?? (input.solved ? 'solved' : 'active')
   return {
     id: generateHistoryId(),
     shuffleId: input.shuffleId,
     displayName,
     solved: input.solved,
     solvable: input.solvable ?? false,
-    finishedAt: finishedAt ?? new Date().toISOString(),
+    startedAt,
+    finishedAt,
     moves: typeof input.moves === 'number' ? input.moves : null,
     durationMs: typeof input.durationMs === 'number' ? input.durationMs : null,
     preview,
+    status,
   }
 }
 
@@ -302,13 +384,22 @@ const generateHistoryId = () => `hist_${Date.now().toString(36)}_${Math.random()
 const normalizeEntry = (entry: HistoryEntry): HistoryEntry => {
   const preview = sanitizePreview(entry.preview)
   const displayName = entry.displayName || formatShuffleDisplayName(entry.shuffleId)
+  // Task 10-6: backward compatibility - derive status from solved if missing
+  const status: HistoryEntryStatus = entry.status ?? (entry.solved ? 'solved' : 'incomplete')
+  // Task 10-6: backward compatibility - use finishedAt as startedAt if missing
+  const startedAt = entry.startedAt ?? entry.finishedAt ?? new Date().toISOString()
+  // For old entries, finishedAt was always set; keep it for solved, null for incomplete
+  const finishedAt = entry.finishedAt ?? (entry.solved ? startedAt : null)
 
   return {
     ...entry,
     displayName,
     preview,
+    startedAt,
+    finishedAt,
     moves: typeof entry.moves === 'number' ? entry.moves : null,
     durationMs: typeof entry.durationMs === 'number' ? entry.durationMs : null,
+    status,
   }
 }
 

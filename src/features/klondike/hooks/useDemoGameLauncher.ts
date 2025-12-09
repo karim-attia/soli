@@ -25,7 +25,8 @@ type UseDemoGameLauncherOptions = {
   foundationLayoutsRef: MutableRefObject<Partial<Record<Suit, LayoutRectangle>>>
   topRowLayoutRef: MutableRefObject<LayoutRectangle | null>
   winCelebrationsRef: MutableRefObject<number>
-  lastRecordedShuffleRef: MutableRefObject<string | null>
+  // Task 10-6: Renamed from lastRecordedShuffleRef to track entry ID
+  currentGameEntryIdRef: MutableRefObject<string | null>
   updateBoardLocked: (locked: boolean) => void
   clearGameState: () => Promise<void>
 }
@@ -51,7 +52,7 @@ export const useDemoGameLauncher = ({
   foundationLayoutsRef,
   topRowLayoutRef,
   winCelebrationsRef,
-  lastRecordedShuffleRef,
+  currentGameEntryIdRef,
   updateBoardLocked,
   clearGameState,
 }: UseDemoGameLauncherOptions) => {
@@ -158,7 +159,7 @@ export const useDemoGameLauncher = ({
       foundationLayoutsRef.current = {}
       topRowLayoutRef.current = null
       winCelebrationsRef.current = 0
-      lastRecordedShuffleRef.current = null
+      currentGameEntryIdRef.current = null
       updateBoardLocked(false)
 
       const demoState = createDemoGameState()
@@ -181,10 +182,10 @@ export const useDemoGameLauncher = ({
       boardLockedRef,
       clearCelebrationDialogTimer,
       clearGameState,
+      currentGameEntryIdRef,
       developerModeEnabled,
       dispatch,
       foundationLayoutsRef,
-      lastRecordedShuffleRef,
       recordCurrentGameResult,
       resetCardFlights,
       runDemoSequence,

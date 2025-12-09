@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
   type HistoryEntry,
+  type HistoryEntryStatus,
   type HistoryPreviewCard,
   type HistoryPreviewColumn,
   useHistory,
@@ -22,8 +23,9 @@ export default function HistoryScreen() {
   const openDrawer = useDrawerOpener()
   const { entries, solvedCount, hydrated } = useHistory()
   const totalEntries = entries.length
+  // Task 10-6: Count incomplete entries (not solved and not active)
   const incompleteCount = useMemo(
-    () => entries.filter((entry) => !entry.solved).length,
+    () => entries.filter((entry) => entry.status === 'incomplete').length,
     [entries],
   )
   const [selectedEntry, setSelectedEntry] = useState<HistoryEntry | null>(null)
@@ -110,13 +112,37 @@ type HistoryListItemProps = {
   onPress?: () => void
 }
 
+// Task 10-6: Map status to display labels and colors
+const STATUS_DISPLAY: Record<HistoryEntryStatus, { label: string; colorKey: 'green' | 'yellow' | 'blue' }> = {
+  solved: { label: 'Solved', colorKey: 'green' },
+  incomplete: { label: 'Incomplete', colorKey: 'yellow' },
+  active: { label: 'Active', colorKey: 'blue' },
+}
+
 const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
   const theme = useTheme()
-  const finishedLabel = useMemo(() => formatFinishedAt(entry.finishedAt), [entry.finishedAt])
-  const statusLabel = entry.solved ? 'Solved' : 'Incomplete'
-  const statusColor = entry.solved ? theme.green10?.val ?? '#15803d' : theme.yellow11?.val ?? '#854d0e'
+  const statusDisplay = STATUS_DISPLAY[entry.status] ?? STATUS_DISPLAY.incomplete
+  const statusLabel = statusDisplay.label
+  const statusColor = useMemo(() => {
+    switch (statusDisplay.colorKey) {
+      case 'green':
+        return theme.green10?.val ?? '#15803d'
+      case 'blue':
+        return theme.blue10?.val ?? '#1d4ed8'
+      case 'yellow':
+      default:
+        return theme.yellow11?.val ?? '#854d0e'
+    }
+  }, [statusDisplay.colorKey, theme.blue10?.val, theme.green10?.val, theme.yellow11?.val])
+  // Task 10-6: Show "Started" for active/incomplete, "Finished" for solved
+  const timeLabel = useMemo(() => {
+    if (entry.status === 'solved' && entry.finishedAt) {
+      return `Finished ${formatFinishedAt(entry.finishedAt)}`
+    }
+    return `Started ${formatFinishedAt(entry.startedAt)}`
+  }, [entry.finishedAt, entry.startedAt, entry.status])
   const metadata = useMemo(() => {
-    const segments = [`Finished ${finishedLabel}`]
+    const segments = [timeLabel]
     if (typeof entry.moves === 'number' && entry.moves >= 0) {
       segments.push(`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`)
     }
@@ -124,7 +150,7 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
       segments.push(`Time ${formatElapsedDuration(entry.durationMs)}`)
     }
     return segments.join(' · ')
-  }, [entry.moves, finishedLabel])
+  }, [entry.durationMs, entry.moves, timeLabel])
 
   const cardStyle = useMemo(
     () => ({
@@ -424,7 +450,9 @@ const HistoryPreviewSheet = ({ entry, open, onOpenChange, snapPoints, onSnapPoin
                 {entry.displayName}
               </Text>
               <Paragraph color="$color10">
-                {formatFinishedAt(entry.finishedAt)} · {entry.solved ? 'Solved' : 'Incomplete'}
+                {entry.status === 'solved' && entry.finishedAt
+                  ? `Finished ${formatFinishedAt(entry.finishedAt)}`
+                  : `Started ${formatFinishedAt(entry.startedAt)}`} · {STATUS_DISPLAY[entry.status]?.label ?? 'Unknown'}
               </Paragraph>
             </YStack>
             <XStack gap="$2" flexWrap="wrap">
