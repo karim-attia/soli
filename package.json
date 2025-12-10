@@ -14,6 +14,7 @@
     "prod": "node scripts/run-demo-autosolve.js --mode=prod",
     "prod:no-timeout": "node scripts/run-demo-autosolve.js --mode=prod --no-prod-timeout",
     "ios": "expo run:ios",
+    "build:ios": "npx eas build --platform ios --profile production --non-interactive",
     "web": "pkill -f 'expo.*start.*web' 2>/dev/null || true && BROWSER=none expo start --web --port 8081",
     "test": "jest --watchAll",
     "harvest:trial": "node scripts/harvest-solvable.js --trial",
