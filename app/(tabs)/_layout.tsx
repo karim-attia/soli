@@ -40,7 +40,7 @@ export default function DrawerLayout() {
         options={{
           title: 'Soli',
           headerTitle: 'Soli',
-          drawerLabel: 'Play Klondike',
+          drawerLabel: 'Play',
           drawerIcon: ({ color, size }) => <Atom color={color as any} size={size} />,
         }}
       />

@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useCallback, useLayoutEffect, useMemo, useState } from 'react'
+import { Dispatch, SetStateAction, memo, useCallback, useLayoutEffect, useMemo, useState } from 'react'
 import { Dimensions, FlatList, LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native'
 import { useNavigation } from 'expo-router'
 import { Button, Paragraph, Separator, Sheet, Text, XStack, YStack, useTheme } from 'tamagui'
@@ -18,7 +18,8 @@ import { useDrawerOpener } from '../src/navigation/useDrawerOpener'
 
 const DEFAULT_SHEET_SNAP_POINTS = [65]
 
-export default function HistoryScreen() {
+// PBI-17: Memoize to prevent re-renders during navigation
+function HistoryScreen() {
   const navigation = useNavigation()
   const openDrawer = useDrawerOpener()
   const { entries, solvedCount, hydrated } = useHistory()
@@ -175,10 +176,10 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
           gap="$2"
           style={{ alignItems: 'center', justifyContent: 'space-between' }}
         >
-          <Text fontSize={16} fontWeight="700">
+          <Text fontSize={16} fontWeight="700" flex={1} numberOfLines={1}>
             {entry.displayName}
           </Text>
-          <Text fontSize={14} fontWeight="600" style={{ color: statusColor }}>
+          <Text fontSize={14} fontWeight="600" flexShrink={0} style={{ color: statusColor }}>
             {statusLabel}
           </Text>
         </XStack>
@@ -719,4 +720,7 @@ const previewStyles = StyleSheet.create({
     marginTop: 16,
   },
 })
+
+// PBI-17: Memoize the entire screen component to prevent re-renders
+export default memo(HistoryScreen)
 

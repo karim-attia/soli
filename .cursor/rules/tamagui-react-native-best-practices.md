@@ -1,0 +1,449 @@
+# Tamagui & React Native Best Practices
+
+> This document provides guidelines for AI agents when working with Tamagui and React Native code in this project.
+
+## 1. Tamagui Component Usage
+
+### 1.1 Always Use Tamagui Components
+- **Use Tamagui primitives** instead of React Native core components:
+  - `View` → `import { View } from 'tamagui'`
+  - `Text` → `import { Text } from 'tamagui'`
+  - `Button` → `import { Button } from 'tamagui'`
+  - `Image` → `import { Image } from 'tamagui'`
+  - `ScrollView` → `import { ScrollView } from 'tamagui'`
+  - `Input` → `import { Input } from 'tamagui'`
+- **Exception**: Use React Native components only when Tamagui doesn't provide an equivalent (e.g., `FlatList`, `SectionList`).
+
+### 1.2 Styling with Tamagui
+```tsx
+// ✅ GOOD: Use Tamagui style props directly
+<View backgroundColor="$background" padding="$4" borderRadius="$2">
+  <Text color="$color" fontSize="$4">Hello</Text>
+</View>
+
+// ❌ BAD: Don't use StyleSheet or inline style objects
+<View style={{ backgroundColor: '#fff', padding: 16 }}>
+  <Text style={styles.text}>Hello</Text>
+</View>
+```
+
+### 1.3 Use Token References
+- Always use `$` token references for consistency:
+  - Colors: `$background`, `$color`, `$red10`, `$blue5`
+  - Spacing: `$1`, `$2`, `$3`, `$4` (multiples of 4px by default)
+  - Sizes: `$sm`, `$md`, `$lg`, `$true`
+  - Radii: `$1`, `$2`, `$3`, `$4`
+  - Font sizes: `$1` through `$16`
+
+```tsx
+// ✅ GOOD: Token references
+<View padding="$4" marginBottom="$2" backgroundColor="$backgroundHover" />
+
+// ❌ BAD: Hardcoded values
+<View padding={16} marginBottom={8} backgroundColor="#f0f0f0" />
+```
+
+### 1.4 Creating Styled Components
+Use `styled()` for reusable components with predefined styles:
+
+```tsx
+import { styled, View, Text } from 'tamagui'
+
+// ✅ GOOD: Styled component with variants
+const Card = styled(View, {
+  backgroundColor: '$background',
+  borderRadius: '$4',
+  padding: '$4',
+  
+  variants: {
+    elevated: {
+      true: {
+        shadowColor: '$shadowColor',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+      },
+    },
+    size: {
+      small: { padding: '$2' },
+      medium: { padding: '$4' },
+      large: { padding: '$6' },
+    },
+  } as const,
+  
+  defaultVariants: {
+    size: 'medium',
+  },
+})
+
+// Usage
+<Card elevated size="large">
+  <Text>Content</Text>
+</Card>
+```
+
+## 2. Responsive Design
+
+### 2.1 Media Query Props
+Use `$` prefix for responsive styles:
+
+```tsx
+// Mobile-first approach
+<View 
+  flexDirection="column"
+  $gtSm={{ flexDirection: 'row' }}
+  $gtMd={{ gap: '$6' }}
+>
+  <Text 
+    fontSize="$4"
+    $gtSm={{ fontSize: '$5' }}
+    $gtLg={{ fontSize: '$6' }}
+  >
+    Responsive Text
+  </Text>
+</View>
+```
+
+### 2.2 useMedia Hook
+For conditional rendering based on screen size:
+
+```tsx
+import { useMedia } from 'tamagui'
+
+function ResponsiveComponent() {
+  const media = useMedia()
+  
+  if (media.sm) {
+    return <MobileLayout />
+  }
+  return <DesktopLayout />
+}
+```
+
+### 2.3 Available Breakpoints
+- `xs`: maxWidth 660px
+- `sm`: maxWidth 860px
+- `md`: maxWidth 980px
+- `lg`: maxWidth 1120px
+- `xl`: maxWidth 1280px
+- `gtXs`, `gtSm`, `gtMd`, `gtLg`: "greater than" variants
+
+## 3. Theming
+
+### 3.1 Theme-Aware Colors
+Always use theme tokens that automatically adapt to light/dark mode:
+
+```tsx
+// ✅ GOOD: Theme-aware tokens
+<View backgroundColor="$background">
+  <Text color="$color">Auto-adapts to theme</Text>
+</View>
+
+// ❌ BAD: Hardcoded colors that won't adapt
+<View backgroundColor="white">
+  <Text color="black">Won't adapt to dark mode</Text>
+</View>
+```
+
+### 3.2 Sub-themes
+Use sub-themes for semantic coloring:
+
+```tsx
+import { Theme } from 'tamagui'
+
+<Theme name="red">
+  <Button>Danger Action</Button>
+</Theme>
+
+<Theme name="green">
+  <Button>Success Action</Button>
+</Theme>
+```
+
+## 4. Performance Optimization
+
+### 4.1 Avoid Inline Functions in Props
+```tsx
+// ❌ BAD: Creates new function on every render
+<Button onPress={() => handlePress(item.id)}>Press</Button>
+
+// ✅ GOOD: Use useCallback
+const handleItemPress = useCallback(() => {
+  handlePress(item.id)
+}, [item.id])
+
+<Button onPress={handleItemPress}>Press</Button>
+```
+
+### 4.2 Memoization Guidelines
+Use `useMemo` and `useCallback` judiciously:
+
+```tsx
+// ✅ Use useMemo for expensive computations
+const sortedItems = useMemo(() => 
+  items.sort((a, b) => a.name.localeCompare(b.name)),
+  [items]
+)
+
+// ✅ Use useCallback for handlers passed to child components
+const handleSelect = useCallback((id: string) => {
+  setSelectedId(id)
+}, [])
+
+// ❌ Don't over-memoize simple values
+const doubled = useMemo(() => count * 2, [count]) // Overkill for simple math
+```
+
+### 4.3 List Rendering
+```tsx
+// ✅ GOOD: Use FlatList for large lists
+import { FlatList } from 'react-native'
+
+<FlatList
+  data={items}
+  renderItem={({ item }) => <ItemCard item={item} />}
+  keyExtractor={(item) => item.id}
+  getItemLayout={(_, index) => ({
+    length: ITEM_HEIGHT,
+    offset: ITEM_HEIGHT * index,
+    index,
+  })}
+  removeClippedSubviews={true}
+/>
+
+// ❌ BAD: Don't map arrays for large lists
+{items.map(item => <ItemCard key={item.id} item={item} />)}
+```
+
+### 4.4 Use React.memo for Pure Components
+```tsx
+import { memo } from 'react'
+
+const ItemCard = memo(function ItemCard({ item }: { item: Item }) {
+  return (
+    <View padding="$3">
+      <Text>{item.name}</Text>
+    </View>
+  )
+})
+```
+
+## 5. Animation Best Practices
+
+### 5.1 Tamagui Animations
+Use Tamagui's built-in animation system:
+
+```tsx
+import { View } from 'tamagui'
+
+<View
+  animation="quick"
+  enterStyle={{ opacity: 0, scale: 0.9 }}
+  opacity={1}
+  scale={1}
+>
+  <Text>Animated content</Text>
+</View>
+```
+
+### 5.2 Reanimated Guidelines
+When using react-native-reanimated:
+
+```tsx
+// ✅ GOOD: Animate transform and opacity (performant)
+const animatedStyle = useAnimatedStyle(() => ({
+  transform: [{ translateX: offset.value }],
+  opacity: opacity.value,
+}))
+
+// ❌ BAD: Avoid animating layout properties
+const animatedStyle = useAnimatedStyle(() => ({
+  width: width.value,    // Triggers layout recalculation
+  height: height.value,  // Triggers layout recalculation
+  margin: margin.value,  // Triggers layout recalculation
+}))
+```
+
+### 5.3 Worklet Best Practices
+- Keep worklets as pure functions
+- Avoid reading shared values on the JS thread
+- Don't create new objects or functions inside worklets
+
+## 6. Accessibility
+
+### 6.1 Required Accessibility Props
+```tsx
+// ✅ GOOD: Include accessibility props
+<Button
+  onPress={handleSubmit}
+  accessibilityLabel="Submit form"
+  accessibilityRole="button"
+  accessibilityHint="Submits your contact information"
+>
+  Submit
+</Button>
+
+<Image
+  source={iconSource}
+  accessibilityLabel="User profile picture"
+/>
+```
+
+### 6.2 Touch Target Sizes
+Ensure minimum 44x44 pixel touch targets:
+
+```tsx
+<Button minWidth={44} minHeight={44}>
+  <Icon name="close" />
+</Button>
+```
+
+### 6.3 Color Contrast
+- Maintain minimum 4.5:1 contrast ratio for text
+- Don't rely solely on color to convey information
+
+## 7. State Management
+
+### 7.1 Local vs Global State
+```tsx
+// Use local state for component-specific UI state
+const [isExpanded, setIsExpanded] = useState(false)
+
+// Use global state (Zustand) for:
+// - User preferences
+// - Authentication state  
+// - Data shared across multiple screens
+```
+
+### 7.2 Zustand Best Practices
+```tsx
+// ✅ GOOD: Selective state subscription
+const userName = useStore((state) => state.user.name)
+
+// ❌ BAD: Subscribing to entire store
+const store = useStore()
+```
+
+## 8. Navigation (Expo Router)
+
+### 8.1 File-Based Routing
+```
+app/
+├── _layout.tsx          // Root layout
+├── index.tsx            // / route
+├── (tabs)/              // Tab group (doesn't affect URL)
+│   ├── _layout.tsx      // Tab navigator setup
+│   ├── home.tsx         // /home
+│   └── settings.tsx     // /settings
+├── [id].tsx             // Dynamic route /:id
+└── modal.tsx            // /modal
+```
+
+### 8.2 Navigation Hooks
+```tsx
+import { useRouter, useLocalSearchParams, useSegments } from 'expo-router'
+
+function Screen() {
+  const router = useRouter()
+  const { id } = useLocalSearchParams<{ id: string }>()
+  
+  // Programmatic navigation
+  router.push('/details/123')
+  router.replace('/home')
+  router.back()
+}
+```
+
+## 9. Code Organization
+
+### 9.1 Component Structure
+```
+src/
+├── features/           # Feature-based organization
+│   └── klondike/
+│       ├── components/
+│       ├── hooks/
+│       ├── types.ts
+│       └── utils/
+├── components/         # Shared components
+├── state/              # Global state
+├── theme/              # Theme configuration
+└── utils/              # Shared utilities
+```
+
+### 9.2 Import Order
+```tsx
+// 1. React/React Native
+import { useState, useCallback } from 'react'
+
+// 2. Third-party libraries
+import { View, Text, Button } from 'tamagui'
+import { useRouter } from 'expo-router'
+
+// 3. Internal imports (absolute)
+import { useSettings } from '@/state/settings'
+
+// 4. Relative imports
+import { CardView } from './CardView'
+import type { CardProps } from './types'
+```
+
+## 10. Common Pitfalls to Avoid
+
+### 10.1 Don't Mix Styling Approaches
+```tsx
+// ❌ BAD: Mixing Tamagui props with style prop
+<View padding="$4" style={{ marginTop: 10 }}>
+
+// ✅ GOOD: Use Tamagui props consistently
+<View padding="$4" marginTop="$2">
+```
+
+### 10.2 Don't Forget TypeScript Types
+```tsx
+// ✅ GOOD: Type your props
+interface CardProps {
+  title: string
+  onPress: () => void
+  variant?: 'primary' | 'secondary'
+}
+
+function Card({ title, onPress, variant = 'primary' }: CardProps) {
+  // ...
+}
+```
+
+### 10.3 Avoid Unnecessary Re-renders in Lists
+```tsx
+// ❌ BAD: Inline object creation
+<FlatList
+  data={items}
+  contentContainerStyle={{ padding: 16 }} // New object every render
+/>
+
+// ✅ GOOD: Define outside component or memoize
+const contentContainerStyle = { padding: 16 }
+
+<FlatList
+  data={items}
+  contentContainerStyle={contentContainerStyle}
+/>
+```
+
+## 11. Testing Considerations
+
+### 11.1 Component Testing
+- Test component behavior, not implementation details
+- Use `@testing-library/react-native` for component tests
+- Mock Tamagui's theme provider in test setup
+
+### 11.2 Accessibility Testing
+- Test with VoiceOver (iOS) and TalkBack (Android)
+- Verify all interactive elements are accessible
+- Check focus order is logical
+
+---
+
+*Last updated: December 2024*
+*References: Tamagui docs (tamagui.dev), React Native docs (reactnative.dev), Expo Router docs (docs.expo.dev)*

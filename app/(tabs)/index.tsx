@@ -14,8 +14,9 @@ export default function TabOneScreen() {
   const { developerModeEnabled, requestNewGame, handleLaunchDemoGame, viewProps } = useKlondikeGame()
 
   useLayoutEffect(() => {
+    // PBI-17: Renamed from Klondike to Soli (iOS centers title by platform convention)
     navigation.setOptions({
-      headerTitle: 'Klondike',
+      headerTitle: 'Soli',
       headerRight: () => (
         <HeaderControls
           onMenuPress={openDrawer}
@@ -35,14 +36,15 @@ type HeaderControlsProps = {
   onDemoGame?: () => void
 }
 
+// PBI-17: Reduced button size from $4 to $3 for iOS best practice (compact nav bar buttons)
 const HeaderControls = ({ onMenuPress, onNewGame, onDemoGame }: HeaderControlsProps) => (
-  <XStack gap="$4" style={{ alignItems: 'center' }}>
+  <XStack gap="$3" style={{ alignItems: 'center' }}>
     {onDemoGame ? (
-      <Button size="$4" onPress={onDemoGame}>
-        Demo Game
+      <Button size="$3" onPress={onDemoGame}>
+        Demo
       </Button>
     ) : null}
-    <Button size="$4" onPress={onNewGame}>
+    <Button size="$3" onPress={onNewGame}>
       New Game
     </Button>
     <HeaderMenuButton onPress={onMenuPress} />

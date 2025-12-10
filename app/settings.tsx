@@ -241,25 +241,41 @@ type ToggleRowProps = {
   inactive?: boolean
 }
 
-const ToggleRow = ({ label, description, value, onValueChange, disabled, inactive }: ToggleRowProps) => (
-  <XStack gap="$3" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-    <YStack flex={1} gap="$1">
-      <Text fontWeight="600" color={inactive ? '$color8' : '$color'}>
-        {label}
-      </Text>
-      {description ? (
-        <Paragraph color={inactive ? '$color9' : '$color10'}>{description}</Paragraph>
-      ) : null}
-    </YStack>
-    <Switch
-      size="$3"
-      checked={value}
-      disabled={disabled}
-      onCheckedChange={(checked) => onValueChange(checked === true)}
-      opacity={inactive ? 0.7 : 1}
-    >
-      <Switch.Thumb animation="quick" />
-    </Switch>
-  </XStack>
-)
+// PBI-17-13: Apply Material Design styling to native Android switches
+const ToggleRow = ({ label, description, value, onValueChange, disabled, inactive }: ToggleRowProps) => {
+  const theme = useTheme()
+
+  // PBI-17-13: Theme-aware colors for Android native switch
+  const androidNativeProps = Platform.OS === 'android' ? {
+    thumbColor: value ? theme.color.val : theme.color6.val,
+    trackColor: {
+      false: theme.color4.val,
+      true: theme.color10.val,
+    },
+  } : undefined
+
+  return (
+    <XStack gap="$3" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
+      <YStack flex={1} gap="$1">
+        <Text fontWeight="600" color={inactive ? '$color8' : '$color'}>
+          {label}
+        </Text>
+        {description ? (
+          <Paragraph color={inactive ? '$color9' : '$color10'}>{description}</Paragraph>
+        ) : null}
+      </YStack>
+      <Switch
+        native
+        nativeProps={androidNativeProps}
+        size="$3"
+        checked={value}
+        disabled={disabled}
+        onCheckedChange={(checked) => onValueChange(checked === true)}
+        opacity={inactive ? 0.7 : 1}
+      >
+        <Switch.Thumb />
+      </Switch>
+    </XStack>
+  )
+}
 

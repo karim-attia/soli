@@ -17,4 +17,7 @@ This document lists all tasks associated with PBI 17.
 | 17-8 | [Add prod install mode to demo script](./17-8.md) | Review | Difficulty: Medium. Add a prod CLI mode that installs the app, freezes progress, and streams logs. |
 | 17-9 | [Undo scrub should preserve move count](./17-9.md) | Review | Difficulty: Easy. Ensure scrub-based undo/redo keeps move totals accurate and allows unlimited history depth. |
 | 17-10 | [Enable card flip animation by default](./17-10.md) | Done | Difficulty: Easy. Change the default setting for card flip animation from disabled to enabled. |
+| 17-11 | [Fix drawer navigation lag and iOS header polish](./17-11.md) | Done | Difficulty: Easy. Fix route navigation lag, rename header to Soli, reduce button size. |
+| 17-12 | [Ultimate fix for first-load drawer navigation lag](./17-12.md) | Review | Difficulty: Hard. Deep analysis and comprehensive fix for navigation lag. |
+| 17-13 | [Apply Material Design styling to native Android switches](./17-13.md) | Review | Difficulty: Easy. Add theme-aware colors to native Android switches via nativeProps. |
 

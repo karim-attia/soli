@@ -356,7 +356,8 @@ const mergeEntries = (current: HistoryEntry[], incoming: HistoryEntry[]): Histor
   })
 
   const merged = Array.from(map.values())
-  merged.sort((a, b) => b.finishedAt.localeCompare(a.finishedAt))
+  // Task 10-6: Sort by startedAt since finishedAt can be null for active games
+  merged.sort((a, b) => b.startedAt.localeCompare(a.startedAt))
   return merged.slice(0, MAX_HISTORY_ENTRIES)
 }
 
@@ -370,7 +371,8 @@ const isValidEntry = (entry: unknown): entry is HistoryEntry => {
     typeof candidate.id === 'string' &&
     typeof candidate.shuffleId === 'string' &&
     typeof candidate.displayName === 'string' &&
-    typeof candidate.finishedAt === 'string' &&
+    // Task 10-6: finishedAt can be null/undefined for active games, or string for completed/old entries
+    (candidate.finishedAt === null || candidate.finishedAt === undefined || typeof candidate.finishedAt === 'string') &&
     typeof candidate.solved === 'boolean' &&
     typeof candidate.solvable === 'boolean' &&
     (candidate.moves === null || typeof candidate.moves === 'number' || candidate.moves === undefined) &&
