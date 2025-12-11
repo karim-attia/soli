@@ -46,7 +46,6 @@ import type {
   Suit,
 } from '../../src/solitaire/klondike'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
-import { SelectionHint } from '../../src/features/klondike/components/SelectionHint'
 
 // Atomic solver types for visualization
 type AtomicSnapshot = {
@@ -502,7 +501,6 @@ export default function TabOneScreen() {
 
         {!atomicReady || !atomicSnapshot ? (
           <>
-            <SelectionHint state={state} onClear={clearSelection} />
             <XStack gap="$2" items="center">
               <Text style={styles.movesLabel}>Moves</Text>
               <Text style={styles.movesValue}>{state.moveCount}</Text>
