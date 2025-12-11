@@ -93,6 +93,7 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
           onPress={onUndoPress}
           disabled={boardLocked}
           themeInverse
+          size="$5"
           style={styles.button}
           opacity={buttonOpacity}
         >
@@ -106,6 +107,7 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginTop: 12,
+    marginBottom: 8,
     width: '100%',
     minHeight: 72,
     position: 'relative',
