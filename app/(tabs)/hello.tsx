@@ -33,6 +33,7 @@ export default function HelloScreen() {
           <Anchor color="$blue10" href="https://x.com/carimatia" target="_blank">
             @carimatia
           </Anchor>
+          <Paragraph style={{ textAlign: 'center' }}>For my girlfriend T because she always had to look at ads when playing Solitaire.</Paragraph>
         </XStack>
 
         <YStack gap="$2" style={{ maxWidth: 560 }}>

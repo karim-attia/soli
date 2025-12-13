@@ -14,7 +14,7 @@
     "prod": "node scripts/run-demo-autosolve.js --mode=prod",
     "prod:no-timeout": "node scripts/run-demo-autosolve.js --mode=prod --no-prod-timeout",
     "ios": "expo run:ios",
-    "build:ios": "npx eas build --platform ios --profile production --non-interactive",
+    "build:ios": "eas build --platform ios --profile production --non-interactive",
     "web": "pkill -f 'expo.*start.*web' 2>/dev/null || true && BROWSER=none expo start --web --port 8081",
     "test": "jest --watchAll",
     "harvest:trial": "node scripts/harvest-solvable.js --trial",
@@ -78,6 +78,7 @@
     "@tamagui/metro-plugin": "^1.135.4",
     "@types/jest": "^29.5.12",
     "@types/react": "~19.0.10",
+    "eas-cli": "16.28.0",
     "jest": "~29.7.0",
     "jest-pnp-resolver": "^1.2.3",
     "typescript": "~5.8.3"

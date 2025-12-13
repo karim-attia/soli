@@ -2,7 +2,7 @@
 /**
  * @type {import('expo/metro-config').MetroConfig}
  */
-const { getDefaultConfig } = require('expo/metro-config')
+const { getDefaultConfig } = require('@expo/metro-config')
 const { withTamagui } = require('@tamagui/metro-plugin')
 
 const config = getDefaultConfig(__dirname, {
