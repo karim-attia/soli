@@ -30,6 +30,7 @@ node_modules
 **/_
 **/tests/spec/out
 .DS_Store
+.cursor/debug.log
 
 .next
 .vercel

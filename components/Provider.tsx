@@ -1,4 +1,5 @@
 import { useColorScheme } from 'react-native'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { TamaguiProvider, type TamaguiProviderProps } from 'tamagui'
 import { ToastProvider, ToastViewport } from '@tamagui/toast'
 import { CurrentToast } from './CurrentToast'
@@ -9,11 +10,15 @@ import { config } from '../tamagui.config'
 
 export function Provider({ children, ...rest }: Omit<TamaguiProviderProps, 'config'>) {
   return (
-    <SettingsProvider>
-      <HistoryProvider>
-      <TamaguiWithSettings {...rest}>{children}</TamaguiWithSettings>
-      </HistoryProvider>
-    </SettingsProvider>
+    // requirement 20-6: GestureHandlerRootView must wrap the app root on iOS.
+    // Without it, iOS gestures can cancel during React Native refresh/commits.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SettingsProvider>
+        <HistoryProvider>
+          <TamaguiWithSettings {...rest}>{children}</TamaguiWithSettings>
+        </HistoryProvider>
+      </SettingsProvider>
+    </GestureHandlerRootView>
   )
 }
 

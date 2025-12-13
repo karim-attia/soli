@@ -21,6 +21,8 @@ export type WasteFanProps = {
   onPress: () => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
+  // requirement 20-6: Disable CardView layout tracking during scrubbing to reduce churn
+  layoutTrackingEnabled?: boolean
   onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
   disabled?: boolean
@@ -33,6 +35,7 @@ export const WasteFan = ({
   onPress,
   invalidWiggle,
   cardFlights,
+  layoutTrackingEnabled = true,
   onCardMeasured,
   cardFlightMemory,
   disabled = false,
@@ -57,6 +60,7 @@ export const WasteFan = ({
             invalidWiggle={invalidWiggle}
             zIndex={index}
             cardFlights={cardFlights}
+            layoutTrackingEnabled={layoutTrackingEnabled}
             onCardMeasured={onCardMeasured}
             cardFlightMemory={cardFlightMemory}
           />
@@ -75,6 +79,7 @@ export type WasteFanCardProps = {
   invalidWiggle: InvalidWiggleConfig
   zIndex: number
   cardFlights: CardFlightRegistry
+  layoutTrackingEnabled: boolean
   onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
 }
@@ -88,6 +93,7 @@ export const WasteFanCard = ({
   invalidWiggle,
   zIndex,
   cardFlights,
+  layoutTrackingEnabled,
   onCardMeasured,
   cardFlightMemory,
 }: WasteFanCardProps) => {
@@ -113,6 +119,7 @@ export const WasteFanCard = ({
         onPress={onPress}
         invalidWiggle={invalidWiggle}
         cardFlights={cardFlights}
+        layoutTrackingEnabled={layoutTrackingEnabled}
         onCardMeasured={onCardMeasured}
         cardFlightMemory={cardFlightMemory}
       />

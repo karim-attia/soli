@@ -11,6 +11,7 @@ import {
   LayoutChangeEvent,
   LayoutRectangle,
   Linking,
+  Platform,
   useColorScheme,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -683,7 +684,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     scrubSliderValue,
     scrubSliderMax,
     undoScrubGesture,
-    handleUndoTap,
     handleTrackMetrics,
   } = useUndoScrubber({
     state,
@@ -693,6 +693,14 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     dispatch,
     handleUndo,
   })
+
+  // requirement 20-6: Scrubbing disables CardView layout tracking to prevent iOS cancels.
+  // That means card-flight snapshots can become stale; reset them when scrubbing begins to avoid wrong flights.
+  useEffect(() => {
+    if (Platform.OS === 'ios' && isScrubbing) {
+      resetCardFlights()
+    }
+  }, [isScrubbing, resetCardFlights])
 
   // Requirement PBI-13: persist state changes after hydration.
   useEffect(() => {
@@ -727,6 +735,8 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     onCardMeasured: handleCardMeasured,
     cardFlightMemory: cardFlightMemoryRef.current,
     interactionsLocked: boardLocked,
+    // requirement 20-6: Reduce board churn during undo scrubbing (iOS gesture stability)
+    scrubbingActive: Platform.OS === 'ios' && isScrubbing,
     hideFoundations: false,
     onTopRowLayout: handleTopRowLayout,
     onFoundationLayout: handleFoundationLayout,
@@ -744,15 +754,17 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     onCardMeasured: handleCardMeasured,
     cardFlightMemory: cardFlightMemoryRef.current,
     interactionsLocked: boardLocked,
+    // requirement 20-6: Reduce board churn during undo scrubbing (iOS gesture stability)
+    scrubbingActive: Platform.OS === 'ios' && isScrubbing,
   }
 
+  // requirement 20-6: onUndoPress removed - tap is handled by composed gesture
   const undoScrubProps: UndoScrubberProps = {
     visible: shouldShowUndo,
     isScrubbing,
     sliderValue: scrubSliderValue,
     sliderMax: scrubSliderMax,
     gesture: undoScrubGesture,
-    onUndoPress: handleUndoTap,
     boardLocked,
     canUndo,
     onTrackMetrics: handleTrackMetrics,

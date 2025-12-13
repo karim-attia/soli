@@ -29,6 +29,8 @@ export type TableauSectionProps = {
   onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
   interactionsLocked: boolean
+  // requirement 20-6: When scrubbing, reduce board churn to avoid iOS gesture cancellation
+  scrubbingActive: boolean
 }
 
 export const TableauSection = ({
@@ -41,6 +43,7 @@ export const TableauSection = ({
   onCardMeasured,
   cardFlightMemory,
   interactionsLocked,
+  scrubbingActive,
 }: TableauSectionProps) => (
   <View style={styles.tableauRow}>
     {state.tableau.map((column, columnIndex) => (
@@ -57,6 +60,7 @@ export const TableauSection = ({
         onCardMeasured={onCardMeasured}
         cardFlightMemory={cardFlightMemory}
         disableInteractions={interactionsLocked}
+        scrubbingActive={scrubbingActive}
       />
     ))}
   </View>
@@ -74,6 +78,7 @@ export type TableauColumnProps = {
   onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
   disableInteractions: boolean
+  scrubbingActive: boolean
 }
 
 export const TableauColumn = ({
@@ -88,6 +93,7 @@ export const TableauColumn = ({
   onCardMeasured,
   cardFlightMemory,
   disableInteractions,
+  scrubbingActive,
 }: TableauColumnProps) => {
   const columnHeight = column.length
     ? cardMetrics.height + (column.length - 1) * cardMetrics.stackOffset
@@ -136,6 +142,7 @@ export const TableauColumn = ({
           }
           invalidWiggle={invalidWiggle}
           cardFlights={cardFlights}
+          layoutTrackingEnabled={!scrubbingActive}
           onCardMeasured={onCardMeasured}
           cardFlightMemory={cardFlightMemory}
         />

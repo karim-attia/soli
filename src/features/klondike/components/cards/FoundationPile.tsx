@@ -34,6 +34,8 @@ export type FoundationPileProps = {
   onPress: () => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
+  // requirement 20-6: Disable CardView layout tracking during scrubbing to reduce churn
+  layoutTrackingEnabled?: boolean
   onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
   onCardArrived?: (cardId: string | null | undefined) => void
@@ -53,6 +55,7 @@ export const FoundationPile = ({
   onPress,
   invalidWiggle,
   cardFlights,
+  layoutTrackingEnabled = true,
   onCardMeasured,
   cardFlightMemory,
   onCardArrived,
@@ -127,6 +130,7 @@ export const FoundationPile = ({
                 metrics={cardMetrics}
                 invalidWiggle={isTop ? invalidWiggle : EMPTY_INVALID_WIGGLE}
                 cardFlights={cardFlights}
+                layoutTrackingEnabled={layoutTrackingEnabled}
                 onCardMeasured={onCardMeasured}
                 cardFlightMemory={cardFlightMemory}
                 celebrationBindings={celebrationBindings}

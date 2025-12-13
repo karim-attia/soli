@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Dimensions } from 'react-native'
 import { Gesture } from 'react-native-gesture-handler'
-import { runOnJS } from 'react-native-reanimated'
+import type { GestureType } from 'react-native-gesture-handler'
 
 import type { GameAction, GameState } from '../../../solitaire/klondike'
 import { UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING } from '../constants'
@@ -42,6 +42,16 @@ export const useUndoScrubber = ({
   const timelineRange = state.history.length + state.future.length
   const shouldShowUndo = !state.hasWon && !celebrationActive && timelineRange > 0
   const canUndo = !boardLocked && hasUndo
+  
+  // requirement 20-6: Refs for all state values to prevent callback recreation during scrubbing
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const timelineRangeRef = useRef(timelineRange)
+  timelineRangeRef.current = timelineRange
+  const shouldShowUndoRef = useRef(shouldShowUndo)
+  shouldShowUndoRef.current = shouldShowUndo
+  const boardLockedRef = useRef(boardLocked)
+  boardLockedRef.current = boardLocked
 
   const [isScrubbing, setIsScrubbing] = useState(false)
   const [scrubValue, setScrubValue] = useState(0)
@@ -52,6 +62,7 @@ export const useUndoScrubber = ({
   const lastDispatchedScrubIndexRef = useRef(state.history.length)
   const trackMetricsRef = useRef<{ left: number; right: number } | null>(null)
   const scrubOriginRef = useRef<ScrubOrigin | null>(null)
+  
 
   useEffect(() => {
     isScrubbingRef.current = isScrubbing
@@ -94,16 +105,25 @@ export const useUndoScrubber = ({
     trackMetricsRef.current = metrics
   }, [])
 
+  // requirement 20-6: ROOT CAUSE FIX - Use refs in dependencies to prevent callback recreation
+  // When we dispatch SCRUB_TO_INDEX, state.history changes, which changes timelineRange.
+  // If timelineRange is in the dependency array, callbacks are recreated, gesture is recreated,
+  // and iOS cancels the gesture. Using refs prevents this callback recreation chain.
+  const safeAreaRef = useRef(safeArea)
+  safeAreaRef.current = safeArea
+
   const computeScrubGeometry = useCallback(
     (anchorIndex: number) => {
       const windowWidth = Dimensions.get('window').width || 1
       const metrics = trackMetricsRef.current
-      const defaultTrackLeft = safeArea.left + UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING
-      const defaultTrackRight = windowWidth - safeArea.right - UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING
+      const currentSafeArea = safeAreaRef.current
+      const currentTimelineRange = timelineRangeRef.current
+      const defaultTrackLeft = currentSafeArea.left + UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING
+      const defaultTrackRight = windowWidth - currentSafeArea.right - UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING
       const trackLeft = metrics ? metrics.left : defaultTrackLeft
       const trackRight = metrics ? metrics.right : defaultTrackRight
       const usableWidth = Math.max(trackRight - trackLeft, 1)
-      const maxIndex = Math.max(timelineRange, 0)
+      const maxIndex = Math.max(currentTimelineRange, 0)
 
       if (maxIndex <= 0) {
         const anchorAbsoluteX = trackLeft + usableWidth / 2
@@ -136,7 +156,7 @@ export const useUndoScrubber = ({
         trackRight,
       }
     },
-    [safeArea.left, safeArea.right, timelineRange],
+    [], // Empty deps - all values come from refs
   )
 
   const cancelScheduledScrub = useCallback(() => {
@@ -151,14 +171,16 @@ export const useUndoScrubber = ({
 
   const computeScrubIndexFromAbsolute = useCallback(
     (absoluteX: number): number => {
-      const totalRange = timelineRange
+      // requirement 20-6: Use refs to prevent callback recreation during scrubbing
+      const totalRange = timelineRangeRef.current
       if (totalRange <= 0) {
         return 0
       }
       const windowWidth = Dimensions.get('window').width || 1
       const metrics = trackMetricsRef.current
-      const defaultTrackLeft = safeArea.left + UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING
-      const defaultTrackRight = windowWidth - safeArea.right - UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING
+      const currentSafeArea = safeAreaRef.current
+      const defaultTrackLeft = currentSafeArea.left + UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING
+      const defaultTrackRight = windowWidth - currentSafeArea.right - UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING
       const trackLeft = metrics ? metrics.left : defaultTrackLeft
       const trackRight = metrics ? metrics.right : defaultTrackRight
       const usableWidth = Math.max(trackRight - trackLeft, 1)
@@ -166,7 +188,7 @@ export const useUndoScrubber = ({
       const normalized = (clamped - trackLeft) / usableWidth
       return Math.max(0, Math.min(Math.round(normalized * totalRange), totalRange))
     },
-    [safeArea.left, safeArea.right, timelineRange],
+    [], // Empty deps - all values come from refs
   )
 
   const scheduleScrubDispatch = useCallback(
@@ -177,25 +199,33 @@ export const useUndoScrubber = ({
       }
       scrubDispatchRafRef.current = requestAnimationFrame(() => {
         scrubDispatchRafRef.current = null
-        const pending = scrubPendingIndexRef.current
+        const desiredPending = scrubPendingIndexRef.current
         scrubPendingIndexRef.current = null
-        if (pending === null || pending === lastDispatchedScrubIndexRef.current) {
+        if (desiredPending === null || desiredPending === lastDispatchedScrubIndexRef.current) {
           return
         }
-        lastDispatchedScrubIndexRef.current = pending
-        dispatch({ type: 'SCRUB_TO_INDEX', index: pending })
+        // requirement 20-6: Yield to gesture handler, then dispatch with startTransition
+        lastDispatchedScrubIndexRef.current = desiredPending
+        setTimeout(() => {
+          startTransition(() => {
+            dispatch({ type: 'SCRUB_TO_INDEX', index: desiredPending })
+          })
+        }, 0)
       })
     },
     [dispatch],
   )
 
   const handleScrubGestureStart = useCallback(
-    (absoluteX: number) => {
-      if (boardLocked || !shouldShowUndo) {
+    (absoluteX: number, absoluteY: number, translationX: number, translationY: number, gestureState: number) => {
+      // requirement 20-6: Use refs to avoid callback recreation during scrubbing
+      const currentState = stateRef.current
+      // requirement 20-6: Use ref for enabled check to avoid stale closure values
+      if (!gestureEnabledRef.current) {
         return
       }
       cancelScheduledScrub()
-      const pointer = state.history.length
+      const pointer = currentState.history.length
       const geometry = computeScrubGeometry(pointer)
       const clampedFingerStart = Math.min(
         Math.max(absoluteX, geometry.trackLeft),
@@ -224,15 +254,18 @@ export const useUndoScrubber = ({
       setScrubValue(pointer)
       setIsScrubbing(true)
     },
-    [boardLocked, cancelScheduledScrub, computeScrubGeometry, shouldShowUndo, state.history.length],
+    // requirement 20-6: Stable deps - only refs and stable callbacks, no state values
+    [cancelScheduledScrub, computeScrubGeometry],
   )
-
   const handleScrubGestureUpdate = useCallback(
-    (absoluteX: number) => {
-      if (!shouldShowUndo || !isScrubbingRef.current) {
+    (absoluteX: number, absoluteY: number, translationX: number, translationY: number, gestureState: number) => {
+      // requirement 20-6: Use refs to avoid callback recreation during scrubbing
+      const currentShouldShowUndo = shouldShowUndoRef.current
+      const currentTimelineRange = timelineRangeRef.current
+      if (!currentShouldShowUndo || !isScrubbingRef.current) {
         return
       }
-      const totalRange = timelineRange
+      const totalRange = currentTimelineRange
       if (totalRange <= 0) {
         return
       }
@@ -274,10 +307,11 @@ export const useUndoScrubber = ({
       setScrubValue(nextIndex)
       scheduleScrubDispatch(nextIndex)
     },
-    [computeScrubIndexFromAbsolute, scheduleScrubDispatch, shouldShowUndo, timelineRange],
+    // requirement 20-6: Stable deps - only refs and stable callbacks, no state values
+    [computeScrubIndexFromAbsolute, scheduleScrubDispatch],
   )
 
-  const handleScrubGestureEnd = useCallback(() => {
+  const handleScrubGestureEnd = useCallback((source: string, gestureState?: number) => {
     if (!isScrubbingRef.current) {
       return
     }
@@ -288,39 +322,83 @@ export const useUndoScrubber = ({
     scrubOriginRef.current = null
   }, [scheduleScrubDispatch])
 
-  const undoScrubGesture = useMemo(() => {
+  // requirement 20-6: compose Tap + Pan to avoid iOS gesture conflicts with Button's onPress
+  // Use ref for canUndo check to avoid gesture recreation
+  const canUndoRef = useRef(false)
+  canUndoRef.current = canUndo
+  
+  // requirement 20-6: CRITICAL - Use ref for handleUndo to prevent callback recreation
+  // handleUndo changes on state updates, which would cause gesture rebuild
+  const handleUndoRef = useRef(handleUndo)
+  handleUndoRef.current = handleUndo
+  
+  // requirement 20-6: Wrap handleUndo to check canUndo ref - NO dependencies to prevent recreation
+  const handleTapEnd = useCallback(() => {
+    if (canUndoRef.current) {
+      handleUndoRef.current()
+    }
+  }, []) // NO dependencies - uses refs only
+
+  // requirement 20-6: Dedicated Tap gesture for plain undo press (works on iOS and Android).
+  const undoTapGesture = useMemo(() => {
+    return Gesture.Tap()
+      .runOnJS(true)
+      .enabled(true)
+      .onEnd(() => {
+        handleTapEnd()
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleTapEnd])
+
+  // requirement 20-6: Keep gesture enabled during active scrubbing even if timeline changes
+  // Use a ref to prevent gesture recreation when state changes during scrubbing
+  const gestureEnabledRef = useRef(false)
+  gestureEnabledRef.current = !boardLocked && (shouldShowUndo || isScrubbingRef.current)
+  
+  const undoPanGesture = useMemo(() => {
     return Gesture.Pan()
-      .enabled(!boardLocked && shouldShowUndo)
-      .minDistance(2)
-      .activeOffsetY([-20, 20])
+      // requirement 20-6: Run pan callbacks on JS thread to avoid worklet->JS bridging during state refresh
+      // Empirically, iOS cancels shortly after the first React commit; this keeps gesture callbacks consistent.
+      .runOnJS(true)
+      // requirement 20-6: Always check ref for enabled state to avoid gesture rebuild during scrubbing
+      .enabled(true)
+      .minDistance(5)
+      // requirement 20-6: Tolerate natural vertical finger drift during horizontal scrubbing
+      .failOffsetY([-100, 100])
+      .shouldCancelWhenOutside(false)
+      // requirement 20-6: Improve iOS gesture arbitration with external/system gestures.
+      .simultaneousWithExternalGesture()
+      .requireExternalGestureToFail()
+      // requirement 20-6: iOS gesture handling - extend hit area to help iOS gesture system
+      .hitSlop({ bottom: 50, top: 50, left: 20, right: 20 })
+      .cancelsTouchesInView(false)
       .onStart((event) => {
-        runOnJS(handleScrubGestureStart)(event.absoluteX)
+        handleScrubGestureStart(event.absoluteX, event.absoluteY, event.translationX, event.translationY, event.state)
       })
       .onUpdate((event) => {
-        runOnJS(handleScrubGestureUpdate)(event.absoluteX)
+        handleScrubGestureUpdate(event.absoluteX, event.absoluteY, event.translationX, event.translationY, event.state)
       })
-      .onEnd(() => {
-        runOnJS(handleScrubGestureEnd)()
+      .onEnd((event) => {
+        handleScrubGestureEnd('onEnd', event.state)
       })
-      .onFinalize(() => {
-        runOnJS(handleScrubGestureEnd)()
+      .onFinalize((event, success) => {
+        handleScrubGestureEnd('onFinalize', event.state)
       })
       .maxPointers(1)
-  }, [
-    boardLocked,
-    handleScrubGestureEnd,
-    handleScrubGestureStart,
-    handleScrubGestureUpdate,
-    shouldShowUndo,
-  ])
+  // requirement 20-6: Minimal dependencies to prevent gesture recreation during scrubbing
+  // The gesture callbacks use refs internally so they don't need to be recreated
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleScrubGestureEnd, handleScrubGestureStart, handleScrubGestureUpdate, handleTapEnd])
 
-  const handleUndoTap = useCallback(() => {
-    if (isScrubbingRef.current || !canUndo) {
-      return
-    }
-    handleUndo()
-  }, [canUndo, handleUndo])
+  // requirement 20-6: Compose Pan + Tap so:
+  // - Tap always triggers undo
+  // - Pan takes over when user actually scrubs
+  const undoScrubGesture = useMemo(
+    () => Gesture.Exclusive(undoPanGesture, undoTapGesture) as unknown as GestureType,
+    [undoPanGesture, undoTapGesture],
+  )
 
+  // requirement 20-6: handleUndoTap no longer exported - tap handled internally by composed gesture
   return {
     shouldShowUndo,
     canUndo,
@@ -328,7 +406,6 @@ export const useUndoScrubber = ({
     scrubSliderValue,
     scrubSliderMax,
     undoScrubGesture,
-    handleUndoTap,
     handleTrackMetrics,
   }
 }

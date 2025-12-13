@@ -137,6 +137,9 @@ export type CardViewProps = {
   onPress?: () => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
+  // requirement 20-6: During undo scrubbing, disable layout tracking to reduce native churn.
+  // Card onLayout → measure() → shared value updates can be extremely noisy during rapid SCRUB_TO_INDEX commits.
+  layoutTrackingEnabled?: boolean
   onCardMeasured?: (cardId: string, snapshot: CardFlightSnapshot) => void
   cardFlightMemory?: Record<string, CardFlightSnapshot>
   celebrationBindings?: CelebrationBindings
@@ -151,6 +154,7 @@ export const CardView = ({
   onPress,
   invalidWiggle,
   cardFlights,
+  layoutTrackingEnabled = true,
   onCardMeasured,
   cardFlightMemory,
   celebrationBindings,
@@ -195,7 +199,7 @@ export const CardView = ({
   return (
     <AnimatedView
       ref={cardRef}
-      onLayout={handleCardLayout}
+      onLayout={layoutTrackingEnabled ? handleCardLayout : undefined}
       style={[positionStyle, motionStyle, containerStyle]}
     >
       <Animated.View style={[styles.cardFlipWrapper, flipStyle]}>

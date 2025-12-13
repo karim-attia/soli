@@ -39,6 +39,8 @@ export type TopRowProps = {
   cardFlightMemory: Record<string, CardFlightSnapshot>
   onFoundationArrival?: (cardId: string | null | undefined) => void
   interactionsLocked: boolean
+  // requirement 20-6: When scrubbing, reduce board churn to avoid iOS gesture cancellation
+  scrubbingActive: boolean
   hideFoundations?: boolean
   onTopRowLayout?: (layout: LayoutRectangle) => void
   onFoundationLayout?: (suit: Suit, layout: LayoutRectangle) => void
@@ -61,6 +63,7 @@ export const TopRow = ({
   cardFlightMemory,
   onFoundationArrival,
   interactionsLocked,
+  scrubbingActive,
   hideFoundations,
   onTopRowLayout,
   onFoundationLayout,
@@ -115,6 +118,7 @@ export const TopRow = ({
             onPress={() => onFoundationPress(suit)}
             invalidWiggle={invalidWiggle}
             cardFlights={cardFlights}
+            layoutTrackingEnabled={!scrubbingActive}
             onCardMeasured={onCardMeasured}
             cardFlightMemory={cardFlightMemory}
             onCardArrived={onFoundationArrival}
@@ -142,6 +146,7 @@ export const TopRow = ({
               onPress={handleWastePress}
               invalidWiggle={invalidWiggle}
               cardFlights={cardFlights}
+              layoutTrackingEnabled={!scrubbingActive}
               onCardMeasured={onCardMeasured}
               cardFlightMemory={cardFlightMemory}
               disabled={interactionsLocked}
@@ -159,6 +164,7 @@ export const TopRow = ({
                 metrics={cardMetrics}
                 invalidWiggle={invalidWiggle}
                 cardFlights={cardFlights}
+                layoutTrackingEnabled={!scrubbingActive}
                 onCardMeasured={onCardMeasured}
                 cardFlightMemory={cardFlightMemory}
                 label={state.stock.length ? drawLabel : undefined}
