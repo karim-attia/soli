@@ -49,6 +49,8 @@ export type UseCardAnimationsParams = {
   celebrationBindings?: CelebrationBindings
 }
 
+const MAX_MEASURE_RETRY_FRAMES = 3
+
 export const useCardAnimations = ({
   card,
   metrics,
@@ -224,19 +226,98 @@ export const useCardAnimations = ({
   const handleCardLayout = useCallback(() => {
     const cardId = card.id
     const snapshotBeforeLayout = cardFlightMemory?.[cardId]
-    if (cardFlightsEnabled && previousSnapshot) {
+    if (cardFlightsEnabled && snapshotBeforeLayout) {
       flightOpacity.value = 0
     }
 
     runOnUI((prevSnapshot: CardFlightSnapshot | null) => {
       'worklet'
-      const layout = measure(cardRef)
-      if (!layout) {
-        return
+      const isFiniteNumber = (value: unknown): value is number =>
+        typeof value === 'number' && isFinite(value)
+
+      const isValidLayout = (layout: any): boolean => {
+        return (
+          !!layout &&
+          isFiniteNumber(layout.pageX) &&
+          isFiniteNumber(layout.pageY) &&
+          isFiniteNumber(layout.width) &&
+          isFiniteNumber(layout.height) &&
+          layout.width > 0 &&
+          layout.height > 0
+        )
       }
 
-      if (!cardFlightsEnabled) {
-        const snapshot: CardFlightSnapshot = {
+      const isValidSnapshot = (snapshot: CardFlightSnapshot | null | undefined): snapshot is CardFlightSnapshot => {
+        return (
+          !!snapshot &&
+          isFiniteNumber(snapshot.pageX) &&
+          isFiniteNumber(snapshot.pageY) &&
+          isFiniteNumber(snapshot.width) &&
+          isFiniteNumber(snapshot.height) &&
+          snapshot.width > 0 &&
+          snapshot.height > 0
+        )
+      }
+
+      // PBI-14-4: `measure()` can temporarily return undefined/meaningless LayoutMetrics; retry briefly.
+      let attempts = 0
+      const attemptMeasure = () => {
+        const layout = measure(cardRef)
+        if (!isValidLayout(layout)) {
+          attempts += 1
+          if (attempts <= MAX_MEASURE_RETRY_FRAMES) {
+            requestAnimationFrame(attemptMeasure)
+            return
+          }
+          // After retries, fall back to rendering the card in-place (no flight) to avoid invisible cards.
+          flightX.value = 0
+          flightY.value = 0
+          flightZ.value = 0
+          flightOpacity.value = 1
+          return
+        }
+
+        if (!cardFlightsEnabled) {
+          const snapshot: CardFlightSnapshot = {
+            pageX: layout.pageX,
+            pageY: layout.pageY,
+            width: layout.width,
+            height: layout.height,
+          }
+          cardFlights.value = {
+            ...cardFlights.value,
+            [cardId]: snapshot,
+          }
+          flightX.value = 0
+          flightY.value = 0
+          flightZ.value = 0
+          flightOpacity.value = 1
+          if (onCardMeasured) {
+            runOnJS(onCardMeasured)(cardId, snapshot)
+          }
+          return
+        }
+
+        const existingSnapshot = cardFlights.value[cardId] as CardFlightSnapshot | undefined
+        const previousCandidate = prevSnapshot ?? existingSnapshot
+        const previous = isValidSnapshot(previousCandidate) ? previousCandidate : null
+        if (previous) {
+          const deltaX = previous.pageX - layout.pageX
+          const deltaY = previous.pageY - layout.pageY
+          if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
+            flightX.value = deltaX
+            flightY.value = deltaY
+            flightZ.value = 1000
+            flightX.value = withTiming(0, CARD_FLIGHT_TIMING, (finished) => {
+              if (finished) {
+                flightZ.value = 0
+              }
+            })
+            flightY.value = withTiming(0, CARD_FLIGHT_TIMING)
+          }
+        }
+
+        const nextSnapshot: CardFlightSnapshot = {
           pageX: layout.pageX,
           pageY: layout.pageY,
           width: layout.width,
@@ -244,51 +325,16 @@ export const useCardAnimations = ({
         }
         cardFlights.value = {
           ...cardFlights.value,
-          [cardId]: snapshot,
+          [cardId]: nextSnapshot,
         }
-        flightX.value = 0
-        flightY.value = 0
-        flightZ.value = 0
         flightOpacity.value = 1
         if (onCardMeasured) {
-          runOnJS(onCardMeasured)(cardId, snapshot)
-        }
-        return
-      }
-
-      const existingSnapshot = cardFlights.value[cardId] as CardFlightSnapshot | undefined
-      const previous = prevSnapshot ?? existingSnapshot
-      if (previous) {
-        const deltaX = previous.pageX - layout.pageX
-        const deltaY = previous.pageY - layout.pageY
-        if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
-          flightX.value = deltaX
-          flightY.value = deltaY
-          flightZ.value = 1000
-          flightX.value = withTiming(0, CARD_FLIGHT_TIMING, (finished) => {
-            if (finished) {
-              flightZ.value = 0
-            }
-          })
-          flightY.value = withTiming(0, CARD_FLIGHT_TIMING)
+          runOnJS(onCardMeasured)(cardId, nextSnapshot)
         }
       }
 
-      const nextSnapshot: CardFlightSnapshot = {
-        pageX: layout.pageX,
-        pageY: layout.pageY,
-        width: layout.width,
-        height: layout.height,
-      }
-      cardFlights.value = {
-        ...cardFlights.value,
-        [cardId]: nextSnapshot,
-      }
-      flightOpacity.value = 1
-      if (onCardMeasured) {
-        runOnJS(onCardMeasured)(cardId, nextSnapshot)
-      }
-    })(previousSnapshot ?? snapshotBeforeLayout ?? null)
+      requestAnimationFrame(attemptMeasure)
+    })(snapshotBeforeLayout ?? null)
   }, [
     card.id,
     cardFlightMemory,
@@ -300,7 +346,6 @@ export const useCardAnimations = ({
     flightY,
     flightZ,
     onCardMeasured,
-    previousSnapshot,
   ])
 
   const containerStyle = useMemo(

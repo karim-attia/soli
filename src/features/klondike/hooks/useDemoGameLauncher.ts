@@ -99,7 +99,8 @@ export const useDemoGameLauncher = ({
         const pushStockToFoundation = (suit: Suit, drawCount: number) => {
           for (let index = 0; index < drawCount; index += 1) {
             steps.push(() => {
-              dispatch({ type: 'DRAW_OR_RECYCLE' })
+              // PBI-14-4: Route draws through the flight controller so stock→waste origins are snapshot-gated.
+              dispatchWithFlight({ type: 'DRAW_OR_RECYCLE' })
             })
             steps.push(() => {
               dispatchWithFlight(

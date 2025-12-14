@@ -14,6 +14,7 @@ type UseKlondikeTimerParams = {
 export const useKlondikeTimer = ({ state, dispatch, stateRef }: UseKlondikeTimerParams) => {
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const previousMoveCountRef = useRef(state.moveCount)
+  const previousAutoCompletingRef = useRef(state.isAutoCompleting)
 
   const pauseTimer = useCallback(() => {
     const snapshot = stateRef.current
@@ -46,11 +47,23 @@ export const useKlondikeTimer = ({ state, dispatch, stateRef }: UseKlondikeTimer
   useEffect(() => {
     const previousMoveCount = previousMoveCountRef.current
     const moveIncreased = state.moveCount > previousMoveCount
-    if (moveIncreased && state.timerState !== 'running') {
+    // PBI-28: Do not start/restart the timer during auto-up (auto-complete).
+    if (moveIncreased && state.timerState !== 'running' && !state.isAutoCompleting) {
       dispatch({ type: 'TIMER_START', startedAt: Date.now() })
     }
     previousMoveCountRef.current = state.moveCount
-  }, [dispatch, state.moveCount, state.timerState])
+  }, [dispatch, state.isAutoCompleting, state.moveCount, state.timerState])
+
+  useEffect(() => {
+    const wasAutoCompleting = previousAutoCompletingRef.current
+    const isAutoCompleting = state.isAutoCompleting
+    previousAutoCompletingRef.current = isAutoCompleting
+
+    // PBI-28: Stop the timer immediately when auto-up begins.
+    if (!wasAutoCompleting && isAutoCompleting && state.timerState === 'running') {
+      dispatch({ type: 'TIMER_STOP', timestamp: Date.now() })
+    }
+  }, [dispatch, state.isAutoCompleting, state.timerState])
 
   useEffect(() => {
     if (state.timerState === 'running' && state.timerStartedAt === null) {

@@ -3,6 +3,7 @@ import type { SharedValue } from 'react-native-reanimated'
 import { useSharedValue } from 'react-native-reanimated'
 
 import type { GameAction, Selection } from '../solitaire/klondike'
+import { devLog, getDeveloperLoggingEnabled } from '../utils/devLogger'
 
 export type CardFlightSnapshot = {
   pageX: number
@@ -24,6 +25,7 @@ type FlightControllerOptions = {
 type DispatchArgs = {
   action: GameAction
   selection?: Selection | null
+  cardIds?: string[]
   dispatch: DispatchFn
 }
 
@@ -34,6 +36,17 @@ export type FlightController = {
   ensureReady: () => void
   reset: () => void
   dispatchWithFlight: (args: DispatchArgs) => void
+}
+
+const isValidSnapshot = (snapshot: CardFlightSnapshot): boolean => {
+  return (
+    Number.isFinite(snapshot.pageX) &&
+    Number.isFinite(snapshot.pageY) &&
+    Number.isFinite(snapshot.width) &&
+    Number.isFinite(snapshot.height) &&
+    snapshot.width > 0 &&
+    snapshot.height > 0
+  )
 }
 
 const describeSelection = (selection: Selection | null | undefined): string => {
@@ -80,6 +93,7 @@ const describeTarget = (action: GameAction): string => {
 export const useFlightController = (options: FlightControllerOptions): FlightController => {
   const cardFlights = useSharedValue<Record<string, CardFlightSnapshot>>({})
   const memoryRef = useRef<Record<string, CardFlightSnapshot>>({})
+  const invalidSnapshotLoggedRef = useRef<Set<string>>(new Set())
   const enabledRef = useRef<boolean>(options.enabled)
   const waitTimeoutRef = useRef<number>(options.waitTimeoutMs)
   const selectionResolverRef = useRef<SelectionResolver>(options.getSelectionCardIds)
@@ -97,6 +111,14 @@ export const useFlightController = (options: FlightControllerOptions): FlightCon
   }, [options.getSelectionCardIds])
 
   const registerSnapshot = useCallback((cardId: string, snapshot: CardFlightSnapshot) => {
+    // PBI-14-4: Defensive guard against invalid LayoutMetrics snapshots entering controller memory.
+    if (!isValidSnapshot(snapshot)) {
+      if (getDeveloperLoggingEnabled() && !invalidSnapshotLoggedRef.current.has(cardId)) {
+        invalidSnapshotLoggedRef.current.add(cardId)
+        devLog('warn', '[Flight] Ignoring invalid snapshot', { cardId, snapshot })
+      }
+      return
+    }
     memoryRef.current[cardId] = snapshot
   }, [])
 
@@ -120,9 +142,9 @@ export const useFlightController = (options: FlightControllerOptions): FlightCon
   }, [cardFlights])
 
   const dispatchWithFlight = useCallback(
-    ({ action, selection, dispatch }: DispatchArgs) => {
+    ({ action, selection, cardIds, dispatch }: DispatchArgs) => {
       const resolver = selectionResolverRef.current
-      const cards = resolver ? resolver(selection) : []
+      const cards = cardIds ?? (resolver ? resolver(selection) : [])
       const selectionLabel = describeSelection(selection)
       const targetLabel = describeTarget(action)
 

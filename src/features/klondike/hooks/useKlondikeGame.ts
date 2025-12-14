@@ -23,6 +23,7 @@ import {
   getDropHints,
   klondikeReducer,
   type GameAction,
+  type GameSnapshot,
   type GameState,
   type Selection,
   type Suit,
@@ -42,7 +43,6 @@ import {
   EDGE_GUTTER,
   COLOR_FELT_LIGHT,
   COLOR_FELT_DARK,
-  CARD_ANIMATION_DURATION_MS,
 } from '../constants'
 import { EMPTY_INVALID_WIGGLE, type CardMetrics, type InvalidWiggleConfig } from '../types'
 import { computeCardMetrics } from '../utils/cardMetrics'
@@ -65,9 +65,9 @@ import { loadBoardMetrics, saveBoardMetrics } from '../../../storage/uiPreferenc
 
 type RequestNewGameFn = (options?: { reason?: 'manual' | 'celebration' }) => void
 
-const AUTO_QUEUE_INTERVAL_MS = 100
-const AUTO_QUEUE_MOVE_BUFFER_MS = 50
-const AUTO_QUEUE_MOVE_DELAY_MS = CARD_ANIMATION_DURATION_MS + AUTO_QUEUE_MOVE_BUFFER_MS
+// PBI-28: Run auto-up (auto-complete) much faster than manual play cadence.
+const AUTO_QUEUE_INTERVAL_MS = 25
+const AUTO_QUEUE_MOVE_DELAY_MS = 35
 
 // Maps a selection descriptor to the card IDs required for animation-flight tracking.
 // The flight controller waits for these IDs to have layout snapshots before animating moves.
@@ -93,6 +93,55 @@ function collectSelectionCardIds(state: GameState, selection?: Selection | null)
   }
 
   return []
+}
+
+type CardSignatureSnapshot = Pick<GameSnapshot, 'stock' | 'waste' | 'foundations' | 'tableau'>
+
+const buildCardSignatureMap = (snapshot: CardSignatureSnapshot): Map<string, string> => {
+  const map = new Map<string, string>()
+
+  snapshot.stock.forEach((card, index) => {
+    map.set(card.id, `stock:${index}:${card.faceUp ? 1 : 0}`)
+  })
+
+  snapshot.waste.forEach((card, index) => {
+    map.set(card.id, `waste:${index}:${card.faceUp ? 1 : 0}`)
+  })
+
+  Object.entries(snapshot.foundations).forEach(([suit, cards]) => {
+    cards.forEach((card, index) => {
+      map.set(card.id, `foundation:${suit}:${index}:${card.faceUp ? 1 : 0}`)
+    })
+  })
+
+  snapshot.tableau.forEach((column, columnIndex) => {
+    column.forEach((card, cardIndex) => {
+      map.set(card.id, `tableau:${columnIndex}:${cardIndex}:${card.faceUp ? 1 : 0}`)
+    })
+  })
+
+  return map
+}
+
+const collectChangedCardIds = (current: GameState, target: GameSnapshot): string[] => {
+  const currentMap = buildCardSignatureMap(current)
+  const targetMap = buildCardSignatureMap(target)
+  const changed: string[] = []
+
+  for (const [cardId, currentSignature] of currentMap.entries()) {
+    const targetSignature = targetMap.get(cardId)
+    if (targetSignature !== currentSignature) {
+      changed.push(cardId)
+    }
+  }
+
+  for (const cardId of targetMap.keys()) {
+    if (!currentMap.has(cardId)) {
+      changed.push(cardId)
+    }
+  }
+
+  return changed
 }
 
 type UseKlondikeGameResult = {
@@ -369,6 +418,34 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       if (boardLockedRef.current) {
         return
       }
+      // PBI-14-4: Some actions (draw/undo) have no `Selection`; infer the affected card IDs for snapshot gating.
+      const current = stateRef.current
+      const inferredCardIds =
+        action.type === 'DRAW_OR_RECYCLE' && !selection
+          ? current.stock.length
+            ? [current.stock[current.stock.length - 1].id]
+            : []
+          : action.type === 'UNDO' && !selection
+            ? current.history.length
+              ? collectChangedCardIds(current, current.history[current.history.length - 1])
+              : []
+            : action.type === 'ADVANCE_AUTO_QUEUE' && !selection
+              ? (() => {
+                  const queued = current.autoQueue[0]
+                  if (!queued) {
+                    return []
+                  }
+                  if (queued.type === 'draw') {
+                    return current.stock.length ? [current.stock[current.stock.length - 1].id] : []
+                  }
+                  if (queued.type === 'recycle') {
+                    const topWaste = current.waste[current.waste.length - 1]
+                    return topWaste ? [topWaste.id] : []
+                  }
+                  return []
+                })()
+            : undefined
+
       if (action.type === 'APPLY_MOVE' && action.target?.type === 'foundation') {
         const destination = action.target.suit
         const sourceLabel = selection
@@ -378,7 +455,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
           : 'unknown'
         // devLog('info', `[Game] Dispatch APPLY_MOVE → foundation:${destination} from ${sourceLabel}`)
       }
-      dispatchWithFlightInternal({ action, selection, dispatch })
+      dispatchWithFlightInternal({ action, selection, cardIds: inferredCardIds, dispatch })
     },
     [dispatch, dispatchWithFlightInternal],
   )
@@ -542,29 +619,23 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
 
   // Handles draw/recycle presses, validating availability before dispatching.
   const handleDraw = useCallback(() => {
-    if (boardLockedRef.current) {
-      return
-    }
-    if (!state.stock.length && !state.waste.length) {
+    const current = stateRef.current
+    if (!current.stock.length && !current.waste.length) {
       notifyInvalidMove()
       return
     }
-    ensureCardFlightsReady()
-    dispatch({ type: 'DRAW_OR_RECYCLE' })
-  }, [dispatch, ensureCardFlightsReady, notifyInvalidMove, state.stock.length, state.waste.length])
+    dispatchWithFlight({ type: 'DRAW_OR_RECYCLE' })
+  }, [dispatchWithFlight, notifyInvalidMove])
 
   // Initiates an undo action when the board is unlocked and history exists.
   const handleUndo = useCallback(() => {
-    if (boardLockedRef.current) {
-      return
-    }
-    if (!state.history.length) {
+    const current = stateRef.current
+    if (!current.history.length) {
       notifyInvalidMove()
       return
     }
-    ensureCardFlightsReady()
-    dispatch({ type: 'UNDO' })
-  }, [dispatch, ensureCardFlightsReady, notifyInvalidMove, state.history.length])
+    dispatchWithFlight({ type: 'UNDO' })
+  }, [dispatchWithFlight, notifyInvalidMove])
 
   // Presents a confirmation dialog and seeds state for a new shuffled game.
   const requestNewGame = useCallback<RequestNewGameFn>(
