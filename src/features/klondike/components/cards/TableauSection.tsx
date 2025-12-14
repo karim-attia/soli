@@ -11,13 +11,16 @@ import type {
 } from '../../types'
 import type { GameState, Selection } from '../../../../solitaire/klondike'
 import {
-  COLUMN_MARGIN,
+  BOARD_COLUMN_GAP,
+  BOARD_COLUMN_MARGIN,
   COLOR_COLUMN_BORDER,
   COLOR_COLUMN_SELECTED,
   COLOR_DROP_BORDER,
 } from '../../constants'
 import { CardView, EmptySlot } from './CardView'
 import { styles } from './styles'
+
+const FACE_DOWN_STACK_OFFSET_DIVISOR = 2
 
 export type TableauSectionProps = {
   state: GameState
@@ -95,15 +98,23 @@ export const TableauColumn = ({
   disableInteractions,
   scrubbingActive,
 }: TableauColumnProps) => {
-  const columnHeight = column.length
-    ? cardMetrics.height + (column.length - 1) * cardMetrics.stackOffset
-    : cardMetrics.height
+  // Task 1-9: Keep face-up spacing (tap targets), but halve the visible spacing for face-down stacks.
+  const faceDownStackOffset = Math.round(cardMetrics.stackOffset / FACE_DOWN_STACK_OFFSET_DIVISOR)
+  let runningOffset = 0
+  const cardOffsets = column.map((card) => {
+    const offset = runningOffset
+    runningOffset += card.faceUp ? cardMetrics.stackOffset : faceDownStackOffset
+    return offset
+  })
+  const columnHeight = column.length ? cardOffsets[cardOffsets.length - 1] + cardMetrics.height : cardMetrics.height
   const tableauSelection =
     state.selected?.source === 'tableau' && state.selected.columnIndex === columnIndex
       ? state.selected
       : null
   const columnSelected = Boolean(tableauSelection)
   const selectedCardIndex = tableauSelection ? tableauSelection.cardIndex : null
+  const isFirstColumn = columnIndex === 0
+  const isLastColumn = columnIndex === state.tableau.length - 1
 
   return (
     <View
@@ -119,7 +130,9 @@ export const TableauColumn = ({
                 ? COLOR_DROP_BORDER
                 : COLOR_COLUMN_BORDER,
           backgroundColor: columnSelected ? COLOR_COLUMN_SELECTED : 'transparent',
-          marginHorizontal: COLUMN_MARGIN,
+          // Task 1-8: reduce board column gaps and keep edge gutters equal to the column gap.
+          marginLeft: isFirstColumn ? BOARD_COLUMN_GAP : BOARD_COLUMN_MARGIN,
+          marginRight: isLastColumn ? BOARD_COLUMN_GAP : BOARD_COLUMN_MARGIN,
         },
       ]}
       pointerEvents={disableInteractions ? 'none' : 'auto'}
@@ -130,7 +143,7 @@ export const TableauColumn = ({
           key={card.id}
           card={card}
           metrics={cardMetrics}
-          offsetTop={cardIndex * cardMetrics.stackOffset}
+          offsetTop={cardOffsets[cardIndex]}
           isSelected={
             columnSelected &&
             selectedCardIndex !== null &&

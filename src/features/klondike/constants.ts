@@ -20,6 +20,10 @@ export const CARD_ASPECT_RATIO = CARD_REFERENCE_HEIGHT / CARD_REFERENCE_WIDTH
 export const BASE_STACK_OFFSET = CARD_REFERENCE_STACK_OFFSET
 export const TABLEAU_GAP = 10
 export const COLUMN_MARGIN = TABLEAU_GAP / 2
+// Task 1-8: Board columns should have ~half the gap vs today, without changing global UI gutters.
+// The "today" full gap is TABLEAU_GAP; board full gap becomes TABLEAU_GAP / 2.
+export const BOARD_COLUMN_GAP = TABLEAU_GAP / 2
+export const BOARD_COLUMN_MARGIN = BOARD_COLUMN_GAP / 2
 export const STACK_PADDING = 8 // matches px="$2" in layout spacing
 export const EDGE_GUTTER = STACK_PADDING + COLUMN_MARGIN
 export const STAT_VERTICAL_MARGIN = EDGE_GUTTER

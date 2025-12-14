@@ -15,13 +15,14 @@ import { CelebrationTouchBlocker } from './cards'
 import { CelebrationDebugBadge } from './CelebrationDebugBadge'
 import { UndoScrubber, type UndoScrubberProps } from './UndoScrubber'
 import type { CelebrationBindings } from '../types'
-import { COLUMN_MARGIN, EDGE_GUTTER } from '../constants'
+import { COLUMN_MARGIN, EDGE_GUTTER, STACK_PADDING } from '../constants'
 
 const BOARD_MARGIN_ADJUSTMENT = 6
 
 export type KlondikeGameViewProps = {
   feltBackground: string
   headerPadding: { top: number; left: number; right: number }
+  boardSafeArea: { left: number; right: number }
   statisticsRows: StatisticsRow[]
   onBoardLayout: (event: LayoutChangeEvent) => void
   topRowProps: TopRowProps
@@ -36,6 +37,7 @@ export type KlondikeGameViewProps = {
 export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
   feltBackground,
   headerPadding,
+  boardSafeArea,
   statisticsRows,
   onBoardLayout,
   topRowProps,
@@ -68,8 +70,17 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
       <YStack
         flex={1}
         onLayout={onBoardLayout}
-        style={[styles.boardShell, { marginTop: EDGE_GUTTER + BOARD_MARGIN_ADJUSTMENT }]}
-        px="$2"
+        style={[
+          styles.boardShell,
+          {
+            marginTop: EDGE_GUTTER + BOARD_MARGIN_ADJUSTMENT,
+            // Task 1-8: cancel root px="$2" so the board can reach safe-area edges,
+            // without changing header/undo spacing.
+            marginHorizontal: -STACK_PADDING,
+            paddingLeft: boardSafeArea.left,
+            paddingRight: boardSafeArea.right,
+          },
+        ]}
         py="$3"
         gap="$3"
       >
@@ -96,9 +107,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   boardShell: {
-    width: '100%',
     alignSelf: 'stretch',
-    paddingHorizontal: COLUMN_MARGIN,
     position: 'relative',
   },
 })

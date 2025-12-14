@@ -1,9 +1,10 @@
 import React, { useCallback } from 'react'
-import { LayoutChangeEvent, LayoutRectangle, View } from 'react-native'
-import { XStack } from 'tamagui'
+import { LayoutChangeEvent, LayoutRectangle } from 'react-native'
+import { Stack, XStack } from 'tamagui'
 
 import {
   FOUNDATION_SUIT_ORDER,
+  TABLEAU_COLUMN_COUNT,
   type Card,
   type GameState,
   type Selection,
@@ -23,6 +24,7 @@ import { PileButton } from './PileButton'
 import { StockStack } from './StockStack'
 import { WasteFan } from './WasteFan'
 import { FoundationPile } from './FoundationPile'
+import { BOARD_COLUMN_GAP, BOARD_COLUMN_MARGIN } from '../../constants'
 
 export type TopRowProps = {
   state: GameState
@@ -104,81 +106,124 @@ export const TopRow = ({
     onWasteTap()
   }, [interactionsLocked, notifyInvalidMove, onWasteTap, state.waste.length])
 
+  const wasteColumnIndex = TABLEAU_COLUMN_COUNT - 2
+  const stockColumnIndex = TABLEAU_COLUMN_COUNT - 1
+
   return (
-    <XStack gap="$4" width="100%" items="flex-start" onLayout={handleRowLayout}>
-      <XStack gap="$2" flexWrap="nowrap" justify="flex-start" shrink={0}>
-        {FOUNDATION_SUIT_ORDER.map((suit) => (
-          <FoundationPile
-            key={suit}
-            suit={suit}
-            cards={state.foundations[suit]}
-            cardMetrics={cardMetrics}
-            isDroppable={dropHints.foundations[suit]}
-            isSelected={state.selected?.source === 'foundation' && state.selected.suit === suit}
-            onPress={() => onFoundationPress(suit)}
-            invalidWiggle={invalidWiggle}
-            cardFlights={cardFlights}
-            layoutTrackingEnabled={!scrubbingActive}
-            onCardMeasured={onCardMeasured}
-            cardFlightMemory={cardFlightMemory}
-            onCardArrived={onFoundationArrival}
-            disableInteractions={interactionsLocked}
-            hideTopCard={hideFoundations && !celebrationActive}
-            celebrationBindings={celebrationBindings}
-            celebrationActive={celebrationActive}
-            onLayout={createFoundationLayoutHandler(suit)}
-          />
-        ))}
-      </XStack>
+    <XStack
+      width="100%"
+      items="flex-start"
+      justify="flex-start"
+      flexWrap="nowrap"
+      onLayout={handleRowLayout}
+    >
+      {Array.from({ length: TABLEAU_COLUMN_COUNT }, (_, columnIndex) => {
+        const isFirstColumn = columnIndex === 0
+        const isLastColumn = columnIndex === TABLEAU_COLUMN_COUNT - 1
+        const slotStyle = {
+          width: cardMetrics.width,
+          // Task 1-8: Match tableau column spacing; edge gutters should equal a full column gap.
+          marginLeft: isFirstColumn ? BOARD_COLUMN_GAP : BOARD_COLUMN_MARGIN,
+          marginRight: isLastColumn ? BOARD_COLUMN_GAP : BOARD_COLUMN_MARGIN,
+          overflow: 'visible' as const,
+        }
 
-      <XStack flex={1} gap="$3" justify="flex-end" items="flex-end">
-        <PileButton
-          label={`${state.waste.length}`}
-          onPress={handleWastePress}
-          disabled={!state.waste.length || interactionsLocked}
-          disablePress
-        >
-          {state.waste.length ? (
-            <WasteFan
-              cards={state.waste}
-              metrics={cardMetrics}
-              isSelected={wasteSelected}
-              onPress={handleWastePress}
-              invalidWiggle={invalidWiggle}
-              cardFlights={cardFlights}
-              layoutTrackingEnabled={!scrubbingActive}
-              onCardMeasured={onCardMeasured}
-              cardFlightMemory={cardFlightMemory}
-              disabled={interactionsLocked}
-            />
-          ) : (
-            <EmptySlot highlight={false} metrics={cardMetrics} />
-          )}
-        </PileButton>
-
-        {!state.hasWon && (
-          <PileButton label={`${state.stock.length}`} onPress={onDraw} disabled={stockDisabled}>
-            {drawVariant === 'stock' ? (
-              <StockStack
-                cards={state.stock}
-                metrics={cardMetrics}
+        if (columnIndex < FOUNDATION_SUIT_ORDER.length) {
+          const suit = FOUNDATION_SUIT_ORDER[columnIndex] as Suit
+          return (
+            <Stack key={`foundation-${suit}`} style={slotStyle}>
+              <FoundationPile
+                suit={suit}
+                cards={state.foundations[suit]}
+                cardMetrics={cardMetrics}
+                isDroppable={dropHints.foundations[suit]}
+                isSelected={state.selected?.source === 'foundation' && state.selected.suit === suit}
+                onPress={() => onFoundationPress(suit)}
                 invalidWiggle={invalidWiggle}
                 cardFlights={cardFlights}
                 layoutTrackingEnabled={!scrubbingActive}
                 onCardMeasured={onCardMeasured}
                 cardFlightMemory={cardFlightMemory}
-                label={state.stock.length ? drawLabel : undefined}
+                onCardArrived={onFoundationArrival}
+                disableInteractions={interactionsLocked}
+                hideTopCard={hideFoundations && !celebrationActive}
+                celebrationBindings={celebrationBindings}
+                celebrationActive={celebrationActive}
+                onLayout={createFoundationLayoutHandler(suit)}
               />
-            ) : (
-              <CardBack
-                label={state.stock.length ? drawLabel : undefined}
-                metrics={cardMetrics}
-                variant={drawVariant}
-              />
-            )}
-          </PileButton>
-        )}
-      </XStack>
+            </Stack>
+          )
+        }
+
+        if (columnIndex === wasteColumnIndex) {
+          return (
+            <Stack key="waste" style={slotStyle}>
+              <PileButton
+                label={`${state.waste.length}`}
+                onPress={handleWastePress}
+                disabled={!state.waste.length || interactionsLocked}
+                disablePress
+                width={cardMetrics.width}
+              >
+                <Stack width={cardMetrics.width} items="flex-end" overflow="visible">
+                  {state.waste.length ? (
+                    <WasteFan
+                      cards={state.waste}
+                      metrics={cardMetrics}
+                      isSelected={wasteSelected}
+                      onPress={handleWastePress}
+                      invalidWiggle={invalidWiggle}
+                      cardFlights={cardFlights}
+                      layoutTrackingEnabled={!scrubbingActive}
+                      onCardMeasured={onCardMeasured}
+                      cardFlightMemory={cardFlightMemory}
+                      disabled={interactionsLocked}
+                    />
+                  ) : (
+                    <EmptySlot highlight={false} metrics={cardMetrics} />
+                  )}
+                </Stack>
+              </PileButton>
+            </Stack>
+          )
+        }
+
+        if (columnIndex === stockColumnIndex) {
+          return (
+            <Stack key="stock" style={slotStyle}>
+              {!state.hasWon && (
+                <PileButton
+                  label={`${state.stock.length}`}
+                  onPress={onDraw}
+                  disabled={stockDisabled}
+                  width={cardMetrics.width}
+                >
+                  {drawVariant === 'stock' ? (
+                    <StockStack
+                      cards={state.stock}
+                      metrics={cardMetrics}
+                      invalidWiggle={invalidWiggle}
+                      cardFlights={cardFlights}
+                      layoutTrackingEnabled={!scrubbingActive}
+                      onCardMeasured={onCardMeasured}
+                      cardFlightMemory={cardFlightMemory}
+                      label={state.stock.length ? drawLabel : undefined}
+                    />
+                  ) : (
+                    <CardBack
+                      label={state.stock.length ? drawLabel : undefined}
+                      metrics={cardMetrics}
+                      variant={drawVariant}
+                    />
+                  )}
+                </PileButton>
+              )}
+            </Stack>
+          )
+        }
+
+        return <Stack key={`empty-${columnIndex}`} style={slotStyle} />
+      })}
     </XStack>
   )
 }

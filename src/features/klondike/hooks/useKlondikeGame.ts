@@ -182,8 +182,15 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     }
   }, [])
 
-  const cardMetrics = useMemo(() => computeCardMetrics(boardLayout.width), [boardLayout.width])
   const safeArea = useSafeAreaInsets()
+  const boardAvailableWidth = useMemo(() => {
+    if (!boardLayout.width || boardLayout.width <= 0) {
+      return null
+    }
+    // Task 1-8: size board columns using the safe-area width (not under notches).
+    return boardLayout.width - safeArea.left - safeArea.right
+  }, [boardLayout.width, safeArea.left, safeArea.right])
+  const cardMetrics = useMemo(() => computeCardMetrics(boardAvailableWidth), [boardAvailableWidth])
   const colorScheme = useColorScheme()
   const feltBackground = colorScheme === 'dark' ? COLOR_FELT_DARK : COLOR_FELT_LIGHT
 
@@ -845,6 +852,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const viewProps: KlondikeGameViewProps = {
     feltBackground,
     headerPadding,
+    boardSafeArea: { left: safeArea.left, right: safeArea.right },
     statisticsRows,
     onBoardLayout: handleBoardLayout,
     topRowProps,

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Pressable } from 'react-native'
+import { Pressable, View } from 'react-native'
 import { Text } from 'tamagui'
 
 import type { Card, Suit } from '../../../../solitaire/klondike'
@@ -24,6 +24,8 @@ import { useFoundationGlowAnimation } from './animations'
 import { AnimatedView } from './common'
 import { styles } from './styles'
 import { CardView } from './CardView'
+
+const FOUNDATION_OUTLINE_BORDER_WIDTH = 2
 
 export type FoundationPileProps = {
   suit: Suit
@@ -73,6 +75,11 @@ export const FoundationPile = ({
   })
 
   const hasCards = cards.length > 0
+  const topCard = cards[cards.length - 1]
+  const shouldHideVisibleTopCard = Boolean(topCard) && hideTopCard
+  // Task 1-8: The dashed empty outline should NOT show behind cards.
+  // When the top card is intentionally hidden, treat the pile as "empty" for outline purposes.
+  const showEmptyOutline = !topCard || shouldHideVisibleTopCard
   const borderColor = isDroppable
     ? COLOR_DROP_BORDER
     : isSelected
@@ -80,7 +87,7 @@ export const FoundationPile = ({
       : hasCards
         ? COLOR_FOUNDATION_BORDER
         : COLOR_COLUMN_BORDER
-  const topCard = cards[cards.length - 1]
+  const highlightOutlineOnTop = !showEmptyOutline && (isSelected || isDroppable)
 
   return (
     <Pressable
@@ -94,6 +101,8 @@ export const FoundationPile = ({
           height: cardMetrics.height,
           borderRadius: cardMetrics.radius,
           borderColor,
+          borderWidth: showEmptyOutline ? FOUNDATION_OUTLINE_BORDER_WIDTH : 0,
+          borderStyle: showEmptyOutline ? 'dashed' : 'solid',
         },
       ]}
     >
@@ -148,6 +157,21 @@ export const FoundationPile = ({
           {SUIT_SYMBOLS[suit]}
         </Text>
       )}
+      {highlightOutlineOnTop ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: cardMetrics.width,
+            height: cardMetrics.height,
+            borderRadius: cardMetrics.radius,
+            borderWidth: FOUNDATION_OUTLINE_BORDER_WIDTH,
+            borderColor,
+          }}
+        />
+      ) : null}
     </Pressable>
   )
 }

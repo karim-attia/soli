@@ -5,9 +5,9 @@ import {
   CARD_ASPECT_RATIO,
   CARD_REFERENCE_STACK_OFFSET,
   CARD_REFERENCE_WIDTH,
+  BOARD_COLUMN_GAP,
   MAX_CARD_WIDTH,
   MIN_CARD_WIDTH,
-  TABLEAU_GAP,
 } from '../constants'
 import type { CardMetrics } from '../types'
 import { TABLEAU_COLUMN_COUNT } from '../../../solitaire/klondike'
@@ -22,13 +22,16 @@ export const computeCardMetrics = (availableWidth: number | null): CardMetrics =
     }
   }
 
-  const totalGap = TABLEAU_GAP * (TABLEAU_COLUMN_COUNT - 1)
+  // Task 1-8: Board sizing uses full-gap gutters at the screen edge:
+  // availableWidth = 7*cardWidth + 6*gap + 2*(gap) = 7*cardWidth + 8*gap
+  // => availableWidth - 8*gap = 7*cardWidth
+  const totalGap = BOARD_COLUMN_GAP * (TABLEAU_COLUMN_COUNT + 1)
   const widthAvailable = Math.max(
     availableWidth - totalGap,
     MIN_CARD_WIDTH * TABLEAU_COLUMN_COUNT,
   )
   const rawWidth = widthAvailable / TABLEAU_COLUMN_COUNT
-  const unclampedWidth = Math.max(Math.floor(rawWidth), MIN_CARD_WIDTH)
+  const unclampedWidth = Math.max(rawWidth, MIN_CARD_WIDTH)
   const constrainedWidth = Math.min(Math.max(unclampedWidth, MIN_CARD_WIDTH), MAX_CARD_WIDTH)
   const height = Math.round(constrainedWidth * CARD_ASPECT_RATIO)
   const stackOffsetRatio = CARD_REFERENCE_STACK_OFFSET / CARD_REFERENCE_WIDTH

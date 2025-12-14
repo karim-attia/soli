@@ -10,10 +10,17 @@ export type PileButtonProps = PropsWithChildren<{
   onPress: () => void
   disabled?: boolean
   disablePress?: boolean
+  width?: number
 }>
 
-export const PileButton = ({ label, onPress, disabled, disablePress, children }: PileButtonProps) => {
-  const baseStyle = [styles.pilePressable, disabled && styles.disabledPressable]
+export const PileButton = ({ label, onPress, disabled, disablePress, width, children }: PileButtonProps) => {
+  // Task 1-8: Fix pile alignment (labels must not change pile width / column alignment).
+  const baseStyle = [
+    styles.pilePressable,
+    disabled && styles.disabledPressable,
+    width ? { width } : null,
+  ]
+  const containerStyle = width ? { width, minWidth: width, maxWidth: width } : undefined
   const body = disablePress ? (
     <View style={baseStyle}>{children}</View>
   ) : (
@@ -23,9 +30,15 @@ export const PileButton = ({ label, onPress, disabled, disablePress, children }:
   )
 
   return (
-    <YStack gap="$1" items="center">
+    <YStack gap="$1" items="center" style={containerStyle}>
       {body}
-      <Text color="$color10" fontSize={12}>
+      <Text
+        color="$color10"
+        fontSize={12}
+        style={{ width: '100%', textAlign: 'center' }}
+        numberOfLines={1}
+        ellipsizeMode="clip"
+      >
         {label}
       </Text>
     </YStack>

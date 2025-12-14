@@ -14,3 +14,5 @@ This document lists all tasks associated with PBI 1.
 | 1-5 | [Responsive layout + header controls refresh](./1-5.md) | Done | Remove horizontal scroll, auto-resize tableau columns, move New Game into header. |
 | 1-6 | [Tap/hold interaction overhaul](./1-6.md) | Done | Add tap-to-auto-move plus long-press manual selection UX with feedback. |
 | 1-7 | [Auto-complete endgame workflow](./1-7.md) | Done | Detect no face-down cards and auto-play remaining moves to foundations. |
+| 1-8 | [Board column spacing + aligned top row](./1-8.md) | Review | Halve board column gaps, reduce edge gutters, and align top-row piles to tableau columns without affecting header/undo spacing. |
+| 1-9 | [Reduce face-down stack height](./1-9.md) | Review | Halve the vertical spacing for covered (face-down) tableau cards while keeping face-up spacing for tap targets. |

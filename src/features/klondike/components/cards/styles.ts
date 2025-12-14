@@ -11,7 +11,6 @@ import {
   COLOR_FELT_TEXT_SECONDARY,
   COLOR_SELECTED_BORDER,
   COLOR_TEXT_MUTED,
-  COLUMN_MARGIN,
   FOUNDATION_GLOW_COLOR,
   FOUNDATION_GLOW_OUTSET,
 } from '../../constants'
@@ -20,10 +19,9 @@ export const styles = StyleSheet.create({
   tableauRow: {
     width: '100%',
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'flex-start',
     flexWrap: 'nowrap',
-    paddingHorizontal: COLUMN_MARGIN,
   },
   column: {
     overflow: 'visible',
