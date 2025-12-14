@@ -137,7 +137,10 @@ export const TableauColumn = ({
       ]}
       pointerEvents={disableInteractions ? 'none' : 'auto'}
     >
-      {column.length === 0 && <EmptySlot highlight={isDroppable} metrics={cardMetrics} />}
+      {/* Task 1-8: Hide empty-slot outlines during celebration (won state). */}
+      {column.length === 0 && !state.hasWon ? (
+        <EmptySlot highlight={isDroppable} metrics={cardMetrics} />
+      ) : null}
       {column.map((card, cardIndex) => (
         <CardView
           key={card.id}

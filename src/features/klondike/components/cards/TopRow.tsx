@@ -94,6 +94,8 @@ export const TopRow = ({
     : state.stock.length
       ? 'stock'
       : 'empty'
+  // Task 1-8: When the game is won, hide empty outlines so celebration looks cleaner.
+  const hideEmptyOutlines = state.hasWon
 
   const handleWastePress = useCallback(() => {
     if (interactionsLocked) {
@@ -180,7 +182,11 @@ export const TopRow = ({
                       disabled={interactionsLocked}
                     />
                   ) : (
-                    <EmptySlot highlight={false} metrics={cardMetrics} />
+                    hideEmptyOutlines ? (
+                      <Stack width={cardMetrics.width} height={cardMetrics.height} />
+                    ) : (
+                      <EmptySlot highlight={false} metrics={cardMetrics} />
+                    )
                   )}
                 </Stack>
               </PileButton>
@@ -210,11 +216,15 @@ export const TopRow = ({
                       label={state.stock.length ? drawLabel : undefined}
                     />
                   ) : (
-                    <CardBack
-                      label={state.stock.length ? drawLabel : undefined}
-                      metrics={cardMetrics}
-                      variant={drawVariant}
-                    />
+                    hideEmptyOutlines ? (
+                      <Stack width={cardMetrics.width} height={cardMetrics.height} />
+                    ) : (
+                      <CardBack
+                        label={state.stock.length ? drawLabel : undefined}
+                        metrics={cardMetrics}
+                        variant={drawVariant}
+                      />
+                    )
                   )}
                 </PileButton>
               )}
