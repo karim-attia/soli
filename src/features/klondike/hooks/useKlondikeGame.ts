@@ -200,7 +200,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const developerModeEnabled = settingsState.developerMode
 
   const animationToggles = useAnimationToggles()
-  const { entries: historyEntries, recordResult, updateEntry } = useHistory()
+  const { entries: historyEntries, recordResult, updateEntry, hydrated: historyHydrated } = useHistory()
   const {
     master: animationsEnabled,
     cardFlights: cardFlightsEnabled,
@@ -292,7 +292,29 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   useKlondikeTimer({ state, dispatch, stateRef })
 
   // Hook: hydrate and persist game state via AsyncStorage once per relevant change.
-  useKlondikePersistence({ state, dispatch, resetCardFlights, previousHasWonRef })
+  // Task 10-7: Persist the current history entry linkage across restarts.
+  useKlondikePersistence({ state, dispatch, resetCardFlights, previousHasWonRef, currentGameEntryIdRef })
+
+  // Task 10-7: After hydration, ensure the persisted/linked entry is the only active one.
+  useEffect(() => {
+    if (!historyHydrated) {
+      return
+    }
+    if (state.hasWon) {
+      return
+    }
+    const entryId = currentGameEntryIdRef.current
+    if (!entryId) {
+      return
+    }
+    const linked = historyEntries.find((entry) => entry.id === entryId)
+    if (!linked) {
+      return
+    }
+    if (linked.status !== 'active') {
+      updateEntry(entryId, { status: 'active', solved: false, finishedAt: null })
+    }
+  }, [historyEntries, historyHydrated, state.hasWon, updateEntry])
 
   // Hook: pick the next solvable shuffle weighted by prior play history when needed.
   const selectNextSolvableShuffle = useSolvableShuffleSelector(historyEntries)
@@ -390,7 +412,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
           moves: state.moveCount,
           durationMs: elapsedForRecord,
           finishedAt,
-          preview: createHistoryPreviewFromState(state),
+          // Task 10-7: Never overwrite preview on completion; it must remain the start snapshot.
         })
         currentGameEntryIdRef.current = null
       } else {
@@ -398,6 +420,23 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         if (!solved && state.moveCount === 0) {
           return
         }
+
+        // Task 10-7: If we lost the entry-id linkage (e.g. restart), update the matching active entry instead
+        // of creating a duplicate solved/incomplete row.
+        const matchingActive = historyEntries.find(
+          (entry) => entry.status === 'active' && entry.shuffleId === state.shuffleId,
+        )
+        if (matchingActive) {
+          updateEntry(matchingActive.id, {
+            solved,
+            status,
+            moves: state.moveCount,
+            durationMs: elapsedForRecord,
+            finishedAt,
+          })
+          return
+        }
+
         recordResult({
           shuffleId: state.shuffleId,
           solved,
@@ -406,13 +445,14 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
           finishedAt,
           moves: state.moveCount,
           durationMs: elapsedForRecord,
-          preview: createHistoryPreviewFromState(state),
+          // Task 10-7: Prefer the game start snapshot for history preview (sheet shows start state).
+          preview: createHistoryPreviewFromState(state.history[0] ?? state),
           displayName: currentDisplayNameRef.current,
           status,
         })
       }
     },
-    [recordResult, updateEntry],
+    [historyEntries, recordResult, updateEntry],
   )
 
   const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(() => ({

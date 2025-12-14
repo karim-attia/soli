@@ -13,4 +13,5 @@ This document lists all tasks associated with PBI 10.
 | 10-4 | [E2E CoS validation](./10-4.md) | Review | Validate history tracking end-to-end. |
 | 10-5 | [Refine history page visual design](./10-5.md) | Done | Improve color contrast and card visuals in light mode. |
 | 10-6 | [Add active status and update entry on completion](./10-6.md) | Review | Fix duplicate entries and add 'active' game status. |
+| 10-7 | [Fix multiple active entries + start preview](./10-7.md) | Review | Persist active-session linkage and keep start preview for history sheet. |
 

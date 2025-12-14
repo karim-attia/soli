@@ -27,21 +27,26 @@ export type LoadedGameState = {
   status: PersistedGameStatus
   state: GameState
   savedAt: string
+  // Task 10-7: Link persisted game session to its history entry.
+  historyEntryId: string | null
 }
 
 interface PersistedGamePayload {
   version: number
   savedAt: string
   status?: PersistedGameStatus
+  // Task 10-7: Link persisted game session to its history entry.
+  historyEntryId?: string | null
   state: GameState
 }
 
 const deriveStatus = (state: GameState): PersistedGameStatus => (state.hasWon ? 'won' : 'in-progress')
 
-const serializeState = (state: GameState): PersistedGamePayload => ({
+const serializeState = (state: GameState, historyEntryId: string | null): PersistedGamePayload => ({
   version: PERSISTENCE_VERSION,
   savedAt: new Date().toISOString(),
   status: deriveStatus(state),
+  historyEntryId,
   state: {
     ...state,
     selected: null,
@@ -75,6 +80,15 @@ const isPersistedGamePayload = (value: unknown): value is PersistedGamePayload =
     return false
   }
 
+  if (
+    'historyEntryId' in payload &&
+    payload.historyEntryId !== undefined &&
+    payload.historyEntryId !== null &&
+    typeof payload.historyEntryId !== 'string'
+  ) {
+    return false
+  }
+
   const candidate = state as Partial<GameState>
   return (
     Array.isArray(candidate.stock) &&
@@ -88,7 +102,17 @@ const isPersistedGamePayload = (value: unknown): value is PersistedGamePayload =
 }
 
 export const saveGameState = async (state: GameState): Promise<void> => {
-  const payload = serializeState(state)
+  // Task 10-7: Include optional history entry linkage.
+  const payload = serializeState(state, null)
+  const serialized = JSON.stringify(payload)
+  await AsyncStorage.setItem(KLONDIKE_STORAGE_KEY, serialized)
+}
+
+export const saveGameStateWithHistory = async (
+  state: GameState,
+  historyEntryId: string | null,
+): Promise<void> => {
+  const payload = serializeState(state, historyEntryId)
   const serialized = JSON.stringify(payload)
   await AsyncStorage.setItem(KLONDIKE_STORAGE_KEY, serialized)
 }
@@ -176,6 +200,10 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
     status,
     state: sanitizedState,
     savedAt: parsed.savedAt,
+    historyEntryId:
+      typeof (parsed as PersistedGamePayload).historyEntryId === 'string'
+        ? (parsed as PersistedGamePayload).historyEntryId ?? null
+        : null,
   }
 }
 

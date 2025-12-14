@@ -5,7 +5,7 @@ import {
   PersistedGameError,
   clearGameState,
   loadGameState,
-  saveGameState,
+  saveGameStateWithHistory,
 } from '../../../storage/gamePersistence'
 import type { GameAction, GameState } from '../../../solitaire/klondike'
 
@@ -14,6 +14,8 @@ type UseKlondikePersistenceParams = {
   dispatch: React.Dispatch<GameAction>
   resetCardFlights: () => void
   previousHasWonRef: React.MutableRefObject<boolean>
+  // Task 10-7: Persist linkage to the active history entry across restarts.
+  currentGameEntryIdRef: React.MutableRefObject<string | null>
 }
 
 export const useKlondikePersistence = ({
@@ -21,6 +23,7 @@ export const useKlondikePersistence = ({
   dispatch,
   resetCardFlights,
   previousHasWonRef,
+  currentGameEntryIdRef,
 }: UseKlondikePersistenceParams) => {
   const [storageHydrationComplete, setStorageHydrationComplete] = useState(false)
 
@@ -51,6 +54,8 @@ export const useKlondikePersistence = ({
           shuffleId: persisted.state.shuffleId,
         })
         previousHasWonRef.current = persisted.state.hasWon
+        // Task 10-7: Restore history linkage so completion updates the same entry.
+        currentGameEntryIdRef.current = persisted.historyEntryId
         resetCardFlights()
         dispatch({ type: 'HYDRATE_STATE', state: persisted.state })
       } catch (error) {
@@ -80,7 +85,7 @@ export const useKlondikePersistence = ({
     return () => {
       isCancelled = true
     }
-  }, [dispatch, previousHasWonRef, resetCardFlights])
+  }, [currentGameEntryIdRef, dispatch, previousHasWonRef, resetCardFlights])
 
   useEffect(() => {
     if (!storageHydrationComplete) {
@@ -91,7 +96,7 @@ export const useKlondikePersistence = ({
 
     ;(async () => {
       try {
-        await saveGameState(state)
+        await saveGameStateWithHistory(state, currentGameEntryIdRef.current)
       } catch (error) {
         if (!isCancelled) {
           devLog('warn', 'Failed to persist Klondike game state', error)
@@ -102,7 +107,7 @@ export const useKlondikePersistence = ({
     return () => {
       isCancelled = true
     }
-  }, [state, storageHydrationComplete])
+  }, [currentGameEntryIdRef, state, storageHydrationComplete])
 
   return storageHydrationComplete
 }

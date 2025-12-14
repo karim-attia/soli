@@ -171,7 +171,7 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
 
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={{ width: '100%' }}>
-      <YStack gap="$2" style={cardStyle} mx="$3" backgroundColor="$color3">
+      <YStack gap="$2" style={cardStyle} mx="$3" bg="$color3">
         <XStack
           gap="$2"
           style={{ alignItems: 'center', justifyContent: 'space-between' }}
@@ -179,7 +179,7 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
           <Text fontSize={16} fontWeight="700" flex={1} numberOfLines={1}>
             {entry.displayName}
           </Text>
-          <Text fontSize={14} fontWeight="600" flexShrink={0} style={{ color: statusColor }}>
+          <Text fontSize={14} fontWeight="600" style={{ color: statusColor, flexShrink: 0 }}>
             {statusLabel}
           </Text>
         </XStack>

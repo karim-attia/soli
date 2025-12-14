@@ -11,7 +11,7 @@ import {
   type PropsWithChildren,
 } from 'react'
 
-import type { GameState, Rank, Suit } from '../solitaire/klondike'
+import type { GameSnapshot, GameState, Rank, Suit } from '../solitaire/klondike'
 import { FOUNDATION_SUIT_ORDER, TABLEAU_COLUMN_COUNT } from '../solitaire/klondike'
 import { extractSolvableBaseId, SOLVABLE_SHUFFLES } from '../data/solvableShuffles'
 import { devLog } from '../utils/devLogger'
@@ -75,7 +75,7 @@ export type UpdateEntryInput = {
 export type RecordGameResultFromStateParams = {
   state: GameState
   lastRecordedShuffleRef: MutableRefObject<string | null>
-  recordResult: (input: RecordGameResultInput) => void
+  recordResult: (input: RecordGameResultInput) => string
   preview: HistoryPreview
   displayName: string
   options?: RecordGameResultOptions
@@ -180,8 +180,10 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
   const recordResult = useCallback((input: RecordGameResultInput): string => {
     const entry = createEntry(input)
     setEntries((previous) => {
-      const next = [entry, ...previous]
-      return next.slice(0, MAX_HISTORY_ENTRIES)
+      const combined = [entry, ...previous]
+      const normalized =
+        entry.status === 'active' ? normalizeActiveEntries(combined, entry.id) : normalizeActiveEntries(combined)
+      return normalized.slice(0, MAX_HISTORY_ENTRIES)
     })
     return entry.id
   }, [])
@@ -220,7 +222,8 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
 
       const next = [...previous]
       next[index] = updated
-      return next
+      const preferredActiveId = updated.status === 'active' ? updated.id : undefined
+      return normalizeActiveEntries(next, preferredActiveId)
     })
   }, [])
 
@@ -342,6 +345,34 @@ const createEntry = (input: RecordGameResultInput): HistoryEntry => {
   }
 }
 
+// Task 10-7: Ensure only one entry is ever marked as active.
+const normalizeActiveEntries = (entries: HistoryEntry[], preferredActiveId?: string): HistoryEntry[] => {
+  const activeEntries = entries.filter((entry) => entry.status === 'active')
+  if (activeEntries.length <= 1) {
+    return entries
+  }
+
+  const preferred =
+    preferredActiveId && activeEntries.some((entry) => entry.id === preferredActiveId) ? preferredActiveId : null
+
+  const keepId =
+    preferred ??
+    [...activeEntries].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]?.id ??
+    activeEntries[0].id
+
+  return entries.map((entry) => {
+    if (entry.status !== 'active' || entry.id === keepId) {
+      return entry
+    }
+    return {
+      ...entry,
+      status: 'incomplete',
+      solved: false,
+      finishedAt: null,
+    }
+  })
+}
+
 const mergeEntries = (current: HistoryEntry[], incoming: HistoryEntry[]): HistoryEntry[] => {
   if (!incoming.length) {
     return current
@@ -355,7 +386,7 @@ const mergeEntries = (current: HistoryEntry[], incoming: HistoryEntry[]): Histor
     map.set(entry.id, normalizeEntry(entry))
   })
 
-  const merged = Array.from(map.values())
+  const merged = normalizeActiveEntries(Array.from(map.values()))
   // Task 10-6: Sort by startedAt since finishedAt can be null for active games
   merged.sort((a, b) => b.startedAt.localeCompare(a.startedAt))
   return merged.slice(0, MAX_HISTORY_ENTRIES)
@@ -503,7 +534,8 @@ const createPlaceholderCard = (): HistoryPreviewCard => ({
   faceUp: false,
 })
 
-export const createHistoryPreviewFromState = (state: GameState): HistoryPreview => {
+// Task 10-7: Preview is derived from a snapshot (start state preferred).
+export const createHistoryPreviewFromState = (state: GameSnapshot): HistoryPreview => {
   const tableau = state.tableau.map((column) => ({
     cards: column.map((card) => ({
       suit: card.suit,
