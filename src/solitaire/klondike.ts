@@ -489,6 +489,53 @@ export const findAutoMoveTarget = (state: GameState, selection: Selection): Move
   return null
 }
 
+// PBI-29: Tableau tap-to-auto-move fallback retries the adjacent card.
+const TABLEAU_TAP_ADJACENT_CARD_OFFSET = 1
+
+export const findAutoMoveTargetWithTableauAdjacentFallback = (
+  state: GameState,
+  selection: Selection,
+): { selection: Selection; target: MoveTarget } | null => {
+  const target = findAutoMoveTarget(state, selection)
+  if (target) {
+    return { selection, target }
+  }
+
+  if (selection.source !== 'tableau') {
+    return null
+  }
+
+  // Task 29-1: If a tableau tap misses, try adjacent face-up card before invalid feedback.
+  const column = state.tableau[selection.columnIndex]
+  if (!column) {
+    return null
+  }
+
+  const adjacentCandidateIndices = [
+    selection.cardIndex - TABLEAU_TAP_ADJACENT_CARD_OFFSET,
+    selection.cardIndex + TABLEAU_TAP_ADJACENT_CARD_OFFSET,
+  ]
+
+  for (const candidateCardIndex of adjacentCandidateIndices) {
+    const candidateCard = column[candidateCardIndex]
+    if (!candidateCard?.faceUp) {
+      continue
+    }
+
+    const candidateSelection: Selection = {
+      source: 'tableau',
+      columnIndex: selection.columnIndex,
+      cardIndex: candidateCardIndex,
+    }
+    const candidateTarget = findAutoMoveTarget(state, candidateSelection)
+    if (candidateTarget) {
+      return { selection: candidateSelection, target: candidateTarget }
+    }
+  }
+
+  return null
+}
+
 export const hasUndoHistory = (state: GameState): boolean => state.history.length > 0
 
 const listDropTargets = (

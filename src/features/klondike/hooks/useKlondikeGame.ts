@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   createInitialState,
   createSolvableGameState,
-  findAutoMoveTarget,
+  findAutoMoveTargetWithTableauAdjacentFallback,
   getDropHints,
   klondikeReducer,
   type GameAction,
@@ -754,12 +754,16 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Attempts to auto-move a selection and falls back to invalid feedback on failure.
   const attemptAutoMove = useCallback(
     (selection: Selection) => {
-      const target = findAutoMoveTarget(state, selection)
-      if (!target) {
+      const resolved = findAutoMoveTargetWithTableauAdjacentFallback(state, selection)
+      if (!resolved) {
         notifyInvalidMove({ selection })
         return
       }
-      dispatchWithFlight({ type: 'APPLY_MOVE', selection, target }, selection)
+
+      dispatchWithFlight(
+        { type: 'APPLY_MOVE', selection: resolved.selection, target: resolved.target },
+        resolved.selection,
+      )
     },
     [dispatchWithFlight, notifyInvalidMove, state],
   )
