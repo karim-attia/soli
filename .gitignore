@@ -45,8 +45,18 @@ node_modules
 .env.production.local
 
 .expo
-ios
-android
+/ios
+/android
+
+# Local Expo modules: keep native sources tracked, ignore build outputs
+modules/**/android/build
+modules/**/android/.cxx
+modules/**/android/.gradle
+modules/**/android/.kotlin
+modules/**/ios/build
+modules/**/ios/Pods
+modules/**/ios/.symlinks
+modules/**/ios/DerivedData
 !android/app/build.gradle
 !android/app/proguard-rules.pro
 !android/gradle.properties

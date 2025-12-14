@@ -63,6 +63,27 @@ react {
     autolinkLibrariesWithApp()
 }
 
+// req: Expo CLI runs Gradle with `--configure-on-demand`; ensure RN New Arch codegen runs before CMake.
+if ((findProperty('newArchEnabled') ?: 'false').toString().toBoolean()) {
+    def codegenProjects = [
+            ':react-native-async-storage_async-storage',
+            ':react-native-gesture-handler',
+            ':react-native-safe-area-context',
+            ':react-native-screens',
+            ':react-native-svg',
+            ':react-native-reanimated',
+            ':react-native-worklets',
+    ]
+
+    afterEvaluate {
+        tasks.matching { it.name.startsWith('configureCMake') }.configureEach { t ->
+            codegenProjects.each { p ->
+                t.dependsOn("${p}:generateCodegenArtifactsFromSchema")
+            }
+        }
+    }
+}
+
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */

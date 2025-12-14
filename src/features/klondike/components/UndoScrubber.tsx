@@ -113,13 +113,11 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
   )
 }
 
-// requirement 20-6: iOS needs extra bottom margin to avoid home indicator gesture area
-const IOS_BOTTOM_MARGIN = 100
-
 const styles = StyleSheet.create({
   container: {
     marginTop: 12,
-    marginBottom: Platform.OS === 'ios' ? IOS_BOTTOM_MARGIN : 8,
+    // requirement 20-6: iOS needs extra bottom margin to avoid home indicator gesture area. Since package upgrades also Android.
+    marginBottom: 100,
     width: '100%',
     minHeight: 72,
     position: 'relative',
