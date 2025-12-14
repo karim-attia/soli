@@ -47,12 +47,12 @@ export const useKlondikeTimer = ({ state, dispatch, stateRef }: UseKlondikeTimer
   useEffect(() => {
     const previousMoveCount = previousMoveCountRef.current
     const moveIncreased = state.moveCount > previousMoveCount
-    // PBI-28: Do not start/restart the timer during auto-up (auto-complete).
-    if (moveIncreased && state.timerState !== 'running' && !state.isAutoCompleting) {
+    // PBI-28: Do not start/restart the timer during auto-up (auto-complete) or after a win.
+    if (moveIncreased && state.timerState !== 'running' && !state.isAutoCompleting && !state.hasWon) {
       dispatch({ type: 'TIMER_START', startedAt: Date.now() })
     }
     previousMoveCountRef.current = state.moveCount
-  }, [dispatch, state.isAutoCompleting, state.moveCount, state.timerState])
+  }, [dispatch, state.hasWon, state.isAutoCompleting, state.moveCount, state.timerState])
 
   useEffect(() => {
     const wasAutoCompleting = previousAutoCompletingRef.current
