@@ -9,7 +9,7 @@
   "maxApproachSteps": "(default)",
   "maxApproachStepsHigh": "(default)",
   "rankingStrategy": "blended",
-  "shufflesFile": "/Users/karim/Code/Soli/soli-app/scripts/shuffles-100.json",
+  "shufflesFile": "/Users/karim/Code/Soli/soli/scripts/shuffles-100.json",
   "saveMd": "scripts/compare-100.md",
   "compare": false,
   "compareAtomicVariants": false
