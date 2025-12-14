@@ -966,38 +966,23 @@ const advanceAutoQueue = (state: GameState): GameState => {
     return state.isAutoCompleting ? { ...state, isAutoCompleting: false } : state
   }
 
-  // PBI-28: Make auto-up much faster by consuming multiple queued actions per ADVANCE_AUTO_QUEUE tick.
-  // This keeps the underlying action order deterministic while allowing multiple flights to animate concurrently.
-  const AUTO_UP_BATCH_SIZE = 8
-
-  let remainingQueue: AutoAction[] = state.autoQueue
+  const [current, ...rest] = state.autoQueue
   let nextState: GameState = state
-  let consumed = 0
 
-  while (remainingQueue.length > 0 && consumed < AUTO_UP_BATCH_SIZE) {
-    const [current, ...rest] = remainingQueue
-    remainingQueue = rest
-
-    if (current.type === 'move') {
-      nextState =
-        applyMove(nextState, current.selection, current.target, { recordHistory: false }) ??
-        nextState
-    } else if (current.type === 'draw') {
-      nextState = drawFromStock(nextState, { recordHistory: false, allowRecycle: false })
-    } else if (current.type === 'recycle') {
-      nextState = recycleWasteToStock(nextState, { recordHistory: false })
-    }
-
-    consumed += 1
+  if (current.type === 'move') {
+    nextState =
+      applyMove(state, current.selection, current.target, { recordHistory: false }) ?? state
+  } else if (current.type === 'draw') {
+    nextState = drawFromStock(state, { recordHistory: false, allowRecycle: false })
+  } else if (current.type === 'recycle') {
+    nextState = recycleWasteToStock(state, { recordHistory: false })
   }
-
-  const queueDone = remainingQueue.length === 0
 
   return {
     ...nextState,
-    autoQueue: remainingQueue,
-    isAutoCompleting: remainingQueue.length > 0,
-    autoCompleteRuns: queueDone ? nextState.autoCompleteRuns + 1 : nextState.autoCompleteRuns,
+    autoQueue: rest,
+    isAutoCompleting: rest.length > 0,
+    autoCompleteRuns: rest.length ? nextState.autoCompleteRuns : nextState.autoCompleteRuns + 1,
   }
 }
 

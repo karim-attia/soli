@@ -67,6 +67,7 @@ type RequestNewGameFn = (options?: { reason?: 'manual' | 'celebration' }) => voi
 
 // PBI-28: Run auto-up (auto-complete) much faster than manual play cadence.
 const AUTO_QUEUE_INTERVAL_MS = 25
+// pls comment that the difference between this and the one above is.
 const AUTO_QUEUE_MOVE_DELAY_MS = 35
 
 // Maps a selection descriptor to the card IDs required for animation-flight tracking.
