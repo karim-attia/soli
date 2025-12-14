@@ -121,3 +121,5 @@ export const STAT_BADGE_MIN_WIDTH = 96
 export const UNDO_SCRUB_BUTTON_DIM_OPACITY = 0.25
 export const UNDO_BUTTON_DISABLED_OPACITY = 0.55
 export const UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING = 40
+// Task 20-6: Keep undo scrubber clear of iOS home indicator / Android nav gesture area.
+export const UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING = 20

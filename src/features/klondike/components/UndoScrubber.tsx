@@ -4,11 +4,13 @@ import Animated from 'react-native-reanimated'
 import { GestureDetector, type GestureType } from 'react-native-gesture-handler'
 import { Slider } from 'tamagui'
 import { Undo2 } from '@tamagui/lucide-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
   UNDO_BUTTON_DISABLED_OPACITY,
   UNDO_SCRUB_BUTTON_DIM_OPACITY,
   UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING,
+  UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING,
 } from '../constants'
 
 export type UndoScrubberProps = {
@@ -58,6 +60,7 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
   onTrackMetrics,
 }) => {
   const trackRef = useRef<View>(null)
+  const safeArea = useSafeAreaInsets()
 
   const measureTrack = useCallback(() => {
     const track = trackRef.current
@@ -97,7 +100,13 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
       : UNDO_BUTTON_DISABLED_OPACITY
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        // Task 20-6: Respect iOS home indicator and Android navigation/gesture areas.
+        { paddingBottom: safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING },
+      ]}
+    >
       <AnimatedView pointerEvents="none" style={[styles.overlay, { opacity: isScrubbing ? 1 : 0 }]}
       >
         <Slider value={sliderValue} min={0} max={sliderMax} step={1} size="$4" style={styles.slider}>
@@ -116,8 +125,6 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginTop: 12,
-    // requirement 20-6: iOS needs extra bottom margin to avoid home indicator gesture area. Since package upgrades also Android.
-    marginBottom: 100,
     width: '100%',
     minHeight: 72,
     position: 'relative',
