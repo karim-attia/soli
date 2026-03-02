@@ -104,9 +104,7 @@ function cloneState(s) {
 
 function hashState(s) {
   const encCard = (c) => `${c.suit[0]}${c.rank}${c.faceUp ? 'u' : 'd'}`
-  const t = s.tableau
-    .map((col) => col.map(encCard).join(','))
-    .join('|')
+  const t = s.tableau.map((col) => col.map(encCard).join(',')).join('|')
   const w = s.waste.map(encCard).join(',')
   const st = s.stock.map(encCard).join(',')
   const f = ['clubs', 'diamonds', 'hearts', 'spades']
@@ -358,5 +356,3 @@ module.exports = {
   solveDeal,
   extractInitialTableauConfig,
 }
-
-

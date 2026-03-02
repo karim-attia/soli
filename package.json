@@ -1,9 +1,8 @@
 {
   "name": "soli",
-  "main": "expo-router/entry",
   "version": "0.3.0",
-  "packageManager": "yarn@4.5.0",
   "private": true,
+  "main": "expo-router/entry",
   "scripts": {
     "upgrade:tamagui": "yarn up '*tamagui*'@latest '@tamagui/*'@latest",
     "upgrade:tamagui:canary": "yarn up '*tamagui*'@canary '@tamagui/*'@canary",
@@ -12,7 +11,7 @@
     "format:check": "oxfmt --check \"{app,components,modules,src,scripts,test}/**/*.{js,jsx,ts,tsx,json}\" package.json",
     "lint": "oxlint --tsconfig tsconfig.json app components modules src scripts test",
     "lint:fix": "oxlint --fix --tsconfig tsconfig.json app components modules src scripts test",
-    "lint:strict": "oxlint -D correctness -D suspicious --deny-warnings --tsconfig tsconfig.json app components modules src scripts test",
+    "lint:strict": "oxlint -D correctness -D suspicious -A react-in-jsx-scope -A jsx-uses-react -A no-unassigned-import --deny-warnings --tsconfig tsconfig.json app components modules src scripts test",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:tsc": "tsc -p tsconfig.json --noEmit",
     "typecheck:tsgo": "tsgo -p tsconfig.tsgo.json",
@@ -30,22 +29,6 @@
     "demo:auto-solve": "node scripts/run-demo-autosolve.js",
     "build:android": "./build-android.sh",
     "prebuild": "npx expo prebuild --platform android --clean"
-  },
-  "jest": {
-    "preset": "jest-expo",
-    "resolver": "jest-pnp-resolver",
-    "transformIgnorePatterns": [
-      "node_modules/(?!(expo|expo-modules-core|@expo|@react-native|react-native|@react-navigation|@react-native-async-storage|react-native-reanimated)/)"
-    ],
-    "setupFiles": [
-      "<rootDir>/test/setup/mock-expo-winter.ts"
-    ],
-    "moduleNameMapper": {
-      "^expo/winter$": "<rootDir>/test/mocks/expo-winter",
-      "^expo/winter/.*": "<rootDir>/test/mocks/expo-winter",
-      "^expo/src/winter$": "<rootDir>/test/mocks/expo-winter",
-      "^expo/src/winter/.*": "<rootDir>/test/mocks/expo-winter"
-    }
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -94,5 +77,22 @@
     "oxfmt": "^0.34.0",
     "oxlint": "^1.50.0",
     "typescript": "^5.9.3"
-  }
+  },
+  "jest": {
+    "moduleNameMapper": {
+      "^expo/src/winter$": "<rootDir>/test/mocks/expo-winter",
+      "^expo/src/winter/.*": "<rootDir>/test/mocks/expo-winter",
+      "^expo/winter$": "<rootDir>/test/mocks/expo-winter",
+      "^expo/winter/.*": "<rootDir>/test/mocks/expo-winter"
+    },
+    "preset": "jest-expo",
+    "resolver": "jest-pnp-resolver",
+    "setupFiles": [
+      "<rootDir>/test/setup/mock-expo-winter.ts"
+    ],
+    "transformIgnorePatterns": [
+      "node_modules/(?!(expo|expo-modules-core|@expo|@react-native|react-native|@react-navigation|@react-native-async-storage|react-native-reanimated)/)"
+    ]
+  },
+  "packageManager": "yarn@4.12.0"
 }

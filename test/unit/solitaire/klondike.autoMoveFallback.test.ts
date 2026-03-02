@@ -73,7 +73,12 @@ describe('findAutoMoveTargetWithTableauAdjacentFallback', () => {
   })
 
   it('does not consider adjacent face-down tableau cards for fallback', () => {
-    const aceClubsFaceDown: Card = { id: 'ac-down', suit: 'clubs', rank: 1, faceUp: false }
+    const aceClubsFaceDown: Card = {
+      id: 'ac-down',
+      suit: 'clubs',
+      rank: 1,
+      faceUp: false,
+    }
     const twoClubs: Card = { id: '2c', suit: 'clubs', rank: 2, faceUp: true }
 
     const state = createEmptyState()

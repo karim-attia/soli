@@ -46,10 +46,9 @@ export const saveBoardMetrics = async (metrics: PersistedBoardMetrics): Promise<
       JSON.stringify({
         width: metrics.width,
         height: metrics.height ?? null,
-      }),
+      })
     )
   } catch (error) {
     devLog('warn', '[uiPreferences] Failed to persist board metrics', error)
   }
 }
-

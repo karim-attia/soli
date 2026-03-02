@@ -62,7 +62,7 @@ export const buildStatisticsRows = ({
       elapsedMs,
       timerState,
       timerStartedAt,
-      Date.now(),
+      Date.now()
     )
     rows.push({ label: 'Time', value: formatElapsedDuration(effectiveElapsedMs) })
   }
@@ -111,4 +111,3 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
 })
-

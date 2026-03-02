@@ -11,7 +11,7 @@ import {
 } from '../../../src/storage/gamePersistence'
 
 jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 )
 
 describe('gamePersistence', () => {
@@ -65,4 +65,3 @@ describe('gamePersistence', () => {
     expect(AsyncStorage.removeItem).toHaveBeenCalledWith(KLONDIKE_STORAGE_KEY)
   })
 })
-

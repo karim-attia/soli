@@ -1,6 +1,5 @@
 import type { SolvableShuffleConfig } from '../data/solvableShuffles'
 import { createSolvableShuffleId } from '../data/solvableShuffles'
-import { devLog } from '../utils/devLogger'
 
 const SUITS = ['clubs', 'diamonds', 'hearts', 'spades'] as const
 const RANKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] as const
@@ -84,7 +83,12 @@ export type GameAction =
   | { type: 'PLACE_ON_TABLEAU'; columnIndex: number }
   | { type: 'PLACE_ON_FOUNDATION'; suit: Suit }
   | { type: 'ADVANCE_AUTO_QUEUE' }
-  | { type: 'APPLY_MOVE'; selection: Selection; target: MoveTarget; recordHistory?: boolean }
+  | {
+      type: 'APPLY_MOVE'
+      selection: Selection
+      target: MoveTarget
+      recordHistory?: boolean
+    }
   | { type: 'TIMER_START'; startedAt: number }
   | { type: 'TIMER_TICK'; timestamp: number }
   | { type: 'TIMER_STOP'; timestamp: number }
@@ -146,7 +150,9 @@ export const createInitialState = (): GameState => {
   }
 }
 
-export const createSolvableGameState = (shuffleConfig: SolvableShuffleConfig): GameState => {
+export const createSolvableGameState = (
+  shuffleConfig: SolvableShuffleConfig
+): GameState => {
   const deck = createDeck()
   const lookup = new Map<string, Card>()
   deck.forEach((card) => {
@@ -157,19 +163,40 @@ export const createSolvableGameState = (shuffleConfig: SolvableShuffleConfig): G
     const column: Card[] = []
 
     columnConfig.down.forEach((cardConfig, cardIndex) => {
-      column.push(takeCardFromLookup(lookup, cardConfig.suit, cardConfig.rank, false, columnIndex, cardIndex, 'down'))
+      column.push(
+        takeCardFromLookup(
+          lookup,
+          cardConfig.suit,
+          cardConfig.rank,
+          false,
+          columnIndex,
+          cardIndex,
+          'down'
+        )
+      )
     })
 
     columnConfig.up.forEach((cardConfig, cardIndex) => {
       column.push(
-        takeCardFromLookup(lookup, cardConfig.suit, cardConfig.rank, true, columnIndex, cardIndex, 'up'),
+        takeCardFromLookup(
+          lookup,
+          cardConfig.suit,
+          cardConfig.rank,
+          true,
+          columnIndex,
+          cardIndex,
+          'up'
+        )
       )
     })
 
     return column
   })
 
-  const remainingCards = Array.from(lookup.values()).map((card) => ({ ...card, faceUp: false }))
+  const remainingCards = Array.from(lookup.values()).map((card) => ({
+    ...card,
+    faceUp: false,
+  }))
   const stockShuffled = shuffle(remainingCards)
   const { stock, waste } = revealInitialWaste(stockShuffled)
 
@@ -315,18 +342,20 @@ export const createDemoGameState = (): GameState => {
   const tableau: Tableau = DEMO_SHUFFLE_CONFIG.tableau.map((columnConfig) => {
     const column: Card[] = []
 
-    columnConfig.down.forEach((cardConfig, downIndex) => {
+    columnConfig.down.forEach((cardConfig) => {
       column.push(takeDemoCard(cardConfig.suit, cardConfig.rank, false))
     })
 
-    columnConfig.up.forEach((cardConfig, upIndex) => {
+    columnConfig.up.forEach((cardConfig) => {
       column.push(takeDemoCard(cardConfig.suit, cardConfig.rank, true))
     })
 
     return column
   })
 
-  const demoStock = DEMO_STOCK_ORDER.map(({ suit, rank }) => takeDemoCard(suit, rank, false))
+  const demoStock = DEMO_STOCK_ORDER.map(({ suit, rank }) =>
+    takeDemoCard(suit, rank, false)
+  )
   const { stock, waste } = revealInitialWaste(demoStock)
 
   const snapshot: GameSnapshot = {
@@ -362,13 +391,13 @@ const takeCardFromLookup = (
   faceUp: boolean,
   columnIndex: number,
   cardIndex: number,
-  zone: 'down' | 'up',
+  zone: 'down' | 'up'
 ): Card => {
   const key = `${suit}-${rank}`
   const card = lookup.get(key)
   if (!card) {
     throw new Error(
-      `Solvable shuffle is missing card ${key} (${zone} column ${columnIndex} position ${cardIndex}).`,
+      `Solvable shuffle is missing card ${key} (${zone} column ${columnIndex} position ${cardIndex}).`
     )
   }
 
@@ -398,16 +427,19 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
         selected: null,
       })
     case 'SELECT_TABLEAU':
-      return handleSelectTableau(haltAutoQueue(state), action.columnIndex, action.cardIndex)
+      return handleSelectTableau(
+        haltAutoQueue(state),
+        action.columnIndex,
+        action.cardIndex
+      )
     case 'SELECT_WASTE':
       return handleSelectWaste(haltAutoQueue(state))
     case 'SELECT_FOUNDATION_TOP':
       return handleSelectFoundation(haltAutoQueue(state), action.suit)
-    case 'CLEAR_SELECTION':
-      {
-        const workingState = haltAutoQueue(state)
-        return workingState.selected ? { ...workingState, selected: null } : workingState
-      }
+    case 'CLEAR_SELECTION': {
+      const workingState = haltAutoQueue(state)
+      return workingState.selected ? { ...workingState, selected: null } : workingState
+    }
     case 'PLACE_ON_TABLEAU':
       if (!state.selected) {
         return state
@@ -434,14 +466,13 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
       }
     case 'ADVANCE_AUTO_QUEUE':
       return finalizeState(advanceAutoQueue(state))
-    case 'APPLY_MOVE':
-      {
-        const workingState = haltAutoQueue(state)
-        const nextState = applyMove(workingState, action.selection, action.target, {
-          recordHistory: action.recordHistory,
-        })
-        return nextState ? finalizeState(nextState) : workingState
-      }
+    case 'APPLY_MOVE': {
+      const workingState = haltAutoQueue(state)
+      const nextState = applyMove(workingState, action.selection, action.target, {
+        recordHistory: action.recordHistory,
+      })
+      return nextState ? finalizeState(nextState) : workingState
+    }
     case 'TIMER_START':
       return startTimer(state, action.startedAt)
     case 'TIMER_TICK':
@@ -478,7 +509,10 @@ export const getDropHints = (state: GameState): DropHints => {
   return { tableau: tableauHints, foundations: foundationHints }
 }
 
-export const findAutoMoveTarget = (state: GameState, selection: Selection): MoveTarget | null => {
+export const findAutoMoveTarget = (
+  state: GameState,
+  selection: Selection
+): MoveTarget | null => {
   const targets = listDropTargets(state, selection)
   if (targets.foundations.length) {
     return { type: 'foundation', suit: targets.foundations[0] }
@@ -494,7 +528,7 @@ const TABLEAU_TAP_ADJACENT_CARD_OFFSET = 1
 
 export const findAutoMoveTargetWithTableauAdjacentFallback = (
   state: GameState,
-  selection: Selection,
+  selection: Selection
 ): { selection: Selection; target: MoveTarget } | null => {
   const target = findAutoMoveTarget(state, selection)
   if (target) {
@@ -540,7 +574,7 @@ export const hasUndoHistory = (state: GameState): boolean => state.history.lengt
 
 const listDropTargets = (
   state: GameState,
-  selection: Selection,
+  selection: Selection
 ): { tableau: number[]; foundations: Suit[] } => {
   const stack = previewSelectionStack(state, selection)
   if (!stack.length) {
@@ -574,7 +608,7 @@ const listDropTargets = (
 
 const drawFromStock = (
   state: GameState,
-  options: { recordHistory?: boolean; allowRecycle?: boolean } = {},
+  options: { recordHistory?: boolean; allowRecycle?: boolean } = {}
 ): GameState => {
   const recordHistory = options.recordHistory !== false
   const allowRecycle = options.allowRecycle !== false
@@ -604,7 +638,7 @@ const drawFromStock = (
 
 const recycleWasteToStock = (
   state: GameState,
-  options: { recordHistory?: boolean } = {},
+  options: { recordHistory?: boolean } = {}
 ): GameState => {
   if (!state.waste.length) {
     return state
@@ -683,7 +717,11 @@ const scrubToIndex = (state: GameState, targetIndex: number): GameState => {
   }
 }
 
-const handleSelectTableau = (state: GameState, columnIndex: number, cardIndex: number): GameState => {
+const handleSelectTableau = (
+  state: GameState,
+  columnIndex: number,
+  cardIndex: number
+): GameState => {
   const column = state.tableau[columnIndex]
   const selectedCard = column?.[cardIndex]
 
@@ -740,7 +778,7 @@ const applyMove = (
   state: GameState,
   selection: Selection,
   target: MoveTarget,
-  options: { recordHistory?: boolean } = {},
+  options: { recordHistory?: boolean } = {}
 ): GameState | null => {
   const stack = previewSelectionStack(state, selection)
   if (!stack.length) {
@@ -771,7 +809,6 @@ const applyMove = (
   const nextWaste = cloneCards(state.waste)
 
   const movingCards = extractMovingCards({
-    state,
     selection,
     tableau: nextTableau,
     foundations: nextFoundations,
@@ -802,13 +839,11 @@ const applyMove = (
 }
 
 const extractMovingCards = ({
-  state,
   selection,
   tableau,
   foundations,
   waste,
 }: {
-  state: GameState
   selection: Selection
   tableau: Tableau
   foundations: Foundations
@@ -857,7 +892,7 @@ const canDropOnTableau = (column: TableauColumn, stack: Card[]): boolean => {
   const targetTop = column[column.length - 1]
   return (
     targetTop.faceUp &&
-    targetTop.rank === (stack[0].rank + 1) &&
+    targetTop.rank === stack[0].rank + 1 &&
     getCardColor(targetTop.suit) !== getCardColor(stack[0].suit)
   )
 }
@@ -905,7 +940,7 @@ const finalizeState = (state: GameState): GameState => {
 
 const maybeSetWinFlag = (state: GameState): GameState => {
   const allFoundationsComplete = FOUNDATION_SUIT_ORDER.every(
-    (suit) => state.foundations[suit].length === TOTAL_CARDS_PER_SUIT,
+    (suit) => state.foundations[suit].length === TOTAL_CARDS_PER_SUIT
   )
 
   if (allFoundationsComplete && !state.hasWon) {
@@ -950,7 +985,9 @@ const planAutoActions = (state: GameState): AutoAction[] => {
       const topCard = preview[0]
       if (!topCard) break
       const target: MoveTarget = { type: 'foundation', suit: topCard.suit }
-      const nextState = applyMove(workingState, selection, target, { recordHistory: false })
+      const nextState = applyMove(workingState, selection, target, {
+        recordHistory: false,
+      })
 
       if (!nextState || nextState === workingState) {
         break
@@ -964,12 +1001,21 @@ const planAutoActions = (state: GameState): AutoAction[] => {
 
     const supportMove = findTableauSupportMove(workingState)
     if (supportMove) {
-      const nextState = applyMove(workingState, supportMove.selection, supportMove.target, {
-        recordHistory: false,
-      })
+      const nextState = applyMove(
+        workingState,
+        supportMove.selection,
+        supportMove.target,
+        {
+          recordHistory: false,
+        }
+      )
 
       if (nextState && nextState !== workingState) {
-        planned.push({ type: 'move', selection: supportMove.selection, target: supportMove.target })
+        planned.push({
+          type: 'move',
+          selection: supportMove.selection,
+          target: supportMove.target,
+        })
         workingState = nextState
         steps += 1
         continue
@@ -986,7 +1032,10 @@ const planAutoActions = (state: GameState): AutoAction[] => {
       break
     }
 
-    workingState = drawFromStock(workingState, { recordHistory: false, allowRecycle: false })
+    workingState = drawFromStock(workingState, {
+      recordHistory: false,
+      allowRecycle: false,
+    })
     planned.push({ type: 'draw' })
     steps += 1
   }
@@ -995,7 +1044,7 @@ const planAutoActions = (state: GameState): AutoAction[] => {
 }
 
 const findTableauSupportMove = (
-  state: GameState,
+  state: GameState
 ): { selection: Selection; target: MoveTarget } | null => {
   if (state.waste.length) {
     const wasteSelection: Selection = { source: 'waste' }
@@ -1018,7 +1067,8 @@ const advanceAutoQueue = (state: GameState): GameState => {
 
   if (current.type === 'move') {
     nextState =
-      applyMove(state, current.selection, current.target, { recordHistory: false }) ?? state
+      applyMove(state, current.selection, current.target, { recordHistory: false }) ??
+      state
   } else if (current.type === 'draw') {
     nextState = drawFromStock(state, { recordHistory: false, allowRecycle: false })
   } else if (current.type === 'recycle') {
@@ -1029,7 +1079,9 @@ const advanceAutoQueue = (state: GameState): GameState => {
     ...nextState,
     autoQueue: rest,
     isAutoCompleting: rest.length > 0,
-    autoCompleteRuns: rest.length ? nextState.autoCompleteRuns : nextState.autoCompleteRuns + 1,
+    autoCompleteRuns: rest.length
+      ? nextState.autoCompleteRuns
+      : nextState.autoCompleteRuns + 1,
   }
 }
 
@@ -1097,12 +1149,18 @@ const startTimer = (state: GameState, startedAt: number): GameState => {
   return {
     ...state,
     timerState: 'running',
-    timerStartedAt: Number.isFinite(state.timerStartedAt ?? NaN) ? state.timerStartedAt : startedAt,
+    timerStartedAt: Number.isFinite(state.timerStartedAt ?? NaN)
+      ? state.timerStartedAt
+      : startedAt,
   }
 }
 
 const tickTimer = (state: GameState, timestamp: number): GameState => {
-  if (state.timerState !== 'running' || state.timerStartedAt === null || !Number.isFinite(timestamp)) {
+  if (
+    state.timerState !== 'running' ||
+    state.timerStartedAt === null ||
+    !Number.isFinite(timestamp)
+  ) {
     return state
   }
 
@@ -1133,7 +1191,11 @@ const stopTimer = (state: GameState, timestamp: number): GameState => {
 }
 
 const resetTimer = (state: GameState): GameState => {
-  if (state.timerState === 'idle' && state.elapsedMs === 0 && state.timerStartedAt === null) {
+  if (
+    state.timerState === 'idle' &&
+    state.elapsedMs === 0 &&
+    state.timerStartedAt === null
+  ) {
     return state
   }
 
@@ -1201,7 +1263,7 @@ const createDeck = (): Card[] => {
     for (let rankIndex = 0; rankIndex < TOTAL_CARDS_PER_SUIT; rankIndex += 1) {
       const rank = (rankIndex + 1) as Rank
       deck.push({
-        id: `${suit}-${rank}-${cardIdCounter += 1}`,
+        id: `${suit}-${rank}-${(cardIdCounter += 1)}`,
         suit,
         rank,
         faceUp: false,
@@ -1262,8 +1324,11 @@ const createEmptyFoundations = (): Foundations =>
     return acc
   }, {} as Foundations)
 
-const createSuitRecord = <T,>(value: T): Record<Suit, T> =>
-  FOUNDATION_SUIT_ORDER.reduce((acc, suit) => {
-    acc[suit] = value
-    return acc
-  }, {} as Record<Suit, T>)
+const createSuitRecord = <T>(value: T): Record<Suit, T> =>
+  FOUNDATION_SUIT_ORDER.reduce(
+    (acc, suit) => {
+      acc[suit] = value
+      return acc
+    },
+    {} as Record<Suit, T>
+  )

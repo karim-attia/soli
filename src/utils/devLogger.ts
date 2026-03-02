@@ -1,7 +1,5 @@
 type DevLogLevel = 'log' | 'info' | 'warn' | 'error' | 'debug'
 
-const LOG_LEVELS: ReadonlyArray<DevLogLevel> = ['log', 'info', 'warn', 'error', 'debug']
-
 const CONSOLE_METHODS: Record<DevLogLevel, (...args: unknown[]) => void> = {
   log: console.log.bind(console),
   info: console.info.bind(console),
@@ -34,4 +32,3 @@ export const devLog = (level: DevLogLevel, ...args: unknown[]): void => {
 export const getDeveloperLoggingEnabled = (): boolean => developerLoggingEnabled
 
 export type { DevLogLevel }
-

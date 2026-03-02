@@ -1,7 +1,22 @@
-import { Dispatch, SetStateAction, memo, useCallback, useLayoutEffect, useMemo, useState } from 'react'
-import { Dimensions, FlatList, LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native'
+import {
+  Dispatch,
+  SetStateAction,
+  memo,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from 'react'
+import {
+  Dimensions,
+  FlatList,
+  LayoutChangeEvent,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native'
 import { useNavigation } from 'expo-router'
-import { Button, Paragraph, Separator, Sheet, Text, XStack, YStack, useTheme } from 'tamagui'
+import { Paragraph, Separator, Sheet, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu } from '@tamagui/lucide-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -27,11 +42,13 @@ function HistoryScreen() {
   // Task 10-6: Count incomplete entries (not solved and not active)
   const incompleteCount = useMemo(
     () => entries.filter((entry) => entry.status === 'incomplete').length,
-    [entries],
+    [entries]
   )
   const [selectedEntry, setSelectedEntry] = useState<HistoryEntry | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [sheetSnapPoints, setSheetSnapPoints] = useState<number[]>([...DEFAULT_SHEET_SNAP_POINTS])
+  const [sheetSnapPoints, setSheetSnapPoints] = useState<number[]>([
+    ...DEFAULT_SHEET_SNAP_POINTS,
+  ])
 
   const handleEntryPress = useCallback((entry: HistoryEntry) => {
     setSelectedEntry(entry)
@@ -114,7 +131,10 @@ type HistoryListItemProps = {
 }
 
 // Task 10-6: Map status to display labels and colors
-const STATUS_DISPLAY: Record<HistoryEntryStatus, { label: string; colorKey: 'green' | 'yellow' | 'blue' }> = {
+const STATUS_DISPLAY: Record<
+  HistoryEntryStatus,
+  { label: string; colorKey: 'green' | 'yellow' | 'blue' }
+> = {
   solved: { label: 'Solved', colorKey: 'green' },
   incomplete: { label: 'Incomplete', colorKey: 'yellow' },
   active: { label: 'Active', colorKey: 'blue' },
@@ -166,7 +186,7 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
       shadowRadius: 8,
       elevation: 2,
     }),
-    [theme.color6?.val, theme.color10?.val],
+    [theme.color6?.val, theme.color10?.val]
   )
 
   return (
@@ -179,7 +199,11 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
           <Text fontSize={16} fontWeight="700" flex={1} numberOfLines={1}>
             {entry.displayName}
           </Text>
-          <Text fontSize={14} fontWeight="600" style={{ color: statusColor, flexShrink: 0 }}>
+          <Text
+            fontSize={14}
+            fontWeight="600"
+            style={{ color: statusColor, flexShrink: 0 }}
+          >
             {statusLabel}
           </Text>
         </XStack>
@@ -196,7 +220,15 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
 
 const ListSpacer = () => <YStack height="$2" />
 
-const EmptyHistory = ({ hydrated, paddingHorizontal, paddingVertical }: { hydrated: boolean; paddingHorizontal: number; paddingVertical: number }) => (
+const EmptyHistory = ({
+  hydrated,
+  paddingHorizontal,
+  paddingVertical,
+}: {
+  hydrated: boolean
+  paddingHorizontal: number
+  paddingVertical: number
+}) => (
   <YStack gap="$3" style={{ paddingHorizontal, paddingVertical }}>
     <Text fontSize={18} fontWeight="600">
       {hydrated ? 'No games recorded yet' : 'Loading history…'}
@@ -239,7 +271,17 @@ const Badge = ({ label, tone }: BadgeProps) => {
           textColor: theme.color11?.val ?? '#111827',
         }
     }
-  }, [theme.blue11?.val, theme.blue4?.val, theme.color11?.val, theme.color4?.val, theme.green11?.val, theme.green4?.val, theme.yellow11?.val, theme.yellow4?.val])
+  }, [
+    tone,
+    theme.blue11?.val,
+    theme.blue4?.val,
+    theme.color11?.val,
+    theme.color4?.val,
+    theme.green11?.val,
+    theme.green4?.val,
+    theme.yellow11?.val,
+    theme.yellow4?.val,
+  ])
   const badgeStyle = useMemo(
     () => ({
       paddingHorizontal: 8,
@@ -247,7 +289,7 @@ const Badge = ({ label, tone }: BadgeProps) => {
       borderRadius: 999,
       backgroundColor,
     }),
-    [backgroundColor],
+    [backgroundColor]
   )
 
   return (
@@ -269,7 +311,10 @@ const formatFinishedAt = (isoTimestamp: string | undefined) => {
     if (Number.isNaN(timestamp.getTime())) {
       return isoTimestamp
     }
-    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(timestamp)
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(timestamp)
   } catch (error) {
     devLog('warn', '[history] Failed to format timestamp', error)
     return isoTimestamp
@@ -326,7 +371,7 @@ const HistoryStatTile = ({ stat }: { stat: HistoryStat }) => {
       borderWidth: 1,
       borderColor,
     }),
-    [backgroundColor, borderColor],
+    [backgroundColor, borderColor]
   )
 
   return (
@@ -381,7 +426,13 @@ const PREVIEW_SUIT_COLORS: Record<HistoryPreviewCard['suit'], string> = {
   hearts: '#c92a2a',
 }
 
-const HistoryPreviewSheet = ({ entry, open, onOpenChange, snapPoints, onSnapPointsChange }: HistoryPreviewSheetProps) => {
+const HistoryPreviewSheet = ({
+  entry,
+  open,
+  onOpenChange,
+  snapPoints,
+  onSnapPointsChange,
+}: HistoryPreviewSheetProps) => {
   const insets = useSafeAreaInsets()
   const [boardWidth, setBoardWidth] = useState<number | null>(null)
 
@@ -414,7 +465,7 @@ const HistoryPreviewSheet = ({ entry, open, onOpenChange, snapPoints, onSnapPoin
         return sortedPoints
       })
     },
-    [insets.bottom, onSnapPointsChange],
+    [insets.bottom, onSnapPointsChange]
   )
 
   return (
@@ -453,7 +504,8 @@ const HistoryPreviewSheet = ({ entry, open, onOpenChange, snapPoints, onSnapPoin
               <Paragraph color="$color10">
                 {entry.status === 'solved' && entry.finishedAt
                   ? `Finished ${formatFinishedAt(entry.finishedAt)}`
-                  : `Started ${formatFinishedAt(entry.startedAt)}`} · {STATUS_DISPLAY[entry.status]?.label ?? 'Unknown'}
+                  : `Started ${formatFinishedAt(entry.startedAt)}`}{' '}
+                · {STATUS_DISPLAY[entry.status]?.label ?? 'Unknown'}
               </Paragraph>
             </YStack>
             <XStack gap="$2" flexWrap="wrap">
@@ -499,25 +551,27 @@ const computePreviewMetrics = (availableWidth: number | null): PreviewMetrics =>
   if (!availableWidth || availableWidth <= 0) {
     return computePreviewMetrics(
       PREVIEW_BASE_CARD_WIDTH * PREVIEW_TABLEAU_COLUMN_COUNT +
-        PREVIEW_TABLEAU_GAP * (PREVIEW_TABLEAU_COLUMN_COUNT - 1),
+        PREVIEW_TABLEAU_GAP * (PREVIEW_TABLEAU_COLUMN_COUNT - 1)
     )
   }
 
   const totalGap = PREVIEW_TABLEAU_GAP * (PREVIEW_TABLEAU_COLUMN_COUNT - 1)
   const widthAvailable = Math.max(
     availableWidth - totalGap,
-    PREVIEW_MIN_CARD_WIDTH * PREVIEW_TABLEAU_COLUMN_COUNT,
+    PREVIEW_MIN_CARD_WIDTH * PREVIEW_TABLEAU_COLUMN_COUNT
   )
   const rawWidth = widthAvailable / PREVIEW_TABLEAU_COLUMN_COUNT
   const unclampedWidth = Math.max(Math.floor(rawWidth), PREVIEW_MIN_CARD_WIDTH)
   const constrainedWidth = Math.min(
     Math.max(unclampedWidth, PREVIEW_MIN_CARD_WIDTH),
-    PREVIEW_MAX_CARD_WIDTH,
+    PREVIEW_MAX_CARD_WIDTH
   )
   const height = Math.round(constrainedWidth * PREVIEW_CARD_ASPECT_RATIO)
   const stackOffset = Math.max(
     24,
-    Math.round(constrainedWidth * (PREVIEW_BASE_STACK_OFFSET / PREVIEW_BASE_CARD_WIDTH + 0.12)),
+    Math.round(
+      constrainedWidth * (PREVIEW_BASE_STACK_OFFSET / PREVIEW_BASE_CARD_WIDTH + 0.12)
+    )
   )
   const radius = Math.max(6, Math.round(constrainedWidth * 0.12))
 
@@ -567,7 +621,7 @@ const PreviewColumn = ({
             metrics={metrics}
             top={index * metrics.stackOffset}
           />
-        ),
+        )
       )}
     </View>
   )
@@ -723,4 +777,3 @@ const previewStyles = StyleSheet.create({
 
 // PBI-17: Memoize the entire screen component to prevent re-renders
 export default memo(HistoryScreen)
-

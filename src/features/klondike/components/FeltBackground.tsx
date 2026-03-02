@@ -7,7 +7,8 @@ const LINE_OFFSET = -400
 
 export const FeltBackground: React.FC = () => {
   const colorScheme = useColorScheme()
-  const patternColor = colorScheme === 'dark' ? 'rgba(255, 255, 255, 0.015)' : 'rgba(0, 0, 0, 0.015)'
+  const patternColor =
+    colorScheme === 'dark' ? 'rgba(255, 255, 255, 0.015)' : 'rgba(0, 0, 0, 0.015)'
 
   return (
     <View style={styles.overlay} pointerEvents="none">
@@ -57,4 +58,3 @@ const styles = StyleSheet.create({
     height: 0.5,
   },
 })
-

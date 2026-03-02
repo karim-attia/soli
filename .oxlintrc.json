@@ -11,10 +11,10 @@
   },
   "plugins": ["typescript", "oxc", "react", "import"],
   "rules": {
-    "import/no-unassigned-import": "off",
-    "react/react-in-jsx-scope": "off",
-    "react/jsx-uses-react": "off",
-    "react/style-prop-object": "off"
+    "no-unassigned-import": "off",
+    "react-in-jsx-scope": "off",
+    "jsx-uses-react": "off",
+    "style-prop-object": "off"
   },
   "ignorePatterns": ["dist/**", "build/**"]
 }

@@ -3,11 +3,7 @@ import { View } from 'react-native'
 
 import type { Card } from '../../../../solitaire/klondike'
 import type { CardFlightSnapshot } from '../../../../animation/flightController'
-import type {
-  CardFlightRegistry,
-  CardMetrics,
-  InvalidWiggleConfig,
-} from '../../types'
+import type { CardFlightRegistry, CardMetrics, InvalidWiggleConfig } from '../../types'
 import { WASTE_FAN_MAX_OFFSET, WASTE_FAN_OVERLAP_RATIO } from '../../constants'
 import { useWasteFanCardAnimation } from './animations'
 import { AnimatedView } from './common'

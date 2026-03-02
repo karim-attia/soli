@@ -112,8 +112,12 @@ function parseColumn(line: string, shuffleId: string): SolvableTableauColumnConf
 
   const downTokens = match[2].trim() ? match[2].trim().split(/\s+/) : []
   const upTokens = match[3].trim().split(/\s+/)
-  const down = downTokens.map((token, tokenIndex) => decodeCard(token, `${shuffleId} col ${columnIndex + 1} down[${tokenIndex}]`))
-  const up = upTokens.map((token, tokenIndex) => decodeCard(token, `${shuffleId} col ${columnIndex + 1} up[${tokenIndex}]`))
+  const down = downTokens.map((token, tokenIndex) =>
+    decodeCard(token, `${shuffleId} col ${columnIndex + 1} down[${tokenIndex}]`)
+  )
+  const up = upTokens.map((token, tokenIndex) =>
+    decodeCard(token, `${shuffleId} col ${columnIndex + 1} up[${tokenIndex}]`)
+  )
 
   return { down, up }
 }
@@ -143,7 +147,10 @@ function parseShuffleBlock(block: string): SolvableShuffleConfig | null {
   const source = meta.get('source') ?? undefined
 
   const tableauLines = lines.slice(1)
-  const columns: Array<SolvableTableauColumnConfig | null> = Array.from({ length: 7 }, () => null)
+  const columns: Array<SolvableTableauColumnConfig | null> = Array.from(
+    { length: 7 },
+    () => null
+  )
   tableauLines.forEach((line) => {
     const match = line.match(/^(\d):/)
     if (!match) {
@@ -210,7 +217,9 @@ function validateShuffle(shuffle: SolvableShuffleConfig): void {
   }
 
   if (!shuffle.addedAt || Number.isNaN(Date.parse(shuffle.addedAt))) {
-    throw new Error(`Solvable shuffle ${shuffle.id} has an invalid addedAt date: ${shuffle.addedAt}`)
+    throw new Error(
+      `Solvable shuffle ${shuffle.id} has an invalid addedAt date: ${shuffle.addedAt}`
+    )
   }
 
   const seenCards = new Set<string>()
@@ -221,7 +230,9 @@ function validateShuffle(shuffle: SolvableShuffleConfig): void {
     }
 
     if (!Array.isArray(column.down) || !Array.isArray(column.up)) {
-      throw new Error(`Solvable shuffle ${shuffle.id} column ${columnIndex} must define down/up arrays`)
+      throw new Error(
+        `Solvable shuffle ${shuffle.id} column ${columnIndex} must define down/up arrays`
+      )
     }
 
     const expectedCards = columnIndex + 1
@@ -229,19 +240,23 @@ function validateShuffle(shuffle: SolvableShuffleConfig): void {
 
     if (actualCards !== expectedCards) {
       throw new Error(
-        `Solvable shuffle ${shuffle.id} column ${columnIndex} should contain ${expectedCards} cards, found ${actualCards}`,
+        `Solvable shuffle ${shuffle.id} column ${columnIndex} should contain ${expectedCards} cards, found ${actualCards}`
       )
     }
 
     if (column.up.length === 0) {
-      throw new Error(`Solvable shuffle ${shuffle.id} column ${columnIndex} must expose at least one face-up card`)
+      throw new Error(
+        `Solvable shuffle ${shuffle.id} column ${columnIndex} must expose at least one face-up card`
+      )
     }
 
     column.down.forEach((card, cardIndex) => {
       validateCard(card, `${shuffle.id} column ${columnIndex} down[${cardIndex}]`)
       const key = encodeCard(card)
       if (seenCards.has(key)) {
-        throw new Error(`Duplicate card ${key} detected in solvable shuffle ${shuffle.id}`)
+        throw new Error(
+          `Duplicate card ${key} detected in solvable shuffle ${shuffle.id}`
+        )
       }
       seenCards.add(key)
     })
@@ -250,7 +265,9 @@ function validateShuffle(shuffle: SolvableShuffleConfig): void {
       validateCard(card, `${shuffle.id} column ${columnIndex} up[${cardIndex}]`)
       const key = encodeCard(card)
       if (seenCards.has(key)) {
-        throw new Error(`Duplicate card ${key} detected in solvable shuffle ${shuffle.id}`)
+        throw new Error(
+          `Duplicate card ${key} detected in solvable shuffle ${shuffle.id}`
+        )
       }
       seenCards.add(key)
     })
@@ -300,4 +317,3 @@ export const extractSolvableBaseId = (shuffleId: string): string | null => {
 
 export const isSolvableShuffleId = (shuffleId: string): boolean =>
   extractSolvableBaseId(shuffleId) !== null
-

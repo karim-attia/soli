@@ -33,7 +33,15 @@ const PROGRESS_BAR_SUFFIX = ']'
 const PROGRESS_EXPECTATION_MULTIPLIER = 1.25
 const DEFAULT_EXPECTED_BUILD_TIME_MS = TOTAL_TIMEOUT_MS
 const CRASH_PREFIX = '[CRASH]'
-const CRASH_KEYWORDS = ['FATAL', 'AndroidRuntime', 'Exception', 'crash', 'SIGSEGV', 'SIGABRT', 'SIGBUS']
+const CRASH_KEYWORDS = [
+  'FATAL',
+  'AndroidRuntime',
+  'Exception',
+  'crash',
+  'SIGSEGV',
+  'SIGABRT',
+  'SIGBUS',
+]
 const MAX_CRASH_CONTEXT_LINES = 8
 const MODES = {
   DEMO: 'demo',
@@ -41,7 +49,8 @@ const MODES = {
 }
 const DEFAULT_MODE = MODES.DEMO
 const INSTALL_SUCCESS_MESSAGE = 'Build & install completed successfully.'
-const PROD_MODE_READY_MESSAGE = 'Production mode active. Streaming filtered logs (press Ctrl+C to exit).'
+const PROD_MODE_READY_MESSAGE =
+  'Production mode active. Streaming filtered logs (press Ctrl+C to exit).'
 const ADB_HEADER_PREFIX = 'List of devices'
 const ADB_STATUS_DEVICE = 'device'
 const REPOSITORY_ROOT = path.resolve(__dirname, '..')
@@ -53,7 +62,7 @@ const RELEASE_APK_PATH = path.join(
   'outputs',
   'apk',
   'release',
-  'app-release.apk',
+  'app-release.apk'
 )
 
 const log = (message) => {
@@ -72,8 +81,8 @@ const extractAppLogMessage = (line) => {
   if (!match) {
     return null
   }
-  let message = match[1].replace(/^[\'",\s]+/, '')
-  message = message.replace(/[\'"]$/g, '')
+  let message = match[1].replace(/^['",\s]+/, '')
+  message = message.replace(/['"]$/g, '')
   if (!message.length) {
     return null
   }
@@ -121,26 +130,31 @@ const parseMode = () => {
 const ensureValidMode = (mode) => {
   const validModes = Object.values(MODES)
   if (!validModes.includes(mode)) {
-    throw new Error(`Unsupported mode "${mode}". Supported modes: ${validModes.join(', ')}`)
+    throw new Error(
+      `Unsupported mode "${mode}". Supported modes: ${validModes.join(', ')}`
+    )
   }
 }
 
 const isDemoMode = (mode) => mode === MODES.DEMO
 
 const getUriForMode = (mode) => (isDemoMode(mode) ? DEMO_URI : BASE_APP_URI)
-const createLauncherForMode = ({ mode }) =>
-  () => runCommand('npx', ['uri-scheme', 'open', getUriForMode(mode), '--android'])
+const createLauncherForMode =
+  ({ mode }) =>
+  () =>
+    runCommand('npx', ['uri-scheme', 'open', getUriForMode(mode), '--android'])
 
 const formatClockDuration = (ms, options = {}) => {
   const { roundUp = false } = options
-  const rawSeconds = roundUp ? Math.ceil(ms / MS_PER_SECOND) : Math.floor(ms / MS_PER_SECOND)
+  const rawSeconds = roundUp
+    ? Math.ceil(ms / MS_PER_SECOND)
+    : Math.floor(ms / MS_PER_SECOND)
   const totalSeconds = Math.max(0, rawSeconds)
   const minutes = Math.floor(totalSeconds / SECONDS_PER_MINUTE)
   const seconds = totalSeconds % SECONDS_PER_MINUTE
-  return `${String(minutes).padStart(CLOCK_PAD_LENGTH, CLOCK_PAD_CHAR)}:${String(seconds).padStart(
-    CLOCK_PAD_LENGTH,
-    CLOCK_PAD_CHAR,
-  )}`
+  return `${String(minutes).padStart(CLOCK_PAD_LENGTH, CLOCK_PAD_CHAR)}:${String(
+    seconds
+  ).padStart(CLOCK_PAD_LENGTH, CLOCK_PAD_CHAR)}`
 }
 
 const formatVerboseDuration = (ms) => {
@@ -161,7 +175,10 @@ const renderProgressBar = (filledSegments) => {
   return `${PROGRESS_BAR_PREFIX}${filled}${empty}${PROGRESS_BAR_SUFFIX}`
 }
 
-const createProgressTracker = (label, expectedDurationMs = DEFAULT_EXPECTED_BUILD_TIME_MS) => {
+const createProgressTracker = (
+  label,
+  expectedDurationMs = DEFAULT_EXPECTED_BUILD_TIME_MS
+) => {
   const startTime = Date.now()
   let expectedTotal = Math.max(expectedDurationMs, PROGRESS_UPDATE_INTERVAL_MS)
   let lastPrintedLine = ''
@@ -179,7 +196,8 @@ const createProgressTracker = (label, expectedDurationMs = DEFAULT_EXPECTED_BUIL
       const scaledElapsed = Math.ceil(elapsed * PROGRESS_EXPECTATION_MULTIPLIER)
       expectedTotal = Math.max(expectedTotal, scaledElapsed, PROGRESS_UPDATE_INTERVAL_MS)
     }
-    const ratio = forceComplete || expectedTotal === 0 ? 1 : Math.min(1, elapsed / expectedTotal)
+    const ratio =
+      forceComplete || expectedTotal === 0 ? 1 : Math.min(1, elapsed / expectedTotal)
     let segments = Math.floor(ratio * PROGRESS_BAR_WIDTH)
     if (forceComplete) {
       segments = PROGRESS_BAR_WIDTH
@@ -190,7 +208,7 @@ const createProgressTracker = (label, expectedDurationMs = DEFAULT_EXPECTED_BUIL
 
     const remainingMs = forceComplete ? 0 : Math.max(0, expectedTotal - elapsed)
     const baseLine = `${renderProgressBar(segments)} ${segments}/${PROGRESS_BAR_WIDTH} elapsed ${formatClockDuration(
-      elapsed,
+      elapsed
     )} remaining ${formatClockDuration(remainingMs, { roundUp: true })}`
     const decoratedBaseLine = appendText ? `${baseLine} ${appendText}` : baseLine
     const finalLine = overrideMessage ?? decoratedBaseLine
@@ -229,10 +247,12 @@ const createProgressTracker = (label, expectedDurationMs = DEFAULT_EXPECTED_BUIL
         forceComplete: true,
         overrideElapsed: elapsed,
         overrideMessage: `${renderProgressBar(PROGRESS_BAR_WIDTH)} ${PROGRESS_BAR_WIDTH}/${PROGRESS_BAR_WIDTH} - completed in ${formatClockDuration(
-          elapsed,
+          elapsed
         )}`,
       })
-      log(`Measured ${label} duration: ${formatVerboseDuration(elapsed)} (${formatClockDuration(elapsed)}).`)
+      log(
+        `Measured ${label} duration: ${formatVerboseDuration(elapsed)} (${formatClockDuration(elapsed)}).`
+      )
       return elapsed
     },
     fail: () => {
@@ -269,10 +289,15 @@ const runCommand = (command, args, options = {}) =>
       if (code === 0) {
         resolve({ stdout, stderr })
       } else {
-        const errorOutput = options.capture || options.silent ? `${stdout}\n${stderr}`.trim() : ''
-        reject(new Error(`Command failed (${code}): ${command} ${args.join(' ')}${
-          errorOutput ? `\n${errorOutput}` : ''
-        }`))
+        const errorOutput =
+          options.capture || options.silent ? `${stdout}\n${stderr}`.trim() : ''
+        reject(
+          new Error(
+            `Command failed (${code}): ${command} ${args.join(' ')}${
+              errorOutput ? `\n${errorOutput}` : ''
+            }`
+          )
+        )
       }
     })
   })
@@ -309,7 +334,7 @@ const ensureDevice = async () => {
   const connectedDevices = parseConnectedDeviceLines(stdout)
   if (!connectedDevices.length) {
     throw new Error(
-      'No Android device detected. Connect a device or start an emulator, then enable USB debugging (adb devices).',
+      'No Android device detected. Connect a device or start an emulator, then enable USB debugging (adb devices).'
     )
   }
   const connectedDeviceDescriptions = connectedDevices
@@ -402,7 +427,9 @@ const createLogMonitor = ({ mode, logcat, launchApp }) => {
   const startAutoSequenceTimer = () => {
     clearTimer(autoSequenceTimer)
     autoSequenceTimer = setTimeout(() => {
-      rejectFailure('Timed out waiting for Foundations complete log after auto-sequence started.')
+      rejectFailure(
+        'Timed out waiting for Foundations complete log after auto-sequence started.'
+      )
     }, AUTO_SEQUENCE_TIMEOUT_MS)
   }
 
@@ -437,7 +464,8 @@ const createLogMonitor = ({ mode, logcat, launchApp }) => {
     }
 
     const hasAppContext =
-      line.includes(PACKAGE_NAME) || crashContext.some((recentLine) => recentLine.includes(PACKAGE_NAME))
+      line.includes(PACKAGE_NAME) ||
+      crashContext.some((recentLine) => recentLine.includes(PACKAGE_NAME))
     const isCrashLine = CRASH_KEYWORDS.some((keyword) => line.includes(keyword))
     if (isCrashLine && hasAppContext) {
       console.log(`${CRASH_PREFIX} ${line}`)
@@ -509,7 +537,14 @@ const main = async () => {
     log(`Running run-demo-autosolve in ${mode} mode.`)
 
     const deviceSerial = await ensureDevice()
-    await runCommand('adb', ['-s', deviceSerial, 'shell', 'am', 'force-stop', PACKAGE_NAME])
+    await runCommand('adb', [
+      '-s',
+      deviceSerial,
+      'shell',
+      'am',
+      'force-stop',
+      PACKAGE_NAME,
+    ])
 
     log('Building release APK via Gradle...')
     await runCommandWithProgress(
@@ -519,7 +554,7 @@ const main = async () => {
         silent: true,
         spawnOptions: { cwd: ANDROID_PROJECT_PATH },
       },
-      { label: 'Build release APK' },
+      { label: 'Build release APK' }
     )
     await runCommand('adb', ['-s', deviceSerial, 'install', '-r', RELEASE_APK_PATH])
 

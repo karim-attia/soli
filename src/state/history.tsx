@@ -18,7 +18,7 @@ import { devLog } from '../utils/devLogger'
 import { computeElapsedWithReference } from '../utils/time'
 
 const SOLVABLE_SHUFFLE_NAME_LOOKUP = new Map<string, string>(
-  SOLVABLE_SHUFFLES.map((shuffle) => [shuffle.id, shuffle.name]),
+  SOLVABLE_SHUFFLES.map((shuffle) => [shuffle.id, shuffle.name])
 )
 
 const formatTitleCase = (value: string): string =>
@@ -182,7 +182,9 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
     setEntries((previous) => {
       const combined = [entry, ...previous]
       const normalized =
-        entry.status === 'active' ? normalizeActiveEntries(combined, entry.id) : normalizeActiveEntries(combined)
+        entry.status === 'active'
+          ? normalizeActiveEntries(combined, entry.id)
+          : normalizeActiveEntries(combined)
       return normalized.slice(0, MAX_HISTORY_ENTRIES)
     })
     return entry.id
@@ -234,12 +236,18 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
     })
   }, [])
 
-  const solvedCount = useMemo(() => entries.filter((entry) => entry.solved).length, [entries])
-  const activeCount = useMemo(() => entries.filter((entry) => entry.status === 'active').length, [entries])
+  const solvedCount = useMemo(
+    () => entries.filter((entry) => entry.solved).length,
+    [entries]
+  )
+  const activeCount = useMemo(
+    () => entries.filter((entry) => entry.status === 'active').length,
+    [entries]
+  )
 
   const getEntryById = useCallback(
     (id: string) => entries.find((entry) => entry.id === id),
-    [entries],
+    [entries]
   )
 
   const value = useMemo<HistoryContextValue>(
@@ -253,7 +261,16 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
       clearHistory,
       getEntryById,
     }),
-    [activeCount, clearHistory, entries, getEntryById, hydrated, recordResult, solvedCount, updateEntry],
+    [
+      activeCount,
+      clearHistory,
+      entries,
+      getEntryById,
+      hydrated,
+      recordResult,
+      solvedCount,
+      updateEntry,
+    ]
   )
 
   return <HistoryContext.Provider value={value}>{children}</HistoryContext.Provider>
@@ -292,7 +309,7 @@ export const recordGameResultFromState = ({
     state.elapsedMs,
     state.timerState,
     state.timerStartedAt,
-    Date.now(),
+    Date.now()
   )
 
   recordResult({
@@ -317,15 +334,16 @@ const createEntry = (input: RecordGameResultInput): HistoryEntry => {
       : input.startedAt.toISOString()
     : now
   // Task 10-6: finishedAt is null for active/incomplete games, set when solved
-  const finishedAt = input.finishedAt === null
-    ? null
-    : input.finishedAt
-      ? typeof input.finishedAt === 'string'
-        ? input.finishedAt
-        : input.finishedAt.toISOString()
-      : input.solved
-        ? now
-        : null
+  const finishedAt =
+    input.finishedAt === null
+      ? null
+      : input.finishedAt
+        ? typeof input.finishedAt === 'string'
+          ? input.finishedAt
+          : input.finishedAt.toISOString()
+        : input.solved
+          ? now
+          : null
   const preview = sanitizePreview(input.preview)
   const displayName = input.displayName ?? formatShuffleDisplayName(input.shuffleId)
   // Task 10-6: derive status from input or solved boolean
@@ -346,14 +364,19 @@ const createEntry = (input: RecordGameResultInput): HistoryEntry => {
 }
 
 // Task 10-7: Ensure only one entry is ever marked as active.
-const normalizeActiveEntries = (entries: HistoryEntry[], preferredActiveId?: string): HistoryEntry[] => {
+const normalizeActiveEntries = (
+  entries: HistoryEntry[],
+  preferredActiveId?: string
+): HistoryEntry[] => {
   const activeEntries = entries.filter((entry) => entry.status === 'active')
   if (activeEntries.length <= 1) {
     return entries
   }
 
   const preferred =
-    preferredActiveId && activeEntries.some((entry) => entry.id === preferredActiveId) ? preferredActiveId : null
+    preferredActiveId && activeEntries.some((entry) => entry.id === preferredActiveId)
+      ? preferredActiveId
+      : null
 
   const keepId =
     preferred ??
@@ -373,7 +396,10 @@ const normalizeActiveEntries = (entries: HistoryEntry[], preferredActiveId?: str
   })
 }
 
-const mergeEntries = (current: HistoryEntry[], incoming: HistoryEntry[]): HistoryEntry[] => {
+const mergeEntries = (
+  current: HistoryEntry[],
+  incoming: HistoryEntry[]
+): HistoryEntry[] => {
   if (!incoming.length) {
     return current
   }
@@ -403,22 +429,30 @@ const isValidEntry = (entry: unknown): entry is HistoryEntry => {
     typeof candidate.shuffleId === 'string' &&
     typeof candidate.displayName === 'string' &&
     // Task 10-6: finishedAt can be null/undefined for active games, or string for completed/old entries
-    (candidate.finishedAt === null || candidate.finishedAt === undefined || typeof candidate.finishedAt === 'string') &&
+    (candidate.finishedAt === null ||
+      candidate.finishedAt === undefined ||
+      typeof candidate.finishedAt === 'string') &&
     typeof candidate.solved === 'boolean' &&
     typeof candidate.solvable === 'boolean' &&
-    (candidate.moves === null || typeof candidate.moves === 'number' || candidate.moves === undefined) &&
-    (candidate.durationMs === null || typeof candidate.durationMs === 'number' || candidate.durationMs === undefined) &&
+    (candidate.moves === null ||
+      typeof candidate.moves === 'number' ||
+      candidate.moves === undefined) &&
+    (candidate.durationMs === null ||
+      typeof candidate.durationMs === 'number' ||
+      candidate.durationMs === undefined) &&
     candidate.preview !== undefined
   )
 }
 
-const generateHistoryId = () => `hist_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+const generateHistoryId = () =>
+  `hist_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
 
 const normalizeEntry = (entry: HistoryEntry): HistoryEntry => {
   const preview = sanitizePreview(entry.preview)
   const displayName = entry.displayName || formatShuffleDisplayName(entry.shuffleId)
   // Task 10-6: backward compatibility - derive status from solved if missing
-  const status: HistoryEntryStatus = entry.status ?? (entry.solved ? 'solved' : 'incomplete')
+  const status: HistoryEntryStatus =
+    entry.status ?? (entry.solved ? 'solved' : 'incomplete')
   // Task 10-6: backward compatibility - use finishedAt as startedAt if missing
   const startedAt = entry.startedAt ?? entry.finishedAt ?? new Date().toISOString()
   // For old entries, finishedAt was always set; keep it for solved, null for incomplete
@@ -442,12 +476,16 @@ const sanitizePreview = (preview: HistoryPreview | undefined): HistoryPreview =>
   }
 
   const tableau = Array.isArray((preview as HistoryPreview).tableau)
-    ? ((preview as HistoryPreview).tableau as unknown[]).map((column) => sanitizePreviewColumn(column))
+    ? ((preview as HistoryPreview).tableau as unknown[]).map((column) =>
+        sanitizePreviewColumn(column)
+      )
     : createEmptyPreview().tableau
 
   return {
     tableau,
-    wasteTop: isValidCard((preview as HistoryPreview).wasteTop) ? (preview as HistoryPreview).wasteTop : null,
+    wasteTop: isValidCard((preview as HistoryPreview).wasteTop)
+      ? (preview as HistoryPreview).wasteTop
+      : null,
     foundations: sanitizeFoundationPreview((preview as HistoryPreview).foundations),
     stockCount:
       typeof (preview as HistoryPreview).stockCount === 'number' &&
@@ -466,13 +504,19 @@ const sanitizePreviewColumn = (column: unknown): HistoryPreviewColumn => {
     .filter((card): card is HistoryPreviewCard => card !== null)
 
   const inferredHidden = sanitizedCards.filter((card) => !card.faceUp).length
-  const legacyHidden = typeof (rawColumn as { hiddenCount?: unknown })?.hiddenCount === 'number'
-    ? Math.max(0, Math.floor(((rawColumn as { hiddenCount?: number }).hiddenCount as number) ?? 0))
-    : inferredHidden
+  const legacyHidden =
+    typeof (rawColumn as { hiddenCount?: unknown })?.hiddenCount === 'number'
+      ? Math.max(
+          0,
+          Math.floor(((rawColumn as { hiddenCount?: number }).hiddenCount as number) ?? 0)
+        )
+      : inferredHidden
 
   const placeholdersNeeded = Math.max(0, legacyHidden - inferredHidden)
   if (placeholdersNeeded > 0) {
-    const placeholders = Array.from({ length: placeholdersNeeded }, () => createPlaceholderCard())
+    const placeholders = Array.from({ length: placeholdersNeeded }, () =>
+      createPlaceholderCard()
+    )
     return {
       cards: [...placeholders, ...sanitizedCards],
     }
@@ -489,11 +533,16 @@ const sanitizePreviewColumn = (column: unknown): HistoryPreviewColumn => {
   }
 }
 
-const sanitizeFoundationPreview = (foundations: HistoryPreview['foundations'] | undefined) => {
-  const base: Record<Suit, HistoryPreviewCard | null> = FOUNDATION_SUIT_ORDER.reduce((acc, suit) => {
-    acc[suit] = null
-    return acc
-  }, {} as Record<Suit, HistoryPreviewCard | null>)
+const sanitizeFoundationPreview = (
+  foundations: HistoryPreview['foundations'] | undefined
+) => {
+  const base: Record<Suit, HistoryPreviewCard | null> = FOUNDATION_SUIT_ORDER.reduce(
+    (acc, suit) => {
+      acc[suit] = null
+      return acc
+    },
+    {} as Record<Suit, HistoryPreviewCard | null>
+  )
 
   if (!foundations || typeof foundations !== 'object') {
     return base
@@ -553,21 +602,22 @@ export const createHistoryPreviewFromState = (state: GameSnapshot): HistoryPrevi
       }
     : null
 
-  const foundations: Record<Suit, HistoryPreviewCard | null> = FOUNDATION_SUIT_ORDER.reduce(
-    (acc, suit) => {
-      const pile = state.foundations[suit]
-      const top = pile[pile.length - 1]
-      acc[suit] = top
-        ? {
-            suit: top.suit,
-            rank: top.rank,
-            faceUp: true,
-          }
-        : null
-      return acc
-    },
-    {} as Record<Suit, HistoryPreviewCard | null>,
-  )
+  const foundations: Record<Suit, HistoryPreviewCard | null> =
+    FOUNDATION_SUIT_ORDER.reduce(
+      (acc, suit) => {
+        const pile = state.foundations[suit]
+        const top = pile[pile.length - 1]
+        acc[suit] = top
+          ? {
+              suit: top.suit,
+              rank: top.rank,
+              faceUp: true,
+            }
+          : null
+        return acc
+      },
+      {} as Record<Suit, HistoryPreviewCard | null>
+    )
 
   return {
     tableau,
@@ -580,7 +630,9 @@ export const createHistoryPreviewFromState = (state: GameSnapshot): HistoryPrevi
 export const formatShuffleDisplayName = (shuffleId: string): string => {
   if (shuffleId.startsWith('SOLVABLE:')) {
     const baseId = extractSolvableBaseId(shuffleId)
-    const lookupName = baseId ? SOLVABLE_SHUFFLE_NAME_LOOKUP.get(baseId) ?? baseId : null
+    const lookupName = baseId
+      ? (SOLVABLE_SHUFFLE_NAME_LOOKUP.get(baseId) ?? baseId)
+      : null
     return lookupName ? formatTitleCase(lookupName) : 'Solvable Shuffle'
   }
 
@@ -591,4 +643,3 @@ export const formatShuffleDisplayName = (shuffleId: string): string => {
   const compact = shuffleId.slice(-5).toUpperCase()
   return `Game ${compact}`
 }
-

@@ -11,7 +11,11 @@ export type PersistedGameErrorReason = 'invalid' | 'unsupported-version'
 export class PersistedGameError extends Error {
   readonly reason: PersistedGameErrorReason
 
-  constructor(reason: PersistedGameErrorReason, message: string, options?: { cause?: unknown }) {
+  constructor(
+    reason: PersistedGameErrorReason,
+    message: string,
+    options?: { cause?: unknown }
+  ) {
     super(message)
     this.name = 'PersistedGameError'
     this.reason = reason
@@ -40,9 +44,13 @@ interface PersistedGamePayload {
   state: GameState
 }
 
-const deriveStatus = (state: GameState): PersistedGameStatus => (state.hasWon ? 'won' : 'in-progress')
+const deriveStatus = (state: GameState): PersistedGameStatus =>
+  state.hasWon ? 'won' : 'in-progress'
 
-const serializeState = (state: GameState, historyEntryId: string | null): PersistedGamePayload => ({
+const serializeState = (
+  state: GameState,
+  historyEntryId: string | null
+): PersistedGamePayload => ({
   version: PERSISTENCE_VERSION,
   savedAt: new Date().toISOString(),
   status: deriveStatus(state),
@@ -110,7 +118,7 @@ export const saveGameState = async (state: GameState): Promise<void> => {
 
 export const saveGameStateWithHistory = async (
   state: GameState,
-  historyEntryId: string | null,
+  historyEntryId: string | null
 ): Promise<void> => {
   const payload = serializeState(state, historyEntryId)
   const serialized = JSON.stringify(payload)
@@ -133,11 +141,17 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
   }
 
   if (!isPersistedGamePayload(parsed)) {
-    throw new PersistedGameError('invalid', 'Saved game payload is missing required fields.')
+    throw new PersistedGameError(
+      'invalid',
+      'Saved game payload is missing required fields.'
+    )
   }
 
   if (parsed.version !== PERSISTENCE_VERSION) {
-    throw new PersistedGameError('unsupported-version', 'Saved game payload version is unsupported.')
+    throw new PersistedGameError(
+      'unsupported-version',
+      'Saved game payload version is unsupported.'
+    )
   }
 
   const shuffleId =
@@ -157,13 +171,18 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
   }
 
   const elapsedMs =
-    typeof parsedState.elapsedMs === 'number' && Number.isFinite(parsedState.elapsedMs) && parsedState.elapsedMs >= 0
+    typeof parsedState.elapsedMs === 'number' &&
+    Number.isFinite(parsedState.elapsedMs) &&
+    parsedState.elapsedMs >= 0
       ? parsedState.elapsedMs
       : 0
 
-  const rawTimerState = isTimerState(parsedState.timerState) ? parsedState.timerState : 'idle'
+  const rawTimerState = isTimerState(parsedState.timerState)
+    ? parsedState.timerState
+    : 'idle'
   const rawTimerStartedAt =
-    typeof parsedState.timerStartedAt === 'number' && Number.isFinite(parsedState.timerStartedAt)
+    typeof parsedState.timerStartedAt === 'number' &&
+    Number.isFinite(parsedState.timerStartedAt)
       ? parsedState.timerStartedAt
       : null
 
@@ -202,7 +221,7 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
     savedAt: parsed.savedAt,
     historyEntryId:
       typeof (parsed as PersistedGamePayload).historyEntryId === 'string'
-        ? (parsed as PersistedGamePayload).historyEntryId ?? null
+        ? ((parsed as PersistedGamePayload).historyEntryId ?? null)
         : null,
   }
 }
@@ -211,10 +230,11 @@ export const clearGameState = async (): Promise<void> => {
   await AsyncStorage.removeItem(KLONDIKE_STORAGE_KEY)
 }
 
-const createLegacyShuffleId = (): string => `LEGACY-${Date.now().toString(36).toUpperCase()}-${
-  Math.random().toString(36).slice(2, 6).toUpperCase()
-}`
+const createLegacyShuffleId = (): string =>
+  `LEGACY-${Date.now().toString(36).toUpperCase()}-${Math.random()
+    .toString(36)
+    .slice(2, 6)
+    .toUpperCase()}`
 
 const isTimerState = (value: unknown): value is TimerState =>
   value === 'idle' || value === 'running' || value === 'paused'
-

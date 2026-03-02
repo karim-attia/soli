@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import {
   Alert,
   LayoutChangeEvent,
@@ -44,17 +37,14 @@ import {
   COLOR_FELT_LIGHT,
   COLOR_FELT_DARK,
 } from '../constants'
-import { EMPTY_INVALID_WIGGLE, type CardMetrics, type InvalidWiggleConfig } from '../types'
+import { EMPTY_INVALID_WIGGLE, type InvalidWiggleConfig } from '../types'
 import { computeCardMetrics } from '../utils/cardMetrics'
 import { useKlondikeTimer } from './useKlondikeTimer'
 import { useKlondikePersistence } from './useKlondikePersistence'
 import { useSolvableShuffleSelector } from './useSolvableShuffleSelector'
 import { useCelebrationController } from './useCelebrationController'
 import { useUndoScrubber } from './useUndoScrubber'
-import {
-  useDemoGameLauncher,
-  DEMO_AUTO_STEP_INTERVAL_MS,
-} from './useDemoGameLauncher'
+import { useDemoGameLauncher, DEMO_AUTO_STEP_INTERVAL_MS } from './useDemoGameLauncher'
 import { useAutoQueueRunner } from './useAutoQueueRunner'
 import type { KlondikeGameViewProps } from '../components/KlondikeGameView'
 import { buildStatisticsRows, type StatisticsRow } from '../components/StatisticsHud'
@@ -73,7 +63,10 @@ const AUTO_QUEUE_MOVE_DELAY_MS = 35
 // Maps a selection descriptor to the card IDs required for animation-flight tracking.
 // The flight controller waits for these IDs to have layout snapshots before animating moves.
 // Auto-move, waste taps, and auto-complete still raise selections even after manual selection removal.
-function collectSelectionCardIds(state: GameState, selection?: Selection | null): string[] {
+function collectSelectionCardIds(
+  state: GameState,
+  selection?: Selection | null
+): string[] {
   if (!selection) {
     return []
   }
@@ -84,7 +77,8 @@ function collectSelectionCardIds(state: GameState, selection?: Selection | null)
   }
 
   if (selection.source === 'foundation') {
-    const topFoundation = state.foundations[selection.suit][state.foundations[selection.suit].length - 1]
+    const topFoundation =
+      state.foundations[selection.suit][state.foundations[selection.suit].length - 1]
     return topFoundation ? [topFoundation.id] : []
   }
 
@@ -96,7 +90,10 @@ function collectSelectionCardIds(state: GameState, selection?: Selection | null)
   return []
 }
 
-type CardSignatureSnapshot = Pick<GameSnapshot, 'stock' | 'waste' | 'foundations' | 'tableau'>
+type CardSignatureSnapshot = Pick<
+  GameSnapshot,
+  'stock' | 'waste' | 'foundations' | 'tableau'
+>
 
 const buildCardSignatureMap = (snapshot: CardSignatureSnapshot): Map<string, string> => {
   const map = new Map<string, string>()
@@ -148,14 +145,21 @@ const collectChangedCardIds = (current: GameState, target: GameSnapshot): string
 type UseKlondikeGameResult = {
   developerModeEnabled: boolean
   requestNewGame: RequestNewGameFn
-  handleLaunchDemoGame: (options?: { autoReveal?: boolean; autoSolve?: boolean; force?: boolean }) => void
+  handleLaunchDemoGame: (options?: {
+    autoReveal?: boolean
+    autoSolve?: boolean
+    force?: boolean
+  }) => void
   viewProps: KlondikeGameViewProps
 }
 
 // Provides the stateful container for the Klondike screen, exposing navigation callbacks and view props.
 export const useKlondikeGame = (): UseKlondikeGameResult => {
   const [state, dispatch] = useReducer(klondikeReducer, undefined, createInitialState)
-  const [boardLayout, setBoardLayout] = useState<{ width: number | null; height: number | null }>({
+  const [boardLayout, setBoardLayout] = useState<{
+    width: number | null
+    height: number | null
+  }>({
     width: null,
     height: null,
   })
@@ -190,17 +194,29 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     // Task 1-8: size board columns using the safe-area width (not under notches).
     return boardLayout.width - safeArea.left - safeArea.right
   }, [boardLayout.width, safeArea.left, safeArea.right])
-  const cardMetrics = useMemo(() => computeCardMetrics(boardAvailableWidth), [boardAvailableWidth])
+  const cardMetrics = useMemo(
+    () => computeCardMetrics(boardAvailableWidth),
+    [boardAvailableWidth]
+  )
   const colorScheme = useColorScheme()
   const feltBackground = colorScheme === 'dark' ? COLOR_FELT_DARK : COLOR_FELT_LIGHT
 
-  const { state: settingsState, hydrated: settingsHydrated, setDeveloperMode } = useSettings()
+  const {
+    state: settingsState,
+    hydrated: settingsHydrated,
+    setDeveloperMode,
+  } = useSettings()
   const { showMoves, showTime } = settingsState.statistics
   const solvableGamesOnly = settingsState.solvableGamesOnly
   const developerModeEnabled = settingsState.developerMode
 
   const animationToggles = useAnimationToggles()
-  const { entries: historyEntries, recordResult, updateEntry, hydrated: historyHydrated } = useHistory()
+  const {
+    entries: historyEntries,
+    recordResult,
+    updateEntry,
+    hydrated: historyHydrated,
+  } = useHistory()
   const {
     master: animationsEnabled,
     cardFlights: cardFlightsEnabled,
@@ -234,7 +250,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       left: safeArea.left + COLUMN_MARGIN,
       right: safeArea.right + COLUMN_MARGIN,
     }),
-    [safeArea.left, safeArea.right],
+    [safeArea.left, safeArea.right]
   )
 
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
@@ -270,8 +286,9 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
 
   // Provides the flight controller with a stable resolver for fetching selection card IDs.
   const resolveSelectionCardIds = useCallback(
-    (selection?: Selection | null) => collectSelectionCardIds(stateRef.current, selection),
-    [],
+    (selection?: Selection | null) =>
+      collectSelectionCardIds(stateRef.current, selection),
+    []
   )
 
   // Manages layout snapshot tracking for card-flight animations.
@@ -293,7 +310,13 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
 
   // Hook: hydrate and persist game state via AsyncStorage once per relevant change.
   // Task 10-7: Persist the current history entry linkage across restarts.
-  useKlondikePersistence({ state, dispatch, resetCardFlights, previousHasWonRef, currentGameEntryIdRef })
+  useKlondikePersistence({
+    state,
+    dispatch,
+    resetCardFlights,
+    previousHasWonRef,
+    currentGameEntryIdRef,
+  })
 
   // Task 10-7: After hydration, ensure the persisted/linked entry is the only active one.
   useEffect(() => {
@@ -387,18 +410,18 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Task 10-6: Updates or records game result in history
   const recordCurrentGameResult = useCallback(
     (options?: { solved?: boolean }) => {
-      const state = stateRef.current
-      if (!state.shuffleId) {
+      const currentState = stateRef.current
+      if (!currentState.shuffleId) {
         return
       }
 
-      const solved = options?.solved ?? state.hasWon
+      const solved = options?.solved ?? currentState.hasWon
       const status = solved ? 'solved' : 'incomplete'
       const elapsedForRecord = computeElapsedWithReference(
-        state.elapsedMs,
-        state.timerState,
-        state.timerStartedAt,
-        Date.now(),
+        currentState.elapsedMs,
+        currentState.timerState,
+        currentState.timerStartedAt,
+        Date.now()
       )
 
       // Task 10-6: finishedAt only set when solved, null for incomplete
@@ -409,7 +432,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         updateEntry(currentGameEntryIdRef.current, {
           solved,
           status,
-          moves: state.moveCount,
+          moves: currentState.moveCount,
           durationMs: elapsedForRecord,
           finishedAt,
           // Task 10-7: Never overwrite preview on completion; it must remain the start snapshot.
@@ -417,20 +440,21 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         currentGameEntryIdRef.current = null
       } else {
         // No tracked entry - only record if there's been meaningful play
-        if (!solved && state.moveCount === 0) {
+        if (!solved && currentState.moveCount === 0) {
           return
         }
 
         // Task 10-7: If we lost the entry-id linkage (e.g. restart), update the matching active entry instead
         // of creating a duplicate solved/incomplete row.
         const matchingActive = historyEntries.find(
-          (entry) => entry.status === 'active' && entry.shuffleId === state.shuffleId,
+          (entry) =>
+            entry.status === 'active' && entry.shuffleId === currentState.shuffleId
         )
         if (matchingActive) {
           updateEntry(matchingActive.id, {
             solved,
             status,
-            moves: state.moveCount,
+            moves: currentState.moveCount,
             durationMs: elapsedForRecord,
             finishedAt,
           })
@@ -438,21 +462,21 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         }
 
         recordResult({
-          shuffleId: state.shuffleId,
+          shuffleId: currentState.shuffleId,
           solved,
-          solvable: Boolean(state.solvableId),
+          solvable: Boolean(currentState.solvableId),
           startedAt: new Date().toISOString(), // Best approximation when no tracked entry
           finishedAt,
-          moves: state.moveCount,
+          moves: currentState.moveCount,
           durationMs: elapsedForRecord,
           // Task 10-7: Prefer the game start snapshot for history preview (sheet shows start state).
-          preview: createHistoryPreviewFromState(state.history[0] ?? state),
+          preview: createHistoryPreviewFromState(currentState.history[0] ?? currentState),
           displayName: currentDisplayNameRef.current,
           status,
         })
       }
     },
-    [historyEntries, recordResult, updateEntry],
+    [historyEntries, recordResult, updateEntry]
   )
 
   const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(() => ({
@@ -475,7 +499,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
             : []
           : action.type === 'UNDO' && !selection
             ? current.history.length
-              ? collectChangedCardIds(current, current.history[current.history.length - 1])
+              ? collectChangedCardIds(
+                  current,
+                  current.history[current.history.length - 1]
+                )
               : []
             : action.type === 'ADVANCE_AUTO_QUEUE' && !selection
               ? (() => {
@@ -484,7 +511,9 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
                     return []
                   }
                   if (queued.type === 'draw') {
-                    return current.stock.length ? [current.stock[current.stock.length - 1].id] : []
+                    return current.stock.length
+                      ? [current.stock[current.stock.length - 1].id]
+                      : []
                   }
                   if (queued.type === 'recycle') {
                     const topWaste = current.waste[current.waste.length - 1]
@@ -492,20 +521,16 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
                   }
                   return []
                 })()
-            : undefined
+              : undefined
 
-      if (action.type === 'APPLY_MOVE' && action.target?.type === 'foundation') {
-        const destination = action.target.suit
-        const sourceLabel = selection
-          ? selection.source === 'tableau'
-            ? `tableau:${selection.columnIndex}`
-            : selection.source
-          : 'unknown'
-        // devLog('info', `[Game] Dispatch APPLY_MOVE → foundation:${destination} from ${sourceLabel}`)
-      }
-      dispatchWithFlightInternal({ action, selection, cardIds: inferredCardIds, dispatch })
+      dispatchWithFlightInternal({
+        action,
+        selection,
+        cardIds: inferredCardIds,
+        dispatch,
+      })
     },
-    [dispatch, dispatchWithFlightInternal],
+    [dispatch, dispatchWithFlightInternal]
   )
 
   const { handleLaunchDemoGame } = useDemoGameLauncher({
@@ -538,7 +563,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         lookup: new Set(ids),
       })
     },
-    [state],
+    [state]
   )
 
   const autoPlayActive = state.isAutoCompleting || state.autoQueue.length > 0
@@ -554,7 +579,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       }
       triggerInvalidSelectionWiggle(options?.selection ?? null)
     },
-    [autoPlayActive, triggerInvalidSelectionWiggle],
+    [autoPlayActive, triggerInvalidSelectionWiggle]
   )
 
   // Sets the stock button label, fading when the stock is empty.
@@ -573,13 +598,14 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       let parsed: URL
       try {
         parsed = new URL(incomingUrl)
-      } catch (error) {
+      } catch {
         return
       }
 
       const host = parsed.host.toLowerCase()
       const pathname = parsed.pathname.toLowerCase()
-      const demoParam = parsed.searchParams.get('demo') ?? parsed.searchParams.get('demoGame')
+      const demoParam =
+        parsed.searchParams.get('demo') ?? parsed.searchParams.get('demoGame')
 
       if (
         host === 'demo-game' ||
@@ -589,10 +615,13 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         demoParam?.toLowerCase() === 'true'
       ) {
         lastDemoLinkRef.current = incomingUrl
-        const autoParam = parsed.searchParams.get('auto') ?? parsed.searchParams.get('autoreveal')
-        const solveParam = parsed.searchParams.get('solve') ?? parsed.searchParams.get('autosolve')
+        const autoParam =
+          parsed.searchParams.get('auto') ?? parsed.searchParams.get('autoreveal')
+        const solveParam =
+          parsed.searchParams.get('solve') ?? parsed.searchParams.get('autosolve')
         const autoSolve = solveParam === '1' || solveParam?.toLowerCase() === 'true'
-        const autoReveal = autoSolve || autoParam === '1' || autoParam?.toLowerCase() === 'true'
+        const autoReveal =
+          autoSolve || autoParam === '1' || autoParam?.toLowerCase() === 'true'
 
         if (!settingsState.developerMode) {
           setDeveloperMode(true)
@@ -603,7 +632,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         }, DEMO_AUTO_STEP_INTERVAL_MS)
       }
     },
-    [handleLaunchDemoGame, setDeveloperMode, settingsState.developerMode],
+    [handleLaunchDemoGame, setDeveloperMode, settingsState.developerMode]
   )
 
   // Mirrors the latest reducer state into a ref for synchronous callbacks.
@@ -632,7 +661,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       currentStartingPreviewRef.current = createHistoryPreviewFromState(state)
       currentDisplayNameRef.current = formatShuffleDisplayName(state.shuffleId)
     }
-  }, [state.moveCount, state.shuffleId, state.stock.length, state.waste.length])
+  }, [state])
 
   // Checks if the game was freshly won to record the result.
   useEffect(() => {
@@ -645,13 +674,20 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       }
       devLog(
         'info',
-        `[Game] hasWon set true (moves=${state.moveCount}, winCelebrations=${state.winCelebrations}).`,
+        `[Game] hasWon set true (moves=${state.moveCount}, winCelebrations=${state.winCelebrations}).`
       )
       recordCurrentGameResult({ solved: true })
     }
 
     previousHasWonRef.current = isWon
-  }, [dispatch, recordCurrentGameResult, state.hasWon, state.moveCount, state.timerState, state.winCelebrations])
+  }, [
+    dispatch,
+    recordCurrentGameResult,
+    state.hasWon,
+    state.moveCount,
+    state.timerState,
+    state.winCelebrations,
+  ])
 
   // Captures board dimensions for card metrics and celebration sizing.
   const handleBoardLayout = useCallback((event: LayoutChangeEvent) => {
@@ -729,7 +765,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         'Start a new game?',
         forced ? 'Nice win! Ready for another round?' : 'Ready for another round?',
         buttons,
-        { cancelable: !forced },
+        { cancelable: !forced }
       )
     },
     [
@@ -737,8 +773,9 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       dealNewGame,
       recordCurrentGameResult,
       resetCardFlights,
+      setCelebrationState,
       updateBoardLocked,
-    ],
+    ]
   )
 
   // Keeps the new-game request ref synchronized with the latest callback.
@@ -762,10 +799,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
 
       dispatchWithFlight(
         { type: 'APPLY_MOVE', selection: resolved.selection, target: resolved.target },
-        resolved.selection,
+        resolved.selection
       )
     },
-    [dispatchWithFlight, notifyInvalidMove, state],
+    [dispatchWithFlight, notifyInvalidMove, state]
   )
 
   const handleWasteTap = useCallback(() => {
@@ -797,7 +834,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       notifyInvalidMove,
       state.foundations,
       state.selected,
-    ],
+    ]
   )
 
   const {
@@ -915,5 +952,3 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     viewProps,
   }
 }
-
-

@@ -49,48 +49,9 @@ const isValidSnapshot = (snapshot: CardFlightSnapshot): boolean => {
   )
 }
 
-const describeSelection = (selection: Selection | null | undefined): string => {
-  if (!selection) {
-    return 'none'
-  }
-  const typed: any = selection
-  switch (typed.source) {
-    case 'tableau':
-      return `tableau:${typed.columnIndex ?? '?'}#${typed.cardIndex ?? '?'}`
-    case 'waste':
-      return 'waste:top'
-    case 'foundation':
-      return `foundation:${typed.suit ?? '?'}`
-    default:
-      return typed.source
-  }
-}
-
-const describeTarget = (action: GameAction): string => {
-  switch (action.type) {
-    case 'APPLY_MOVE':
-      return action.target.type === 'foundation'
-        ? `foundation:${action.target.suit}`
-        : `tableau:${action.target.columnIndex}`
-    case 'PLACE_ON_FOUNDATION':
-      return `foundation:${action.suit}`
-    case 'PLACE_ON_TABLEAU':
-      return `tableau:${action.columnIndex}`
-    case 'DRAW_OR_RECYCLE':
-      return 'stock→waste'
-    case 'UNDO':
-      return 'undo'
-    case 'SCRUB_TO_INDEX':
-      return `scrub:${action.index}`
-    case 'ADVANCE_AUTO_QUEUE':
-      return 'auto-queue'
-    default:
-      return action.type
-  }
-}
-
-
-export const useFlightController = (options: FlightControllerOptions): FlightController => {
+export const useFlightController = (
+  options: FlightControllerOptions
+): FlightController => {
   const cardFlights = useSharedValue<Record<string, CardFlightSnapshot>>({})
   const memoryRef = useRef<Record<string, CardFlightSnapshot>>({})
   const invalidSnapshotLoggedRef = useRef<Set<string>>(new Set())
@@ -145,8 +106,6 @@ export const useFlightController = (options: FlightControllerOptions): FlightCon
     ({ action, selection, cardIds, dispatch }: DispatchArgs) => {
       const resolver = selectionResolverRef.current
       const cards = cardIds ?? (resolver ? resolver(selection) : [])
-      const selectionLabel = describeSelection(selection)
-      const targetLabel = describeTarget(action)
 
       if (!enabledRef.current) {
         ensureReady()
@@ -156,7 +115,8 @@ export const useFlightController = (options: FlightControllerOptions): FlightCon
 
       const waitStart = Date.now()
       const attemptDispatch = () => {
-        const snapshotsReady = cards.length === 0 || cards.every((id) => !!memoryRef.current[id])
+        const snapshotsReady =
+          cards.length === 0 || cards.every((id) => !!memoryRef.current[id])
         const elapsed = Date.now() - waitStart
         if (snapshotsReady || elapsed >= waitTimeoutRef.current) {
           ensureReady()
@@ -168,7 +128,7 @@ export const useFlightController = (options: FlightControllerOptions): FlightCon
 
       attemptDispatch()
     },
-    [ensureReady],
+    [ensureReady]
   )
 
   return useMemo(
@@ -180,7 +140,6 @@ export const useFlightController = (options: FlightControllerOptions): FlightCon
       reset,
       dispatchWithFlight,
     }),
-    [cardFlights, dispatchWithFlight, ensureReady, registerSnapshot],
+    [cardFlights, dispatchWithFlight, ensureReady, registerSnapshot, reset]
   )
 }
-

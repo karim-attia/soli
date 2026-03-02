@@ -96,7 +96,14 @@ export const useCelebrationController = ({
       board: celebrationBoard,
       total: celebrationTotal,
     }),
-    [celebrationActive, celebrationAssignments, celebrationBoard, celebrationMode, celebrationProgress, celebrationTotal],
+    [
+      celebrationActive,
+      celebrationAssignments,
+      celebrationBoard,
+      celebrationMode,
+      celebrationProgress,
+      celebrationTotal,
+    ]
   )
 
   const clearCelebrationDialogTimer = useCallback(() => {
@@ -135,7 +142,15 @@ export const useCelebrationController = ({
       cancelAnimation(celebrationProgress)
     })()
     clearCelebrationDialogTimer()
-  }, [celebrationActive, celebrationAssignments, celebrationBoard, celebrationMode, celebrationProgress, celebrationTotal, clearCelebrationDialogTimer])
+  }, [
+    celebrationActive,
+    celebrationAssignments,
+    celebrationBoard,
+    celebrationMode,
+    celebrationProgress,
+    celebrationTotal,
+    clearCelebrationDialogTimer,
+  ])
 
   const handleCelebrationAbort = useCallback(() => {
     celebrationAbortRef.current = true
@@ -149,7 +164,13 @@ export const useCelebrationController = ({
     updateBoardLocked(false)
     setCelebrationState(null)
     openCelebrationDialog()
-  }, [celebrationActive, celebrationProgress, clearCelebrationDialogTimer, openCelebrationDialog, updateBoardLocked])
+  }, [
+    celebrationActive,
+    celebrationProgress,
+    clearCelebrationDialogTimer,
+    openCelebrationDialog,
+    updateBoardLocked,
+  ])
 
   useEffect(() => {
     if (!celebrationState) {
@@ -197,11 +218,14 @@ export const useCelebrationController = ({
           if (finished && !celebrationAbortRef.current) {
             runOnJS(handleCelebrationComplete)()
           }
-        },
+        }
       )
     })()
 
-    celebrationDialogTimeoutRef.current = setTimeout(openCelebrationDialog, CELEBRATION_DIALOG_DELAY_MS)
+    celebrationDialogTimeoutRef.current = setTimeout(
+      openCelebrationDialog,
+      CELEBRATION_DIALOG_DELAY_MS
+    )
 
     return () => {
       celebrationAbortRef.current = true
@@ -212,7 +236,19 @@ export const useCelebrationController = ({
         cancelAnimation(celebrationProgress)
       })()
     }
-  }, [celebrationActive, celebrationAssignments, celebrationBoard, celebrationMode, celebrationProgress, celebrationState, celebrationTotal, clearCelebrationAnimations, clearCelebrationDialogTimer, handleCelebrationComplete, openCelebrationDialog])
+  }, [
+    celebrationActive,
+    celebrationAssignments,
+    celebrationBoard,
+    celebrationMode,
+    celebrationProgress,
+    celebrationState,
+    celebrationTotal,
+    clearCelebrationAnimations,
+    clearCelebrationDialogTimer,
+    handleCelebrationComplete,
+    openCelebrationDialog,
+  ])
 
   const celebrationLabel = useMemo(() => {
     if (!developerModeEnabled || !celebrationState) {

@@ -105,7 +105,10 @@ export function computeCelebrationFrame({
   const seed = assignment.randomSeed
   const relativeIndex = assignment.index - safeTotalCards / 2
   const normalizedIndex = (assignment.index + 1) / safeTotalCards
-  const stackFactor = Math.min(1, Math.max(0, assignment.stackIndex / FOUNDATION_STACK_MAX))
+  const stackFactor = Math.min(
+    1,
+    Math.max(0, assignment.stackIndex / FOUNDATION_STACK_MAX)
+  )
   const theta = TAU * rawProgress
   const thetaSeed = TAU * (rawProgress + seed)
   const thetaDouble = TAU * (rawProgress * 2 + seed * 0.5)
@@ -121,12 +124,14 @@ export function computeCelebrationFrame({
   let targetScale = 1
   let targetOpacity = 1
 
-  const mode = ((modeId % CELEBRATION_MODE_COUNT) + CELEBRATION_MODE_COUNT) % CELEBRATION_MODE_COUNT
+  const mode =
+    ((modeId % CELEBRATION_MODE_COUNT) + CELEBRATION_MODE_COUNT) % CELEBRATION_MODE_COUNT
 
   switch (mode) {
     case 0: {
       const radius = boardRadius * (0.24 + 0.18 * Math.sin(thetaDouble))
-      pathX = centerX + Math.cos(thetaSeed) * radius + relativeIndex * metrics.width * 0.25
+      pathX =
+        centerX + Math.cos(thetaSeed) * radius + relativeIndex * metrics.width * 0.25
       pathY = centerY + Math.sin(thetaSeed) * radius - stackFactor * metrics.height * 0.4
       rotation = (thetaSeed * 180) / Math.PI
       targetScale = 1 + 0.06 * Math.sin(theta * 2 + stackFactor)
@@ -203,7 +208,8 @@ export function computeCelebrationFrame({
     }
     case 8: {
       const ring = Math.floor(normalizedIndex * 4)
-      const radius = boardRadius * (0.15 + 0.12 * ring + 0.05 * Math.sin(theta * 3 + seed))
+      const radius =
+        boardRadius * (0.15 + 0.12 * ring + 0.05 * Math.sin(theta * 3 + seed))
       const angle = theta + ring * 0.3
       pathX = centerX + Math.cos(angle) * radius
       pathY = centerY + Math.sin(angle) * radius
@@ -350,8 +356,7 @@ export function computeCelebrationFrame({
 }
 
 export function getCelebrationModeMetadata(modeId: number): CelebrationMetadata {
-  const index = ((modeId % CELEBRATION_MODE_COUNT) + CELEBRATION_MODE_COUNT) % CELEBRATION_MODE_COUNT
+  const index =
+    ((modeId % CELEBRATION_MODE_COUNT) + CELEBRATION_MODE_COUNT) % CELEBRATION_MODE_COUNT
   return CELEBRATION_MODE_METADATA[index]
 }
-
-

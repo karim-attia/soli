@@ -27,7 +27,12 @@ export const CelebrationDebugBadge = memo(({ label }: CelebrationDebugBadgeProps
         borderColor: 'rgba(148, 163, 184, 0.45)',
       }}
     >
-      <Paragraph color="#f8fafc" fontSize={BADGE_BASE_OFFSET} fontWeight="600" letterSpacing={0.3}>
+      <Paragraph
+        color="#f8fafc"
+        fontSize={BADGE_BASE_OFFSET}
+        fontWeight="600"
+        letterSpacing={0.3}
+      >
         {label}
       </Paragraph>
     </YStack>
@@ -35,4 +40,3 @@ export const CelebrationDebugBadge = memo(({ label }: CelebrationDebugBadgeProps
 })
 
 CelebrationDebugBadge.displayName = 'CelebrationDebugBadge'
-

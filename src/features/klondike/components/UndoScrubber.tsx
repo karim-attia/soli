@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react'
-import { type LayoutChangeEvent, Platform, StyleSheet, View, Text } from 'react-native'
-import Animated from 'react-native-reanimated'
+import { type LayoutChangeEvent, StyleSheet, View, Text } from 'react-native'
+import Animated, { createAnimatedComponent } from 'react-native-reanimated'
 import { GestureDetector, type GestureType } from 'react-native-gesture-handler'
 import { Slider } from 'tamagui'
 import { Undo2 } from '@tamagui/lucide-icons'
@@ -24,18 +24,12 @@ export type UndoScrubberProps = {
   onTrackMetrics: (metrics: { left: number; right: number }) => void
 }
 
-const AnimatedView = Animated.createAnimatedComponent(View)
+const AnimatedView = createAnimatedComponent(View)
 
 // requirement 20-6: Approach A - Isolate gesture component to prevent re-renders during scrubbing
 // This wrapper NEVER re-renders, preventing iOS gesture cancellation from React updates
 const GestureWrapper = React.memo(
-  ({
-    gesture,
-    opacity,
-  }: {
-    gesture: GestureType
-    opacity: number
-  }) => {
+  ({ gesture, opacity }: { gesture: GestureType; opacity: number }) => {
     return (
       <GestureDetector gesture={gesture}>
         <Animated.View style={[styles.undoButton, { opacity }]} collapsable={false}>
@@ -55,7 +49,7 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
   sliderValue,
   sliderMax,
   gesture,
-  boardLocked,
+  boardLocked: _boardLocked,
   canUndo,
   onTrackMetrics,
 }) => {
@@ -79,7 +73,7 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
     (_event: LayoutChangeEvent) => {
       measureTrack()
     },
-    [measureTrack],
+    [measureTrack]
   )
 
   useEffect(() => {
@@ -107,9 +101,18 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
         { paddingBottom: safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING },
       ]}
     >
-      <AnimatedView pointerEvents="none" style={[styles.overlay, { opacity: isScrubbing ? 1 : 0 }]}
+      <AnimatedView
+        pointerEvents="none"
+        style={[styles.overlay, { opacity: isScrubbing ? 1 : 0 }]}
       >
-        <Slider value={sliderValue} min={0} max={sliderMax} step={1} size="$4" style={styles.slider}>
+        <Slider
+          value={sliderValue}
+          min={0}
+          max={sliderMax}
+          step={1}
+          size="$4"
+          style={styles.slider}
+        >
           <Slider.Track ref={trackRef} onLayout={handleTrackLayout} style={styles.track}>
             <Slider.TrackActive style={styles.trackActive} />
           </Slider.Track>
@@ -188,4 +191,3 @@ const styles = StyleSheet.create({
     color: '#000',
   },
 })
-

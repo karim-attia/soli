@@ -38,7 +38,10 @@ export const useKlondikePersistence = ({
         }
 
         if (persisted.status === 'won') {
-          devLog('info', '[Game] Cleared completed session on startup; starting new shuffle.')
+          devLog(
+            'info',
+            '[Game] Cleared completed session on startup; starting new shuffle.'
+          )
           try {
             await clearGameState()
           } catch (clearError) {
@@ -64,7 +67,10 @@ export const useKlondikePersistence = ({
         }
 
         let message = 'Saved game was corrupted and has been cleared.'
-        if (error instanceof PersistedGameError && error.reason === 'unsupported-version') {
+        if (
+          error instanceof PersistedGameError &&
+          error.reason === 'unsupported-version'
+        ) {
           message = 'Saved game came from an older version and has been cleared.'
         }
 
@@ -111,7 +117,3 @@ export const useKlondikePersistence = ({
 
   return storageHydrationComplete
 }
-
-
-
-

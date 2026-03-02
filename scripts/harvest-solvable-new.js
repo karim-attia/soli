@@ -39,8 +39,6 @@ function parseArgs(argv) {
   return args
 }
 
-
-
 async function main() {
   const args = parseArgs(process.argv)
   const trial = args.get('trial') === 'true'
@@ -67,7 +65,9 @@ async function main() {
 
     if (!solved) {
       if (attempts % 50 === 0) {
-        console.log(`[trial=${trial}] attempts=${attempts}, found=${found}, lastNodes=${nodes}`)
+        console.log(
+          `[trial=${trial}] attempts=${attempts}, found=${found}, lastNodes=${nodes}`
+        )
       }
       continue
     }
@@ -86,11 +86,18 @@ async function main() {
     }
 
     const id = nextShuffleId()
-    shuffles.push({ id, addedAt: new Date().toISOString().slice(0, 10), source: 'new-solver', tableau })
+    shuffles.push({
+      id,
+      addedAt: new Date().toISOString().slice(0, 10),
+      source: 'new-solver',
+      tableau,
+    })
     seen.add(sig)
     found += 1
     if (found % 5 === 0 || trial) {
-      console.log(`[harvest] found=${found}/${maxSolved} attempts=${attempts} nodes=${nodes} id=${id}`)
+      console.log(
+        `[harvest] found=${found}/${maxSolved} attempts=${attempts} nodes=${nodes} id=${id}`
+      )
     }
     if (trial) {
       // Persist incrementally for trial
@@ -100,12 +107,12 @@ async function main() {
 
   saveDataset(shuffles)
   const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1)
-  console.log(`[done] found=${found} attempts=${attempts} elapsed=${elapsed}s beam=${beamWidth} nodes=${maxNodes}`)
+  console.log(
+    `[done] found=${found} attempts=${attempts} elapsed=${elapsed}s beam=${beamWidth} nodes=${maxNodes}`
+  )
 }
 
 main().catch((e) => {
   console.error(e)
   process.exit(1)
 })
-
-

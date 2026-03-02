@@ -31,7 +31,12 @@ const LAYOUT_GAP = 24
 const ICON_SOURCE: ImageSourcePropType = require('../assets/images/icon.png')
 const BENEFITS = ['Free & no ads', 'Solvable games', 'Undo time travel']
 
-type FeatureVariant = 'badges' | 'icon' | 'premium-badges' | 'badges-remix' | 'glass-modern'
+type FeatureVariant =
+  | 'badges'
+  | 'icon'
+  | 'premium-badges'
+  | 'badges-remix'
+  | 'glass-modern'
 
 type VariantCopy = {
   headline: string
@@ -95,13 +100,6 @@ const createCard = (suit: Suit, rank: Rank, suffix: string): Card => ({
   faceUp: true,
 })
 
-const FOUNDATION_CARDS: Card[] = [
-  createCard('hearts', 1, 'foundation'),
-  createCard('diamonds', 1, 'foundation'),
-  createCard('clubs', 1, 'foundation'),
-  createCard('spades', 1, 'foundation'),
-]
-
 const ICON_RING_CARDS: Card[] = [
   createCard('hearts', 1, 'ring-1'),
   createCard('diamonds', 1, 'ring-2'),
@@ -111,8 +109,7 @@ const ICON_RING_CARDS: Card[] = [
   createCard('spades', 13, 'ring-6'),
 ]
 
-
-const IconBadge = ({ palette, size = 140 }: { palette: Palette; size?: number }) => {
+const IconBadge = ({ size = 140 }: { size?: number }) => {
   const iconSize = Math.round(size * 0.79)
   const iconRadius = Math.round(iconSize * 0.25)
   return (
@@ -128,11 +125,14 @@ const IconBadge = ({ palette, size = 140 }: { palette: Palette; size?: number })
         shadowOffset: { width: 0, height: 6 },
       }}
     >
-      <Image source={ICON_SOURCE} style={{ width: iconSize, height: iconSize, borderRadius: iconRadius }} resizeMode="contain" />
+      <Image
+        source={ICON_SOURCE}
+        style={{ width: iconSize, height: iconSize, borderRadius: iconRadius }}
+        resizeMode="contain"
+      />
     </Stack>
   )
 }
-
 
 const SafeFrameOverlay = ({ color }: { color: string }) => (
   <Stack
@@ -149,12 +149,21 @@ const SafeFrameOverlay = ({ color }: { color: string }) => (
   />
 )
 
-
-
-const BadgeHighlightsRightSide = ({ palette, copy }: { palette: Palette; copy: VariantCopy }) => (
+const BadgeHighlightsRightSide = ({
+  palette,
+  copy,
+}: {
+  palette: Palette
+  copy: VariantCopy
+}) => (
   <YStack gap="$4" maxW={360}>
     <YStack gap="$2">
-      <Text style={{ color: palette.infoTextPrimary }} fontSize={52} fontWeight="800" letterSpacing={-0.5}>
+      <Text
+        style={{ color: palette.infoTextPrimary }}
+        fontSize={52}
+        fontWeight="800"
+        letterSpacing={-0.5}
+      >
         {copy.headline}
       </Text>
       <LinearGradient
@@ -166,8 +175,8 @@ const BadgeHighlightsRightSide = ({ palette, copy }: { palette: Palette; copy: V
           height: 3,
           width: 60,
           borderRadius: 999,
-        }}>
-      </LinearGradient>
+        }}
+      ></LinearGradient>
     </YStack>
     <Paragraph style={{ color: palette.infoTextSecondary }} fontSize={22} lineHeight={28}>
       {copy.subtitle}
@@ -184,14 +193,14 @@ const BadgeHighlightsRightSide = ({ palette, copy }: { palette: Palette; copy: V
             borderRadius: 16,
           }}
         >
-          <Stack
-            rounded={14}
-            px={18}
-            py={12}
-            style={{ backgroundColor: '#fdfdfc' }}
-          >
+          <Stack rounded={14} px={18} py={12} style={{ backgroundColor: '#fdfdfc' }}>
             <XStack items="center" gap="$2.5">
-              <Stack width={6} height={6} rounded={999} style={{ backgroundColor: purple.purple10 }} />
+              <Stack
+                width={6}
+                height={6}
+                rounded={999}
+                style={{ backgroundColor: purple.purple10 }}
+              />
               <Text fontSize={18} fontWeight="700" style={{ color: '#0a2817' }}>
                 {benefit}
               </Text>
@@ -203,7 +212,13 @@ const BadgeHighlightsRightSide = ({ palette, copy }: { palette: Palette; copy: V
   </YStack>
 )
 
-const GlassBadgesRightSide = ({ palette, copy }: { palette: Palette; copy: VariantCopy }) => (
+const GlassBadgesRightSide = ({
+  palette,
+  copy,
+}: {
+  palette: Palette
+  copy: VariantCopy
+}) => (
   <YStack gap="$5" maxW={360}>
     <YStack gap="$1">
       <Text
@@ -219,7 +234,13 @@ const GlassBadgesRightSide = ({ palette, copy }: { palette: Palette; copy: Varia
       >
         {copy.headline}
       </Text>
-      <Paragraph style={{ color: palette.infoTextSecondary }} fontSize={24} lineHeight={30} fontWeight="500" letterSpacing={-0.2}>
+      <Paragraph
+        style={{ color: palette.infoTextSecondary }}
+        fontSize={24}
+        lineHeight={30}
+        fontWeight="500"
+        letterSpacing={-0.2}
+      >
         {copy.subtitle}
       </Paragraph>
     </YStack>
@@ -252,7 +273,12 @@ const GlassBadgesRightSide = ({ palette, copy }: { palette: Palette; copy: Varia
                 shadowRadius: 6,
               }}
             />
-            <Text fontSize={20} fontWeight="700" letterSpacing={-0.3} style={{ color: palette.infoTextPrimary }}>
+            <Text
+              fontSize={20}
+              fontWeight="700"
+              letterSpacing={-0.3}
+              style={{ color: palette.infoTextPrimary }}
+            >
               {benefit}
             </Text>
           </XStack>
@@ -268,7 +294,7 @@ const FixedWidthTwoColumnLayout = ({
   leftWidth,
   rightWidth,
   gap = LAYOUT_GAP,
-  verticalPadding = "$4",
+  verticalPadding = '$4',
 }: {
   leftContent: React.ReactNode
   rightContent: React.ReactNode
@@ -290,15 +316,13 @@ const FixedWidthTwoColumnLayout = ({
       <Stack width={leftWidth} items="center">
         {leftContent}
       </Stack>
-      <Stack width={rightWidth}>
-        {rightContent}
-      </Stack>
+      <Stack width={rightWidth}>{rightContent}</Stack>
     </XStack>
   </YStack>
 )
 
 const renderBadgesVariant = (ctx: VariantContext) => {
-  const { cardMetrics, palette, contentWidth, iconBadge } = ctx
+  const { cardMetrics, palette, iconBadge } = ctx
 
   const SIMPLE_FAN_CARDS: Card[] = [
     createCard('hearts', 13, 'fan-1'),
@@ -330,7 +354,9 @@ const renderBadgesVariant = (ctx: VariantContext) => {
     </YStack>
   )
 
-  const rightSide = <BadgeHighlightsRightSide palette={palette} copy={ctx.definition.copy} />
+  const rightSide = (
+    <BadgeHighlightsRightSide palette={palette} copy={ctx.definition.copy} />
+  )
 
   return (
     <FixedWidthTwoColumnLayout
@@ -342,10 +368,8 @@ const renderBadgesVariant = (ctx: VariantContext) => {
   )
 }
 
-
-
 const renderIconVariant = (ctx: VariantContext) => {
-  const { cardMetrics, palette, iconBadge, contentWidth } = ctx
+  const { cardMetrics, palette, iconBadge } = ctx
   const stageWidth = Math.max(0, SAFE_CONTENT_WIDTH - 360 - LAYOUT_GAP)
   const maxRadius = Math.max(120, (stageWidth - cardMetrics.width - 48) / 2)
   const ringRadius = Math.min(cardMetrics.width * 1.8, maxRadius)
@@ -353,14 +377,14 @@ const renderIconVariant = (ctx: VariantContext) => {
   const center = diameter / 2
 
   const leftSide = (
-    <YStack
-      flex={1}
-      items="center"
-      justify="center"
-      gap="$4"
-      p="$5"
-    >
-      <Stack width={diameter} height={diameter} position="relative" items="center" justify="center">
+    <YStack flex={1} items="center" justify="center" gap="$4" p="$5">
+      <Stack
+        width={diameter}
+        height={diameter}
+        position="relative"
+        items="center"
+        justify="center"
+      >
         {iconBadge}
         {ICON_RING_CARDS.map((card, index) => {
           const angle = (2 * Math.PI * index) / ICON_RING_CARDS.length
@@ -390,7 +414,9 @@ const renderIconVariant = (ctx: VariantContext) => {
     </YStack>
   )
 
-  const rightSide = <BadgeHighlightsRightSide palette={palette} copy={ctx.definition.copy} />
+  const rightSide = (
+    <BadgeHighlightsRightSide palette={palette} copy={ctx.definition.copy} />
+  )
 
   return (
     <FixedWidthTwoColumnLayout
@@ -429,10 +455,7 @@ const renderPremiumBadgesVariant = (ctx: VariantContext) => {
               height={cardMetrics.height}
               ml={index === 0 ? 0 : -40} // Overlap cards
               style={{
-                transform: [
-                  { rotate: `${rotation}deg` },
-                  { translateY: yOffset }
-                ],
+                transform: [{ rotate: `${rotation}deg` }, { translateY: yOffset }],
                 shadowColor: 'rgba(15, 23, 42, 0.5)',
                 shadowOpacity: 0.5,
                 shadowRadius: 20,
@@ -448,7 +471,9 @@ const renderPremiumBadgesVariant = (ctx: VariantContext) => {
     </YStack>
   )
 
-  const rightSide = <BadgeHighlightsRightSide palette={palette} copy={ctx.definition.copy} />
+  const rightSide = (
+    <BadgeHighlightsRightSide palette={palette} copy={ctx.definition.copy} />
+  )
 
   return (
     <FixedWidthTwoColumnLayout
@@ -487,10 +512,7 @@ const renderBadgesRemixVariant = (ctx: VariantContext) => {
               height={cardMetrics.height}
               ml={index === 0 ? 0 : -40} // Overlap cards
               style={{
-                transform: [
-                  { rotate: `${rotation}deg` },
-                  { translateY: yOffset }
-                ],
+                transform: [{ rotate: `${rotation}deg` }, { translateY: yOffset }],
                 shadowColor: 'rgba(15, 23, 42, 0.5)',
                 shadowOpacity: 0.5,
                 shadowRadius: 20,
@@ -506,7 +528,9 @@ const renderBadgesRemixVariant = (ctx: VariantContext) => {
     </YStack>
   )
 
-  const rightSide = <BadgeHighlightsRightSide palette={palette} copy={ctx.definition.copy} />
+  const rightSide = (
+    <BadgeHighlightsRightSide palette={palette} copy={ctx.definition.copy} />
+  )
 
   return (
     <FixedWidthTwoColumnLayout
@@ -551,7 +575,7 @@ const renderGlassModernVariant = (ctx: VariantContext) => {
         />
         {iconBadge}
       </Stack>
-      
+
       <XStack items="center" justify="center">
         {GLASS_CARDS.map((card, index) => {
           const rotation = -15 + index * 10
@@ -564,10 +588,7 @@ const renderGlassModernVariant = (ctx: VariantContext) => {
               height={cardMetrics.height}
               ml={index === 0 ? 0 : -40}
               style={{
-                transform: [
-                  { rotate: `${rotation}deg` },
-                  { translateY: yOffset }
-                ],
+                transform: [{ rotate: `${rotation}deg` }, { translateY: yOffset }],
                 shadowColor: 'rgba(0, 0, 0, 0.6)', // Stronger shadow for depth
                 shadowOpacity: 0.6,
                 shadowRadius: 24,
@@ -595,7 +616,10 @@ const renderGlassModernVariant = (ctx: VariantContext) => {
   )
 }
 
-const VARIANT_RENDERERS: Record<FeatureVariant, (ctx: VariantContext) => React.ReactElement> = {
+const VARIANT_RENDERERS: Record<
+  FeatureVariant,
+  (ctx: VariantContext) => React.ReactElement
+> = {
   badges: renderBadgesVariant,
   icon: renderIconVariant,
   'premium-badges': renderPremiumBadgesVariant,
@@ -745,7 +769,9 @@ export default function FeatureGraphicScreen() {
   const [activeVariantId, setActiveVariantId] = useState<FeatureVariant>('badges')
   const [showSafeFrame, setShowSafeFrame] = useState(false)
 
-  const activeVariant = VARIANT_DEFINITIONS.find((variant) => variant.id === activeVariantId) ?? VARIANT_DEFINITIONS[0]
+  const activeVariant =
+    VARIANT_DEFINITIONS.find((variant) => variant.id === activeVariantId) ??
+    VARIANT_DEFINITIONS[0]
 
   const cardMetrics = useMemo<CardMetrics>(() => {
     const width = activeVariant.cardWidth
@@ -762,12 +788,12 @@ export default function FeatureGraphicScreen() {
     () =>
       Math.max(
         activeVariant.minInfoWidth ?? 260,
-        Math.round(SAFE_CONTENT_WIDTH * (activeVariant.infoWidthRatio ?? 0.35)),
+        Math.round(SAFE_CONTENT_WIDTH * (activeVariant.infoWidthRatio ?? 0.35))
       ),
-    [activeVariant],
+    [activeVariant]
   )
 
-  const iconBadge = useMemo(() => <IconBadge palette={palette} />, [palette])
+  const iconBadge = useMemo(() => <IconBadge />, [])
 
   const variantContext: VariantContext = {
     definition: activeVariant,
@@ -855,120 +881,146 @@ export default function FeatureGraphicScreen() {
             <Button
               size="$2"
               variant="outlined"
-              onPress={() => setSchemeOverride((prev) => ((prev ?? scheme) === 'dark' ? 'light' : 'dark'))}
+              onPress={() =>
+                setSchemeOverride((prev) =>
+                  (prev ?? scheme) === 'dark' ? 'light' : 'dark'
+                )
+              }
             >
               {scheme === 'dark' ? '☀️ Light' : '🌙 Dark'}
             </Button>
-            <Button size="$2" variant="outlined" onPress={() => setShowSafeFrame((prev) => !prev)}>
+            <Button
+              size="$2"
+              variant="outlined"
+              onPress={() => setShowSafeFrame((prev) => !prev)}
+            >
               {showSafeFrame ? 'Hide safe frame' : 'Show safe frame'}
             </Button>
           </XStack>
         </XStack>
 
-      <Stack
-        width={FEATURE_WIDTH}
-        height={FEATURE_HEIGHT}
-        self="center"
-        overflow="hidden"
-        style={{ backgroundColor: palette.canvasBackground }}
-      >
-        {/* Safe-area padding derived from Task 24-1 (15% bleed documented). */}
-        <FeltBackground />
-        <Stack flex={1} p={SAFE_INNER_PADDING} justify="center">
-          {VARIANT_RENDERERS[activeVariant.id](variantContext)}
-        </Stack>
-        {showSafeFrame ? <SafeFrameOverlay color={palette.safeFrame} /> : null}
-      </Stack>
-
-      <YStack maxW={FEATURE_WIDTH} self="center" gap="$3">
-        <Text style={{ color: palette.bodyText }} fontSize={22} fontWeight="700">
-          {activeVariant.label}
-        </Text>
-        <Paragraph style={{ color: palette.bodySubduedText }} fontSize={18}>
-          {activeVariant.summary}
-        </Paragraph>
-        <Paragraph style={{ color: palette.bodySubduedText }} fontSize={16}>
-          {activeVariant.description}
-        </Paragraph>
-      </YStack>
-
-      <YStack maxW={FEATURE_WIDTH} self="center" gap="$2">
-        <Text style={{ color: palette.bodyText }} fontSize={18} fontWeight="700">
-          Variant lineup overview
-        </Text>
-        <YStack gap="$1">
-          {VARIANT_DEFINITIONS.map((variant) => (
-            <XStack key={`${variant.id}-overview`} items="flex-start" gap="$2">
-              <Text
-                style={{ color: variant.id === activeVariant.id ? palette.bodyText : palette.bodySubduedText }}
-                fontSize={18}
-              >
-                •
-              </Text>
-              <Paragraph
-                flex={1}
-                style={{ color: variant.id === activeVariant.id ? palette.bodyText : palette.bodySubduedText }}
-                fontSize={15}
-              >
-                {variant.label}: {variant.summary}
-              </Paragraph>
-            </XStack>
-          ))}
-        </YStack>
-      </YStack>
-
-      <YStack maxW={FEATURE_WIDTH} self="center" gap="$2">
-        <Text style={{ color: palette.bodyText }} fontSize={18} fontWeight="700">
-          Safe zone calculations
-        </Text>
-        <YStack
-          rounded={24}
-          borderWidth={1}
-          p="$4"
-          gap="$2"
-          style={{
-            borderColor: palette.panelBorder,
-            backgroundColor: `${palette.panelTint}40`,
-          }}
+        <Stack
+          width={FEATURE_WIDTH}
+          height={FEATURE_HEIGHT}
+          self="center"
+          overflow="hidden"
+          style={{ backgroundColor: palette.canvasBackground }}
         >
-          {dimensionRows.map((row) => (
-            <XStack key={row.label} justify="space-between" items="flex-start" gap="$3">
-              <Text style={{ color: palette.bodyText }} fontWeight="600">
-                {row.label}
-              </Text>
-              <YStack flex={1} items="flex-end" gap="$1">
-                <Text style={{ color: palette.bodyText }}>{row.value}</Text>
-                <Paragraph style={{ color: palette.bodySubduedText }} text="right" fontSize={14}>
-                  {row.notes}
-                </Paragraph>
-              </YStack>
-            </XStack>
-          ))}
-        </YStack>
-      </YStack>
+          {/* Safe-area padding derived from Task 24-1 (15% bleed documented). */}
+          <FeltBackground />
+          <Stack flex={1} p={SAFE_INNER_PADDING} justify="center">
+            {VARIANT_RENDERERS[activeVariant.id](variantContext)}
+          </Stack>
+          {showSafeFrame ? <SafeFrameOverlay color={palette.safeFrame} /> : null}
+        </Stack>
 
-      <YStack self="center" maxW={FEATURE_WIDTH} gap="$3" pt="$5">
-        <Text style={{ color: palette.bodyText }} fontSize={24} fontWeight="800">
-          Feature graphic concept
-        </Text>
-        {CONCEPT_PARAGRAPHS.map((paragraph, index) => (
-          <Paragraph key={`concept-${index}`} style={{ color: palette.bodySubduedText }} fontSize={16}>
-            {paragraph}
+        <YStack maxW={FEATURE_WIDTH} self="center" gap="$3">
+          <Text style={{ color: palette.bodyText }} fontSize={22} fontWeight="700">
+            {activeVariant.label}
+          </Text>
+          <Paragraph style={{ color: palette.bodySubduedText }} fontSize={18}>
+            {activeVariant.summary}
           </Paragraph>
-        ))}
-        <YStack gap="$3" pt="$2">
-          {VARIANT_DEFINITIONS.map((variant) => (
-            <Stack key={`${variant.id}-detail`} gap="$1">
-              <Text style={{ color: palette.bodyText }} fontSize={18} fontWeight="700">
-                {variant.label}
-              </Text>
-              <Paragraph style={{ color: palette.bodySubduedText }} fontSize={15}>
-                {variant.description}
-              </Paragraph>
-            </Stack>
-          ))}
+          <Paragraph style={{ color: palette.bodySubduedText }} fontSize={16}>
+            {activeVariant.description}
+          </Paragraph>
         </YStack>
-      </YStack>
+
+        <YStack maxW={FEATURE_WIDTH} self="center" gap="$2">
+          <Text style={{ color: palette.bodyText }} fontSize={18} fontWeight="700">
+            Variant lineup overview
+          </Text>
+          <YStack gap="$1">
+            {VARIANT_DEFINITIONS.map((variant) => (
+              <XStack key={`${variant.id}-overview`} items="flex-start" gap="$2">
+                <Text
+                  style={{
+                    color:
+                      variant.id === activeVariant.id
+                        ? palette.bodyText
+                        : palette.bodySubduedText,
+                  }}
+                  fontSize={18}
+                >
+                  •
+                </Text>
+                <Paragraph
+                  flex={1}
+                  style={{
+                    color:
+                      variant.id === activeVariant.id
+                        ? palette.bodyText
+                        : palette.bodySubduedText,
+                  }}
+                  fontSize={15}
+                >
+                  {variant.label}: {variant.summary}
+                </Paragraph>
+              </XStack>
+            ))}
+          </YStack>
+        </YStack>
+
+        <YStack maxW={FEATURE_WIDTH} self="center" gap="$2">
+          <Text style={{ color: palette.bodyText }} fontSize={18} fontWeight="700">
+            Safe zone calculations
+          </Text>
+          <YStack
+            rounded={24}
+            borderWidth={1}
+            p="$4"
+            gap="$2"
+            style={{
+              borderColor: palette.panelBorder,
+              backgroundColor: `${palette.panelTint}40`,
+            }}
+          >
+            {dimensionRows.map((row) => (
+              <XStack key={row.label} justify="space-between" items="flex-start" gap="$3">
+                <Text style={{ color: palette.bodyText }} fontWeight="600">
+                  {row.label}
+                </Text>
+                <YStack flex={1} items="flex-end" gap="$1">
+                  <Text style={{ color: palette.bodyText }}>{row.value}</Text>
+                  <Paragraph
+                    style={{ color: palette.bodySubduedText }}
+                    text="right"
+                    fontSize={14}
+                  >
+                    {row.notes}
+                  </Paragraph>
+                </YStack>
+              </XStack>
+            ))}
+          </YStack>
+        </YStack>
+
+        <YStack self="center" maxW={FEATURE_WIDTH} gap="$3" pt="$5">
+          <Text style={{ color: palette.bodyText }} fontSize={24} fontWeight="800">
+            Feature graphic concept
+          </Text>
+          {CONCEPT_PARAGRAPHS.map((paragraph, index) => (
+            <Paragraph
+              key={`concept-${index}`}
+              style={{ color: palette.bodySubduedText }}
+              fontSize={16}
+            >
+              {paragraph}
+            </Paragraph>
+          ))}
+          <YStack gap="$3" pt="$2">
+            {VARIANT_DEFINITIONS.map((variant) => (
+              <Stack key={`${variant.id}-detail`} gap="$1">
+                <Text style={{ color: palette.bodyText }} fontSize={18} fontWeight="700">
+                  {variant.label}
+                </Text>
+                <Paragraph style={{ color: palette.bodySubduedText }} fontSize={15}>
+                  {variant.description}
+                </Paragraph>
+              </Stack>
+            ))}
+          </YStack>
+        </YStack>
       </YStack>
     </ScrollView>
   )

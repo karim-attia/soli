@@ -5,12 +5,8 @@ import {
   COLOR_CARD_BORDER,
   COLOR_CARD_FACE,
   COLOR_COLUMN_BORDER,
-  COLOR_COLUMN_SELECTED,
-  COLOR_DROP_BORDER,
   COLOR_FELT_TEXT_PRIMARY,
   COLOR_FELT_TEXT_SECONDARY,
-  COLOR_SELECTED_BORDER,
-  COLOR_TEXT_MUTED,
   FOUNDATION_GLOW_ANDROID_FILL_COLOR,
   FOUNDATION_GLOW_COLOR,
 } from '../../constants'
@@ -150,7 +146,8 @@ export const styles = StyleSheet.create({
     shadowColor: FOUNDATION_GLOW_COLOR,
     shadowOpacity: 0.6,
     shadowRadius: 12,
-    backgroundColor: Platform.OS === 'android' ? FOUNDATION_GLOW_ANDROID_FILL_COLOR : 'transparent',
+    backgroundColor:
+      Platform.OS === 'android' ? FOUNDATION_GLOW_ANDROID_FILL_COLOR : 'transparent',
   },
   foundationCard: {
     position: 'absolute',

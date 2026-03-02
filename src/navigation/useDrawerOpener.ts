@@ -18,4 +18,3 @@ export const useDrawerOpener = () => {
     openNavigationDrawer(navigation)
   }, [navigation])
 }
-

@@ -90,8 +90,12 @@ function parseDataset(rawBody) {
         const downTokens = match[2].trim() ? match[2].trim().split(/\s+/) : []
         const upTokens = match[3].trim().split(/\s+/)
         tableau[index] = {
-          down: downTokens.map((token, tokenIndex) => decodeCard(token, `${id} col ${index + 1} down[${tokenIndex}]`)),
-          up: upTokens.map((token, tokenIndex) => decodeCard(token, `${id} col ${index + 1} up[${tokenIndex}]`)),
+          down: downTokens.map((token, tokenIndex) =>
+            decodeCard(token, `${id} col ${index + 1} down[${tokenIndex}]`)
+          ),
+          up: upTokens.map((token, tokenIndex) =>
+            decodeCard(token, `${id} col ${index + 1} up[${tokenIndex}]`)
+          ),
         }
       })
 
@@ -130,7 +134,11 @@ function loadDataset() {
 
 function saveDataset(shuffles) {
   const rawBody = stringifyDataset(shuffles)
-  const tsContent = `export const SOLVABLE_SHUFFLES_RAW = ` + '`\n' + rawBody.replace(/`/g, '\\`') + '\n`\n'
+  const tsContent =
+    `export const SOLVABLE_SHUFFLES_RAW = ` +
+    '`\n' +
+    rawBody.replace(/`/g, '\\`') +
+    '\n`\n'
   fs.writeFileSync(RAW_DATASET_PATH, tsContent, 'utf8')
 }
 
@@ -178,5 +186,3 @@ module.exports = {
   encodeCard,
   decodeCard,
 }
-
-

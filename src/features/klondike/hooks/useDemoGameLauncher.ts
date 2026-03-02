@@ -75,7 +75,7 @@ export const useDemoGameLauncher = ({
                 target: { type: 'foundation', suit },
                 recordHistory: false,
               },
-              selection,
+              selection
             )
           })
         }
@@ -110,7 +110,7 @@ export const useDemoGameLauncher = ({
                   target: { type: 'foundation', suit },
                   recordHistory: false,
                 },
-                { source: 'waste' },
+                { source: 'waste' }
               )
             })
           }
@@ -132,12 +132,15 @@ export const useDemoGameLauncher = ({
 
       const finalStepIndex = steps.length - 1
       if (finalStepIndex >= 0) {
-        setTimeout(() => {
-          devLog('info', '[Demo] Auto sequence completed dispatch queue.')
-        }, DEMO_AUTO_STEP_INTERVAL_MS * (finalStepIndex + 2))
+        setTimeout(
+          () => {
+            devLog('info', '[Demo] Auto sequence completed dispatch queue.')
+          },
+          DEMO_AUTO_STEP_INTERVAL_MS * (finalStepIndex + 2)
+        )
       }
     },
-    [dispatch, dispatchWithFlight],
+    [dispatchWithFlight]
   )
 
   const handleLaunchDemoGame = useCallback(
@@ -195,10 +198,8 @@ export const useDemoGameLauncher = ({
       topRowLayoutRef,
       updateBoardLocked,
       winCelebrationsRef,
-    ],
+    ]
   )
 
   return { handleLaunchDemoGame }
 }
-
-

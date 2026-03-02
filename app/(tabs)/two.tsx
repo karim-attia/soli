@@ -16,7 +16,7 @@ import {
   ScrollView,
 } from 'react-native'
 import { useFocusEffect, useNavigation } from 'expo-router'
-import { Button, H2, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
+import { Button, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu, RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
 
 import { devLog } from '../../src/utils/devLogger'
@@ -38,13 +38,7 @@ import {
   getDropHints,
   klondikeReducer,
 } from '../../src/solitaire/klondike'
-import type {
-  Card,
-  GameState,
-  Rank,
-  Selection,
-  Suit,
-} from '../../src/solitaire/klondike'
+import type { Card, GameState, Rank, Selection, Suit } from '../../src/solitaire/klondike'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
 
 // Atomic solver types for visualization
@@ -98,7 +92,6 @@ const FACE_CARD_LABELS: Partial<Record<Rank, string>> = {
 // Solver visual tweaks: grey only for covered cards in solver mode
 const COLOR_SOLVER_COVERED_FACE = '#f3f4f6'
 
-
 type CardMetrics = {
   width: number
   height: number
@@ -129,12 +122,21 @@ function computeCardMetrics(availableWidth: number | null): CardMetrics {
   }
 
   const totalGap = TABLEAU_GAP * (TABLEAU_COLUMN_COUNT - 1)
-  const widthAvailable = Math.max(availableWidth - totalGap, MIN_CARD_WIDTH * TABLEAU_COLUMN_COUNT)
+  const widthAvailable = Math.max(
+    availableWidth - totalGap,
+    MIN_CARD_WIDTH * TABLEAU_COLUMN_COUNT
+  )
   const rawWidth = widthAvailable / TABLEAU_COLUMN_COUNT
   const unclampedWidth = Math.max(Math.floor(rawWidth), MIN_CARD_WIDTH)
-  const constrainedWidth = Math.min(Math.max(unclampedWidth, MIN_CARD_WIDTH), MAX_CARD_WIDTH)
+  const constrainedWidth = Math.min(
+    Math.max(unclampedWidth, MIN_CARD_WIDTH),
+    MAX_CARD_WIDTH
+  )
   const height = Math.round(constrainedWidth * CARD_ASPECT_RATIO)
-  const stackOffset = Math.max(24, Math.round(constrainedWidth * (BASE_STACK_OFFSET / BASE_CARD_WIDTH + 0.12)))
+  const stackOffset = Math.max(
+    24,
+    Math.round(constrainedWidth * (BASE_STACK_OFFSET / BASE_CARD_WIDTH + 0.12))
+  )
   const radius = Math.max(6, Math.round(constrainedWidth * 0.12))
 
   return {
@@ -145,7 +147,10 @@ function computeCardMetrics(availableWidth: number | null): CardMetrics {
   }
 }
 
-function collectSelectionCardIds(state: GameState, selection?: Selection | null): string[] {
+function collectSelectionCardIds(
+  state: GameState,
+  selection?: Selection | null
+): string[] {
   if (!selection) {
     return []
   }
@@ -156,7 +161,8 @@ function collectSelectionCardIds(state: GameState, selection?: Selection | null)
   }
 
   if (selection.source === 'foundation') {
-    const topFoundation = state.foundations[selection.suit][state.foundations[selection.suit].length - 1]
+    const topFoundation =
+      state.foundations[selection.suit][state.foundations[selection.suit].length - 1]
     return topFoundation ? [topFoundation.id] : []
   }
 
@@ -196,7 +202,7 @@ export default function TabOneScreen() {
         lookup: new Set(ids),
       })
     },
-    [state],
+    [state]
   )
   const autoPlayActive = state.isAutoCompleting || state.autoQueue.length > 0
   const notifyInvalidMove = useCallback(
@@ -209,7 +215,7 @@ export default function TabOneScreen() {
       }
       triggerInvalidSelectionWiggle(options?.selection ?? null)
     },
-    [autoPlayActive, triggerInvalidSelectionWiggle],
+    [autoPlayActive, triggerInvalidSelectionWiggle]
   )
 
   // --- Atomic solver visualization state ---
@@ -237,7 +243,8 @@ export default function TabOneScreen() {
         }
 
         const idx = 90
-        const deckOrder: number[] = Array.isArray(shuffles) && shuffles[idx] ? shuffles[idx] : []
+        const deckOrder: number[] =
+          Array.isArray(shuffles) && shuffles[idx] ? shuffles[idx] : []
 
         try {
           const frame = atomicSolver.getAtomicFrame(deckOrder, {
@@ -257,7 +264,7 @@ export default function TabOneScreen() {
           setAtomicStepCount(0)
           setAtomicReady(true)
           solverInitializedRef.current = true
-        } catch (error) {
+        } catch {
           if (!cancelled) {
             setAtomicReady(true)
             solverInitializedRef.current = true
@@ -286,7 +293,7 @@ export default function TabOneScreen() {
       return () => {
         cleanup()
       }
-    }, [developerModeEnabled, initializeSolver, navigation]),
+    }, [developerModeEnabled, initializeSolver, navigation])
   )
 
   const drawLabel = state.stock.length ? 'Draw' : ''
@@ -320,14 +327,14 @@ export default function TabOneScreen() {
       }
       dispatch({ type: 'APPLY_MOVE', selection, target })
     },
-    [dispatch, notifyInvalidMove, state],
+    [dispatch, notifyInvalidMove, state]
   )
 
   const handleManualSelectTableau = useCallback(
     (columnIndex: number, cardIndex: number) => {
       dispatch({ type: 'SELECT_TABLEAU', columnIndex, cardIndex })
     },
-    [dispatch],
+    [dispatch]
   )
 
   const handleManualWasteSelect = useCallback(() => {
@@ -338,7 +345,7 @@ export default function TabOneScreen() {
     (suit: Suit) => {
       dispatch({ type: 'SELECT_FOUNDATION_TOP', suit })
     },
-    [dispatch],
+    [dispatch]
   )
 
   const handleColumnPress = useCallback(
@@ -352,7 +359,7 @@ export default function TabOneScreen() {
         notifyInvalidMove({ selection: state.selected })
       }
     },
-    [dispatch, dropHints.tableau, notifyInvalidMove, state.selected],
+    [dispatch, dropHints.tableau, notifyInvalidMove, state.selected]
   )
 
   const handleFoundationPress = useCallback(
@@ -369,14 +376,15 @@ export default function TabOneScreen() {
         notifyInvalidMove({ selection: state.selected })
       }
     },
-    [attemptAutoMove, dispatch, dropHints.foundations, notifyInvalidMove, state.foundations, state.selected],
+    [
+      attemptAutoMove,
+      dispatch,
+      dropHints.foundations,
+      notifyInvalidMove,
+      state.foundations,
+      state.selected,
+    ]
   )
-
-  const clearSelection = useCallback(() => {
-    if (state.selected) {
-      dispatch({ type: 'CLEAR_SELECTION' })
-    }
-  }, [dispatch, state.selected])
 
   const theme = useTheme()
   const openDrawer = useDrawerOpener()
@@ -453,138 +461,140 @@ export default function TabOneScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-    <YStack flex={1} bg="$background" px="$2" pt="$0" pb="$0" gap="$0">
-      <YStack
-        flex={1}
-        onLayout={handleBoardLayout}
-        style={styles.boardShell}
-        px="$2"
-        py="$2"
-        gap="$3"
-      >
-        {!atomicReady && (
-          <View style={styles.solverOverlay} pointerEvents="auto">
-            <Paragraph color="$color10">Preparing solver…</Paragraph>
-          </View>
-        )}
-        {atomicReady && atomicSnapshot ? (
-          <SolverTopRow snapshot={atomicSnapshot} cardMetrics={cardMetrics} />
-        ) : (
-          <TopRow
-            state={state}
-            drawLabel={drawLabel}
-            onDraw={handleDraw}
-            onWasteTap={() => attemptAutoMove({ source: 'waste' })}
-            onWasteHold={handleManualWasteSelect}
-            onFoundationPress={handleFoundationPress}
-            onFoundationHold={handleManualFoundationSelect}
-            cardMetrics={cardMetrics}
-            dropHints={dropHints}
-            notifyInvalidMove={notifyInvalidMove}
-            invalidWiggle={invalidWiggle}
-          />
-        )}
+      <YStack flex={1} bg="$background" px="$2" pt="$0" pb="$0" gap="$0">
+        <YStack
+          flex={1}
+          onLayout={handleBoardLayout}
+          style={styles.boardShell}
+          px="$2"
+          py="$2"
+          gap="$3"
+        >
+          {!atomicReady && (
+            <View style={styles.solverOverlay} pointerEvents="auto">
+              <Paragraph color="$color10">Preparing solver…</Paragraph>
+            </View>
+          )}
+          {atomicReady && atomicSnapshot ? (
+            <SolverTopRow snapshot={atomicSnapshot} cardMetrics={cardMetrics} />
+          ) : (
+            <TopRow
+              state={state}
+              drawLabel={drawLabel}
+              onDraw={handleDraw}
+              onWasteTap={() => attemptAutoMove({ source: 'waste' })}
+              onWasteHold={handleManualWasteSelect}
+              onFoundationPress={handleFoundationPress}
+              onFoundationHold={handleManualFoundationSelect}
+              cardMetrics={cardMetrics}
+              dropHints={dropHints}
+              notifyInvalidMove={notifyInvalidMove}
+              invalidWiggle={invalidWiggle}
+            />
+          )}
 
-        {atomicReady && atomicSnapshot ? (
-          <SolverTableau snapshot={atomicSnapshot} cardMetrics={cardMetrics} />
-        ) : (
-          <TableauSection
-            state={state}
-            cardMetrics={cardMetrics}
-            dropHints={dropHints}
-            onAutoMove={attemptAutoMove}
-            onLongPress={handleManualSelectTableau}
-            onColumnPress={handleColumnPress}
-            invalidWiggle={invalidWiggle}
-          />
-        )}
+          {atomicReady && atomicSnapshot ? (
+            <SolverTableau snapshot={atomicSnapshot} cardMetrics={cardMetrics} />
+          ) : (
+            <TableauSection
+              state={state}
+              cardMetrics={cardMetrics}
+              dropHints={dropHints}
+              onAutoMove={attemptAutoMove}
+              onLongPress={handleManualSelectTableau}
+              onColumnPress={handleColumnPress}
+              invalidWiggle={invalidWiggle}
+            />
+          )}
+
+          {!atomicReady || !atomicSnapshot ? (
+            <>
+              <XStack gap="$2" items="center">
+                <Text style={styles.movesLabel}>Moves</Text>
+                <Text style={styles.movesValue}>{state.moveCount}</Text>
+              </XStack>
+            </>
+          ) : (
+            <>
+              <SolverStockGrid snapshot={atomicSnapshot} cardMetrics={cardMetrics} />
+              <YStack gap="$2">
+                <Text style={styles.movesLabel}>Next Approaches</Text>
+                {atomicCandidates.map((cand, i) => {
+                  const flip = getFlipCoverInfo(atomicSnapshot, cand.state)
+                  const header = flip
+                    ? `C${flip.column + 1} | ${rankToLabel(flip.uncovered.rank)}${SUIT_SYMBOLS[flip.uncovered.suit]} | ${cand.steps} steps`
+                    : `— | — | ${cand.steps} steps`
+                  const steps = formatPathShort(atomicSnapshot, cand.path)
+                  return (
+                    <YStack key={`cand-${i}`} gap="$1">
+                      <Paragraph color="$color12">{header}</Paragraph>
+                      {steps.map((line, li) => (
+                        <Paragraph key={`cand-${i}-s-${li}`} color="$color12">
+                          - {line}
+                        </Paragraph>
+                      ))}
+                    </YStack>
+                  )
+                })}
+                <XStack gap="$3" mt="$2">
+                  <Button
+                    size="$3"
+                    onPress={() => {
+                      if (!atomicSnapshot || !atomicCandidates.length) return
+                      const chosen = atomicCandidates[0]
+                      const next = atomicSolver.applyPath(atomicSnapshot, chosen.path)
+                      const nextFrame = atomicSolver.getAtomicFrameFromState(next, {
+                        maxLocalNodes: 20000,
+                        maxTimeMs: 1000,
+                        maxApproachSteps: 20,
+                        avoidEmptyUnlessKing: true,
+                        strategy: 'leastSteps',
+                      })
+                      setAtomicSnapshot(nextFrame.snapshot)
+                      setAtomicCandidates(nextFrame.candidates || [])
+                      setAtomicStepCount(atomicStepCount + 1)
+                    }}
+                  >
+                    Next atomic position
+                  </Button>
+                  <Button
+                    size="$3"
+                    variant="outlined"
+                    onPress={() => {
+                      if (!atomicSnapshot || !atomicCandidates.length) return
+                      const chosen = atomicCandidates[0]
+                      const next = atomicSolver.applyPath(atomicSnapshot, chosen.path)
+                      const nextFrame = atomicSolver.getAtomicFrameFromState(next, {
+                        maxLocalNodes: 20000,
+                        maxTimeMs: 1000,
+                        maxApproachSteps: 20,
+                        avoidEmptyUnlessKing: true,
+                        strategy: 'mostCovered',
+                      })
+                      setAtomicSnapshot(nextFrame.snapshot)
+                      setAtomicCandidates(nextFrame.candidates || [])
+                      setAtomicStepCount(atomicStepCount + 1)
+                    }}
+                  >
+                    Next (Most Covered)
+                  </Button>
+                  <Text style={styles.movesValue}>Depth {atomicStepCount}</Text>
+                </XStack>
+              </YStack>
+            </>
+          )}
+        </YStack>
 
         {!atomicReady || !atomicSnapshot ? (
-          <>
-            <XStack gap="$2" items="center">
-              <Text style={styles.movesLabel}>Moves</Text>
-              <Text style={styles.movesValue}>{state.moveCount}</Text>
-            </XStack>
-          </>
-        ) : (
-          <>
-            <SolverStockGrid snapshot={atomicSnapshot} cardMetrics={cardMetrics} />
-            <YStack gap="$2">
-              <Text style={styles.movesLabel}>Next Approaches</Text>
-              {atomicCandidates.map((cand, i) => {
-                const flip = getFlipCoverInfo(atomicSnapshot, cand.state)
-                const header = flip
-                  ? `C${flip.column + 1} | ${rankToLabel(flip.uncovered.rank)}${SUIT_SYMBOLS[flip.uncovered.suit]} | ${cand.steps} steps`
-                  : `— | — | ${cand.steps} steps`
-                const steps = formatPathShort(atomicSnapshot, cand.path)
-                return (
-                  <YStack key={`cand-${i}`} gap="$1">
-                    <Paragraph color="$color12">{header}</Paragraph>
-                    {steps.map((line, li) => (
-                      <Paragraph key={`cand-${i}-s-${li}`} color="$color12">- {line}</Paragraph>
-                    ))}
-                  </YStack>
-                )
-              })}
-              <XStack gap="$3" mt="$2">
-                <Button
-                  size="$3"
-                  onPress={() => {
-                    if (!atomicSnapshot || !atomicCandidates.length) return
-                    const chosen = atomicCandidates[0]
-                    const next = atomicSolver.applyPath(atomicSnapshot, chosen.path)
-                    const nextFrame = atomicSolver.getAtomicFrameFromState(next, {
-                      maxLocalNodes: 20000,
-                      maxTimeMs: 1000,
-                      maxApproachSteps: 20,
-                      avoidEmptyUnlessKing: true,
-                      strategy: 'leastSteps',
-                    })
-                    setAtomicSnapshot(nextFrame.snapshot)
-                    setAtomicCandidates(nextFrame.candidates || [])
-                    setAtomicStepCount(atomicStepCount + 1)
-                  }}
-                >
-                  Next atomic position
-                </Button>
-                <Button
-                  size="$3"
-                  variant="outlined"
-                  onPress={() => {
-                    if (!atomicSnapshot || !atomicCandidates.length) return
-                    const chosen = atomicCandidates[0]
-                    const next = atomicSolver.applyPath(atomicSnapshot, chosen.path)
-                    const nextFrame = atomicSolver.getAtomicFrameFromState(next, {
-                      maxLocalNodes: 20000,
-                      maxTimeMs: 1000,
-                      maxApproachSteps: 20,
-                      avoidEmptyUnlessKing: true,
-                      strategy: 'mostCovered',
-                    })
-                    setAtomicSnapshot(nextFrame.snapshot)
-                    setAtomicCandidates(nextFrame.candidates || [])
-                    setAtomicStepCount(atomicStepCount + 1)
-                  }}
-                >
-                  Next (Most Covered)
-                </Button>
-                <Text style={styles.movesValue}>Depth {atomicStepCount}</Text>
-              </XStack>
-            </YStack>
-          </>
-        )}
+          <ControlBar
+            onDraw={handleDraw}
+            drawLabel={drawLabel}
+            onUndo={handleUndo}
+            canUndo={state.history.length > 0}
+            canDraw={Boolean(state.stock.length || state.waste.length)}
+          />
+        ) : null}
       </YStack>
-
-      {!atomicReady || !atomicSnapshot ? (
-        <ControlBar
-          onDraw={handleDraw}
-          drawLabel={drawLabel}
-          onUndo={handleUndo}
-          canUndo={state.history.length > 0}
-          canDraw={Boolean(state.stock.length || state.waste.length)}
-        />
-      ) : null}
-    </YStack>
     </ScrollView>
   )
 }
@@ -619,11 +629,7 @@ const TopRow = ({
   const stockDisabled = !state.stock.length && !state.waste.length
   const wasteSelected = state.selected?.source === 'waste'
   const showRecycle = !state.stock.length && state.waste.length > 0
-  const drawVariant = showRecycle
-    ? 'recycle'
-    : state.stock.length
-      ? 'stock'
-      : 'empty'
+  const drawVariant = showRecycle ? 'recycle' : state.stock.length ? 'stock' : 'empty'
 
   const handleWastePress = useCallback(() => {
     if (!state.waste.length) {
@@ -643,7 +649,9 @@ const TopRow = ({
             cards={state.foundations[suit]}
             cardMetrics={cardMetrics}
             isDroppable={dropHints.foundations[suit]}
-            isSelected={state.selected?.source === 'foundation' && state.selected.suit === suit}
+            isSelected={
+              state.selected?.source === 'foundation' && state.selected.suit === suit
+            }
             onPress={() => onFoundationPress(suit)}
             onLongPress={() => onFoundationHold(suit)}
             invalidWiggle={invalidWiggle}
@@ -673,7 +681,11 @@ const TopRow = ({
         </PileButton>
 
         {!state.hasWon && (
-          <PileButton label={`${state.stock.length}`} onPress={onDraw} disabled={stockDisabled}>
+          <PileButton
+            label={`${state.stock.length}`}
+            onPress={onDraw}
+            disabled={stockDisabled}
+          >
             <CardBack
               label={state.stock.length ? drawLabel : undefined}
               metrics={cardMetrics}
@@ -726,7 +738,13 @@ const TableauSection = ({
   </View>
 )
 // ---- Solver read-only UI (keeps exact positions/design; uses light grey open cards) ----
-const SolverTopRow = ({ snapshot, cardMetrics }: { snapshot: AtomicSnapshot; cardMetrics: CardMetrics }) => {
+const SolverTopRow = ({
+  snapshot,
+  cardMetrics,
+}: {
+  snapshot: AtomicSnapshot
+  cardMetrics: CardMetrics
+}) => {
   const foundations = FOUNDATION_SUIT_ORDER
   return (
     <XStack gap="$4" width="100%" items="flex-start">
@@ -735,7 +753,12 @@ const SolverTopRow = ({ snapshot, cardMetrics }: { snapshot: AtomicSnapshot; car
           <FoundationPile
             key={suit}
             suit={suit}
-            cards={snapshot.foundations[suit].map((c) => ({ id: `${suit}-${c.rank}`, suit, rank: c.rank as Rank, faceUp: true }))}
+            cards={snapshot.foundations[suit].map((c) => ({
+              id: `${suit}-${c.rank}`,
+              suit,
+              rank: c.rank as Rank,
+              faceUp: true,
+            }))}
             cardMetrics={cardMetrics}
             isDroppable={false}
             isSelected={false}
@@ -747,15 +770,29 @@ const SolverTopRow = ({ snapshot, cardMetrics }: { snapshot: AtomicSnapshot; car
       </XStack>
 
       <XStack flex={1} gap="$3" justify="flex-end" items="flex-end">
-        <PileButton label={`${snapshot.stock.length}`} onPress={() => {}} disabled disablePress>
-          <CardBack metrics={cardMetrics} variant={snapshot.stock.length ? 'stock' : 'empty'} />
+        <PileButton
+          label={`${snapshot.stock.length}`}
+          onPress={() => {}}
+          disabled
+          disablePress
+        >
+          <CardBack
+            metrics={cardMetrics}
+            variant={snapshot.stock.length ? 'stock' : 'empty'}
+          />
         </PileButton>
       </XStack>
     </XStack>
   )
 }
 
-const SolverTableau = ({ snapshot, cardMetrics }: { snapshot: AtomicSnapshot; cardMetrics: CardMetrics }) => (
+const SolverTableau = ({
+  snapshot,
+  cardMetrics,
+}: {
+  snapshot: AtomicSnapshot
+  cardMetrics: CardMetrics
+}) => (
   <View style={styles.tableauRow}>
     {snapshot.tableau.map((column, columnIndex) => (
       <Pressable
@@ -764,7 +801,9 @@ const SolverTableau = ({ snapshot, cardMetrics }: { snapshot: AtomicSnapshot; ca
           styles.column,
           {
             width: cardMetrics.width,
-            height: column.length ? cardMetrics.height + (column.length - 1) * cardMetrics.stackOffset : cardMetrics.height,
+            height: column.length
+              ? cardMetrics.height + (column.length - 1) * cardMetrics.stackOffset
+              : cardMetrics.height,
             borderColor: column.length === 0 ? 'transparent' : COLOR_COLUMN_BORDER,
             marginHorizontal: COLUMN_MARGIN,
           },
@@ -776,7 +815,12 @@ const SolverTableau = ({ snapshot, cardMetrics }: { snapshot: AtomicSnapshot; ca
           return (
             <CardView
               key={`${c.suit}-${c.rank}-${idx}`}
-              card={{ id: `${c.suit}-${c.rank}-${idx}`, suit: c.suit as Suit, rank: c.rank as Rank, faceUp: true }}
+              card={{
+                id: `${c.suit}-${c.rank}-${idx}`,
+                suit: c.suit as Suit,
+                rank: c.rank as Rank,
+                faceUp: true,
+              }}
               metrics={cardMetrics}
               offsetTop={idx * cardMetrics.stackOffset}
               invalidWiggle={EMPTY_INVALID_WIGGLE}
@@ -791,14 +835,27 @@ const SolverTableau = ({ snapshot, cardMetrics }: { snapshot: AtomicSnapshot; ca
   </View>
 )
 
-const SolverStockGrid = ({ snapshot, cardMetrics }: { snapshot: AtomicSnapshot; cardMetrics: CardMetrics }) => {
+const SolverStockGrid = ({
+  snapshot,
+  cardMetrics,
+}: {
+  snapshot: AtomicSnapshot
+  cardMetrics: CardMetrics
+}) => {
   // render stock as 4 columns below, open and sorted by suit+rank
   const sorted = snapshot.stock
     .slice()
-    .sort((a, b) => (a.suit === b.suit ? a.rank - b.rank : FOUNDATION_SUIT_ORDER.indexOf(a.suit as any) - FOUNDATION_SUIT_ORDER.indexOf(b.suit as any)))
+    .sort((a, b) =>
+      a.suit === b.suit
+        ? a.rank - b.rank
+        : FOUNDATION_SUIT_ORDER.indexOf(a.suit as any) -
+          FOUNDATION_SUIT_ORDER.indexOf(b.suit as any)
+    )
   const cols = 4
   const perCol = Math.ceil(sorted.length / cols)
-  const stacks: Array<typeof sorted> = Array.from({ length: cols }, (_, i) => sorted.slice(i * perCol, (i + 1) * perCol))
+  const stacks: Array<typeof sorted> = Array.from({ length: cols }, (_, i) =>
+    sorted.slice(i * perCol, (i + 1) * perCol)
+  )
   return (
     <YStack gap="$2">
       <Text style={styles.movesLabel}>Stock</Text>
@@ -810,7 +867,9 @@ const SolverStockGrid = ({ snapshot, cardMetrics }: { snapshot: AtomicSnapshot; 
               styles.column,
               {
                 width: cardMetrics.width,
-                height: stack.length ? cardMetrics.height + (stack.length - 1) * cardMetrics.stackOffset : cardMetrics.height,
+                height: stack.length
+                  ? cardMetrics.height + (stack.length - 1) * cardMetrics.stackOffset
+                  : cardMetrics.height,
                 borderColor: stack.length === 0 ? 'transparent' : COLOR_COLUMN_BORDER,
                 marginHorizontal: COLUMN_MARGIN,
               },
@@ -820,7 +879,12 @@ const SolverStockGrid = ({ snapshot, cardMetrics }: { snapshot: AtomicSnapshot; 
             {stack.map((c, idx) => (
               <CardView
                 key={`s-${si}-${c.suit}-${c.rank}-${idx}`}
-                card={{ id: `s-${si}-${c.suit}-${c.rank}-${idx}`, suit: c.suit as Suit, rank: c.rank as Rank, faceUp: true }}
+                card={{
+                  id: `s-${si}-${c.suit}-${c.rank}-${idx}`,
+                  suit: c.suit as Suit,
+                  rank: c.rank as Rank,
+                  faceUp: true,
+                }}
                 metrics={cardMetrics}
                 offsetTop={idx * cardMetrics.stackOffset}
                 invalidWiggle={EMPTY_INVALID_WIGGLE}
@@ -834,22 +898,15 @@ const SolverStockGrid = ({ snapshot, cardMetrics }: { snapshot: AtomicSnapshot; 
   )
 }
 
-function describePath(path: any[]): string {
-  if (!Array.isArray(path) || !path.length) return '—'
-  return path
-    .map((mv) => {
-      if (mv.kind === 't2f') return `Move top of Column ${mv.ci + 1} to Foundation (${SUIT_SYMBOLS[mv.suit]})`
-      if (mv.kind === 't2t') return `Move stack from Column ${mv.from + 1} (from index ${mv.index + 1}) to Column ${mv.to + 1}`
-      if (mv.kind === 'stock2f') return `Move Stock card to Foundation (${SUIT_SYMBOLS[mv.suit]})`
-      if (mv.kind === 'stock2t') return `Move Stock card to Column ${mv.to + 1}`
-      if (mv.kind === 'f2t') return `Move top of Foundation (${SUIT_SYMBOLS[mv.suit]}) to Column ${mv.to + 1}`
-      return mv.kind
-    })
-    .join(', ')
-}
-
 // Determine uncovered card and the covering card (the card that was above it before the flip)
-function getFlipCoverInfo(before: AtomicSnapshot, after: AtomicSnapshot): null | { column: number; uncovered: { suit: Suit; rank: Rank }; cover: { suit: Suit; rank: Rank } } {
+function getFlipCoverInfo(
+  before: AtomicSnapshot,
+  after: AtomicSnapshot
+): null | {
+  column: number
+  uncovered: { suit: Suit; rank: Rank }
+  cover: { suit: Suit; rank: Rank }
+} {
   for (let ci = 0; ci < Math.max(before.tableau.length, after.tableau.length); ci += 1) {
     const b = before.tableau[ci] || []
     const a = after.tableau[ci] || []
@@ -879,15 +936,30 @@ function getFlipCoverInfo(before: AtomicSnapshot, after: AtomicSnapshot): null |
 // Human-friendly compact step list (e.g., "2♥ → F♥", "2♥ 3♣ → C5")
 function formatPathShort(root: AtomicSnapshot, path: any[]): string[] {
   const sim = {
-    tableau: root.tableau.map((col) => col.map((c) => ({ suit: c.suit as Suit, rank: c.rank as Rank, faceUp: true }))),
-    foundations: FOUNDATION_SUIT_ORDER.reduce((acc, s) => { acc[s] = root.foundations[s].map((c) => ({ suit: c.suit as Suit, rank: c.rank as Rank })); return acc }, {} as Record<Suit, { suit: Suit; rank: Rank }[]>),
+    tableau: root.tableau.map((col) =>
+      col.map((c) => ({ suit: c.suit as Suit, rank: c.rank as Rank, faceUp: true }))
+    ),
+    foundations: FOUNDATION_SUIT_ORDER.reduce(
+      (acc, s) => {
+        acc[s] = root.foundations[s].map((c) => ({
+          suit: c.suit as Suit,
+          rank: c.rank as Rank,
+        }))
+        return acc
+      },
+      {} as Record<Suit, { suit: Suit; rank: Rank }[]>
+    ),
     stock: root.stock.map((c) => ({ suit: c.suit as Suit, rank: c.rank as Rank })),
   }
   const lines: string[] = []
-  const cardLabel = (c: { suit: Suit; rank: Rank }) => `${rankToLabel(c.rank)}${SUIT_SYMBOLS[c.suit]}`
+  const cardLabel = (c: { suit: Suit; rank: Rank }) =>
+    `${rankToLabel(c.rank)}${SUIT_SYMBOLS[c.suit]}`
   const stackLabel = (arr: { suit: Suit; rank: Rank }[]) => arr.map(cardLabel).join(' ')
   const isRed = (s: Suit) => new Set(['hearts', 'diamonds']).has(s)
-  const canDropOn = (target: { suit: Suit; rank: Rank } | undefined, moving: { suit: Suit; rank: Rank }) => {
+  const canDropOn = (
+    target: { suit: Suit; rank: Rank } | undefined,
+    moving: { suit: Suit; rank: Rank }
+  ) => {
     if (!target) return moving.rank === 13
     return target.rank === moving.rank + 1 && isRed(moving.suit) !== isRed(target.suit)
   }
@@ -908,16 +980,25 @@ function formatPathShort(root: AtomicSnapshot, path: any[]): string[] {
       const pile = sim.foundations[mv.suit]
       const need = (pile[pile.length - 1]?.rank || 0) + 1
       const idx = sim.stock.findIndex((c) => c.suit === mv.suit && c.rank === need)
-      const card = idx >= 0 ? sim.stock.splice(idx, 1)[0] : { suit: mv.suit as Suit, rank: need as Rank }
+      const card =
+        idx >= 0
+          ? sim.stock.splice(idx, 1)[0]
+          : { suit: mv.suit as Suit, rank: need as Rank }
       lines.push(`${cardLabel(card)} → F${SUIT_SYMBOLS[mv.suit]}`)
       sim.foundations[mv.suit].push(card)
     } else if (mv.kind === 'stock2t') {
       const targetTop = sim.tableau[mv.to][sim.tableau[mv.to].length - 1]
       let idx = -1
-      for (let i = 0; i < sim.stock.length; i += 1) { if (canDropOn(targetTop, sim.stock[i])) { idx = i; break } }
+      for (let i = 0; i < sim.stock.length; i += 1) {
+        if (canDropOn(targetTop, sim.stock[i])) {
+          idx = i
+          break
+        }
+      }
       const card = idx >= 0 ? sim.stock.splice(idx, 1)[0] : sim.stock[0]
       if (card) lines.push(`${cardLabel(card)} → C${mv.to + 1}`)
-      if (card) sim.tableau[mv.to].push({ suit: card.suit, rank: card.rank, faceUp: true })
+      if (card)
+        sim.tableau[mv.to].push({ suit: card.suit, rank: card.rank, faceUp: true })
     } else if (mv.kind === 'f2t') {
       const pile = sim.foundations[mv.suit]
       const card = pile[pile.length - 1]
@@ -958,7 +1039,9 @@ const TableauColumn = ({
   const columnSelected =
     state.selected?.source === 'tableau' && state.selected.columnIndex === columnIndex
   const selectedCardIndex =
-    columnSelected && state.selected?.source === 'tableau' ? state.selected.cardIndex : null
+    columnSelected && state.selected?.source === 'tableau'
+      ? state.selected.cardIndex
+      : null
 
   return (
     <Pressable
@@ -979,9 +1062,7 @@ const TableauColumn = ({
       ]}
       onPress={onColumnPress}
     >
-      {column.length === 0 && (
-        <EmptySlot highlight={isDroppable} metrics={cardMetrics} />
-      )}
+      {column.length === 0 && <EmptySlot highlight={isDroppable} metrics={cardMetrics} />}
       {column.map((card, cardIndex) => (
         <CardView
           key={card.id}
@@ -1023,7 +1104,7 @@ const CardView = ({
   isSelected,
   onPress,
   onLongPress,
-  invalidWiggle,
+  invalidWiggle: _invalidWiggle,
   variant = 'normal',
 }: CardViewProps) => {
   const shouldFloat = typeof offsetTop === 'number' || typeof offsetLeft === 'number'
@@ -1075,7 +1156,7 @@ const CardView = ({
             height: '100%',
             borderRadius: metrics.radius,
             borderColor,
-              backgroundColor: faceColor,
+            backgroundColor: faceColor,
           },
         ]}
         onPress={onPress}
@@ -1247,7 +1328,7 @@ const WasteFanCard = ({
   onPress,
   onLongPress,
   invalidWiggle,
-  isEntering,
+  isEntering: _isEntering,
   zIndex,
 }: WasteFanCardProps) => {
   return (
@@ -1283,7 +1364,13 @@ type PileButtonProps = {
   disablePress?: boolean
 }
 
-const PileButton = ({ label, children, onPress, disabled, disablePress }: PileButtonProps) => {
+const PileButton = ({
+  label,
+  children,
+  onPress,
+  disabled,
+  disablePress,
+}: PileButtonProps) => {
   const commonStyle = [styles.pilePressable, disabled && styles.disabledPressable]
 
   return (
@@ -1350,7 +1437,12 @@ const FoundationPile = ({
       ]}
     >
       {topCard ? (
-        <CardView card={topCard} metrics={cardMetrics} invalidWiggle={invalidWiggle} variant={variant} />
+        <CardView
+          card={topCard}
+          metrics={cardMetrics}
+          invalidWiggle={invalidWiggle}
+          variant={variant}
+        />
       ) : (
         <Text
           style={[

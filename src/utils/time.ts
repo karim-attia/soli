@@ -10,7 +10,7 @@ export const computeElapsedWithReference = (
   elapsedMs: number,
   timerState: TimerState,
   timerStartedAt: number | null,
-  referenceTimestamp: number,
+  referenceTimestamp: number
 ): number => {
   if (timerState !== 'running' || typeof timerStartedAt !== 'number') {
     return elapsedMs
@@ -40,4 +40,3 @@ export const formatElapsedDuration = (elapsedMs: number): string => {
 
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
-

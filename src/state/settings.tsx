@@ -176,7 +176,9 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
   }, [hydrated, state])
 
   const setThemeMode = useCallback((mode: ThemeMode) => {
-    setState((previous) => (previous.themeMode === mode ? previous : { ...previous, themeMode: mode }))
+    setState((previous) =>
+      previous.themeMode === mode ? previous : { ...previous, themeMode: mode }
+    )
   }, [])
 
   const setGlobalAnimationsEnabled = useCallback((enabled: boolean) => {
@@ -189,78 +191,92 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
               ...previous.animations,
               master: enabled,
             },
-          },
+          }
     )
   }, [])
 
-  const setAnimationPreference = useCallback((key: AnimationPreferenceKey, enabled: boolean) => {
-    setState((previous) => {
-      // If enabling an animation while master is off, turn on master first
-      if (enabled && !previous.animations.master) {
+  const setAnimationPreference = useCallback(
+    (key: AnimationPreferenceKey, enabled: boolean) => {
+      setState((previous) => {
+        // If enabling an animation while master is off, turn on master first
+        if (enabled && !previous.animations.master) {
+          return {
+            ...previous,
+            animations: {
+              ...previous.animations,
+              master: true,
+              [key]: enabled,
+            },
+          }
+        }
+
+        // If disabling an animation, just update that preference
+        if (previous.animations[key] === enabled) {
+          return previous
+        }
+
         return {
           ...previous,
           animations: {
             ...previous.animations,
-            master: true,
             [key]: enabled,
           },
         }
-      }
-
-      // If disabling an animation, just update that preference
-      if (previous.animations[key] === enabled) {
-        return previous
-      }
-
-      return {
-        ...previous,
-        animations: {
-          ...previous.animations,
-          [key]: enabled,
-        },
-      }
-    })
-  }, [])
+      })
+    },
+    []
+  )
 
   const setShareSolvedGames = useCallback((enabled: boolean) => {
     setState((previous) =>
-      previous.shareSolvedGames === enabled ? previous : { ...previous, shareSolvedGames: enabled },
+      previous.shareSolvedGames === enabled
+        ? previous
+        : { ...previous, shareSolvedGames: enabled }
     )
   }, [])
 
   const setSolvableGamesOnly = useCallback((enabled: boolean) => {
     setState((previous) =>
-      previous.solvableGamesOnly === enabled ? previous : { ...previous, solvableGamesOnly: enabled },
+      previous.solvableGamesOnly === enabled
+        ? previous
+        : { ...previous, solvableGamesOnly: enabled }
     )
   }, [])
 
   const setDeveloperMode = useCallback((enabled: boolean) => {
     setDeveloperLoggingEnabled(enabled)
     setState((previous) =>
-      previous.developerMode === enabled ? previous : { ...previous, developerMode: enabled },
+      previous.developerMode === enabled
+        ? previous
+        : { ...previous, developerMode: enabled }
     )
   }, [])
 
-  const setStatisticsPreference = useCallback((key: StatisticsPreferenceKey, enabled: boolean) => {
-    setState((previous) => {
-      if (previous.statistics[key] === enabled) {
-        return previous
-      }
+  const setStatisticsPreference = useCallback(
+    (key: StatisticsPreferenceKey, enabled: boolean) => {
+      setState((previous) => {
+        if (previous.statistics[key] === enabled) {
+          return previous
+        }
 
-      return {
-        ...previous,
-        statistics: {
-          ...previous.statistics,
-          [key]: enabled,
-        },
-      }
-    })
-  }, [])
+        return {
+          ...previous,
+          statistics: {
+            ...previous.statistics,
+            [key]: enabled,
+          },
+        }
+      })
+    },
+    []
+  )
 
   // PBI-27: Refresh rate mode setter
   const setRefreshRateMode = useCallback((mode: RefreshRateMode) => {
     setState((previous) =>
-      previous.refreshRateMode === mode ? previous : { ...previous, refreshRateMode: mode },
+      previous.refreshRateMode === mode
+        ? previous
+        : { ...previous, refreshRateMode: mode }
     )
   }, [])
 
@@ -308,7 +324,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setDeveloperMode,
       setRefreshRateMode,
       state,
-    ],
+    ]
   )
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>
@@ -352,7 +368,10 @@ export function useStatisticsPreferences(): StatisticsPreferences {
   return statistics
 }
 
-const mergeSettings = (current: SettingsState, incoming?: Partial<SettingsState>): SettingsState => {
+const mergeSettings = (
+  current: SettingsState,
+  incoming?: Partial<SettingsState>
+): SettingsState => {
   if (!incoming) {
     return current
   }
@@ -367,10 +386,13 @@ const mergeSettings = (current: SettingsState, incoming?: Partial<SettingsState>
       wasteFan: getBoolean(animations.wasteFan, current.animations.wasteFan),
       invalidMoveWiggle: getBoolean(
         animations.invalidMoveWiggle,
-        current.animations.invalidMoveWiggle,
+        current.animations.invalidMoveWiggle
       ),
       cardFlip: getBoolean(animations.cardFlip, current.animations.cardFlip),
-      foundationGlow: getBoolean(animations.foundationGlow, current.animations.foundationGlow),
+      foundationGlow: getBoolean(
+        animations.foundationGlow,
+        current.animations.foundationGlow
+      ),
       celebrations: getBoolean(animations.celebrations, current.animations.celebrations),
     },
     themeMode: isThemeMode(incoming.themeMode) ? incoming.themeMode : current.themeMode,

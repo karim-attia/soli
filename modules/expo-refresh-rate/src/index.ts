@@ -3,7 +3,7 @@ import ExpoRefreshRateModule from './ExpoRefreshRateModule'
 
 /**
  * Refresh rate mode options for Android.
- * 
+ *
  * PBI-27: Android High Refresh Rate Control
  */
 export type RefreshRateMode = 'auto' | 'high'
@@ -43,12 +43,12 @@ export function getCurrentRefreshRate(): number {
 
 /**
  * Set the preferred refresh rate mode.
- * 
+ *
  * @param mode The desired refresh rate mode:
  *   - 'auto': Let Android decide based on content and battery
- *   - 'high': Request 120Hz for smoothest animations  
+ *   - 'high': Request 120Hz for smoothest animations
  *   - 'standard': Request 60Hz for battery savings
- * 
+ *
  * @returns Promise that resolves to true if successful, false if not supported
  */
 export async function setRefreshRateMode(mode: RefreshRateMode): Promise<boolean> {
@@ -56,7 +56,7 @@ export async function setRefreshRateMode(mode: RefreshRateMode): Promise<boolean
     // Silently no-op on non-Android platforms
     return false
   }
-  
+
   try {
     return await ExpoRefreshRateModule.setRefreshRateMode(mode)
   } catch {
@@ -64,5 +64,3 @@ export async function setRefreshRateMode(mode: RefreshRateMode): Promise<boolean
     return false
   }
 }
-
-

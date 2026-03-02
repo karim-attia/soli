@@ -5,7 +5,6 @@ import { Stack, XStack } from 'tamagui'
 import {
   FOUNDATION_SUIT_ORDER,
   TABLEAU_COLUMN_COUNT,
-  type Card,
   type GameState,
   type Selection,
   type Suit,
@@ -18,7 +17,6 @@ import type {
   DropHints,
   InvalidWiggleConfig,
 } from '../../types'
-import { styles } from './styles'
 import { EmptySlot, CardBack } from './CardView'
 import { PileButton } from './PileButton'
 import { StockStack } from './StockStack'
@@ -76,14 +74,14 @@ export const TopRow = ({
     (event: LayoutChangeEvent) => {
       onTopRowLayout?.(event.nativeEvent.layout)
     },
-    [onTopRowLayout],
+    [onTopRowLayout]
   )
 
   const createFoundationLayoutHandler = useCallback(
     (suit: Suit) => (layout: LayoutRectangle) => {
       onFoundationLayout?.(suit, layout)
     },
-    [onFoundationLayout],
+    [onFoundationLayout]
   )
 
   const stockDisabled = (!state.stock.length && !state.waste.length) || interactionsLocked
@@ -139,7 +137,9 @@ export const TopRow = ({
                 cards={state.foundations[suit]}
                 cardMetrics={cardMetrics}
                 isDroppable={dropHints.foundations[suit]}
-                isSelected={state.selected?.source === 'foundation' && state.selected.suit === suit}
+                isSelected={
+                  state.selected?.source === 'foundation' && state.selected.suit === suit
+                }
                 onPress={() => onFoundationPress(suit)}
                 invalidWiggle={invalidWiggle}
                 cardFlights={cardFlights}
@@ -181,12 +181,10 @@ export const TopRow = ({
                       cardFlightMemory={cardFlightMemory}
                       disabled={interactionsLocked}
                     />
+                  ) : hideEmptyOutlines ? (
+                    <Stack width={cardMetrics.width} height={cardMetrics.height} />
                   ) : (
-                    hideEmptyOutlines ? (
-                      <Stack width={cardMetrics.width} height={cardMetrics.height} />
-                    ) : (
-                      <EmptySlot highlight={false} metrics={cardMetrics} />
-                    )
+                    <EmptySlot highlight={false} metrics={cardMetrics} />
                   )}
                 </Stack>
               </PileButton>
@@ -215,16 +213,14 @@ export const TopRow = ({
                       cardFlightMemory={cardFlightMemory}
                       label={state.stock.length ? drawLabel : undefined}
                     />
+                  ) : hideEmptyOutlines ? (
+                    <Stack width={cardMetrics.width} height={cardMetrics.height} />
                   ) : (
-                    hideEmptyOutlines ? (
-                      <Stack width={cardMetrics.width} height={cardMetrics.height} />
-                    ) : (
-                      <CardBack
-                        label={state.stock.length ? drawLabel : undefined}
-                        metrics={cardMetrics}
-                        variant={drawVariant}
-                      />
-                    )
+                    <CardBack
+                      label={state.stock.length ? drawLabel : undefined}
+                      metrics={cardMetrics}
+                      variant={drawVariant}
+                    />
                   )}
                 </PileButton>
               )}

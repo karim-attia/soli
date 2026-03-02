@@ -3,11 +3,7 @@ import { LayoutChangeEvent, StyleSheet, View } from 'react-native'
 import { YStack } from 'tamagui'
 
 import type { CelebrationState } from '../hooks/useCelebrationController'
-import {
-  StatisticsHud,
-  StatisticsPlaceholder,
-  type StatisticsRow,
-} from './StatisticsHud'
+import { StatisticsHud, StatisticsPlaceholder, type StatisticsRow } from './StatisticsHud'
 import { FeltBackground } from './FeltBackground'
 import { TopRow, type TopRowProps } from './cards/TopRow'
 import { TableauSection, type TableauSectionProps } from './cards/TableauSection'
@@ -15,7 +11,7 @@ import { CelebrationTouchBlocker } from './cards'
 import { CelebrationDebugBadge } from './CelebrationDebugBadge'
 import { UndoScrubber, type UndoScrubberProps } from './UndoScrubber'
 import type { CelebrationBindings } from '../types'
-import { COLUMN_MARGIN, EDGE_GUTTER, STACK_PADDING } from '../constants'
+import { EDGE_GUTTER, STACK_PADDING } from '../constants'
 
 const BOARD_MARGIN_ADJUSTMENT = 6
 
@@ -44,7 +40,7 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
   tableauProps,
   celebrationState,
   celebrationLabel,
-  celebrationBindings,
+  celebrationBindings: _celebrationBindings,
   onCelebrationAbort,
   undoScrubProps,
 }) => {
@@ -111,5 +107,3 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
 })
-
-

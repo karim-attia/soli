@@ -33,7 +33,7 @@
 {
   "printWidth": 90,
   "tabWidth": 2,
-  "useTabs": true,
+  "useTabs": false,
   "semi": false,
   "singleQuote": true,
   "trailingComma": "es5",

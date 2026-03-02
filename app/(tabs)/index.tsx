@@ -11,7 +11,8 @@ import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
 export default function TabOneScreen() {
   const navigation = useNavigation()
   const openDrawer = useDrawerOpener()
-  const { developerModeEnabled, requestNewGame, handleLaunchDemoGame, viewProps } = useKlondikeGame()
+  const { developerModeEnabled, requestNewGame, handleLaunchDemoGame, viewProps } =
+    useKlondikeGame()
 
   useLayoutEffect(() => {
     // PBI-17: Renamed from Klondike to Soli (iOS centers title by platform convention)
@@ -63,5 +64,3 @@ const HeaderMenuButton = ({ onPress }: { onPress: () => void }) => {
     </Pressable>
   )
 }
-
-

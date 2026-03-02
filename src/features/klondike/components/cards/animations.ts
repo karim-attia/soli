@@ -3,6 +3,7 @@ import { Platform, View } from 'react-native'
 import type { ViewStyle } from 'react-native'
 import Animated, {
   cancelAnimation,
+  createAnimatedComponent,
   measure,
   runOnJS,
   runOnUI,
@@ -14,7 +15,11 @@ import Animated, {
 } from 'react-native-reanimated'
 
 import type { CardFlightSnapshot } from '../../../../animation/flightController'
-import { CELEBRATION_WOBBLE_FREQUENCY, TAU, computeCelebrationFrame } from '../../../../animation/celebrationModes'
+import {
+  CELEBRATION_WOBBLE_FREQUENCY,
+  TAU,
+  computeCelebrationFrame,
+} from '../../../../animation/celebrationModes'
 import type { Card } from '../../../../solitaire/klondike'
 import { useAnimationToggles } from '../../../../state/settings'
 import {
@@ -35,7 +40,7 @@ import type {
   CelebrationBindings,
   InvalidWiggleConfig,
 } from '../../types'
-export const AnimatedView = Animated.createAnimatedComponent(View)
+export const AnimatedView = createAnimatedComponent(View)
 
 export type UseCardAnimationsParams = {
   card: Card
@@ -57,7 +62,7 @@ export const useCardAnimations = ({
   metrics,
   offsetTop,
   offsetLeft,
-  isSelected,
+  isSelected: _isSelected,
   invalidWiggle,
   cardFlights,
   cardFlightMemory,
@@ -92,7 +97,7 @@ export const useCardAnimations = ({
             left: typeof offsetLeft === 'number' ? offsetLeft : 0,
           }
         : undefined,
-    [offsetLeft, offsetTop, shouldFloat],
+    [offsetLeft, offsetTop, shouldFloat]
   )
 
   const motionStyle = useAnimatedStyle<ViewStyle>(() => {
@@ -130,15 +135,24 @@ export const useCardAnimations = ({
           } = frame
 
           const seed = assignment.randomSeed
-          const wobblePhase = rawProgress * TAU * CELEBRATION_WOBBLE_FREQUENCY + seed * TAU
+          const wobblePhase =
+            rawProgress * TAU * CELEBRATION_WOBBLE_FREQUENCY + seed * TAU
           const wobbleEnvelope = 0.15 + 0.85 * Math.pow(Math.sin(wobblePhase), 2)
           const wobbleX =
-            Math.sin(wobblePhase * 1.25 + relativeIndex * 0.4) * metrics.width * 0.1 * wobbleEnvelope
+            Math.sin(wobblePhase * 1.25 + relativeIndex * 0.4) *
+            metrics.width *
+            0.1 *
+            wobbleEnvelope
           const wobbleY =
-            Math.cos(wobblePhase * 0.95 + stackFactor * 4) * metrics.height * 0.11 * wobbleEnvelope
+            Math.cos(wobblePhase * 0.95 + stackFactor * 4) *
+            metrics.height *
+            0.11 *
+            wobbleEnvelope
 
-          const finalX = assignment.baseX * (1 - launchEased) + pathX * launchEased + wobbleX
-          const finalY = assignment.baseY * (1 - launchEased) + pathY * launchEased + wobbleY
+          const finalX =
+            assignment.baseX * (1 - launchEased) + pathX * launchEased + wobbleX
+          const finalY =
+            assignment.baseY * (1 - launchEased) + pathY * launchEased + wobbleY
           const finalScale = 1 + (targetScale - 1) * launchEased
           const finalRotation = rotation * launchEased
           const clampedOpacity = targetOpacity < 0 ? 0 : targetOpacity
@@ -154,10 +168,12 @@ export const useCardAnimations = ({
       }
     }
 
-    const transforms: Array<{ translateX: number } | { translateY: number } | { rotate: string } | { scale: number }> = [
-      { translateX },
-      { translateY },
-    ]
+    const transforms: Array<
+      | { translateX: number }
+      | { translateY: number }
+      | { rotate: string }
+      | { scale: number }
+    > = [{ translateX }, { translateY }]
 
     if (scale !== 1) {
       transforms.push({ scale })
@@ -202,7 +218,7 @@ export const useCardAnimations = ({
     wiggle.value = withSequence(
       withTiming(-WIGGLE_OFFSET_PX, WIGGLE_TIMING_CONFIG),
       withTiming(WIGGLE_OFFSET_PX, WIGGLE_TIMING_CONFIG),
-      withTiming(0, WIGGLE_TIMING_CONFIG),
+      withTiming(0, WIGGLE_TIMING_CONFIG)
     )
   }, [card.id, invalidMoveEnabled, invalidWiggle.key, invalidWiggle.lookup, wiggle])
 
@@ -238,7 +254,9 @@ export const useCardAnimations = ({
 
       type MeasuredLayout = NonNullable<ReturnType<typeof measure>>
 
-      const isValidLayout = (layout: ReturnType<typeof measure>): layout is MeasuredLayout => {
+      const isValidLayout = (
+        layout: ReturnType<typeof measure>
+      ): layout is MeasuredLayout => {
         return (
           !!layout &&
           isFiniteNumber(layout.pageX) &&
@@ -250,7 +268,9 @@ export const useCardAnimations = ({
         )
       }
 
-      const isValidSnapshot = (snapshot: CardFlightSnapshot | null | undefined): snapshot is CardFlightSnapshot => {
+      const isValidSnapshot = (
+        snapshot: CardFlightSnapshot | null | undefined
+      ): snapshot is CardFlightSnapshot => {
         return (
           !!snapshot &&
           isFiniteNumber(snapshot.pageX) &&
@@ -301,7 +321,9 @@ export const useCardAnimations = ({
           return
         }
 
-        const existingSnapshot = cardFlights.value[cardId] as CardFlightSnapshot | undefined
+        const existingSnapshot = cardFlights.value[cardId] as
+          | CardFlightSnapshot
+          | undefined
         const previousCandidate = prevSnapshot ?? existingSnapshot
         const previous = isValidSnapshot(previousCandidate) ? previousCandidate : null
         if (previous) {
@@ -353,7 +375,7 @@ export const useCardAnimations = ({
 
   const containerStyle = useMemo(
     () => ({ width: metrics.width, height: metrics.height }),
-    [metrics.height, metrics.width],
+    [metrics.height, metrics.width]
   )
 
   return {
@@ -457,7 +479,7 @@ export const useFoundationGlowAnimation = ({
     glowOpacity.value = 0
     glowOpacity.value = withSequence(
       withTiming(maxGlowOpacity, FOUNDATION_GLOW_IN_TIMING),
-      withTiming(0, FOUNDATION_GLOW_OUT_TIMING),
+      withTiming(0, FOUNDATION_GLOW_OUT_TIMING)
     )
   }, [
     cards,

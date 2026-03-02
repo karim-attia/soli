@@ -2,7 +2,7 @@ import { requireNativeModule } from 'expo-modules-core'
 
 /**
  * Native module interface for expo-refresh-rate.
- * 
+ *
  * PBI-27: Android High Refresh Rate Control
  */
 interface ExpoRefreshRateModuleType {
@@ -31,5 +31,3 @@ const ExpoRefreshRateModule: ExpoRefreshRateModuleType = module ?? {
 }
 
 export default ExpoRefreshRateModule
-
-

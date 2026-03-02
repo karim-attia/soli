@@ -27,7 +27,7 @@ export const useAutoQueueRunner = ({
     }
 
     const delay = nextAction.type === 'move' ? moveDelayMs : intervalMs
-    const selection = nextAction.type === 'move' ? nextAction.selection ?? null : null
+    const selection = nextAction.type === 'move' ? (nextAction.selection ?? null) : null
 
     const timeoutId = setTimeout(() => {
       dispatchWithFlight({ type: 'ADVANCE_AUTO_QUEUE' }, selection)
@@ -36,5 +36,11 @@ export const useAutoQueueRunner = ({
     return () => {
       clearTimeout(timeoutId)
     }
-  }, [dispatchWithFlight, intervalMs, moveDelayMs, state.autoQueue, state.isAutoCompleting])
+  }, [
+    dispatchWithFlight,
+    intervalMs,
+    moveDelayMs,
+    state.autoQueue,
+    state.isAutoCompleting,
+  ])
 }

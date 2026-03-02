@@ -19,7 +19,10 @@ describe('klondike undo history behaviour', () => {
     expect(undone.future.length).toBeGreaterThan(0)
 
     const scrubIndex = undone.history.length + 1
-    const scrubbed = klondikeReducer(undone, { type: 'SCRUB_TO_INDEX', index: scrubIndex })
+    const scrubbed = klondikeReducer(undone, {
+      type: 'SCRUB_TO_INDEX',
+      index: scrubIndex,
+    })
 
     expect(scrubbed.moveCount).toBe(undone.moveCount)
   })
@@ -46,4 +49,3 @@ describe('klondike undo history behaviour', () => {
     expect(scrubbed.moveCount).toBe(beforeScrubMoveCount)
   })
 })
-

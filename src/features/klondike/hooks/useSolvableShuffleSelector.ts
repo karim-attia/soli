@@ -63,7 +63,3 @@ export const useSolvableShuffleSelector = (historyEntries: HistoryEntry[]) => {
     return candidates[randomIndex]
   }, [historyEntries])
 }
-
-
-
-

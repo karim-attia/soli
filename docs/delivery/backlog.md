@@ -151,3 +151,7 @@
 | 2026-03-02 22:58:00 | 31 | submit_for_review | Initial migration implementation completed with remaining blocker on package install due offline registry. | ai_agent |
 | 2026-03-02 23:02:00 | 31 | significant_update | Reopened for approved networked dependency install and final validation run. | ai_agent |
 | 2026-03-02 23:07:00 | 31 | submit_for_review | Installed dependencies, finalized validation, and resubmitted (format/lint-strict issues are pre-existing cleanup scope). | ai_agent |
+| 2026-03-02 23:17:00 | 31 | significant_update | Reopened task-level work to execute requested must/should/could follow-up actions (format apply, lint autofix pass, strict-lint assessment). | ai_agent |
+| 2026-03-02 23:28:00 | 31 | submit_for_review | MoSCoW follow-up completed: format now passes, typechecks pass, baseline lint passes, and strict-lint debt moved into new task 31-2. | ai_agent |
+| 2026-03-02 23:37:00 | 31 | significant_update | Reopened PBI 31 to execute approved Task 31-2 strict-lint cleanup and indentation preference updates. | ai_agent |
+| 2026-03-02 23:58:00 | 31 | submit_for_review | Completed Task 31-2 strict lint cleanup; lint/lint:strict/typecheck/format checks all pass and work is ready for review. | ai_agent |

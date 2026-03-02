@@ -30,9 +30,21 @@ const themeOptions: Array<{ mode: ThemeMode; label: string }> = [
 ]
 
 // PBI-27: Refresh rate mode options
-const refreshRateOptions: Array<{ mode: RefreshRateMode; label: string; description: string }> = [
-  { mode: 'high', label: 'High', description: 'Use maximum refresh rate for smoothest animations' },
-  { mode: 'auto', label: 'Auto', description: 'Let Android decide based on content and battery' },
+const refreshRateOptions: Array<{
+  mode: RefreshRateMode
+  label: string
+  description: string
+}> = [
+  {
+    mode: 'high',
+    label: 'High',
+    description: 'Use maximum refresh rate for smoothest animations',
+  },
+  {
+    mode: 'auto',
+    label: 'Auto',
+    description: 'Let Android decide based on content and battery',
+  },
 ]
 
 export default function SettingsScreen() {
@@ -162,7 +174,8 @@ export default function SettingsScreen() {
             Advanced
           </Text>
           <Paragraph color="$color10">
-            Developer tooling for internal builds. Toggle to reveal experimental utilities in the app.
+            Developer tooling for internal builds. Toggle to reveal experimental utilities
+            in the app.
           </Paragraph>
           <ToggleRow
             label="Developer mode"
@@ -173,40 +186,48 @@ export default function SettingsScreen() {
           />
 
           {/* PBI-27: Refresh rate control - Android only, devices with >60Hz support */}
-          {Platform.OS === 'android' && isHighRefreshRateSupported && maxRefreshRate !== null && maxRefreshRate > 60 && (
-            <>
-              <Separator my="$2" />
-              <YStack gap="$2">
-                <Text fontWeight="600">Display refresh rate</Text>
-                <Paragraph color="$color10">
-                  Higher refresh rates provide smoother animations but use more battery.
-                  {maxRefreshRate ? ` Your display supports up to ${Math.round(maxRefreshRate)}Hz.` : ''}
-                </Paragraph>
-                <XStack gap="$2" flexWrap="wrap" mt="$1">
-                  {refreshRateOptions.map((option) => {
-                    const isSelected = state.refreshRateMode === option.mode
-                    return (
-                      <Button
-                        key={option.mode}
-                        size="$2"
-                        variant="outlined"
-                        bg={isSelected ? '$color4' : undefined}
-                        onPress={() => setRefreshRateMode(option.mode)}
-                        disabled={!hydrated}
-                      >
-                        {option.mode === 'high' && maxRefreshRate
-                          ? `High (${Math.round(maxRefreshRate)}Hz)`
-                          : option.label}
-                      </Button>
-                    )
-                  })}
-                </XStack>
-                <Paragraph color="$color9" fontSize={12}>
-                  {refreshRateOptions.find((o) => o.mode === state.refreshRateMode)?.description}
-                </Paragraph>
-              </YStack>
-            </>
-          )}
+          {Platform.OS === 'android' &&
+            isHighRefreshRateSupported &&
+            maxRefreshRate !== null &&
+            maxRefreshRate > 60 && (
+              <>
+                <Separator my="$2" />
+                <YStack gap="$2">
+                  <Text fontWeight="600">Display refresh rate</Text>
+                  <Paragraph color="$color10">
+                    Higher refresh rates provide smoother animations but use more battery.
+                    {maxRefreshRate
+                      ? ` Your display supports up to ${Math.round(maxRefreshRate)}Hz.`
+                      : ''}
+                  </Paragraph>
+                  <XStack gap="$2" flexWrap="wrap" mt="$1">
+                    {refreshRateOptions.map((option) => {
+                      const isSelected = state.refreshRateMode === option.mode
+                      return (
+                        <Button
+                          key={option.mode}
+                          size="$2"
+                          variant="outlined"
+                          bg={isSelected ? '$color4' : undefined}
+                          onPress={() => setRefreshRateMode(option.mode)}
+                          disabled={!hydrated}
+                        >
+                          {option.mode === 'high' && maxRefreshRate
+                            ? `High (${Math.round(maxRefreshRate)}Hz)`
+                            : option.label}
+                        </Button>
+                      )
+                    })}
+                  </XStack>
+                  <Paragraph color="$color9" fontSize={12}>
+                    {
+                      refreshRateOptions.find((o) => o.mode === state.refreshRateMode)
+                        ?.description
+                    }
+                  </Paragraph>
+                </YStack>
+              </>
+            )}
         </YStack>
 
         <YStack gap="$3">
@@ -250,17 +271,27 @@ type ToggleRowProps = {
 }
 
 // PBI-17-13: Apply Material Design styling to native Android switches
-const ToggleRow = ({ label, description, value, onValueChange, disabled, inactive }: ToggleRowProps) => {
+const ToggleRow = ({
+  label,
+  description,
+  value,
+  onValueChange,
+  disabled,
+  inactive,
+}: ToggleRowProps) => {
   const theme = useTheme()
 
   // PBI-17-13: Theme-aware colors for Android native switch
-  const androidNativeProps = Platform.OS === 'android' ? {
-    thumbColor: value ? theme.color.val : theme.color6.val,
-    trackColor: {
-      false: theme.color4.val,
-      true: theme.color10.val,
-    },
-  } : undefined
+  const androidNativeProps =
+    Platform.OS === 'android'
+      ? {
+          thumbColor: value ? theme.color.val : theme.color6.val,
+          trackColor: {
+            false: theme.color4.val,
+            true: theme.color10.val,
+          },
+        }
+      : undefined
 
   return (
     <XStack gap="$3" style={{ alignItems: 'center', justifyContent: 'space-between' }}>

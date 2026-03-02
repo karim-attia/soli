@@ -4,11 +4,7 @@ import { Text, Stack } from 'tamagui'
 
 import type { Card } from '../../../../solitaire/klondike'
 import type { CardFlightSnapshot } from '../../../../animation/flightController'
-import type {
-  CardFlightRegistry,
-  CardMetrics,
-  InvalidWiggleConfig,
-} from '../../types'
+import type { CardFlightRegistry, CardMetrics, InvalidWiggleConfig } from '../../types'
 import { EMPTY_INVALID_WIGGLE } from '../../types'
 import { CardView } from './CardView'
 import { styles } from './styles'
@@ -69,7 +65,11 @@ export const StockStack = ({
           <View
             key={card.id}
             pointerEvents="none"
-            style={[styles.stockCardWrapper, { zIndex: index + 1 }, !isTopCard && styles.hiddenCard]}
+            style={[
+              styles.stockCardWrapper,
+              { zIndex: index + 1 },
+              !isTopCard && styles.hiddenCard,
+            ]}
           >
             <CardView
               card={card}

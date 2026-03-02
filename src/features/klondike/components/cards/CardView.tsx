@@ -89,7 +89,11 @@ export const CardVisual = ({ card, metrics, onPress, disabled }: CardVisualProps
     <>
       {/* Small rank label | top left */}
       <Text
-        style={[styles.cardCornerRank, cornerRankStyle, { color: SUIT_COLORS[card.suit] }]}
+        style={[
+          styles.cardCornerRank,
+          cornerRankStyle,
+          { color: SUIT_COLORS[card.suit] },
+        ]}
         ellipsizeMode="clip"
         numberOfLines={1}
         allowFontScaling={false}
@@ -98,7 +102,11 @@ export const CardVisual = ({ card, metrics, onPress, disabled }: CardVisualProps
       </Text>
       {/* Small suit symbol | top right */}
       <Text
-        style={[styles.cardCornerSuit, cornerSuitStyle, { color: SUIT_COLORS[card.suit] }]}
+        style={[
+          styles.cardCornerSuit,
+          cornerSuitStyle,
+          { color: SUIT_COLORS[card.suit] },
+        ]}
         ellipsizeMode="clip"
         numberOfLines={1}
         allowFontScaling={false}
@@ -180,7 +188,9 @@ export const CardView = ({
     celebrationBindings,
   })
 
-  const frontContent = <CardVisual card={card} metrics={metrics} onPress={onPress} disabled={!onPress} />
+  const frontContent = (
+    <CardVisual card={card} metrics={metrics} onPress={onPress} disabled={!onPress} />
+  )
 
   const backContent = (
     <View
@@ -219,7 +229,10 @@ export const CardBack = ({ label, metrics, variant }: CardBackProps) => {
   const containerStyle: StyleProp<ViewStyle> = [
     variant === 'stock'
       ? styles.cardBack
-      : [styles.cardBackOutline, variant === 'recycle' ? styles.cardBackRecycle : styles.cardBackEmpty],
+      : [
+          styles.cardBackOutline,
+          variant === 'recycle' ? styles.cardBackRecycle : styles.cardBackEmpty,
+        ],
     {
       width: metrics.width,
       height: metrics.height,

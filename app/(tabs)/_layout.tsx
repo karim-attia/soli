@@ -49,7 +49,9 @@ export default function DrawerLayout() {
         options={{
           title: 'Solver Lab',
           drawerLabel: 'Solver Lab',
-          drawerIcon: ({ color, size }) => <AudioWaveform color={color as any} size={size} />,
+          drawerIcon: ({ color, size }) => (
+            <AudioWaveform color={color as any} size={size} />
+          ),
           drawerItemStyle: developerModeEnabled ? undefined : { display: 'none' },
         }}
       />

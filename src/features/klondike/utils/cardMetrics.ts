@@ -28,16 +28,19 @@ export const computeCardMetrics = (availableWidth: number | null): CardMetrics =
   const totalGap = BOARD_COLUMN_GAP * (TABLEAU_COLUMN_COUNT + 1)
   const widthAvailable = Math.max(
     availableWidth - totalGap,
-    MIN_CARD_WIDTH * TABLEAU_COLUMN_COUNT,
+    MIN_CARD_WIDTH * TABLEAU_COLUMN_COUNT
   )
   const rawWidth = widthAvailable / TABLEAU_COLUMN_COUNT
   const unclampedWidth = Math.max(rawWidth, MIN_CARD_WIDTH)
-  const constrainedWidth = Math.min(Math.max(unclampedWidth, MIN_CARD_WIDTH), MAX_CARD_WIDTH)
+  const constrainedWidth = Math.min(
+    Math.max(unclampedWidth, MIN_CARD_WIDTH),
+    MAX_CARD_WIDTH
+  )
   const height = Math.round(constrainedWidth * CARD_ASPECT_RATIO)
   const stackOffsetRatio = CARD_REFERENCE_STACK_OFFSET / CARD_REFERENCE_WIDTH
   const stackOffset = Math.max(
     CARD_REFERENCE_STACK_OFFSET,
-    Math.round(constrainedWidth * stackOffsetRatio),
+    Math.round(constrainedWidth * stackOffsetRatio)
   )
   const radius = Math.max(6, Math.round(constrainedWidth * 0.12))
 
@@ -48,5 +51,3 @@ export const computeCardMetrics = (availableWidth: number | null): CardMetrics =
     radius,
   }
 }
-
-

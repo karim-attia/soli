@@ -13,7 +13,14 @@ export type PileButtonProps = PropsWithChildren<{
   width?: number
 }>
 
-export const PileButton = ({ label, onPress, disabled, disablePress, width, children }: PileButtonProps) => {
+export const PileButton = ({
+  label,
+  onPress,
+  disabled,
+  disablePress,
+  width,
+  children,
+}: PileButtonProps) => {
   // Task 1-8: Fix pile alignment (labels must not change pile width / column alignment).
   const baseStyle = [
     styles.pilePressable,

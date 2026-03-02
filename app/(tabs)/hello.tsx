@@ -1,7 +1,7 @@
 import { useLayoutEffect } from 'react'
 import { Pressable } from 'react-native'
 import { useNavigation } from 'expo-router'
-import { Anchor, Button, Paragraph, View, XStack, YStack, YGroup, ListItem, Separator, useTheme } from 'tamagui'
+import { Anchor, Paragraph, View, XStack, YStack, useTheme } from 'tamagui'
 import { Menu } from '@tamagui/lucide-icons'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
 
@@ -26,14 +26,25 @@ export default function HelloScreen() {
   }, [navigation, openDrawer, theme])
 
   return (
-    <View flex={1} px="$4" py="$4" style={{ alignItems: 'center', justifyContent: 'center' }}>
+    <View
+      flex={1}
+      px="$4"
+      py="$4"
+      style={{ alignItems: 'center', justifyContent: 'center' }}
+    >
       <YStack gap="$5" width="100%" style={{ maxWidth: 560, alignItems: 'center' }}>
-        <XStack gap="$2" style={{ flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+        <XStack
+          gap="$2"
+          style={{ flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}
+        >
           <Paragraph style={{ textAlign: 'center' }}>Made by</Paragraph>
           <Anchor color="$blue10" href="https://x.com/carimatia" target="_blank">
             @carimatia
           </Anchor>
-          <Paragraph style={{ textAlign: 'center' }}>For my girlfriend T because she always had to look at ads when playing Solitaire.</Paragraph>
+          <Paragraph style={{ textAlign: 'center' }}>
+            For my girlfriend T because she always had to look at ads when playing
+            Solitaire.
+          </Paragraph>
         </XStack>
 
         <YStack gap="$2" style={{ maxWidth: 560 }}>
@@ -53,9 +64,7 @@ export default function HelloScreen() {
             No ads, in-app purchases, or gamification to get you to play more.
           </Paragraph>
         </YStack>
-
       </YStack>
     </View>
   )
 }
-

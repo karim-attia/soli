@@ -57,7 +57,9 @@ export const TableauSection = ({
         state={state}
         cardMetrics={cardMetrics}
         isDroppable={dropHints.tableau[columnIndex]}
-        onCardPress={(cardIndex) => onAutoMove({ source: 'tableau', columnIndex, cardIndex })}
+        onCardPress={(cardIndex) =>
+          onAutoMove({ source: 'tableau', columnIndex, cardIndex })
+        }
         invalidWiggle={invalidWiggle}
         cardFlights={cardFlights}
         onCardMeasured={onCardMeasured}
@@ -99,14 +101,18 @@ export const TableauColumn = ({
   scrubbingActive,
 }: TableauColumnProps) => {
   // Task 1-9: Keep face-up spacing (tap targets), but halve the visible spacing for face-down stacks.
-  const faceDownStackOffset = Math.round(cardMetrics.stackOffset / FACE_DOWN_STACK_OFFSET_DIVISOR)
+  const faceDownStackOffset = Math.round(
+    cardMetrics.stackOffset / FACE_DOWN_STACK_OFFSET_DIVISOR
+  )
   let runningOffset = 0
   const cardOffsets = column.map((card) => {
     const offset = runningOffset
     runningOffset += card.faceUp ? cardMetrics.stackOffset : faceDownStackOffset
     return offset
   })
-  const columnHeight = column.length ? cardOffsets[cardOffsets.length - 1] + cardMetrics.height : cardMetrics.height
+  const columnHeight = column.length
+    ? cardOffsets[cardOffsets.length - 1] + cardMetrics.height
+    : cardMetrics.height
   const tableauSelection =
     state.selected?.source === 'tableau' && state.selected.columnIndex === columnIndex
       ? state.selected

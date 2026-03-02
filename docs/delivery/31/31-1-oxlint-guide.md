@@ -18,6 +18,8 @@
 - Keep an incremental rule posture for migration: baseline lint as warnings, then add a strict command for CI/hard enforcement.
 - Add `ignorePatterns` for generated/build output to avoid noisy lint results.
 - When defining `plugins`, declare the complete set explicitly since plugin lists are treated as authoritative in config.
+- For React 17+ JSX transform projects, allow legacy scope/import rules (`react-in-jsx-scope`, `jsx-uses-react`) in strict command invocations when they create false positives.
+- Prefer CLI `-A` overrides for strict mode when needed; oxlint applies CLI rule/category flags left-to-right.
 
 ## Recommended script pattern
 ```json
@@ -25,7 +27,7 @@
   "scripts": {
     "lint": "oxlint --tsconfig tsconfig.json app components modules src scripts test",
     "lint:fix": "oxlint --fix --tsconfig tsconfig.json app components modules src scripts test",
-    "lint:strict": "oxlint -D correctness -D suspicious --deny-warnings --tsconfig tsconfig.json app components modules src scripts test"
+    "lint:strict": "oxlint -D correctness -D suspicious -A react-in-jsx-scope -A jsx-uses-react -A no-unassigned-import --deny-warnings --tsconfig tsconfig.json app components modules src scripts test"
   }
 }
 ```
