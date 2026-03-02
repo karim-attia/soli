@@ -55,7 +55,6 @@
         }
       ]
     ],
-    "newArchEnabled": true,
     "experiments": {
       "typedRoutes": true
     },

@@ -6,6 +6,7 @@
  */
 
 const { spawn } = require('child_process')
+const path = require('path')
 
 const DEMO_URI = 'soli:///?demo=1&auto=1&solve=1'
 const BASE_APP_URI = 'soli:///'
@@ -41,6 +42,19 @@ const MODES = {
 const DEFAULT_MODE = MODES.DEMO
 const INSTALL_SUCCESS_MESSAGE = 'Build & install completed successfully.'
 const PROD_MODE_READY_MESSAGE = 'Production mode active. Streaming filtered logs (press Ctrl+C to exit).'
+const ADB_HEADER_PREFIX = 'List of devices'
+const ADB_STATUS_DEVICE = 'device'
+const REPOSITORY_ROOT = path.resolve(__dirname, '..')
+const ANDROID_PROJECT_PATH = path.join(REPOSITORY_ROOT, 'android')
+const RELEASE_APK_PATH = path.join(
+  ANDROID_PROJECT_PATH,
+  'app',
+  'build',
+  'outputs',
+  'apk',
+  'release',
+  'app-release.apk',
+)
 
 const log = (message) => {
   console.log(`\x1b[36m[demo]\x1b[0m ${message}`)
@@ -114,9 +128,8 @@ const ensureValidMode = (mode) => {
 const isDemoMode = (mode) => mode === MODES.DEMO
 
 const getUriForMode = (mode) => (isDemoMode(mode) ? DEMO_URI : BASE_APP_URI)
-
-const createLauncherForMode = (mode) => () =>
-  runCommand('npx', ['uri-scheme', 'open', getUriForMode(mode), '--android'])
+const createLauncherForMode = ({ mode }) =>
+  () => runCommand('npx', ['uri-scheme', 'open', getUriForMode(mode), '--android'])
 
 const formatClockDuration = (ms, options = {}) => {
   const { roundUp = false } = options
@@ -277,19 +290,37 @@ const runCommandWithProgress = async (command, args, options, progressOptions = 
   }
 }
 
+const parseConnectedDeviceLines = (stdout) =>
+  stdout
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => line && !line.startsWith(ADB_HEADER_PREFIX))
+    .map((line) => {
+      const [serial, status] = line.split('\t')
+      return {
+        serial: serial?.trim() ?? '',
+        status: status?.trim() ?? '',
+      }
+    })
+    .filter(({ serial, status }) => serial.length > 0 && status === ADB_STATUS_DEVICE)
+
 const ensureDevice = async () => {
   const { stdout } = await runCommand('adb', ['devices'], { capture: true })
-  const lines = stdout.split('\n').map((line) => line.trim())
-  const deviceLines = lines.filter((line) => line && !line.startsWith('List of devices') && !line.endsWith('offline'))
-  if (!deviceLines.length) {
+  const connectedDevices = parseConnectedDeviceLines(stdout)
+  if (!connectedDevices.length) {
     throw new Error(
       'No Android device detected. Connect a device or start an emulator, then enable USB debugging (adb devices).',
     )
   }
-  log(`Detected device(s): ${deviceLines.join(', ')}`)
+  const connectedDeviceDescriptions = connectedDevices
+    .map(({ serial, status }) => `${serial}\t${status}`)
+    .join(', ')
+  log(`Detected device(s): ${connectedDeviceDescriptions}`)
+  return connectedDevices[0].serial
 }
 
-const startLogcatListener = () => spawn('adb', ['logcat'], { stdio: ['ignore', 'pipe', 'pipe'] })
+const startLogcatListener = (deviceSerial) =>
+  spawn('adb', ['-s', deviceSerial, 'logcat'], { stdio: ['ignore', 'pipe', 'pipe'] })
 
 const createLogMonitor = ({ mode, logcat, launchApp }) => {
   let cleanedUp = false
@@ -477,23 +508,27 @@ const main = async () => {
     ensureValidMode(mode)
     log(`Running run-demo-autosolve in ${mode} mode.`)
 
-    await ensureDevice()
-    await runCommand('adb', ['shell', 'am', 'force-stop', PACKAGE_NAME])
+    const deviceSerial = await ensureDevice()
+    await runCommand('adb', ['-s', deviceSerial, 'shell', 'am', 'force-stop', PACKAGE_NAME])
 
-    log('Building and installing release APK (expo run:android --variant release)...')
+    log('Building release APK via Gradle...')
     await runCommandWithProgress(
-      'npx',
-      ['expo', 'run:android', '--variant', 'release'],
-      { silent: true },
-      { label: 'Build & install release APK' },
+      './gradlew',
+      ['app:assembleRelease', '--no-daemon', '--console=plain'],
+      {
+        silent: true,
+        spawnOptions: { cwd: ANDROID_PROJECT_PATH },
+      },
+      { label: 'Build release APK' },
     )
+    await runCommand('adb', ['-s', deviceSerial, 'install', '-r', RELEASE_APK_PATH])
 
     log(INSTALL_SUCCESS_MESSAGE)
 
-    await runCommand('adb', ['logcat', '-c'])
+    await runCommand('adb', ['-s', deviceSerial, 'logcat', '-c'])
 
-    const logcat = startLogcatListener()
-    const launchApp = createLauncherForMode(mode)
+    const logcat = startLogcatListener(deviceSerial)
+    const launchApp = createLauncherForMode({ mode })
     monitor = createLogMonitor({ mode, logcat, launchApp })
 
     handleSigint = () => {
@@ -535,5 +570,3 @@ const main = async () => {
 }
 
 main()
-
-

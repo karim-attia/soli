@@ -64,10 +64,12 @@ export const WIGGLE_TIMING_CONFIG = {
 } as const
 
 export const FOUNDATION_GLOW_MAX_OPACITY = 0.55
+export const FOUNDATION_GLOW_ANDROID_MAX_OPACITY = 0.75
 export const FOUNDATION_GLOW_IN_DURATION_MS = 90
 export const FOUNDATION_GLOW_OUT_DURATION_MS = 220
 export const FOUNDATION_GLOW_COLOR = 'rgba(255, 255, 160, 0.65)'
 export const FOUNDATION_GLOW_OUTSET = 10
+export const FOUNDATION_GLOW_ANDROID_FILL_COLOR = 'rgba(255, 255, 160, 0.08)'
 export const FOUNDATION_GLOW_IN_TIMING = {
   duration: FOUNDATION_GLOW_IN_DURATION_MS,
   easing: Easing.bezier(0.3, 0, 0.5, 1),

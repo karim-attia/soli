@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { View } from 'react-native'
+import { Platform, View } from 'react-native'
 import type { ViewStyle } from 'react-native'
 import Animated, {
   cancelAnimation,
@@ -20,6 +20,7 @@ import { useAnimationToggles } from '../../../../state/settings'
 import {
   CARD_FLIGHT_TIMING,
   CARD_FLIP_HALF_TIMING,
+  FOUNDATION_GLOW_ANDROID_MAX_OPACITY,
   FOUNDATION_GLOW_IN_TIMING,
   FOUNDATION_GLOW_MAX_OPACITY,
   FOUNDATION_GLOW_OUT_TIMING,
@@ -235,7 +236,9 @@ export const useCardAnimations = ({
       const isFiniteNumber = (value: unknown): value is number =>
         typeof value === 'number' && isFinite(value)
 
-      const isValidLayout = (layout: any): boolean => {
+      type MeasuredLayout = NonNullable<ReturnType<typeof measure>>
+
+      const isValidLayout = (layout: ReturnType<typeof measure>): layout is MeasuredLayout => {
         return (
           !!layout &&
           isFiniteNumber(layout.pageX) &&
@@ -405,6 +408,11 @@ export const useFoundationGlowAnimation = ({
     opacity: glowOpacity.value,
   }))
 
+  const maxGlowOpacity =
+    Platform.OS === 'android'
+      ? FOUNDATION_GLOW_ANDROID_MAX_OPACITY
+      : FOUNDATION_GLOW_MAX_OPACITY
+
   const lastGlowCardRef = useRef<string | null>(null)
   const previousCountRef = useRef(cards.length)
   const glowWidth = cardMetrics.width + FOUNDATION_GLOW_OUTSET * 2
@@ -448,10 +456,17 @@ export const useFoundationGlowAnimation = ({
     cancelAnimation(glowOpacity)
     glowOpacity.value = 0
     glowOpacity.value = withSequence(
-      withTiming(FOUNDATION_GLOW_MAX_OPACITY, FOUNDATION_GLOW_IN_TIMING),
+      withTiming(maxGlowOpacity, FOUNDATION_GLOW_IN_TIMING),
       withTiming(0, FOUNDATION_GLOW_OUT_TIMING),
     )
-  }, [cards, celebrationActive, foundationGlowEnabled, glowOpacity, onCardArrived])
+  }, [
+    cards,
+    celebrationActive,
+    foundationGlowEnabled,
+    glowOpacity,
+    maxGlowOpacity,
+    onCardArrived,
+  ])
 
   return {
     glowStyle,

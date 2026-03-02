@@ -175,27 +175,31 @@ export default function SettingsScreen() {
           {/* PBI-27: Refresh rate control - Android only, devices with >60Hz support */}
           {Platform.OS === 'android' && isHighRefreshRateSupported && maxRefreshRate !== null && maxRefreshRate > 60 && (
             <>
-              <Separator marginVertical="$2" />
+              <Separator my="$2" />
               <YStack gap="$2">
                 <Text fontWeight="600">Display refresh rate</Text>
                 <Paragraph color="$color10">
                   Higher refresh rates provide smoother animations but use more battery.
                   {maxRefreshRate ? ` Your display supports up to ${Math.round(maxRefreshRate)}Hz.` : ''}
                 </Paragraph>
-                <XStack gap="$2" flexWrap="wrap" marginTop="$1">
-                  {refreshRateOptions.map((option) => (
-                    <Button
-                      key={option.mode}
-                      size="$2"
-                      variant={state.refreshRateMode === option.mode ? undefined : 'outlined'}
-                      onPress={() => setRefreshRateMode(option.mode)}
-                      disabled={!hydrated}
-                    >
-                      {option.mode === 'high' && maxRefreshRate
-                        ? `High (${Math.round(maxRefreshRate)}Hz)`
-                        : option.label}
-                    </Button>
-                  ))}
+                <XStack gap="$2" flexWrap="wrap" mt="$1">
+                  {refreshRateOptions.map((option) => {
+                    const isSelected = state.refreshRateMode === option.mode
+                    return (
+                      <Button
+                        key={option.mode}
+                        size="$2"
+                        variant="outlined"
+                        bg={isSelected ? '$color4' : undefined}
+                        onPress={() => setRefreshRateMode(option.mode)}
+                        disabled={!hydrated}
+                      >
+                        {option.mode === 'high' && maxRefreshRate
+                          ? `High (${Math.round(maxRefreshRate)}Hz)`
+                          : option.label}
+                      </Button>
+                    )
+                  })}
                 </XStack>
                 <Paragraph color="$color9" fontSize={12}>
                   {refreshRateOptions.find((o) => o.mode === state.refreshRateMode)?.description}
@@ -214,17 +218,21 @@ export default function SettingsScreen() {
           </Paragraph>
 
           <XStack gap="$2" flexWrap="wrap">
-            {themeOptions.map((option) => (
-              <Button
-                key={option.mode}
-                size="$2"
-                variant={state.themeMode === option.mode ? undefined : 'outlined'}
-                onPress={() => setThemeMode(option.mode)}
-                disabled={!hydrated}
-              >
-                {option.label}
-              </Button>
-            ))}
+            {themeOptions.map((option) => {
+              const isSelected = state.themeMode === option.mode
+              return (
+                <Button
+                  key={option.mode}
+                  size="$2"
+                  variant="outlined"
+                  bg={isSelected ? '$color4' : undefined}
+                  onPress={() => setThemeMode(option.mode)}
+                  disabled={!hydrated}
+                >
+                  {option.label}
+                </Button>
+              )
+            })}
           </XStack>
         </YStack>
       </YStack>
@@ -278,4 +286,3 @@ const ToggleRow = ({ label, description, value, onValueChange, disabled, inactiv
     </XStack>
   )
 }
-

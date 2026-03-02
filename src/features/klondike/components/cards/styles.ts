@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 
 import {
   COLOR_CARD_BACK,
@@ -11,8 +11,8 @@ import {
   COLOR_FELT_TEXT_SECONDARY,
   COLOR_SELECTED_BORDER,
   COLOR_TEXT_MUTED,
+  FOUNDATION_GLOW_ANDROID_FILL_COLOR,
   FOUNDATION_GLOW_COLOR,
-  FOUNDATION_GLOW_OUTSET,
 } from '../../constants'
 
 export const styles = StyleSheet.create({
@@ -150,6 +150,7 @@ export const styles = StyleSheet.create({
     shadowColor: FOUNDATION_GLOW_COLOR,
     shadowOpacity: 0.6,
     shadowRadius: 12,
+    backgroundColor: Platform.OS === 'android' ? FOUNDATION_GLOW_ANDROID_FILL_COLOR : 'transparent',
   },
   foundationCard: {
     position: 'absolute',

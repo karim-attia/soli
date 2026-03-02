@@ -116,18 +116,18 @@ const IconBadge = ({ palette, size = 140 }: { palette: Palette; size?: number })
   const iconSize = Math.round(size * 0.79)
   const iconRadius = Math.round(iconSize * 0.25)
   return (
-        <Stack
+    <Stack
       width={size}
       height={size}
-          alignItems="center"
-          justifyContent="center"
-          style={{
+      items="center"
+      justify="center"
+      style={{
         shadowColor: 'rgba(4, 17, 9, 0.35)',
-            shadowOpacity: 0.35,
+        shadowOpacity: 0.35,
         shadowRadius: 16,
-            shadowOffset: { width: 0, height: 6 },
-          }}
-        >
+        shadowOffset: { width: 0, height: 6 },
+      }}
+    >
       <Image source={ICON_SOURCE} style={{ width: iconSize, height: iconSize, borderRadius: iconRadius }} resizeMode="contain" />
     </Stack>
   )
@@ -138,23 +138,23 @@ const SafeFrameOverlay = ({ color }: { color: string }) => (
   <Stack
     pointerEvents="none"
     position="absolute"
-    left={SAFE_MARGIN_X}
-    top={SAFE_MARGIN_Y}
+    l={SAFE_MARGIN_X}
+    t={SAFE_MARGIN_Y}
     width={SAFE_WIDTH}
     height={SAFE_HEIGHT}
-    borderColor={color}
     borderWidth={2}
     borderStyle="dashed"
-    borderRadius={28}
+    rounded={28}
+    style={{ borderColor: color }}
   />
 )
 
 
 
 const BadgeHighlightsRightSide = ({ palette, copy }: { palette: Palette; copy: VariantCopy }) => (
-  <YStack gap="$4" maxWidth={360}>
+  <YStack gap="$4" maxW={360}>
     <YStack gap="$2">
-      <Text color={palette.infoTextPrimary} fontSize={52} fontWeight="800" letterSpacing={-0.5}>
+      <Text style={{ color: palette.infoTextPrimary }} fontSize={52} fontWeight="800" letterSpacing={-0.5}>
         {copy.headline}
       </Text>
       <LinearGradient
@@ -169,10 +169,10 @@ const BadgeHighlightsRightSide = ({ palette, copy }: { palette: Palette; copy: V
         }}>
       </LinearGradient>
     </YStack>
-    <Paragraph color={palette.infoTextSecondary} fontSize={22} lineHeight={28}>
+    <Paragraph style={{ color: palette.infoTextSecondary }} fontSize={22} lineHeight={28}>
       {copy.subtitle}
     </Paragraph>
-    <YStack gap="$3" paddingTop="$3">
+    <YStack gap="$3" pt="$3">
       {BENEFITS.map((benefit) => (
         <LinearGradient
           key={benefit}
@@ -185,14 +185,14 @@ const BadgeHighlightsRightSide = ({ palette, copy }: { palette: Palette; copy: V
           }}
         >
           <Stack
-            backgroundColor="#fdfdfc"
-            borderRadius={14}
-            paddingHorizontal={18}
-            paddingVertical={12}
+            rounded={14}
+            px={18}
+            py={12}
+            style={{ backgroundColor: '#fdfdfc' }}
           >
-            <XStack alignItems="center" gap="$2.5">
-              <Stack width={6} height={6} borderRadius={999} backgroundColor={purple.purple10} />
-              <Text fontSize={18} fontWeight="700" color="#0a2817">
+            <XStack items="center" gap="$2.5">
+              <Stack width={6} height={6} rounded={999} style={{ backgroundColor: purple.purple10 }} />
+              <Text fontSize={18} fontWeight="700" style={{ color: '#0a2817' }}>
                 {benefit}
               </Text>
             </XStack>
@@ -204,16 +204,26 @@ const BadgeHighlightsRightSide = ({ palette, copy }: { palette: Palette; copy: V
 )
 
 const GlassBadgesRightSide = ({ palette, copy }: { palette: Palette; copy: VariantCopy }) => (
-  <YStack gap="$5" maxWidth={360}>
+  <YStack gap="$5" maxW={360}>
     <YStack gap="$1">
-      <Text color={palette.infoTextPrimary} fontSize={64} fontWeight="900" letterSpacing={-2} style={{ textShadowColor: 'rgba(0,0,0,0.1)', textShadowRadius: 10, textShadowOffset: { width: 0, height: 4 } }}>
+      <Text
+        fontSize={64}
+        fontWeight="900"
+        letterSpacing={-2}
+        style={{
+          color: palette.infoTextPrimary,
+          textShadowColor: 'rgba(0,0,0,0.1)',
+          textShadowRadius: 10,
+          textShadowOffset: { width: 0, height: 4 },
+        }}
+      >
         {copy.headline}
       </Text>
-      <Paragraph color={palette.infoTextSecondary} fontSize={24} lineHeight={30} fontWeight="500" letterSpacing={-0.2}>
+      <Paragraph style={{ color: palette.infoTextSecondary }} fontSize={24} lineHeight={30} fontWeight="500" letterSpacing={-0.2}>
         {copy.subtitle}
       </Paragraph>
     </YStack>
-    <YStack gap="$3" paddingTop="$2">
+    <YStack gap="$3" pt="$2">
       {BENEFITS.map((benefit) => (
         <Stack
           key={benefit}
@@ -230,9 +240,19 @@ const GlassBadgesRightSide = ({ palette, copy }: { palette: Palette; copy: Varia
             shadowOffset: { width: 0, height: 6 },
           }}
         >
-          <XStack alignItems="center" gap="$3">
-            <Stack width={8} height={8} borderRadius={999} backgroundColor={palette.accent} style={{ shadowColor: palette.accent, shadowOpacity: 0.6, shadowRadius: 6 }} />
-            <Text fontSize={20} fontWeight="700" color={palette.infoTextPrimary} letterSpacing={-0.3}>
+          <XStack items="center" gap="$3">
+            <Stack
+              width={8}
+              height={8}
+              rounded={999}
+              style={{
+                backgroundColor: palette.accent,
+                shadowColor: palette.accent,
+                shadowOpacity: 0.6,
+                shadowRadius: 6,
+              }}
+            />
+            <Text fontSize={20} fontWeight="700" letterSpacing={-0.3} style={{ color: palette.infoTextPrimary }}>
               {benefit}
             </Text>
           </XStack>
@@ -248,26 +268,26 @@ const FixedWidthTwoColumnLayout = ({
   leftWidth,
   rightWidth,
   gap = LAYOUT_GAP,
-  verticalPadding = "$4"
+  verticalPadding = "$4",
 }: {
   leftContent: React.ReactNode
   rightContent: React.ReactNode
   leftWidth: number
   rightWidth: number
   gap?: number
-  verticalPadding?: string
+  verticalPadding?: React.ComponentProps<typeof XStack>['py']
 }) => (
-  <YStack flex={1} justifyContent="center">
+  <YStack flex={1} justify="center">
     <XStack
       width="100%"
-      maxWidth={leftWidth + rightWidth + gap}
-      alignSelf="center"
+      maxW={leftWidth + rightWidth + gap}
+      self="center"
       gap={gap}
-      alignItems="center"
-      justifyContent="center"
-      style={{ paddingVertical: verticalPadding }}
+      items="center"
+      justify="center"
+      py={verticalPadding}
     >
-      <Stack width={leftWidth} alignItems="center">
+      <Stack width={leftWidth} items="center">
         {leftContent}
       </Stack>
       <Stack width={rightWidth}>
@@ -287,9 +307,9 @@ const renderBadgesVariant = (ctx: VariantContext) => {
   ]
 
   const leftSide = (
-    <YStack gap="$3" alignItems="center">
+    <YStack gap="$3" items="center">
       {iconBadge}
-      <XStack gap="$2" alignItems="center">
+      <XStack gap="$2" items="center">
         {SIMPLE_FAN_CARDS.map((card, index) => (
           <Stack
             key={card.id}
@@ -335,12 +355,12 @@ const renderIconVariant = (ctx: VariantContext) => {
   const leftSide = (
     <YStack
       flex={1}
-      alignItems="center"
-      justifyContent="center"
+      items="center"
+      justify="center"
       gap="$4"
-      padding="$5"
+      p="$5"
     >
-      <Stack width={diameter} height={diameter} position="relative" alignItems="center" justifyContent="center">
+      <Stack width={diameter} height={diameter} position="relative" items="center" justify="center">
         {iconBadge}
         {ICON_RING_CARDS.map((card, index) => {
           const angle = (2 * Math.PI * index) / ICON_RING_CARDS.length
@@ -350,8 +370,8 @@ const renderIconVariant = (ctx: VariantContext) => {
             <Stack
               key={card.id}
               position="absolute"
-              left={center + x - cardMetrics.width / 2}
-              top={center + y - cardMetrics.height / 2}
+              l={center + x - cardMetrics.width / 2}
+              t={center + y - cardMetrics.height / 2}
               width={cardMetrics.width}
               height={cardMetrics.height}
               style={{
@@ -393,10 +413,10 @@ const renderPremiumBadgesVariant = (ctx: VariantContext) => {
   ]
 
   const leftSide = (
-    <YStack gap="$4" alignItems="center" justifyContent="center">
+    <YStack gap="$4" items="center" justify="center">
       {iconBadge}
       <Stack height={20} />
-      <XStack alignItems="center" justifyContent="center">
+      <XStack items="center" justify="center">
         {PREMIUM_FAN_CARDS.map((card, index) => {
           // Tighter fan with slight vertical arc
           const rotation = -15 + index * 10
@@ -407,7 +427,7 @@ const renderPremiumBadgesVariant = (ctx: VariantContext) => {
               key={card.id}
               width={cardMetrics.width}
               height={cardMetrics.height}
-              marginLeft={index === 0 ? 0 : -40} // Overlap cards
+              ml={index === 0 ? 0 : -40} // Overlap cards
               style={{
                 transform: [
                   { rotate: `${rotation}deg` },
@@ -452,9 +472,9 @@ const renderBadgesRemixVariant = (ctx: VariantContext) => {
   ]
 
   const leftSide = (
-    <YStack gap="$3" alignItems="center">
+    <YStack gap="$3" items="center">
       {iconBadge}
-      <XStack alignItems="center" justifyContent="center">
+      <XStack items="center" justify="center">
         {REMIX_CARDS.map((card, index) => {
           // Tighter fan with slight vertical arc (Same as Premium Badges)
           const rotation = -15 + index * 10
@@ -465,7 +485,7 @@ const renderBadgesRemixVariant = (ctx: VariantContext) => {
               key={card.id}
               width={cardMetrics.width}
               height={cardMetrics.height}
-              marginLeft={index === 0 ? 0 : -40} // Overlap cards
+              ml={index === 0 ? 0 : -40} // Overlap cards
               style={{
                 transform: [
                   { rotate: `${rotation}deg` },
@@ -510,7 +530,7 @@ const renderGlassModernVariant = (ctx: VariantContext) => {
   ]
 
   const leftSide = (
-    <YStack gap="$3" alignItems="center">
+    <YStack gap="$3" items="center">
       {/* Glow behind the icon */}
       <Stack position="relative">
         <Stack
@@ -519,10 +539,10 @@ const renderGlassModernVariant = (ctx: VariantContext) => {
           height={200}
           x={-30}
           y={-30}
-          borderRadius={999}
-          backgroundColor={palette.accent}
+          rounded={999}
           opacity={0.15}
           style={{
+            backgroundColor: palette.accent,
             filter: 'blur(40px)', // Note: standard RN might not support filter, but we can try or rely on shadow
             shadowColor: palette.accent,
             shadowOpacity: 0.4,
@@ -532,7 +552,7 @@ const renderGlassModernVariant = (ctx: VariantContext) => {
         {iconBadge}
       </Stack>
       
-      <XStack alignItems="center" justifyContent="center">
+      <XStack items="center" justify="center">
         {GLASS_CARDS.map((card, index) => {
           const rotation = -15 + index * 10
           const yOffset = Math.abs(index - 1.5) * 8
@@ -542,7 +562,7 @@ const renderGlassModernVariant = (ctx: VariantContext) => {
               key={card.id}
               width={cardMetrics.width}
               height={cardMetrics.height}
-              marginLeft={index === 0 ? 0 : -40}
+              ml={index === 0 ? 0 : -40}
               style={{
                 transform: [
                   { rotate: `${rotation}deg` },
@@ -575,7 +595,7 @@ const renderGlassModernVariant = (ctx: VariantContext) => {
   )
 }
 
-const VARIANT_RENDERERS: Record<FeatureVariant, (ctx: VariantContext) => JSX.Element> = {
+const VARIANT_RENDERERS: Record<FeatureVariant, (ctx: VariantContext) => React.ReactElement> = {
   badges: renderBadgesVariant,
   icon: renderIconVariant,
   'premium-badges': renderPremiumBadgesVariant,
@@ -805,86 +825,89 @@ export default function FeatureGraphicScreen() {
       contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
     >
       <YStack gap="$4">
-      <XStack
-        alignItems="center"
-        justifyContent="space-between"
-        gap="$3"
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-          backgroundColor: palette.pageBackground,
-          paddingVertical: 12,
-          marginHorizontal: -20,
-          paddingHorizontal: 20,
-        }}
-      >
-        <XStack gap="$2" flexWrap="wrap">
-          {VARIANT_DEFINITIONS.map((variant) => (
+        <XStack
+          items="center"
+          justify="space-between"
+          gap="$3"
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            backgroundColor: palette.pageBackground,
+            paddingVertical: 12,
+            marginHorizontal: -20,
+            paddingHorizontal: 20,
+          }}
+        >
+          <XStack gap="$2" flexWrap="wrap">
+            {VARIANT_DEFINITIONS.map((variant) => (
+              <Button
+                key={variant.id}
+                size="$3"
+                variant={variant.id === activeVariant.id ? undefined : 'outlined'}
+                onPress={() => setActiveVariantId(variant.id)}
+              >
+                {variant.label}
+              </Button>
+            ))}
+          </XStack>
+          <XStack gap="$2">
             <Button
-              key={variant.id}
-              size="$3"
-              variant={variant.id === activeVariant.id ? 'solid' : 'outlined'}
-              onPress={() => setActiveVariantId(variant.id)}
+              size="$2"
+              variant="outlined"
+              onPress={() => setSchemeOverride((prev) => ((prev ?? scheme) === 'dark' ? 'light' : 'dark'))}
             >
-              {variant.label}
+              {scheme === 'dark' ? '☀️ Light' : '🌙 Dark'}
             </Button>
-          ))}
+            <Button size="$2" variant="outlined" onPress={() => setShowSafeFrame((prev) => !prev)}>
+              {showSafeFrame ? 'Hide safe frame' : 'Show safe frame'}
+            </Button>
+          </XStack>
         </XStack>
-        <XStack gap="$2">
-          <Button
-            size="$2"
-            variant="outlined"
-            onPress={() => setSchemeOverride((prev) => ((prev ?? scheme) === 'dark' ? 'light' : 'dark'))}
-          >
-            {scheme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-          </Button>
-          <Button size="$2" variant="outlined" onPress={() => setShowSafeFrame((prev) => !prev)}>
-            {showSafeFrame ? 'Hide safe frame' : 'Show safe frame'}
-          </Button>
-        </XStack>
-      </XStack>
 
       <Stack
         width={FEATURE_WIDTH}
         height={FEATURE_HEIGHT}
-        alignSelf="center"
-        backgroundColor={palette.canvasBackground}
+        self="center"
         overflow="hidden"
+        style={{ backgroundColor: palette.canvasBackground }}
       >
         {/* Safe-area padding derived from Task 24-1 (15% bleed documented). */}
         <FeltBackground />
-        <Stack flex={1} padding={SAFE_INNER_PADDING} justifyContent="center">
+        <Stack flex={1} p={SAFE_INNER_PADDING} justify="center">
           {VARIANT_RENDERERS[activeVariant.id](variantContext)}
         </Stack>
         {showSafeFrame ? <SafeFrameOverlay color={palette.safeFrame} /> : null}
       </Stack>
 
-      <YStack maxWidth={FEATURE_WIDTH} alignSelf="center" gap="$3">
-        <Text color={palette.bodyText} fontSize={22} fontWeight="700">
+      <YStack maxW={FEATURE_WIDTH} self="center" gap="$3">
+        <Text style={{ color: palette.bodyText }} fontSize={22} fontWeight="700">
           {activeVariant.label}
         </Text>
-        <Paragraph color={palette.bodySubduedText} fontSize={18}>
+        <Paragraph style={{ color: palette.bodySubduedText }} fontSize={18}>
           {activeVariant.summary}
         </Paragraph>
-        <Paragraph color={palette.bodySubduedText} fontSize={16}>
+        <Paragraph style={{ color: palette.bodySubduedText }} fontSize={16}>
           {activeVariant.description}
         </Paragraph>
       </YStack>
 
-      <YStack maxWidth={FEATURE_WIDTH} alignSelf="center" gap="$2">
-        <Text color={palette.bodyText} fontSize={18} fontWeight="700">
+      <YStack maxW={FEATURE_WIDTH} self="center" gap="$2">
+        <Text style={{ color: palette.bodyText }} fontSize={18} fontWeight="700">
           Variant lineup overview
         </Text>
         <YStack gap="$1">
           {VARIANT_DEFINITIONS.map((variant) => (
-            <XStack key={`${variant.id}-overview`} alignItems="flex-start" gap="$2">
-              <Text color={variant.id === activeVariant.id ? palette.bodyText : palette.bodySubduedText} fontSize={18}>
+            <XStack key={`${variant.id}-overview`} items="flex-start" gap="$2">
+              <Text
+                style={{ color: variant.id === activeVariant.id ? palette.bodyText : palette.bodySubduedText }}
+                fontSize={18}
+              >
                 •
               </Text>
               <Paragraph
                 flex={1}
-                color={variant.id === activeVariant.id ? palette.bodyText : palette.bodySubduedText}
+                style={{ color: variant.id === activeVariant.id ? palette.bodyText : palette.bodySubduedText }}
                 fontSize={15}
               >
                 {variant.label}: {variant.summary}
@@ -894,26 +917,28 @@ export default function FeatureGraphicScreen() {
         </YStack>
       </YStack>
 
-      <YStack maxWidth={FEATURE_WIDTH} alignSelf="center" gap="$2">
-        <Text color={palette.bodyText} fontSize={18} fontWeight="700">
+      <YStack maxW={FEATURE_WIDTH} self="center" gap="$2">
+        <Text style={{ color: palette.bodyText }} fontSize={18} fontWeight="700">
           Safe zone calculations
         </Text>
         <YStack
-          borderRadius={24}
+          rounded={24}
           borderWidth={1}
-          borderColor={palette.panelBorder}
-          backgroundColor={`${palette.panelTint}40`}
-          padding="$4"
+          p="$4"
           gap="$2"
+          style={{
+            borderColor: palette.panelBorder,
+            backgroundColor: `${palette.panelTint}40`,
+          }}
         >
           {dimensionRows.map((row) => (
-            <XStack key={row.label} justifyContent="space-between" alignItems="flex-start" gap="$3">
-              <Text color={palette.bodyText} fontWeight="600">
+            <XStack key={row.label} justify="space-between" items="flex-start" gap="$3">
+              <Text style={{ color: palette.bodyText }} fontWeight="600">
                 {row.label}
               </Text>
-              <YStack flex={1} alignItems="flex-end" gap="$1">
-                <Text color={palette.bodyText}>{row.value}</Text>
-                <Paragraph color={palette.bodySubduedText} textAlign="right" fontSize={14}>
+              <YStack flex={1} items="flex-end" gap="$1">
+                <Text style={{ color: palette.bodyText }}>{row.value}</Text>
+                <Paragraph style={{ color: palette.bodySubduedText }} text="right" fontSize={14}>
                   {row.notes}
                 </Paragraph>
               </YStack>
@@ -922,22 +947,22 @@ export default function FeatureGraphicScreen() {
         </YStack>
       </YStack>
 
-      <YStack alignSelf="center" maxWidth={FEATURE_WIDTH} gap="$3" paddingTop="$5">
-        <Text color={palette.bodyText} fontSize={24} fontWeight="800">
+      <YStack self="center" maxW={FEATURE_WIDTH} gap="$3" pt="$5">
+        <Text style={{ color: palette.bodyText }} fontSize={24} fontWeight="800">
           Feature graphic concept
         </Text>
         {CONCEPT_PARAGRAPHS.map((paragraph, index) => (
-          <Paragraph key={`concept-${index}`} color={palette.bodySubduedText} fontSize={16}>
+          <Paragraph key={`concept-${index}`} style={{ color: palette.bodySubduedText }} fontSize={16}>
             {paragraph}
           </Paragraph>
         ))}
-        <YStack gap="$3" paddingTop="$2">
+        <YStack gap="$3" pt="$2">
           {VARIANT_DEFINITIONS.map((variant) => (
             <Stack key={`${variant.id}-detail`} gap="$1">
-              <Text color={palette.bodyText} fontSize={18} fontWeight="700">
+              <Text style={{ color: palette.bodyText }} fontSize={18} fontWeight="700">
                 {variant.label}
               </Text>
-              <Paragraph color={palette.bodySubduedText} fontSize={15}>
+              <Paragraph style={{ color: palette.bodySubduedText }} fontSize={15}>
                 {variant.description}
               </Paragraph>
             </Stack>
