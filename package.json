@@ -8,6 +8,14 @@
     "upgrade:tamagui": "yarn up '*tamagui*'@latest '@tamagui/*'@latest",
     "upgrade:tamagui:canary": "yarn up '*tamagui*'@canary '@tamagui/*'@canary",
     "check:tamagui": "tamagui check",
+    "format": "oxfmt \"{app,components,modules,src,scripts,test}/**/*.{js,jsx,ts,tsx,json}\" package.json",
+    "format:check": "oxfmt --check \"{app,components,modules,src,scripts,test}/**/*.{js,jsx,ts,tsx,json}\" package.json",
+    "lint": "oxlint --tsconfig tsconfig.json app components modules src scripts test",
+    "lint:fix": "oxlint --fix --tsconfig tsconfig.json app components modules src scripts test",
+    "lint:strict": "oxlint -D correctness -D suspicious --deny-warnings --tsconfig tsconfig.json app components modules src scripts test",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:tsc": "tsc -p tsconfig.json --noEmit",
+    "typecheck:tsgo": "tsgo -p tsconfig.tsgo.json",
     "start": "expo start -c",
     "android": "expo run:android",
     "release": "expo run:android --variant release",
@@ -80,8 +88,11 @@
     "@tamagui/metro-plugin": "^1.140.3",
     "@types/jest": "29.5.14",
     "@types/react": "^19.2.0",
+    "@typescript/native-preview": "^7.0.0-dev.20260226.1",
     "jest": "~29.7.0",
     "jest-pnp-resolver": "^1.2.3",
+    "oxfmt": "^0.34.0",
+    "oxlint": "^1.50.0",
     "typescript": "^5.9.3"
   }
 }

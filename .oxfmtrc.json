@@ -1,0 +1,14 @@
+{
+  "printWidth": 90,
+  "tabWidth": 2,
+  "useTabs": true,
+  "semi": false,
+  "singleQuote": true,
+  "trailingComma": "es5",
+  "ignorePatterns": [
+    "**/*/generated-new.ts",
+    "**/*/generated-v2.ts",
+    "dist/**",
+    "build/**"
+  ]
+}
