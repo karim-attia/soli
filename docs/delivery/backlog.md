@@ -155,3 +155,5 @@
 | 2026-03-02 23:28:00 | 31 | submit_for_review | MoSCoW follow-up completed: format now passes, typechecks pass, baseline lint passes, and strict-lint debt moved into new task 31-2. | ai_agent |
 | 2026-03-02 23:37:00 | 31 | significant_update | Reopened PBI 31 to execute approved Task 31-2 strict-lint cleanup and indentation preference updates. | ai_agent |
 | 2026-03-02 23:58:00 | 31 | submit_for_review | Completed Task 31-2 strict lint cleanup; lint/lint:strict/typecheck/format checks all pass and work is ready for review. | ai_agent |
+| 2026-03-03 00:40:00 | 31 | significant_update | Reopened PBI 31 to set `tsgo` as the default `typecheck` command while retaining explicit `tsc` fallback per user request. | user |
+| 2026-03-03 00:40:40 | 31 | submit_for_review | Updated scripts so `typecheck` defaults to `tsgo`, added `typecheck:fallback`, and revalidated both typecheck paths. | ai_agent |

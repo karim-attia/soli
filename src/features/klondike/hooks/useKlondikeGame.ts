@@ -36,6 +36,7 @@ import {
   EDGE_GUTTER,
   COLOR_FELT_LIGHT,
   COLOR_FELT_DARK,
+  WIGGLE_SEGMENT_DURATION_MS,
 } from '../constants'
 import { EMPTY_INVALID_WIGGLE, type InvalidWiggleConfig } from '../types'
 import { computeCardMetrics } from '../utils/cardMetrics'
@@ -59,6 +60,15 @@ type RequestNewGameFn = (options?: { reason?: 'manual' | 'celebration' }) => voi
 const AUTO_QUEUE_INTERVAL_MS = 25
 // pls comment that the difference between this and the one above is.
 const AUTO_QUEUE_MOVE_DELAY_MS = 35
+const WIGGLE_SEQUENCE_SEGMENT_COUNT = 3
+const WIGGLE_RESET_BUFFER_MS = 40
+const INVALID_WIGGLE_RESET_DELAY_MS =
+  WIGGLE_SEGMENT_DURATION_MS * WIGGLE_SEQUENCE_SEGMENT_COUNT + WIGGLE_RESET_BUFFER_MS
+
+const createEmptyInvalidWiggle = (): InvalidWiggleConfig => ({
+  ...EMPTY_INVALID_WIGGLE,
+  lookup: new Set<string>(),
+})
 
 // Maps a selection descriptor to the card IDs required for animation-flight tracking.
 // The flight controller waits for these IDs to have layout snapshots before animating moves.
@@ -479,10 +489,19 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     [historyEntries, recordResult, updateEntry]
   )
 
-  const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(() => ({
-    ...EMPTY_INVALID_WIGGLE,
-    lookup: new Set<string>(),
-  }))
+  const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(
+    createEmptyInvalidWiggle
+  )
+  const invalidWiggleResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (invalidWiggleResetTimeoutRef.current) {
+        clearTimeout(invalidWiggleResetTimeoutRef.current)
+        invalidWiggleResetTimeoutRef.current = null
+      }
+    }
+  }, [])
 
   // Dispatches game actions via the flight controller while respecting board locks.
   const dispatchWithFlight = useCallback(
@@ -558,10 +577,22 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       if (!ids.length) {
         return
       }
+      if (invalidWiggleResetTimeoutRef.current) {
+        clearTimeout(invalidWiggleResetTimeoutRef.current)
+      }
+      const key = Date.now()
       setInvalidWiggle({
-        key: Date.now(),
+        key,
         lookup: new Set(ids),
       })
+      invalidWiggleResetTimeoutRef.current = setTimeout(() => {
+        setInvalidWiggle((current) =>
+          current.key === key ? createEmptyInvalidWiggle() : current
+        )
+        if (invalidWiggleResetTimeoutRef.current) {
+          invalidWiggleResetTimeoutRef.current = null
+        }
+      }, INVALID_WIGGLE_RESET_DELAY_MS)
     },
     [state]
   )

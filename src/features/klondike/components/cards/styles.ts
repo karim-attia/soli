@@ -144,8 +144,8 @@ export const styles = StyleSheet.create({
     left: 0,
     opacity: 0,
     shadowColor: FOUNDATION_GLOW_COLOR,
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
+    shadowOpacity: 0.85,
+    shadowRadius: 14,
     backgroundColor:
       Platform.OS === 'android' ? FOUNDATION_GLOW_ANDROID_FILL_COLOR : 'transparent',
   },
