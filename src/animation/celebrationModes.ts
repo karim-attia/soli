@@ -45,6 +45,9 @@ export const CELEBRATION_WOBBLE_FREQUENCY = 5.5
 export const TAU = Math.PI * 2
 
 const CELEBRATION_SPEED_MULTIPLIER = 10.4
+// PBI-28 follow-up: make celebration cards break out of stacked foundations immediately.
+const CELEBRATION_LAUNCH_INITIAL_PROGRESS = 0.08
+const CELEBRATION_LAUNCH_SPEED_MULTIPLIER = 32
 const FOUNDATION_STACK_MAX = 13
 
 export type CelebrationFrameInput = {
@@ -100,7 +103,14 @@ export function computeCelebrationFrame({
   const safeTotalCards = Math.max(totalCards, 1)
   const totalProgress = progress * CELEBRATION_SPEED_MULTIPLIER
   const rawProgress = totalProgress % 1
-  const launchProgress = Math.min(1, Math.max(0, totalProgress))
+  const launchProgress = Math.min(
+    1,
+    Math.max(
+      0,
+      CELEBRATION_LAUNCH_INITIAL_PROGRESS +
+        progress * CELEBRATION_LAUNCH_SPEED_MULTIPLIER
+    )
+  )
   const launchEased = easeOutCubic(launchProgress)
   const seed = assignment.randomSeed
   const relativeIndex = assignment.index - safeTotalCards / 2
