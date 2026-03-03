@@ -4,6 +4,9 @@ Do a minor version bump for the app.
 
 @app.json
 
+expo
+version
+
 ios
 buildNumber
 
