@@ -11,5 +11,5 @@
 | 19-2 | [Implement statistics tracking and HUD](./19-2.md) | Review | Track elapsed time starting on the first move and render move/time stats in the Klondike HUD per settings. |
 | 19-3 | [Reveal initial stock card on new game start](./19-3.md) | Review | Ensure new games expose the first stock card without kicking off the timer until the first move occurs. |
  | 19-4 | [E2E CoS validation](./19-4.md) | Proposed | Validate statistics toggles, HUD behaviour, timer cadence, and initial draw through end-to-end testing. |
+ | 19-5 | [Isolate timer updates from board render path](./19-5.md) | Review | Remove per-second game-state ticks from the board path, keep HUD time live, and benchmark with repeatable device profiling. |
  
-
