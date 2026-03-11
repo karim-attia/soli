@@ -18,7 +18,7 @@
     "typecheck:fallback": "yarn typecheck:tsc",
     "start": "expo start -c",
     "android": "expo run:android",
-    "release": "expo run:android --variant release",
+    "release": "./run-android-release.sh",
     "prod": "node scripts/run-demo-autosolve.js --mode=prod",
     "prod:no-timeout": "node scripts/run-demo-autosolve.js --mode=prod --no-prod-timeout",
     "ios": "expo run:ios",
