@@ -37,6 +37,9 @@ Use this section to add guidance or constraints before the next step.
 | 2026-03-02 22:14:00 | 16 | Researched official troubleshooting for navigator registration errors and skill installation layout. | Confirmed React Navigation recommends checking for duplicate package copies and keeping dependency graph deduped; confirmed skills CLI supports project-local `.agents/skills` installs and multi-agent activation flags. |
 | 2026-03-02 22:18:00 | 17 | Applied dependency range alignment to remove duplicate risk and restore Expo dependency check health. | Changed direct `@react-navigation/native` declaration from pinned `7.1.31` to Expo-aligned `^7.1.28`, reinstalled lockfile, and verified single runtime version (`7.1.31`) via `yarn why`. |
 | 2026-03-02 22:27:00 | 18 | Revalidated release build and played on connected Android device with agent-device. | Built and reinstalled release APK, relaunched app with `agent-device`, played several moves, captured screenshot evidence, and confirmed no navigator crash entries in logcat. |
+| 2026-03-11 11:50:30 | 19 | Reopened iOS-native validation follow-up after new simulator report. | Confirmed Expo Doctor now flags patch drift on `expo` and `expo-router`; reproduced CocoaPods refresh and began a clean simulator build to isolate any remaining Expo/Pods failures. |
+| 2026-03-11 11:56:56 | 20 | Applied Expo patch alignment and refreshed iOS pods. | Upgraded to `expo@~55.0.5` and `expo-router@~55.0.4`, which also lifted `expo-modules-core`, `expo-image`, and `expo-symbols` to current SDK-55 patches; `npx expo-doctor` now passes 17/17 and `pod install` updated the native Expo pod set without reproducing the prior `EXReactRootViewFactory` header failure. |
+| 2026-03-11 13:46:09 | 21 | Completed fresh iOS simulator validation on the booted device. | Enabled `ios.buildReactNativeFromSource`, cleared the derived data build, achieved `BUILD SUCCEEDED`, then installed and launched `ch.karimattia.soli` on the `iPhone 17 Pro` simulator. |
 
 ## Research Notes
 ### Official docs to collect
@@ -106,6 +109,8 @@ Use this section to add guidance or constraints before the next step.
 - Post-fix run still times out waiting for demo auto-sequence token in release logcat even though release install and deep-link launch succeed.
 - On-device runtime showed React Navigation registration error screen (`Couldn't register the navigator...multiple copies of '@react-navigation' packages installed.`) after dependency alignment changes.
 - Resolution used: align direct `@react-navigation/native` to Expo’s expected semver range (`^7.1.28`), run install to dedupe graph, and verify only one resolved runtime version (`7.1.31`) remains.
+- iOS simulator builds on Xcode 26.2 still required local vendored fixes inside `node_modules/expo/ios/AppDelegates/*` plus `ios.buildReactNativeFromSource: true` to avoid Expo wrapper compile/link issues during this validation pass.
+- Resolution used: patched the vendored Expo app-delegate wrapper sources in-place for the current workspace and rebuilt React Native from source so the simulator build could complete.
 - Primary source for the `ColorSchemeName` typing change:
   - https://github.com/facebook/react-native/blob/main/packages/react-native/Libraries/Utilities/Appearance.d.ts
 
@@ -118,6 +123,12 @@ Use this section to add guidance or constraints before the next step.
 - `/Users/karim/Library/Android/sdk/platform-tools/adb devices` → connected device detected.
 - `./gradlew app:assembleRelease --no-daemon --console=plain` → pass.
 - `adb -s <serial> install -r android/app/build/outputs/apk/release/app-release.apk` → pass.
+- `yarn up expo@~55.0.5 expo-router@~55.0.4` → pass; lockfile now resolves Expo SDK 55 patch set (`expo@55.0.5`, `expo-router@55.0.4`, `expo-modules-core@55.0.14`).
+- `npx expo-doctor` → pass (`17/17 checks passed. No issues detected!`).
+- `cd ios && pod install` → pass; CocoaPods updated native Expo pods to `Expo 55.0.5`, `ExpoRouter 55.0.4`, `ExpoModulesCore 55.0.14`, `ExpoImage 55.0.6`, and `ExpoSymbols 55.0.5`.
+- `xcodebuild -workspace ios/Soli.xcworkspace -scheme Soli -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,id=28F666FA-BEB6-4BDF-96CC-F8273FF8B4C1' -derivedDataPath /tmp/soli-derived build` → pass (`** BUILD SUCCEEDED **`).
+- `xcrun simctl install 28F666FA-BEB6-4BDF-96CC-F8273FF8B4C1 /tmp/soli-derived/Build/Products/Debug-iphonesimulator/Soli.app` → pass.
+- `xcrun simctl launch 28F666FA-BEB6-4BDF-96CC-F8273FF8B4C1 ch.karimattia.soli` → pass (`pid 30630`).
 - `adb -s <serial> shell monkey -p ch.karimattia.soli -c android.intent.category.LAUNCHER 1` → pass.
 - `node .yarn/releases/yarn-4.5.0.cjs demo:auto-solve` → release build/install + deep-link launch pass; timeout remains waiting for auto-sequence log token.
 - `npx expo install --check` (after `@react-navigation/native` range alignment) → pass (`Dependencies are up to date`, offline warning only).
