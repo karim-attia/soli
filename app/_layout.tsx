@@ -28,7 +28,6 @@ export default function RootLayout() {
   const [fontsLoaded, fontsError] = useFonts({
     Inter: require('@tamagui/font-inter/otf/Inter-Medium.otf'),
     InterBold: require('@tamagui/font-inter/otf/Inter-Bold.otf'),
-    CardRankRoboto700: require('../assets/fonts/CardRankRoboto700.ttf'),
   })
 
   useEffect(() => {

@@ -17,7 +17,7 @@
 - Use `instantiateVariableFont(..., static=True, updateFontNames=True)` on the Android `Roboto-Regular.ttf` source file to create a static 700-weight rank font.
 - Use `fontTools.subset` after instancing so the generated rank font contains only `A234567890JQK`.
 - Save the generated output under `assets/fonts/` so Expo can bundle it without any runtime font transformation.
-- This task ended up using Android `NotoColorEmoji` exports for suits instead of a second bundled text font because the emoji artwork preserved the approved fat-heart shape while the symbol font did not.
+- This task now uses `fonttools` only for the generated Roboto Bold rank font. The wide-heart suit glyphs come from exact Android `NotoColorEmoji` exports checked into `assets/card-suits/`.
 
 ## Example task pattern
 ```py
@@ -31,7 +31,7 @@ rank_font = instantiateVariableFont(rank_font, {"wght": 700}, updateFontNames=Tr
 rank_subsetter = subset.Subsetter()
 rank_subsetter.populate(text="A234567890JQK")
 rank_subsetter.subset(rank_font)
-rank_font.save("CardRankRoboto700.ttf")
+rank_font.save("CardRankAndroidBold.ttf")
 ```
 
 ## Task fit assessment

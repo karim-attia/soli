@@ -8,5 +8,5 @@ This document lists all tasks associated with PBI 33.
 
 | Task ID | Name | Status | Description |
 | :------ | :--- | :----- | :---------- |
-| 33-1 | [Build and wire exact Android-derived card glyph assets](./33-1.md) | Review | Generate explicit Android-derived rank and suit assets, load them at app startup, and apply them only to card rank/suit visuals. |
-| 33-2 | [E2E CoS Test: exact card font parity](./33-2.md) | Review | Verify the bundled card visuals on the connected Android target and iPhone simulator and record evidence against the approved Android look. |
+| 33-1 | [Build and wire exact Android-derived card fonts](./33-1.md) | Review | Bundle the exact Android rank and suit fonts, load them natively, and apply them only to card rank/suit visuals. |
+| 33-2 | [E2E CoS Test: exact card font parity](./33-2.md) | InProgress | Verify the bundled card visuals on the connected Android target and iPhone simulator and record evidence against the approved Android look. |

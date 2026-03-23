@@ -14,6 +14,7 @@ import {
   COLOR_COLUMN_BORDER,
   COLOR_DROP_BORDER,
   SUIT_COLORS,
+  SUIT_SYMBOLS,
 } from '../../constants'
 import type {
   CardFlightRegistry,
@@ -22,9 +23,8 @@ import type {
   InvalidWiggleConfig,
 } from '../../types'
 import { useCardAnimations } from './animations'
-import { CardSuitGlyph, getSuitGlyphWidth } from './CardSuitGlyph'
 import { AnimatedView } from './common'
-import { CARD_RANK_FONT_FAMILY } from './fonts'
+import { CARD_RANK_FONT_FAMILY, CARD_SUIT_FONT_FAMILY } from './fonts'
 import { styles } from './styles'
 import { rankToLabel } from './utils'
 
@@ -33,11 +33,9 @@ const CARD_PADDING_VERTICAL = 6
 const CARD_CORNER_RANK_TOP = -2
 const CARD_CORNER_RANK_LEFT = 3
 const CARD_CORNER_RANK_FONT = 16
-const CARD_CORNER_SUIT_HEIGHT = 12
-const CARD_CORNER_SUIT_TOP = 1
-const CARD_CORNER_SUIT_RIGHT = 2
-const CARD_SYMBOL_HEIGHT = 32
-const CARD_SYMBOL_MARGIN_TOP = 14
+const CARD_CORNER_SUIT_FONT = 12
+const CARD_SYMBOL_FONT = 28
+const CARD_SYMBOL_MARGIN_TOP = 16
 
 const deriveCardScale = (metrics: CardMetrics) => {
   if (metrics.width) {
@@ -68,18 +66,14 @@ export const CardVisual = ({ card, metrics, onPress, disabled }: CardVisualProps
     fontSize: scaleValue(CARD_CORNER_RANK_FONT),
     fontFamily: CARD_RANK_FONT_FAMILY,
   }
-  const cornerSuitHeight = scaleValue(CARD_CORNER_SUIT_HEIGHT)
   const cornerSuitStyle = {
-    top: scaleValue(CARD_CORNER_SUIT_TOP),
-    right: scaleValue(CARD_CORNER_SUIT_RIGHT),
-    width: scaleValue(getSuitGlyphWidth(card.suit, CARD_CORNER_SUIT_HEIGHT)),
-    height: cornerSuitHeight,
+    fontSize: scaleValue(CARD_CORNER_SUIT_FONT),
+    fontFamily: CARD_SUIT_FONT_FAMILY,
   }
-  const centerSymbolHeight = scaleValue(CARD_SYMBOL_HEIGHT)
   const centerSymbolStyle = {
+    fontSize: scaleValue(CARD_SYMBOL_FONT),
     marginTop: scaleValue(CARD_SYMBOL_MARGIN_TOP),
-    width: scaleValue(getSuitGlyphWidth(card.suit, CARD_SYMBOL_HEIGHT)),
-    height: centerSymbolHeight,
+    fontFamily: CARD_SUIT_FONT_FAMILY,
   }
 
   const baseStyle: StyleProp<ViewStyle> = [
@@ -111,15 +105,31 @@ export const CardVisual = ({ card, metrics, onPress, disabled }: CardVisualProps
         {rankToLabel(card.rank)}
       </Text>
       {/* Small suit symbol | top right */}
-      <CardSuitGlyph
-        suit={card.suit}
-        style={[styles.cardCornerSuit, cornerSuitStyle]}
-      />
+      <Text
+        style={[
+          styles.cardCornerSuit,
+          cornerSuitStyle,
+          { color: SUIT_COLORS[card.suit] },
+        ]}
+        ellipsizeMode="clip"
+        numberOfLines={1}
+        allowFontScaling={false}
+      >
+        {SUIT_SYMBOLS[card.suit]}
+      </Text>
       {/* Large suit symbol | center */}
-      <CardSuitGlyph
-        suit={card.suit}
-        style={[styles.cardSymbol, centerSymbolStyle]}
-      />
+      <Text
+        style={[
+          styles.cardSymbol,
+          centerSymbolStyle,
+          { color: SUIT_COLORS[card.suit] },
+        ]}
+        ellipsizeMode="clip"
+        numberOfLines={1}
+        allowFontScaling={false}
+      >
+        {SUIT_SYMBOLS[card.suit]}
+      </Text>
     </>
   )
 
