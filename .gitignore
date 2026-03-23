@@ -64,3 +64,4 @@ modules/**/ios/DerivedData
 *.keystore
 *.jks
 .venv
+scripts/android-unlock-pattern.sh
