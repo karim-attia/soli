@@ -82,6 +82,10 @@ EOF
 EOF
 )"
 
+  local file_before_patch
+  local file_after_patch
+  file_before_patch="$(cat "${BUILD_GRADLE_FILE}")"
+
   if ! rg -q "signingConfigs\\.release" "${BUILD_GRADLE_FILE}"; then
     SOLI_DEFAULT_SIGNING_BLOCK="${default_signing_block}" SOLI_DESIRED_SIGNING_BLOCK="${desired_signing_block}" perl -0pi -e '
       my $current = $ENV{SOLI_DEFAULT_SIGNING_BLOCK};
@@ -95,6 +99,13 @@ EOF
     my $desired = $ENV{SOLI_DESIRED_RELEASE_BLOCK};
     s/\Q$current\E/$desired/s;
   ' "${BUILD_GRADLE_FILE}"
+
+  file_after_patch="$(cat "${BUILD_GRADLE_FILE}")"
+  if [ "${file_before_patch}" = "${file_after_patch}" ]; then
+    echo "Android signing config already correct"
+  else
+    echo "Repaired Android signing config"
+  fi
 }
 
 # Load environment variables and export them.
