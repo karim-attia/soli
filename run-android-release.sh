@@ -4,8 +4,15 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${ROOT_DIR}/.env"
+BUILD_GRADLE_FILE="${ROOT_DIR}/android/app/build.gradle"
 EXPO_RELEASE_COMMAND=(yarn expo run:android --variant release)
 CONNECT_CANDIDATES=()
+REQUIRED_SIGNING_KEYS=(
+  "SOLI_UPLOAD_STORE_FILE"
+  "SOLI_UPLOAD_STORE_PASSWORD"
+  "SOLI_UPLOAD_KEY_ALIAS"
+  "SOLI_UPLOAD_KEY_PASSWORD"
+)
 
 pick_adb() {
   if [[ -n "${ADB_BIN:-}" && -x "${ADB_BIN}" ]]; then
@@ -55,6 +62,112 @@ load_env_file() {
     source "${ENV_FILE}"
     set +a
   fi
+}
+
+require_signing_env() {
+  local signing_key=""
+  local missing_keys=()
+
+  for signing_key in "${REQUIRED_SIGNING_KEYS[@]}"; do
+    if [[ -z "${!signing_key:-}" ]]; then
+      missing_keys+=("${signing_key}")
+    fi
+  done
+
+  if [[ "${#missing_keys[@]}" -gt 0 ]]; then
+    echo "Error: Missing required signing variables: ${missing_keys[*]}" >&2
+    exit 1
+  fi
+
+  if [[ ! -f "${SOLI_UPLOAD_STORE_FILE}" ]]; then
+    echo "Error: Keystore file not found at '${SOLI_UPLOAD_STORE_FILE}'" >&2
+    exit 1
+  fi
+}
+
+apply_release_signing_patch() {
+  if [[ ! -f "${BUILD_GRADLE_FILE}" ]]; then
+    echo "Error: Gradle file not found at '${BUILD_GRADLE_FILE}'" >&2
+    exit 1
+  fi
+
+  local default_signing_block=""
+  local desired_signing_block=""
+  local default_release_block=""
+  local desired_release_block=""
+
+  default_signing_block="$(cat <<'EOF'
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+EOF
+)"
+
+  desired_signing_block="$(cat <<'EOF'
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+        release {
+            // Keep release config valid for local debug workflows (e.g. `yarn android`).
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+
+            def uploadStoreFile = System.getenv('SOLI_UPLOAD_STORE_FILE') ?: findProperty('SOLI_UPLOAD_STORE_FILE')
+            def uploadStorePassword = System.getenv('SOLI_UPLOAD_STORE_PASSWORD') ?: findProperty('SOLI_UPLOAD_STORE_PASSWORD')
+            def uploadKeyAlias = System.getenv('SOLI_UPLOAD_KEY_ALIAS') ?: findProperty('SOLI_UPLOAD_KEY_ALIAS')
+            def uploadKeyPassword = System.getenv('SOLI_UPLOAD_KEY_PASSWORD') ?: findProperty('SOLI_UPLOAD_KEY_PASSWORD')
+
+            if (uploadStoreFile != null && uploadStorePassword != null && uploadKeyAlias != null && uploadKeyPassword != null) {
+                storeFile file(uploadStoreFile)
+                storePassword uploadStorePassword
+                keyAlias uploadKeyAlias
+                keyPassword uploadKeyPassword
+            }
+        }
+    }
+EOF
+)"
+
+  default_release_block="$(cat <<'EOF'
+        release {
+            // Caution! In production, you need to generate your own keystore file.
+            // see https://reactnative.dev/docs/signed-apk-android.
+            signingConfig signingConfigs.debug
+EOF
+)"
+
+  desired_release_block="$(cat <<'EOF'
+        release {
+            // Caution! In production, you need to generate your own keystore file.
+            // see https://reactnative.dev/docs/signed-apk-android.
+            signingConfig signingConfigs.release
+EOF
+)"
+
+  if ! rg -q "signingConfigs\\.release" "${BUILD_GRADLE_FILE}"; then
+    SOLI_DEFAULT_SIGNING_BLOCK="${default_signing_block}" SOLI_DESIRED_SIGNING_BLOCK="${desired_signing_block}" perl -0pi -e '
+      my $current = $ENV{SOLI_DEFAULT_SIGNING_BLOCK};
+      my $desired = $ENV{SOLI_DESIRED_SIGNING_BLOCK};
+      s/\Q$current\E/$desired/s or die "Failed to patch Android signingConfigs block\n";
+    ' "${BUILD_GRADLE_FILE}"
+  fi
+
+  SOLI_DEFAULT_RELEASE_BLOCK="${default_release_block}" SOLI_DESIRED_RELEASE_BLOCK="${desired_release_block}" perl -0pi -e '
+    my $current = $ENV{SOLI_DEFAULT_RELEASE_BLOCK};
+    my $desired = $ENV{SOLI_DESIRED_RELEASE_BLOCK};
+    s/\Q$current\E/$desired/s;
+  ' "${BUILD_GRADLE_FILE}"
 }
 
 collect_existing_serial() {
@@ -177,6 +290,8 @@ connect_candidate() {
 main() {
   cd "${ROOT_DIR}"
   load_env_file
+  require_signing_env
+  apply_release_signing_patch
 
   local adb_bin=""
   local requested_target="${ADB_WIFI_TARGET:-}"
