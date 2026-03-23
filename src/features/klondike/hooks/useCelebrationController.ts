@@ -16,9 +16,14 @@ import {
   getCelebrationModeMetadata,
 } from '../../../animation/celebrationModes'
 import { FOUNDATION_SUIT_ORDER } from '../../../solitaire/klondike'
+import { useAnimationToggles } from '../../../state/settings'
 import type { Card, GameState, Suit } from '../../../solitaire/klondike'
 import { devLog } from '../../../utils/devLogger'
-import { FOUNDATION_FALLBACK_GAP } from '../constants'
+import {
+  CARD_ANIMATION_DURATION_MS,
+  FOUNDATION_FALLBACK_GAP,
+  WIN_CELEBRATION_HANDOFF_DELAY_MS,
+} from '../constants'
 import type { CelebrationBindings, CardMetrics } from '../types'
 
 export type CelebrationCardConfig = {
@@ -86,6 +91,9 @@ export const useCelebrationController = ({
   const celebrationAbortRef = useRef(false)
   const celebrationDialogTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const celebrationDialogShownRef = useRef(false)
+  const celebrationStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingCelebrationStateRef = useRef<CelebrationState | null>(null)
+  const { foundationGlow: foundationGlowEnabled } = useAnimationToggles()
 
   const celebrationBindings = useMemo<CelebrationBindings>(
     () => ({
@@ -113,6 +121,13 @@ export const useCelebrationController = ({
     }
   }, [])
 
+  const clearCelebrationStartTimer = useCallback(() => {
+    if (celebrationStartTimeoutRef.current) {
+      clearTimeout(celebrationStartTimeoutRef.current)
+      celebrationStartTimeoutRef.current = null
+    }
+  }, [])
+
   const openCelebrationDialog = useCallback(() => {
     clearCelebrationDialogTimer()
     if (celebrationDialogShownRef.current) {
@@ -129,9 +144,83 @@ export const useCelebrationController = ({
     openCelebrationDialog()
   }, [openCelebrationDialog, updateBoardLocked])
 
+  const buildCelebrationState = useCallback((): CelebrationState | null => {
+    const boardWidthValue = boardLayout.width ?? 0
+    const boardHeightValue = boardLayout.height ?? 0
+
+    if (!boardWidthValue || !boardHeightValue) {
+      return null
+    }
+
+    const topLayout = topRowLayoutRef.current
+    const topOffsetX = topLayout?.x ?? 0
+    const topOffsetY = topLayout?.y ?? 0
+    const fallbackSpacing = cardMetrics.width + FOUNDATION_FALLBACK_GAP
+    const cards: CelebrationCardConfig[] = []
+
+    FOUNDATION_SUIT_ORDER.forEach((suit, suitIndex) => {
+      const pile = state.foundations[suit]
+      if (!pile.length) {
+        return
+      }
+      const layout = foundationLayoutsRef.current[suit]
+      const baseX = topOffsetX + (layout?.x ?? suitIndex * fallbackSpacing)
+      const baseY = topOffsetY + (layout?.y ?? 0)
+
+      pile.forEach((card, stackIndex) => {
+        const cardOffsetY = stackIndex * (cardMetrics.height * 0.02)
+        cards.push({
+          card,
+          suit,
+          suitIndex,
+          stackIndex,
+          baseX,
+          baseY: baseY - cardOffsetY,
+          randomSeed: Math.random(),
+        })
+      })
+    })
+
+    if (!cards.length) {
+      return null
+    }
+
+    const shuffledCards = [...cards].sort(() => Math.random() - 0.5)
+    const modeId = Math.floor(Math.random() * CELEBRATION_MODE_COUNT)
+
+    return {
+      modeId,
+      durationMs: CELEBRATION_DURATION_MS,
+      boardWidth: boardWidthValue,
+      boardHeight: boardHeightValue,
+      cards: shuffledCards,
+    }
+  }, [
+    boardLayout.height,
+    boardLayout.width,
+    cardMetrics.height,
+    cardMetrics.width,
+    foundationLayoutsRef,
+    state.foundations,
+    topRowLayoutRef,
+  ])
+
+  const startPendingCelebration = useCallback(() => {
+    const pendingCelebration = pendingCelebrationStateRef.current
+    if (!pendingCelebration) {
+      return
+    }
+
+    pendingCelebrationStateRef.current = null
+    clearCelebrationStartTimer()
+    ensureCardFlightsReady()
+    setCelebrationState((current) => current ?? pendingCelebration)
+  }, [clearCelebrationStartTimer, ensureCardFlightsReady])
+
   const clearCelebrationAnimations = useCallback(() => {
     celebrationAbortRef.current = false
     celebrationDialogShownRef.current = false
+    pendingCelebrationStateRef.current = null
     celebrationAssignments.value = {}
     celebrationTotal.value = 0
     celebrationMode.value = 0
@@ -141,6 +230,7 @@ export const useCelebrationController = ({
       celebrationActive.value = 0
       cancelAnimation(celebrationProgress)
     })()
+    clearCelebrationStartTimer()
     clearCelebrationDialogTimer()
   }, [
     celebrationActive,
@@ -149,6 +239,7 @@ export const useCelebrationController = ({
     celebrationMode,
     celebrationProgress,
     celebrationTotal,
+    clearCelebrationStartTimer,
     clearCelebrationDialogTimer,
   ])
 
@@ -275,76 +366,36 @@ export const useCelebrationController = ({
       celebrations: state.winCelebrations,
     })
 
-    if (celebrationState) {
+    if (celebrationState || pendingCelebrationStateRef.current) {
       return
     }
 
-    ensureCardFlightsReady()
-
-    const boardWidthValue = boardLayout.width ?? 0
-    const boardHeightValue = boardLayout.height ?? 0
-
-    if (!boardWidthValue || !boardHeightValue) {
+    const nextCelebrationState = buildCelebrationState()
+    if (!nextCelebrationState) {
       return
     }
 
-    const topLayout = topRowLayoutRef.current
-    const topOffsetX = topLayout?.x ?? 0
-    const topOffsetY = topLayout?.y ?? 0
-    const fallbackSpacing = cardMetrics.width + FOUNDATION_FALLBACK_GAP
-    const cards: CelebrationCardConfig[] = []
+    const celebrationHandoffDelayMs = foundationGlowEnabled
+      ? WIN_CELEBRATION_HANDOFF_DELAY_MS
+      : CARD_ANIMATION_DURATION_MS
 
-    FOUNDATION_SUIT_ORDER.forEach((suit, suitIndex) => {
-      const pile = state.foundations[suit]
-      if (!pile.length) {
-        return
-      }
-      const layout = foundationLayoutsRef.current[suit]
-      const baseX = topOffsetX + (layout?.x ?? suitIndex * fallbackSpacing)
-      const baseY = topOffsetY + (layout?.y ?? 0)
-
-      pile.forEach((card, stackIndex) => {
-        const cardOffsetY = stackIndex * (cardMetrics.height * 0.02)
-        cards.push({
-          card,
-          suit,
-          suitIndex,
-          stackIndex,
-          baseX,
-          baseY: baseY - cardOffsetY,
-          randomSeed: Math.random(),
-        })
-      })
-    })
-
-    if (!cards.length) {
-      return
-    }
-
-    const shuffledCards = [...cards].sort(() => Math.random() - 0.5)
-    const modeId = Math.floor(Math.random() * CELEBRATION_MODE_COUNT)
-
-    setCelebrationState({
-      modeId,
-      durationMs: CELEBRATION_DURATION_MS,
-      boardWidth: boardWidthValue,
-      boardHeight: boardHeightValue,
-      cards: shuffledCards,
-    })
+    // Task 28-2: Let the last winning move flight/glow finish before celebration motion starts.
+    pendingCelebrationStateRef.current = nextCelebrationState
     updateBoardLocked(true)
+    clearCelebrationStartTimer()
+    celebrationStartTimeoutRef.current = setTimeout(() => {
+      celebrationStartTimeoutRef.current = null
+      startPendingCelebration()
+    }, celebrationHandoffDelayMs)
   }, [
     animationsEnabled,
-    celebrationAnimationsEnabled,
-    boardLayout.height,
-    boardLayout.width,
-    cardMetrics.height,
-    cardMetrics.width,
+    buildCelebrationState,
     celebrationState,
-    ensureCardFlightsReady,
-    foundationLayoutsRef,
-    state.foundations,
+    celebrationAnimationsEnabled,
+    clearCelebrationStartTimer,
+    foundationGlowEnabled,
     state.winCelebrations,
-    topRowLayoutRef,
+    startPendingCelebration,
     updateBoardLocked,
     winCelebrationsRef,
   ])

@@ -66,6 +66,8 @@ export const WIGGLE_TIMING_CONFIG = {
 export const FOUNDATION_GLOW_MAX_OPACITY = 1
 export const FOUNDATION_GLOW_IN_DURATION_MS = 90
 export const FOUNDATION_GLOW_OUT_DURATION_MS = 220
+export const FOUNDATION_GLOW_TOTAL_DURATION_MS =
+  FOUNDATION_GLOW_IN_DURATION_MS + FOUNDATION_GLOW_OUT_DURATION_MS
 export const FOUNDATION_GLOW_COLOR = 'rgba(255, 238, 92, 0.92)'
 export const FOUNDATION_GLOW_FILL_COLOR = 'rgba(255, 238, 92, 0.3)'
 export const FOUNDATION_GLOW_OUTSET = 10
@@ -77,6 +79,11 @@ export const FOUNDATION_GLOW_OUT_TIMING = {
   duration: FOUNDATION_GLOW_OUT_DURATION_MS,
   easing: Easing.bezier(0.2, 0, 0.2, 1),
 } as const
+// Task 28-2: Celebration should begin only after the final winning move's visual handoff finishes.
+export const WIN_CELEBRATION_HANDOFF_DELAY_MS = Math.max(
+  CARD_ANIMATION_DURATION_MS,
+  FOUNDATION_GLOW_TOTAL_DURATION_MS
+)
 export const FOUNDATION_FALLBACK_GAP = 16
 
 // Colour palette
