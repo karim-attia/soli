@@ -51,20 +51,15 @@ export const styles = StyleSheet.create({
     position: 'absolute',
     top: -2,
     left: 3,
-    fontWeight: '700',
     fontSize: 16,
   },
   cardCornerSuit: {
     position: 'absolute',
     top: 0,
     right: 0,
-    fontSize: 12,
   },
   cardSymbol: {
-    textAlignVertical: 'center',
-    textAlign: 'center',
-    fontSize: 28,
-    fontWeight: '600',
+    alignSelf: 'center',
     marginTop: 16,
   },
   celebrationOverlay: {
