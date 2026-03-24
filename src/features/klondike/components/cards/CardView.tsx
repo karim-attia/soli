@@ -43,12 +43,16 @@ const CARD_CORNER_RANK_TOP = Platform.select({
 const CARD_CORNER_RANK_LEFT = 3
 const CARD_CORNER_RANK_FONT = 16
 const CARD_CORNER_SUIT_TOP = Platform.select({
-  ios: 2,
+  ios: 1,
+  default: 1,
+})
+const CARD_CORNER_SUIT_RIGHT = Platform.select({
+  ios: 1,
   default: 0,
 })
 const CARD_CORNER_SUIT_FONT = Platform.select({
   ios: 15,
-  default: 12,
+  default: 11,
 })
 const CARD_SYMBOL_FONT = Platform.select({
   ios: 34,
@@ -88,6 +92,7 @@ export const CardVisual = ({ card, metrics, onPress, disabled }: CardVisualProps
   }
   const cornerSuitStyle = {
     top: scaleValue(CARD_CORNER_SUIT_TOP),
+    right: scaleValue(CARD_CORNER_SUIT_RIGHT),
     fontSize: scaleValue(CARD_CORNER_SUIT_FONT),
     fontFamily: CARD_SUIT_FONT_FAMILY,
     fontWeight: CARD_SUIT_FONT_WEIGHT,

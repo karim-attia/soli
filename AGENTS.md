@@ -6,7 +6,7 @@ Compatibility notice (explicit): This repo makes NO backward-compatibility guara
 
 # Implementation plan
 
-Create a detailed implementation plan for every feature.
+Create a detailed implementation plan for every feature. IF THERE IS NO IMPLEMENTATION PLAN, SEARCH FOR AN EXISTING ONE.
 
 Create a folder @docs/product/<feature-name> if it doesn't exist yet.
 

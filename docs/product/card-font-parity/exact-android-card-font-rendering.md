@@ -155,6 +155,10 @@ Recommended for the current pass:
 - [completed] Generate real merged card-font variants for the old card weights instead of using one `Regular` file for every case.
 - [completed] Normalize suit glyph metrics in the merged font using the Android symbol-font measurements while keeping the wide emoji suit shapes.
 - [completed] Re-run clean Android and iOS builds and verify the weighted merged-font result with sub-agents.
+- [completed] Move the final top-right-corner tuning into dedicated corner-suit font variants instead of relying only on component offsets.
+- [completed] Replace the suit-only corner font with a shared corner text family so the top-left rank and top-right suit use the same family metrics.
+- [in progress] Decide and implement one definitive font architecture for corners/center/rank across iOS and Android, then remove any now-redundant font roles.
+- [in progress] Add a repeatable screenshot-measurement workflow and use it to tune the top-left/top-right corner alignment to the final target.
 
 ## Plan: Files to modify
 
@@ -163,6 +167,8 @@ Recommended for the current pass:
 - [app/_layout.tsx](/Users/karim/kDrive/Code/soli/app/_layout.tsx)
 - [fonts.ts](/Users/karim/kDrive/Code/soli/src/features/klondike/components/cards/fonts.ts)
 - [CardView.tsx](/Users/karim/kDrive/Code/soli/src/features/klondike/components/cards/CardView.tsx)
+- [measure-card-corners.py](/Users/karim/kDrive/Code/soli/scripts/measure-card-corners.py)
+- [card-font-parity-imagemagick-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-imagemagick-guide.md)
 - [card-font-parity-fonttools-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-fonttools-guide.md)
 - [card-font-parity-nanoemoji-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-nanoemoji-guide.md)
 - [33-1.md](/Users/karim/kDrive/Code/soli/docs/delivery/33/33-1.md)
@@ -180,6 +186,8 @@ Recommended for the current pass:
 - [CardTextAndroid.ttf](/Users/karim/kDrive/Code/soli/assets/fonts/CardTextAndroid.ttf)
 - [CardTextAndroid-SemiBold.ttf](/Users/karim/kDrive/Code/soli/assets/fonts/CardTextAndroid-SemiBold.ttf)
 - [CardTextAndroid-Bold.ttf](/Users/karim/kDrive/Code/soli/assets/fonts/CardTextAndroid-Bold.ttf)
+- [measure-card-corners.py](/Users/karim/kDrive/Code/soli/scripts/measure-card-corners.py)
+- [card-font-parity-imagemagick-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-imagemagick-guide.md)
 - [card-font-parity-fonttools-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-fonttools-guide.md)
 - [card-font-parity-nanoemoji-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-nanoemoji-guide.md)
 
@@ -222,7 +230,27 @@ Recommended for the current pass:
 - Suit metric normalization:
   Status: completed. The merged suit glyphs still use the wide Android emoji shapes, but their horizontal metrics now come from `NotoSansSymbols-Regular-Subsetted2.ttf` scaled into the merged font’s `unitsPerEm`. The raw emoji suit advances were `1275`; after normalization they are now `758` for hearts and `620` for diamonds, which materially reduces the oversized empty box around the suit glyphs.
 - Final implementation result:
-  Status: partially successful. Android phone and emulator both kept the good alignment and wide-heart shape, and the top-left rank is now a little stronger thanks to real weighted variants. iOS also improved: the top spacing is a little less cramped and the suits read a bit larger. The remaining gap is now small and mostly visual rather than architectural.
+  Status: successful. Android phone and emulator kept the good alignment and wide-heart shape, and the top-left rank is now a little stronger thanks to real weighted variants. iOS also improved: the top spacing is less cramped and the suits read larger. After the final screenshot-measured tuning pass, the remaining corner mismatch is down to roughly half a pixel in opposite directions across Android and iOS.
+- Final corner alignment measurement:
+  Status: confirmed. Using the final screenshots, the visible top-right suit box and top-left rank box differ by only about `0.5 px` in center position on each platform. Android ends at `top_diff=-1`, `center_diff=-0.5`; iOS ends at `top_diff=+1`, `center_diff=+0.5`. The shared `CARD_CORNER_SUIT_TOP = 1` constant is the cleanest midpoint found from direct screenshot measurement.
+- Cleanup check:
+  Status: clean. No stale suit asset renderer remains in the live path. The remaining repo diff is the intended card-font work plus the updated product doc. No extra runtime cleanup is needed from this pass.
+- Dedicated corner-suit font variants:
+  Status: replaced. This intermediate approach improved the top-right suit, but it also meant the rank and suit no longer shared one corner text family. That was not ideal for natural top/bottom alignment.
+- Shared corner text families:
+  Status: superseded. This intermediate approach improved the corner suit, but it made the architecture harder to reason about and reintroduced role/platform-specific font-family divergence.
+- Definitive single-family concept:
+  Status: in progress. The live implementation is being simplified back to one merged Android-derived family with `400`, `600`, and `700` variants for all card text on both platforms. Corner alignment will now be tuned with measured layout constants and screenshot analysis instead of extra font families.
+- Architecture simplification review:
+  Status: completed. The definitive concept is now one cross-platform card family with real weight variants: `CardTextAndroid` at `400`, `600`, and `700`. The live card path no longer needs separate corner families or platform-specific font-family names. Rank, corner suit, and center suit all use the same bundled family, while sizing and offsets remain in component styles where they can be measured and tuned explicitly.
+- Screenshot measurement workflow:
+  Status: implemented. Added [measure-card-corners.py](/Users/karim/kDrive/Code/soli/scripts/measure-card-corners.py), a repeatable ImageMagick-backed script that measures the visible pixel bounds of the top-left rank and top-right suit inside a cropped card region and reports `top_diff`, `bottom_diff`, and `center_diff`. The next tuning pass uses this script against fresh Android phone and iOS simulator screenshots instead of relying on visual guesses alone.
+- Unified-family corner follow-up:
+  Status: completed. Fresh clean-build screenshots showed that the simplified one-family setup was structurally right, but Android still read the top-right suit a little lighter/smaller than the top-left rank even when the vertical offset was close. The final follow-up kept the single-family concept and strengthened the corner suit via `fontWeight: 600` instead of bringing back separate corner families. This materially improved suit presence on both iOS and Android without reintroducing per-platform font-family divergence.
+- Asset audit and final Android corner alignment:
+  Status: completed. The live app now uses only the three merged runtime assets in `assets/fonts`: `CardTextAndroid.ttf`, `CardTextAndroid-SemiBold.ttf`, and `CardTextAndroid-Bold.ttf`. The old source/reference files `CardRankAndroidBold.ttf` and `CardSuitAndroidEmoji.ttf` were not referenced by the runtime or the current build script anymore, so they were removed to avoid confusion. The old Expo template leftover `SpaceMono-Regular.ttf` was also unused and removed. Fresh Android screenshot measurement showed the corner suit was not mainly “too high”; it was still too tall while sharing the same top alignment. The final fix therefore reverts the Android top offset back to `1` and reduces the Android corner suit font size from `12` to `11` so the top stays aligned while the visible suit height comes down.
+- Missing font-side metric insight:
+  Status: confirmed. The suit glyphs in `CardTextAndroid*.ttf` are color glyphs stored in the `SVG ` table. Their `glyf` bounding boxes are effectively empty, so the remaining visual mismatch is not explained well by `hhea`, `OS/2`, or `hmtx` alone. The missing font-side concept is the actual SVG artwork bounds and padding inside the color glyph documents. That is also why iOS and Android can still differ even on the same font file: their native text engines render the same color-glyph documents differently while still sharing the same horizontal metrics.
 
 ## Testing
 
@@ -252,3 +280,16 @@ Recommended for the current pass:
   - iOS simulator after final iOS sizing pass: [/tmp/soli-ios-merged-pass4.png](/tmp/soli-ios-merged-pass4.png)
   - Android phone after weighted merged-font pass: [/tmp/soli-android-phone-merged-improvement.png](/tmp/soli-android-phone-merged-improvement.png)
   - Android phone final sanity check: [/tmp/soli-android-phone-final-sanity.png](/tmp/soli-android-phone-final-sanity.png)
+  - iOS simulator after screenshot-measured corner alignment pass: [/tmp/soli-ios-merged-pass6-board.png](/tmp/soli-ios-merged-pass6-board.png)
+  - Android phone after screenshot-measured corner alignment pass: [/tmp/soli-android-phone-final-linecheck-2.png](/tmp/soli-android-phone-final-linecheck-2.png)
+  - iOS simulator after dedicated corner-suit font pass: [/tmp/soli-ios-merged-pass7-board.png](/tmp/soli-ios-merged-pass7-board.png)
+  - Android phone after dedicated corner-suit font pass: [/tmp/soli-android-phone-corner-suit-1.png](/tmp/soli-android-phone-corner-suit-1.png)
+  - iOS simulator after shared corner-family font pass: [/tmp/soli-ios-merged-pass8-board.png](/tmp/soli-ios-merged-pass8-board.png)
+  - Android phone after shared corner-family font pass: [/tmp/soli-android-phone-corner-family-1.png](/tmp/soli-android-phone-corner-family-1.png)
+  - iOS simulator after unified single-family clean rebuild: [/tmp/soli-ios-clean-unified-font-board-ready.png](/tmp/soli-ios-clean-unified-font-board-ready.png)
+  - Android phone after unified single-family release install: [/tmp/soli-android-phone-unified-card-font.png](/tmp/soli-android-phone-unified-card-font.png)
+  - iOS simulator after corner-suit weight follow-up: [/tmp/soli-ios-clean-unified-font-weight.png](/tmp/soli-ios-clean-unified-font-weight.png)
+  - Android phone after corner-suit weight follow-up: [/tmp/soli-android-phone-corner-suit-weight-pass.png](/tmp/soli-android-phone-corner-suit-weight-pass.png)
+  - Screenshot measurement workflow examples:
+    - iOS club corner crop example: `python3 scripts/measure-card-corners.py --image /tmp/soli-ios-clean-unified-font-board-ready.png --card-geometry 190x120+12+965 --threshold 80`
+    - Android top-card crop example: `python3 scripts/measure-card-corners.py --image /tmp/soli-android-phone-corner-suit-weight-pass.png --card-geometry 210x130+778+638 --threshold 80`

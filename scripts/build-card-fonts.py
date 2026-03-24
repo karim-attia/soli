@@ -176,7 +176,6 @@ def normalize_suit_metrics_from_symbol_font(suit_font: TTFont, symbol_font: TTFo
       round(left_side_bearing * scale),
     )
 
-
 def merge_rank_glyphs_into_suit_font(rank_font: TTFont, suit_font: TTFont) -> TTFont:
   target_upem = suit_font['head'].unitsPerEm
   scale_upem(rank_font, target_upem)
