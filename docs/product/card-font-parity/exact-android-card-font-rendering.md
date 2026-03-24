@@ -130,6 +130,7 @@ Recommended for the current pass:
 - [completed] Re-run clean iOS and Android verification using sub-agents and compare the results against the prior clean-build screenshots.
 - [completed] Rebuild the suit font from the physical Android phone’s `NotoColorEmoji.ttf`, subset it to card suits only, and add an `SVG` table alongside `COLRv1`.
 - [completed] Re-run clean iOS and Android verification using sub-agents and compare the updated multi-table suit font against the Android-good baseline.
+- [completed] Investigate the remaining Android top-corner misalignment and iOS top-spacing drift after the multi-table font pass.
 
 ## Plan: Files to modify
 
@@ -169,6 +170,12 @@ Recommended for the current pass:
   Status: confirmed. The physical Android phone’s `NotoColorEmoji.ttf` is a `COLRv1` font. The bundled suit asset currently preserves that `COLRv1` table, but iOS still does not match Android. The next fix is to add an `SVG` table to the same suit font so iOS has a second standards-based color representation instead of falling back.
 - Fresh verification after the multi-table suit-font pass:
   Status: confirmed. The rebuilt suit font now contains both `COLRv1` and `SVG` tables. Android phone and emulator kept the same good wide-heart rendering, while iOS clean-build rendering moved materially closer to Android and no longer looks like the tiny fallback-style suit rendering.
+- Root cause of the remaining Android top-corner misalignment:
+  Status: confirmed. Before `ab6c605e03acb648fb2b286ee63302797d71058a`, the top-right suit symbol was rendered through Android system fallback with no explicit `fontFamily`. Android’s text-metrics docs say that when a `Typeface` is created from custom font files, the custom font’s own ascent/descent are reserved, but when using a system fallback typeface, the default font’s metrics are reserved instead. That means the old layout used the default-font line box while drawing fallback suit glyphs inside it, whereas the current layout uses the explicit `CardSuitAndroidEmoji` line box. The `top` offsets were tuned for the old fallback box, not the new custom-font box.
+- Root cause of the remaining iOS narrow top spacing:
+  Status: confirmed. The current iOS card corners are laid out from explicit custom font metrics, not the old platform-default text path. Apple’s font-metrics docs note that `ascender`, `descender`, `capHeight`, and `lineHeight` come directly from the font. Our current explicit rank and suit fonts have materially different metrics from each other and from the old platform-default rendering path, so the same `top: -2` and `top: 0` values produce a tighter visual inset on iOS even though the glyph source is now correct.
+- Why this still differs even though the glyph source is “the same font”:
+  Status: confirmed. Matching the glyph outline source is not enough to reproduce the old layout. The card corners are separate `Text` nodes, and the layout engine positions each node using its own font metrics and native text engine. The shipped fonts currently have different global metrics: `CardRankAndroidBold.ttf` uses `unitsPerEm=2048`, `hhea=1900/-500`, while `CardSuitAndroidEmoji.ttf` uses `unitsPerEm=1024`, `hhea=950/-250`. Even on Android, that is a different text-layout path from the old system-font-plus-fallback rendering, so matching the source font file does not guarantee matching the old line box or baseline behavior.
 
 ## Testing
 
