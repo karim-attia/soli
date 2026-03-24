@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import math
+import re
 import shutil
 import subprocess
 import tempfile
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 from fontTools import subset
 from fontTools.ttLib import TTFont
@@ -28,6 +31,9 @@ MERGED_FAMILY_NAME = 'CardTextAndroid'
 REGULAR_STYLE_NAME = 'Regular'
 SEMIBOLD_STYLE_NAME = 'SemiBold'
 BOLD_STYLE_NAME = 'Bold'
+SUIT_RIGHT_PADDING = 72
+SVG_PATH_NUMBER_PATTERN = re.compile(r'[-+]?(?:\d*\.\d+|\d+)')
+SVG_PATH_CHUNK_PATTERN = re.compile(r'([A-Za-z])([^A-Za-z]*)')
 
 
 @dataclass(frozen=True)
@@ -176,6 +182,56 @@ def normalize_suit_metrics_from_symbol_font(suit_font: TTFont, symbol_font: TTFo
       round(left_side_bearing * scale),
     )
 
+
+def iter_suit_svg_x_bounds(font: TTFont) -> list[tuple[str, float, float]]:
+  svg_table = font.get('SVG ')
+  if svg_table is None:
+    return []
+
+  glyph_order = font.getGlyphOrder()
+  glyph_names = set(SUIT_TEXT)
+  bounds: list[tuple[str, float, float]] = []
+
+  for doc in svg_table.docList:
+    if doc.startGlyphID != doc.endGlyphID:
+      continue
+    glyph_name = glyph_order[doc.startGlyphID]
+    codepoints = {
+      codepoint
+      for cmap_table in font['cmap'].tables
+      if cmap_table.isUnicode()
+      for codepoint, mapped_glyph_name in cmap_table.cmap.items()
+      if mapped_glyph_name == glyph_name
+    }
+    if not codepoints or not any(chr(codepoint) in glyph_names for codepoint in codepoints):
+      continue
+
+    root = ET.fromstring(doc.data)
+    x_values: list[float] = []
+    for path in root.iter('{http://www.w3.org/2000/svg}path'):
+      for command, values in SVG_PATH_CHUNK_PATTERN.findall(path.attrib['d']):
+        numbers = [float(number) for number in SVG_PATH_NUMBER_PATTERN.findall(values)]
+        if command.upper() in {'M', 'L', 'Q', 'C', 'S', 'T'}:
+          x_values.extend(numbers[::2])
+        elif command.upper() == 'H':
+          x_values.extend(numbers)
+    if x_values:
+      bounds.append((glyph_name, min(x_values), max(x_values)))
+
+  return bounds
+
+
+def expand_suit_advance_widths_to_fit_svg_artwork(
+  font: TTFont,
+  *,
+  right_padding: int = SUIT_RIGHT_PADDING,
+) -> None:
+  for glyph_name, _x_min, x_max in iter_suit_svg_x_bounds(font):
+    advance_width, left_side_bearing = font['hmtx'].metrics[glyph_name]
+    minimum_advance_width = math.ceil(x_max + right_padding)
+    if minimum_advance_width > advance_width:
+      font['hmtx'].metrics[glyph_name] = (minimum_advance_width, left_side_bearing)
+
 def merge_rank_glyphs_into_suit_font(rank_font: TTFont, suit_font: TTFont) -> TTFont:
   target_upem = suit_font['head'].unitsPerEm
   scale_upem(rank_font, target_upem)
@@ -217,6 +273,7 @@ def build_merged_card_font_variants(
     if suit_metrics_font is not None:
       normalize_suit_metrics_from_symbol_font(suit_font, deepcopy(suit_metrics_font))
     merged_font = merge_rank_glyphs_into_suit_font(rank_font, suit_font)
+    expand_suit_advance_widths_to_fit_svg_artwork(merged_font)
     full_name = (
       MERGED_FAMILY_NAME
       if variant.style_name == REGULAR_STYLE_NAME

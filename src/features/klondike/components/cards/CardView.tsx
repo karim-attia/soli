@@ -1,5 +1,5 @@
 import React from 'react'
-import { Platform, Pressable, View } from 'react-native'
+import { Pressable, View } from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
 import { Text } from 'tamagui'
 import Animated from 'react-native-reanimated'
@@ -36,28 +36,13 @@ import { rankToLabel } from './utils'
 
 const CARD_PADDING_HORIZONTAL = 4
 const CARD_PADDING_VERTICAL = 6
-const CARD_CORNER_RANK_TOP = Platform.select({
-  ios: 0,
-  default: -2,
-})
+const CARD_CORNER_RANK_TOP = -2
 const CARD_CORNER_RANK_LEFT = 3
 const CARD_CORNER_RANK_FONT = 16
-const CARD_CORNER_SUIT_TOP = Platform.select({
-  ios: 1,
-  default: 1,
-})
-const CARD_CORNER_SUIT_RIGHT = Platform.select({
-  ios: 1,
-  default: 0,
-})
-const CARD_CORNER_SUIT_FONT = Platform.select({
-  ios: 15,
-  default: 11,
-})
-const CARD_SYMBOL_FONT = Platform.select({
-  ios: 34,
-  default: 28,
-})
+const CARD_CORNER_SUIT_TOP = 1
+const CARD_CORNER_SUIT_RIGHT = 2
+const CARD_CORNER_SUIT_FONT = 11
+const CARD_SYMBOL_FONT = 28
 const CARD_SYMBOL_MARGIN_TOP = 16
 
 const deriveCardScale = (metrics: CardMetrics) => {
