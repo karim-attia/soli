@@ -14,10 +14,11 @@
 - `fontTools.ttLib.TTFont` provides direct read/write access for programmatic font processing in Python.
 
 ## Practical usage notes for this task
-- Use `instantiateVariableFont(..., static=True, updateFontNames=True)` on the Android `Roboto-Regular.ttf` source file to create a static 700-weight rank font.
-- Use `fontTools.subset` after instancing so the generated rank font contains only `A234567890JQK`.
-- Save the generated output under `assets/fonts/` so Expo can bundle it without any runtime font transformation.
-- This task now uses `fonttools` only for the generated Roboto Bold rank font. The wide-heart suit glyphs come from exact Android `NotoColorEmoji` exports checked into `assets/card-suits/`.
+- Use `instantiateVariableFont(..., static=True, updateFontNames=False)` on the Android `Roboto-Regular.ttf` source file to create static rank donor variants.
+- Use `fontTools.subset` so the rank donor contains only `A1234567890JQK` and the suit host contains only `♠♣♥♦`.
+- Merge the Roboto rank glyphs into the Android suit host font so the live app can render cards from one bundled family with multiple weights.
+- Save the generated outputs under `assets/fonts/` as the `CardTextAndroid` family variants so Expo can bundle them natively without runtime font transformation.
+- The current shipping approach is font-only again; the earlier `assets/card-suits/` experiment is no longer part of the live path.
 
 ## Example task pattern
 ```py
@@ -26,14 +27,14 @@ from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 
 rank_font = TTFont("Roboto-Regular.ttf")
-rank_font = instantiateVariableFont(rank_font, {"wght": 700}, updateFontNames=True, static=True)
+rank_font = instantiateVariableFont(rank_font, {"wght": 700}, updateFontNames=False, static=True)
 
 rank_subsetter = subset.Subsetter()
-rank_subsetter.populate(text="A234567890JQK")
+rank_subsetter.populate(text="A1234567890JQK")
 rank_subsetter.subset(rank_font)
-rank_font.save("CardRankAndroidBold.ttf")
+rank_font.save("CardTextAndroid-Bold.ttf")
 ```
 
 ## Task fit assessment
-- This task needs exact Android-derived outlines, so a static generated font is preferable to relying on runtime variable-font support.
-- The Python API is sufficient for the bundled rank font; no project runtime dependency is needed.
+- This task needs exact Android-derived outlines and one shared metric system, so static generated variants are preferable to relying on runtime variable-font support or multiple independent families.
+- The Python API is sufficient for the merged bundled family; no project runtime dependency is needed.
