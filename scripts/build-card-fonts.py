@@ -4,23 +4,24 @@ import argparse
 import shutil
 import subprocess
 import tempfile
+from copy import deepcopy
 from pathlib import Path
 
 from fontTools import subset
 from fontTools.ttLib import TTFont
+from fontTools.ttLib.scaleUpem import scale_upem
 from fontTools.varLib.instancer import instantiateVariableFont
 
 DEFAULT_SOURCE_DIR = Path('/tmp/soli-font-check')
 DEFAULT_OUTPUT_DIR = Path('assets/fonts')
 RANK_SOURCE_FILE = 'Roboto-Regular.ttf'
 SUIT_SOURCE_FILE = 'NotoColorEmoji.ttf'
-RANK_OUTPUT_FILE = 'CardRankAndroidBold.ttf'
-SUIT_OUTPUT_FILE = 'CardSuitAndroidEmoji.ttf'
-RANK_TEXT = 'A234567890JQK'
+MERGED_OUTPUT_FILE = 'CardTextAndroid.ttf'
+RANK_TEXT = 'A1234567890JQK'
 SUIT_TEXT = '♠♣♥♦'
+CARD_TEXT = RANK_TEXT + SUIT_TEXT
 RANK_WEIGHT = 700
-RANK_FAMILY_NAME = 'CardRankAndroidBold'
-SUIT_FAMILY_NAME = 'CardSuitAndroidEmoji'
+MERGED_FAMILY_NAME = 'CardTextAndroid'
 REGULAR_STYLE_NAME = 'Regular'
 
 
@@ -63,7 +64,7 @@ def require_tool(name: str) -> str:
   )
 
 
-def generate_rank_font(source_path: Path, output_path: Path) -> None:
+def build_rank_font(source_path: Path) -> TTFont:
   rank_font = TTFont(source_path)
   rank_font = instantiateVariableFont(
     rank_font,
@@ -74,17 +75,10 @@ def generate_rank_font(source_path: Path, output_path: Path) -> None:
   rank_subsetter = build_subsetter()
   rank_subsetter.populate(text=RANK_TEXT)
   rank_subsetter.subset(rank_font)
-  rename_font(
-    rank_font,
-    family_name=RANK_FAMILY_NAME,
-    style_name=REGULAR_STYLE_NAME,
-    full_name=RANK_FAMILY_NAME,
-    postscript_name=RANK_FAMILY_NAME,
-  )
-  rank_font.save(output_path)
+  return rank_font
 
 
-def copy_suit_font(source_path: Path, output_path: Path) -> None:
+def build_suit_font(source_path: Path) -> TTFont:
   with tempfile.TemporaryDirectory(prefix='soli-suit-font-') as temp_dir_name:
     temp_dir = Path(temp_dir_name)
     subset_path = temp_dir / 'subset.ttf'
@@ -114,22 +108,60 @@ def copy_suit_font(source_path: Path, output_path: Path) -> None:
         f'Expected nanoemoji output at {generated_font_path}, but it was not created.'
       )
 
-    shutil.copyfile(generated_font_path, output_path)
+    return TTFont(generated_font_path)
 
-  suit_font = TTFont(output_path)
+
+def glyph_name_for_codepoint(font: TTFont, codepoint: int) -> str | None:
+  for table in font['cmap'].tables:
+    if table.isUnicode() and codepoint in table.cmap:
+      return table.cmap[codepoint]
+  return None
+
+
+def merge_rank_glyphs_into_suit_font(rank_font: TTFont, suit_font: TTFont) -> TTFont:
+  target_upem = suit_font['head'].unitsPerEm
+  scale_upem(rank_font, target_upem)
+
+  new_order = suit_font.getGlyphOrder()[:]
+  for character in RANK_TEXT:
+    codepoint = ord(character)
+    rank_glyph_name = glyph_name_for_codepoint(rank_font, codepoint)
+    if rank_glyph_name is None:
+      raise ValueError(f'Missing glyph for {character!r} in the rank font subset.')
+
+    merged_glyph_name = f'card_{rank_glyph_name}'
+    if merged_glyph_name not in suit_font['glyf'].glyphs:
+      suit_font['glyf'][merged_glyph_name] = deepcopy(rank_font['glyf'][rank_glyph_name])
+      suit_font['hmtx'].metrics[merged_glyph_name] = rank_font['hmtx'].metrics[rank_glyph_name]
+      new_order.append(merged_glyph_name)
+
+    for cmap_table in suit_font['cmap'].tables:
+      if cmap_table.isUnicode():
+        cmap_table.cmap[codepoint] = merged_glyph_name
+
+  suit_font.setGlyphOrder(new_order)
+  suit_font['maxp'].numGlyphs = len(new_order)
+  suit_font['hhea'].numberOfHMetrics = len(suit_font['hmtx'].metrics)
+  return suit_font
+
+
+def build_merged_card_font(rank_source_path: Path, suit_source_path: Path, output_path: Path) -> None:
+  rank_font = build_rank_font(rank_source_path)
+  suit_font = build_suit_font(suit_source_path)
+  merged_font = merge_rank_glyphs_into_suit_font(rank_font, suit_font)
   rename_font(
-    suit_font,
-    family_name=SUIT_FAMILY_NAME,
+    merged_font,
+    family_name=MERGED_FAMILY_NAME,
     style_name=REGULAR_STYLE_NAME,
-    full_name=SUIT_FAMILY_NAME,
-    postscript_name=SUIT_FAMILY_NAME,
+    full_name=MERGED_FAMILY_NAME,
+    postscript_name=MERGED_FAMILY_NAME,
   )
-  suit_font.save(output_path)
+  merged_font.save(output_path)
 
 
 def parse_args() -> argparse.Namespace:
   parser = argparse.ArgumentParser(
-    description='Generate the Android-derived bold rank font and copy the Android color emoji suit font.',
+    description='Generate a single Android-derived card font with Roboto rank glyphs and Android suit glyphs.',
   )
   parser.add_argument(
     '--source-dir',
@@ -159,14 +191,10 @@ def main() -> None:
     raise FileNotFoundError(f'Missing suit font source: {suit_source_path}')
 
   output_dir.mkdir(parents=True, exist_ok=True)
-  rank_output_path = output_dir / RANK_OUTPUT_FILE
-  suit_output_path = output_dir / SUIT_OUTPUT_FILE
+  merged_output_path = output_dir / MERGED_OUTPUT_FILE
+  build_merged_card_font(rank_source_path, suit_source_path, merged_output_path)
 
-  generate_rank_font(rank_source_path, rank_output_path)
-  copy_suit_font(suit_source_path, suit_output_path)
-
-  print(rank_output_path)
-  print(suit_output_path)
+  print(merged_output_path)
 
 
 if __name__ == '__main__':

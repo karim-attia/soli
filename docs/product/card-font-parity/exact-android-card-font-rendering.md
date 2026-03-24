@@ -85,6 +85,21 @@ Cons:
 Recommended for the current pass:
 - Yes. This is now the best fit, because the current suit font from the Android phone is already `COLRv1`, and Google’s color-font guidance says static `COLRv1` fonts should also include an equivalent `SVG` table.
 
+### 6. Single merged Android-derived card font
+
+Pros:
+- Still a font-only renderer
+- Removes the avoidable rank-vs-suit metric mismatch by giving both corners one font family
+- Keeps the Android suit glyph source that already looks good
+- Avoids per-platform spacing constants for rank vs suit
+
+Cons:
+- Requires font construction work instead of simple bundling
+- Does not magically recreate the old Android fallback engine, only the closest single-font approximation
+
+Recommended for the current pass:
+- Yes. This is now the best cross-platform font-only approach, because it replaces the old runtime fallback composition with one explicit bundled card font.
+
 ## Open questions to the user incl. recommendations
 
 - None currently blocking.
@@ -93,12 +108,14 @@ Recommended for the current pass:
 
 - None planned.
 - Build-time tool only: `nanoemoji` for adding an `SVG` color table to the Android-derived suit font.
+- Build-time library already in use: `fontTools` for subsetting, scaling, and merging the glyph sets into a single card font.
 
 ## UX/UI Considerations
 
 - The card renderer should preserve the familiar Android card proportions that users already liked.
 - The top-left rank and top-right suit should sit on the same perceived baseline.
 - The center suit should look full-sized and not shrunken by font metrics.
+- The best chance of preserving spacing without hacks is to encode the spacing assumptions into the font metrics, not into extra platform margins.
 
 ## Components
 
@@ -107,6 +124,7 @@ Recommended for the current pass:
 - Reuse [fonts.ts](/Users/karim/kDrive/Code/soli/src/features/klondike/components/cards/fonts.ts)
 - Reuse [app.json](/Users/karim/kDrive/Code/soli/app.json) for native font embedding
 - Reuse [build-card-fonts.py](/Users/karim/kDrive/Code/soli/scripts/build-card-fonts.py) for reproducible font preparation
+- Reuse [card-font-parity-fonttools-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-fonttools-guide.md) for the merged-font mechanics
 
 ## How to fetch data, how to cache
 
@@ -131,6 +149,7 @@ Recommended for the current pass:
 - [completed] Rebuild the suit font from the physical Android phone’s `NotoColorEmoji.ttf`, subset it to card suits only, and add an `SVG` table alongside `COLRv1`.
 - [completed] Re-run clean iOS and Android verification using sub-agents and compare the updated multi-table suit font against the Android-good baseline.
 - [completed] Investigate the remaining Android top-corner misalignment and iOS top-spacing drift after the multi-table font pass.
+- [completed] Replace the split rank/suit bundled-font setup with one merged Android-derived card font and re-verify on both platforms.
 
 ## Plan: Files to modify
 
@@ -139,6 +158,7 @@ Recommended for the current pass:
 - [app/_layout.tsx](/Users/karim/kDrive/Code/soli/app/_layout.tsx)
 - [fonts.ts](/Users/karim/kDrive/Code/soli/src/features/klondike/components/cards/fonts.ts)
 - [CardView.tsx](/Users/karim/kDrive/Code/soli/src/features/klondike/components/cards/CardView.tsx)
+- [card-font-parity-fonttools-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-fonttools-guide.md)
 - [card-font-parity-nanoemoji-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-nanoemoji-guide.md)
 - [33-1.md](/Users/karim/kDrive/Code/soli/docs/delivery/33/33-1.md)
 - [33-2.md](/Users/karim/kDrive/Code/soli/docs/delivery/33/33-2.md)
@@ -152,8 +172,8 @@ Recommended for the current pass:
 - [scripts/build-card-fonts.py](/Users/karim/kDrive/Code/soli/scripts/build-card-fonts.py)
 - [fonts.ts](/Users/karim/kDrive/Code/soli/src/features/klondike/components/cards/fonts.ts)
 - [CardView.tsx](/Users/karim/kDrive/Code/soli/src/features/klondike/components/cards/CardView.tsx)
-- [CardRankAndroidBold.ttf](/Users/karim/kDrive/Code/soli/assets/fonts/CardRankAndroidBold.ttf)
-- [CardSuitAndroidEmoji.ttf](/Users/karim/kDrive/Code/soli/assets/fonts/CardSuitAndroidEmoji.ttf)
+- [CardTextAndroid.ttf](/Users/karim/kDrive/Code/soli/assets/fonts/CardTextAndroid.ttf)
+- [card-font-parity-fonttools-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-fonttools-guide.md)
 - [card-font-parity-nanoemoji-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-nanoemoji-guide.md)
 
 ## Identified issues and status of these issues
@@ -176,6 +196,10 @@ Recommended for the current pass:
   Status: confirmed. The current iOS card corners are laid out from explicit custom font metrics, not the old platform-default text path. Apple’s font-metrics docs note that `ascender`, `descender`, `capHeight`, and `lineHeight` come directly from the font. Our current explicit rank and suit fonts have materially different metrics from each other and from the old platform-default rendering path, so the same `top: -2` and `top: 0` values produce a tighter visual inset on iOS even though the glyph source is now correct.
 - Why this still differs even though the glyph source is “the same font”:
   Status: confirmed. Matching the glyph outline source is not enough to reproduce the old layout. The card corners are separate `Text` nodes, and the layout engine positions each node using its own font metrics and native text engine. The shipped fonts currently have different global metrics: `CardRankAndroidBold.ttf` uses `unitsPerEm=2048`, `hhea=1900/-500`, while `CardSuitAndroidEmoji.ttf` uses `unitsPerEm=1024`, `hhea=950/-250`. Even on Android, that is a different text-layout path from the old system-font-plus-fallback rendering, so matching the source font file does not guarantee matching the old line box or baseline behavior.
+- Current fix direction:
+  Status: completed. The Android-derived rank glyphs and Android-derived suit glyphs now live in one bundled card font so the rank and suit share a single metric system again.
+- Result of the merged-font pass:
+  Status: partially successful. The merged font materially improved iOS top spacing and rank/suit alignment, but it did not produce a meaningful Android top-corner alignment change. That strongly suggests Android’s remaining drift is not just “two different font metrics” anymore, but also tied to how the explicit custom-font text run is laid out compared with the old system-font-plus-fallback path.
 
 ## Testing
 
@@ -188,3 +212,7 @@ Recommended for the current pass:
   - iOS simulator: [/tmp/soli-ios-verify-fresh.png](/tmp/soli-ios-verify-fresh.png)
   - Android phone: [/tmp/soli-android-phone-latest.png](/tmp/soli-android-phone-latest.png)
   - Android emulator: [/tmp/soli-android-emulator-latest.png](/tmp/soli-android-emulator-latest.png)
+- Merged-font verification artifacts:
+  - iOS simulator: [/tmp/soli-ios-verify-merged.png](/tmp/soli-ios-verify-merged.png)
+  - Android phone: [/tmp/soli-android-phone-merged.png](/tmp/soli-android-phone-merged.png)
+  - Android emulator: [/tmp/soli-android-emulator-merged.png](/tmp/soli-android-emulator-merged.png)

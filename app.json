@@ -47,8 +47,7 @@
         "expo-font",
         {
           "fonts": [
-            "./assets/fonts/CardRankAndroidBold.ttf",
-            "./assets/fonts/CardSuitAndroidEmoji.ttf"
+            "./assets/fonts/CardTextAndroid.ttf"
           ]
         }
       ],
