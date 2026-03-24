@@ -150,6 +150,11 @@ Recommended for the current pass:
 - [completed] Re-run clean iOS and Android verification using sub-agents and compare the updated multi-table suit font against the Android-good baseline.
 - [completed] Investigate the remaining Android top-corner misalignment and iOS top-spacing drift after the multi-table font pass.
 - [completed] Replace the split rank/suit bundled-font setup with one merged Android-derived card font and re-verify on both platforms.
+- [completed] Run a follow-up pass to make the merged rank outlines heavier and slightly relax the iOS corner spacing.
+- [completed] Research the old Android fallback path, inspect the merged-font metadata, and document how runtime weight steering should work with Expo + React Native.
+- [completed] Generate real merged card-font variants for the old card weights instead of using one `Regular` file for every case.
+- [completed] Normalize suit glyph metrics in the merged font using the Android symbol-font measurements while keeping the wide emoji suit shapes.
+- [completed] Re-run clean Android and iOS builds and verify the weighted merged-font result with sub-agents.
 
 ## Plan: Files to modify
 
@@ -173,6 +178,8 @@ Recommended for the current pass:
 - [fonts.ts](/Users/karim/kDrive/Code/soli/src/features/klondike/components/cards/fonts.ts)
 - [CardView.tsx](/Users/karim/kDrive/Code/soli/src/features/klondike/components/cards/CardView.tsx)
 - [CardTextAndroid.ttf](/Users/karim/kDrive/Code/soli/assets/fonts/CardTextAndroid.ttf)
+- [CardTextAndroid-SemiBold.ttf](/Users/karim/kDrive/Code/soli/assets/fonts/CardTextAndroid-SemiBold.ttf)
+- [CardTextAndroid-Bold.ttf](/Users/karim/kDrive/Code/soli/assets/fonts/CardTextAndroid-Bold.ttf)
 - [card-font-parity-fonttools-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-fonttools-guide.md)
 - [card-font-parity-nanoemoji-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-nanoemoji-guide.md)
 
@@ -200,6 +207,22 @@ Recommended for the current pass:
   Status: completed. The Android-derived rank glyphs and Android-derived suit glyphs now live in one bundled card font so the rank and suit share a single metric system again.
 - Result of the merged-font pass:
   Status: partially successful. The merged font materially improved iOS top spacing and rank/suit alignment, but it did not produce a meaningful Android top-corner alignment change. That strongly suggests Android’s remaining drift is not just “two different font metrics” anymore, but also tied to how the explicit custom-font text run is laid out compared with the old system-font-plus-fallback path.
+- Result of the heavier-rank / iOS-corner follow-up:
+  Status: partially successful. Android rank boldness improved slightly while keeping the good corner alignment and wide heart. iOS corners improved only a little, which suggests the remaining iOS issue is now mostly a visual sizing/position tuning problem rather than a wrong font-source problem.
+- Android fallback-path research update:
+  Status: confirmed. On the connected Android phone, `adb shell cmd font dump` shows `sans-serif -> /system/fonts/Roboto-Regular.ttf` at weight `400`, plus fallback families `und-Zsye -> NotoColorEmoji.ttf` and `und-Zsym -> NotoSansSymbols-Regular-Subsetted2.ttf`. That means the old pre-commit card path was almost certainly not “one font”; it was a system text run using Roboto 400-family metrics with Android fallback selecting the suit glyph source at render time.
+- Prior explicit card weights in the codebase:
+  Status: confirmed. Before `ab6c605e03acb648fb2b286ee63302797d71058a`, `cardCornerRank` in the old card styles explicitly requested `fontWeight: '700'`, `cardSymbol` requested `fontWeight: '600'`, and `cardCornerSuit` did not explicitly set a weight.
+- Current merged-font metadata:
+  Status: confirmed. The live `CardTextAndroid.ttf` file currently advertises itself as `Regular` with `OS/2.usWeightClass = 400` and `name` style `Regular`, even when the rank outlines are rebuilt from a heavier Roboto instance. This explains why the font can still read like a 400-weight custom font to native text layout even though the rank outlines were sourced from a heavier variation instance.
+- Current merged-font geometry hint:
+  Status: confirmed. The merged font inherits the suit font’s global metrics and horizontal advance widths (`unitsPerEm = 1024`, `hhea = 950 / -250`, suit glyph advances `1275`). That is a strong hint for the remaining iOS issue: the suit glyphs are being laid out inside the emoji font’s wider color-glyph metrics, so they can look visually smaller than the rank at the same `fontSize`.
+- Recommended next font-only path:
+  Status: completed. The merged card family now ships as real weighted variants: `400` regular, `600` semibold, and `700` bold. Android is registered through the Expo font plugin as one `CardTextAndroid` family with weighted definitions, iOS bundles the three files with matching internal family/style names, and card text now requests `fontWeight` again where the old code did.
+- Suit metric normalization:
+  Status: completed. The merged suit glyphs still use the wide Android emoji shapes, but their horizontal metrics now come from `NotoSansSymbols-Regular-Subsetted2.ttf` scaled into the merged font’s `unitsPerEm`. The raw emoji suit advances were `1275`; after normalization they are now `758` for hearts and `620` for diamonds, which materially reduces the oversized empty box around the suit glyphs.
+- Final implementation result:
+  Status: partially successful. Android phone and emulator both kept the good alignment and wide-heart shape, and the top-left rank is now a little stronger thanks to real weighted variants. iOS also improved: the top spacing is a little less cramped and the suits read a bit larger. The remaining gap is now small and mostly visual rather than architectural.
 
 ## Testing
 
@@ -216,3 +239,16 @@ Recommended for the current pass:
   - iOS simulator: [/tmp/soli-ios-verify-merged.png](/tmp/soli-ios-verify-merged.png)
   - Android phone: [/tmp/soli-android-phone-merged.png](/tmp/soli-android-phone-merged.png)
   - Android emulator: [/tmp/soli-android-emulator-merged.png](/tmp/soli-android-emulator-merged.png)
+- Follow-up verification artifacts:
+  - iOS simulator: [/tmp/soli-ios-verify-merged-pass2-loaded.png](/tmp/soli-ios-verify-merged-pass2-loaded.png)
+  - Android phone: [/tmp/soli-android-phone-merged-3.png](/tmp/soli-android-phone-merged-3.png)
+  - Android emulator: [/tmp/soli-android-emulator-merged-2.png](/tmp/soli-android-emulator-merged-2.png)
+- Research-only verification artifacts:
+  - Android fallback dump from connected phone confirms `sans-serif -> Roboto-Regular.ttf` and fallback families `und-Zsye -> NotoColorEmoji.ttf`, `und-Zsym -> NotoSansSymbols-Regular-Subsetted2.ttf`.
+  - Rebuilt merged font after reverting the temporary 800-setting back to `RANK_WEIGHT = 700`.
+  - Current merged-font metadata after rebuild: `OS/2.usWeightClass = 400`, style name `Regular`, family name `CardTextAndroid`.
+- Weighted merged-font verification artifacts:
+  - iOS simulator after real font variants and metric normalization: [/tmp/soli-ios-merged-pass3.png](/tmp/soli-ios-merged-pass3.png)
+  - iOS simulator after final iOS sizing pass: [/tmp/soli-ios-merged-pass4.png](/tmp/soli-ios-merged-pass4.png)
+  - Android phone after weighted merged-font pass: [/tmp/soli-android-phone-merged-improvement.png](/tmp/soli-android-phone-merged-improvement.png)
+  - Android phone final sanity check: [/tmp/soli-android-phone-final-sanity.png](/tmp/soli-android-phone-final-sanity.png)

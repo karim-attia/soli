@@ -1,5 +1,5 @@
 import React from 'react'
-import { Pressable, View } from 'react-native'
+import { Platform, Pressable, View } from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
 import { Text } from 'tamagui'
 import Animated from 'react-native-reanimated'
@@ -24,17 +24,36 @@ import type {
 } from '../../types'
 import { useCardAnimations } from './animations'
 import { AnimatedView } from './common'
-import { CARD_RANK_FONT_FAMILY, CARD_SUIT_FONT_FAMILY } from './fonts'
+import {
+  CARD_CENTER_SUIT_FONT_WEIGHT,
+  CARD_RANK_FONT_FAMILY,
+  CARD_RANK_FONT_WEIGHT,
+  CARD_SUIT_FONT_FAMILY,
+  CARD_SUIT_FONT_WEIGHT,
+} from './fonts'
 import { styles } from './styles'
 import { rankToLabel } from './utils'
 
 const CARD_PADDING_HORIZONTAL = 4
 const CARD_PADDING_VERTICAL = 6
-const CARD_CORNER_RANK_TOP = -2
+const CARD_CORNER_RANK_TOP = Platform.select({
+  ios: 0,
+  default: -2,
+})
 const CARD_CORNER_RANK_LEFT = 3
 const CARD_CORNER_RANK_FONT = 16
-const CARD_CORNER_SUIT_FONT = 12
-const CARD_SYMBOL_FONT = 28
+const CARD_CORNER_SUIT_TOP = Platform.select({
+  ios: 2,
+  default: 0,
+})
+const CARD_CORNER_SUIT_FONT = Platform.select({
+  ios: 15,
+  default: 12,
+})
+const CARD_SYMBOL_FONT = Platform.select({
+  ios: 34,
+  default: 28,
+})
 const CARD_SYMBOL_MARGIN_TOP = 16
 
 const deriveCardScale = (metrics: CardMetrics) => {
@@ -65,15 +84,19 @@ export const CardVisual = ({ card, metrics, onPress, disabled }: CardVisualProps
     left: scaleValue(CARD_CORNER_RANK_LEFT),
     fontSize: scaleValue(CARD_CORNER_RANK_FONT),
     fontFamily: CARD_RANK_FONT_FAMILY,
+    fontWeight: CARD_RANK_FONT_WEIGHT,
   }
   const cornerSuitStyle = {
+    top: scaleValue(CARD_CORNER_SUIT_TOP),
     fontSize: scaleValue(CARD_CORNER_SUIT_FONT),
     fontFamily: CARD_SUIT_FONT_FAMILY,
+    fontWeight: CARD_SUIT_FONT_WEIGHT,
   }
   const centerSymbolStyle = {
     fontSize: scaleValue(CARD_SYMBOL_FONT),
     marginTop: scaleValue(CARD_SYMBOL_MARGIN_TOP),
     fontFamily: CARD_SUIT_FONT_FAMILY,
+    fontWeight: CARD_CENTER_SUIT_FONT_WEIGHT,
   }
 
   const baseStyle: StyleProp<ViewStyle> = [

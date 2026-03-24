@@ -46,9 +46,34 @@
       [
         "expo-font",
         {
-          "fonts": [
-            "./assets/fonts/CardTextAndroid.ttf"
-          ]
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "CardTextAndroid",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/CardTextAndroid.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/CardTextAndroid-SemiBold.ttf",
+                    "weight": 600
+                  },
+                  {
+                    "path": "./assets/fonts/CardTextAndroid-Bold.ttf",
+                    "weight": 700
+                  }
+                ]
+              }
+            ]
+          },
+          "ios": {
+            "fonts": [
+              "./assets/fonts/CardTextAndroid.ttf",
+              "./assets/fonts/CardTextAndroid-SemiBold.ttf",
+              "./assets/fonts/CardTextAndroid-Bold.ttf"
+            ]
+          }
         }
       ],
       "expo-web-browser",
