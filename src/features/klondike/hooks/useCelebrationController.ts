@@ -22,6 +22,7 @@ import { devLog } from '../../../utils/devLogger'
 import {
   CARD_ANIMATION_DURATION_MS,
   FOUNDATION_FALLBACK_GAP,
+  FOUNDATION_GLOW_TOTAL_DURATION_MS,
   WIN_CELEBRATION_HANDOFF_DELAY_MS,
 } from '../constants'
 import type { CelebrationBindings, CardMetrics } from '../types'
@@ -62,6 +63,33 @@ type UseCelebrationControllerParams = {
 }
 
 const CELEBRATION_DIALOG_DELAY_MS = 30_000
+const CELEBRATION_HANDOFF_LOG_PREFIX = '[CelebrationHandoff]'
+
+type FoundationTopCardIds = Record<Suit, string | null>
+type CelebrationStartReason = 'flight_settled' | 'fallback'
+
+const buildFoundationTopCardIds = (
+  foundations: GameState['foundations']
+): FoundationTopCardIds => ({
+  clubs: foundations.clubs[foundations.clubs.length - 1]?.id ?? null,
+  diamonds: foundations.diamonds[foundations.diamonds.length - 1]?.id ?? null,
+  hearts: foundations.hearts[foundations.hearts.length - 1]?.id ?? null,
+  spades: foundations.spades[foundations.spades.length - 1]?.id ?? null,
+})
+
+const findWinningTopCardId = (
+  previousTopCardIds: FoundationTopCardIds,
+  currentTopCardIds: FoundationTopCardIds
+): string | null => {
+  for (const suit of FOUNDATION_SUIT_ORDER) {
+    const topCardId = currentTopCardIds[suit]
+    if (topCardId && topCardId !== previousTopCardIds[suit]) {
+      return topCardId
+    }
+  }
+
+  return null
+}
 
 export const useCelebrationController = ({
   state,
@@ -78,6 +106,7 @@ export const useCelebrationController = ({
   requestNewGameRef,
 }: UseCelebrationControllerParams) => {
   const [celebrationState, setCelebrationState] = useState<CelebrationState | null>(null)
+  const [celebrationPending, setCelebrationPending] = useState(false)
   const celebrationAssignments = useSharedValue<Record<string, CelebrationAssignment>>({})
   const celebrationProgress = useSharedValue(0)
   const celebrationActive = useSharedValue(0)
@@ -92,8 +121,18 @@ export const useCelebrationController = ({
   const celebrationDialogTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const celebrationDialogShownRef = useRef(false)
   const celebrationStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const celebrationFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingCelebrationStateRef = useRef<CelebrationState | null>(null)
-  const { foundationGlow: foundationGlowEnabled } = useAnimationToggles()
+  const pendingCelebrationQueuedAtRef = useRef<number | null>(null)
+  const pendingWinningCardIdRef = useRef<string | null>(null)
+  const pendingWinningCardSettledRef = useRef(false)
+  const previousFoundationTopCardIdsRef = useRef<FoundationTopCardIds>(
+    buildFoundationTopCardIds(state.foundations)
+  )
+  const {
+    foundationGlow: foundationGlowEnabled,
+    cardFlights: cardFlightsEnabled,
+  } = useAnimationToggles()
 
   const celebrationBindings = useMemo<CelebrationBindings>(
     () => ({
@@ -127,6 +166,20 @@ export const useCelebrationController = ({
       celebrationStartTimeoutRef.current = null
     }
   }, [])
+
+  const clearCelebrationFallbackTimer = useCallback(() => {
+    if (celebrationFallbackTimeoutRef.current) {
+      clearTimeout(celebrationFallbackTimeoutRef.current)
+      celebrationFallbackTimeoutRef.current = null
+    }
+  }, [])
+
+  const logCelebrationHandoff = useCallback(
+    (event: string, details?: Record<string, unknown>) => {
+      devLog('info', `${CELEBRATION_HANDOFF_LOG_PREFIX} ${event}`, details ?? {})
+    },
+    []
+  )
 
   const openCelebrationDialog = useCallback(() => {
     clearCelebrationDialogTimer()
@@ -205,22 +258,45 @@ export const useCelebrationController = ({
     topRowLayoutRef,
   ])
 
-  const startPendingCelebration = useCallback(() => {
-    const pendingCelebration = pendingCelebrationStateRef.current
-    if (!pendingCelebration) {
-      return
-    }
+  const startPendingCelebration = useCallback(
+    (reason: CelebrationStartReason) => {
+      const pendingCelebration = pendingCelebrationStateRef.current
+      if (!pendingCelebration) {
+        return
+      }
 
-    pendingCelebrationStateRef.current = null
-    clearCelebrationStartTimer()
-    ensureCardFlightsReady()
-    setCelebrationState((current) => current ?? pendingCelebration)
-  }, [clearCelebrationStartTimer, ensureCardFlightsReady])
+      const pendingWinningCardId = pendingWinningCardIdRef.current
+      pendingCelebrationStateRef.current = null
+      pendingCelebrationQueuedAtRef.current = null
+      pendingWinningCardIdRef.current = null
+      pendingWinningCardSettledRef.current = false
+      setCelebrationPending(false)
+      clearCelebrationStartTimer()
+      clearCelebrationFallbackTimer()
+      ensureCardFlightsReady()
+      logCelebrationHandoff('start', {
+        ts: Date.now(),
+        reason,
+        pendingWinningCardId,
+      })
+      setCelebrationState((current) => current ?? pendingCelebration)
+    },
+    [
+      clearCelebrationFallbackTimer,
+      clearCelebrationStartTimer,
+      ensureCardFlightsReady,
+      logCelebrationHandoff,
+    ]
+  )
 
   const clearCelebrationAnimations = useCallback(() => {
     celebrationAbortRef.current = false
     celebrationDialogShownRef.current = false
     pendingCelebrationStateRef.current = null
+    pendingCelebrationQueuedAtRef.current = null
+    pendingWinningCardIdRef.current = null
+    pendingWinningCardSettledRef.current = false
+    setCelebrationPending(false)
     celebrationAssignments.value = {}
     celebrationTotal.value = 0
     celebrationMode.value = 0
@@ -231,6 +307,7 @@ export const useCelebrationController = ({
       cancelAnimation(celebrationProgress)
     })()
     clearCelebrationStartTimer()
+    clearCelebrationFallbackTimer()
     clearCelebrationDialogTimer()
   }, [
     celebrationActive,
@@ -239,8 +316,9 @@ export const useCelebrationController = ({
     celebrationMode,
     celebrationProgress,
     celebrationTotal,
-    clearCelebrationStartTimer,
     clearCelebrationDialogTimer,
+    clearCelebrationFallbackTimer,
+    clearCelebrationStartTimer,
   ])
 
   const handleCelebrationAbort = useCallback(() => {
@@ -262,6 +340,74 @@ export const useCelebrationController = ({
     openCelebrationDialog,
     updateBoardLocked,
   ])
+
+  const scheduleCelebrationStart = useCallback(
+    (delayMs: number, reason: CelebrationStartReason) => {
+      clearCelebrationStartTimer()
+      if (delayMs <= 0) {
+        startPendingCelebration(reason)
+        return
+      }
+
+      celebrationStartTimeoutRef.current = setTimeout(() => {
+        celebrationStartTimeoutRef.current = null
+        startPendingCelebration(reason)
+      }, delayMs)
+    },
+    [clearCelebrationStartTimer, startPendingCelebration]
+  )
+
+  const scheduleCelebrationFallback = useCallback(
+    (delayMs: number) => {
+      clearCelebrationFallbackTimer()
+      celebrationFallbackTimeoutRef.current = setTimeout(() => {
+        celebrationFallbackTimeoutRef.current = null
+        logCelebrationHandoff('fallback_timeout_reached', {
+          ts: Date.now(),
+          pendingWinningCardId: pendingWinningCardIdRef.current,
+          delayMs,
+        })
+        startPendingCelebration('fallback')
+      }, delayMs)
+    },
+    [clearCelebrationFallbackTimer, logCelebrationHandoff, startPendingCelebration]
+  )
+
+  const handleWinningCardFlightSettled = useCallback(
+    (cardId: string) => {
+      const pendingWinningCardId = pendingWinningCardIdRef.current
+      if (!pendingCelebrationStateRef.current || !pendingWinningCardId) {
+        return
+      }
+      if (cardId !== pendingWinningCardId || pendingWinningCardSettledRef.current) {
+        return
+      }
+
+      pendingWinningCardSettledRef.current = true
+      const settledAt = Date.now()
+      const queuedAt = pendingCelebrationQueuedAtRef.current ?? settledAt
+      const elapsedSinceQueuedAt = Math.max(0, settledAt - queuedAt)
+      const remainingGlowDelayMs = foundationGlowEnabled
+        ? cardFlightsEnabled
+          ? Math.max(0, WIN_CELEBRATION_HANDOFF_DELAY_MS - elapsedSinceQueuedAt)
+          : Math.max(0, FOUNDATION_GLOW_TOTAL_DURATION_MS - elapsedSinceQueuedAt)
+        : 0
+
+      logCelebrationHandoff('winning_card_settled', {
+        ts: settledAt,
+        cardId,
+        elapsedSinceQueuedAt,
+        remainingGlowDelayMs,
+      })
+      scheduleCelebrationStart(remainingGlowDelayMs, 'flight_settled')
+    },
+    [
+      cardFlightsEnabled,
+      foundationGlowEnabled,
+      logCelebrationHandoff,
+      scheduleCelebrationStart,
+    ]
+  )
 
   useEffect(() => {
     if (!celebrationState) {
@@ -352,61 +498,79 @@ export const useCelebrationController = ({
   }, [celebrationState, developerModeEnabled])
 
   useEffect(() => {
-    if (!animationsEnabled || !celebrationAnimationsEnabled) {
-      return
+    const currentTopCardIds = buildFoundationTopCardIds(state.foundations)
+    const previousTopCardIds = previousFoundationTopCardIdsRef.current
+
+    if (
+      animationsEnabled &&
+      celebrationAnimationsEnabled &&
+      state.winCelebrations > winCelebrationsRef.current
+    ) {
+      winCelebrationsRef.current = state.winCelebrations
+      devLog('info', '[Game] Foundations complete, player won the game.')
+      devLog('log', '[Toast suppressed] Celebration triggered', {
+        celebrations: state.winCelebrations,
+      })
+
+      if (!celebrationState && !pendingCelebrationStateRef.current) {
+        const nextCelebrationState = buildCelebrationState()
+        if (nextCelebrationState) {
+          const winningCardId = findWinningTopCardId(previousTopCardIds, currentTopCardIds)
+          const celebrationHandoffDelayMs = foundationGlowEnabled
+            ? WIN_CELEBRATION_HANDOFF_DELAY_MS
+            : CARD_ANIMATION_DURATION_MS
+          const queuedAt = Date.now()
+
+          // Task 28-2: Wait for the actual winning card settle event, with a guarded fallback.
+          pendingCelebrationStateRef.current = nextCelebrationState
+          pendingCelebrationQueuedAtRef.current = queuedAt
+          pendingWinningCardIdRef.current = winningCardId
+          pendingWinningCardSettledRef.current = false
+          setCelebrationPending(true)
+          updateBoardLocked(true)
+
+          logCelebrationHandoff('queued', {
+            ts: queuedAt,
+            celebrations: state.winCelebrations,
+            winningCardId,
+            celebrationHandoffDelayMs,
+          })
+          logCelebrationHandoff('winning_card_selected', {
+            ts: queuedAt,
+            previousTopCardIds,
+            currentTopCardIds,
+            winningCardId,
+          })
+
+          scheduleCelebrationFallback(celebrationHandoffDelayMs)
+        }
+      }
     }
 
-    if (state.winCelebrations <= winCelebrationsRef.current) {
-      return
-    }
-
-    winCelebrationsRef.current = state.winCelebrations
-    devLog('info', '[Game] Foundations complete, player won the game.')
-    devLog('log', '[Toast suppressed] Celebration triggered', {
-      celebrations: state.winCelebrations,
-    })
-
-    if (celebrationState || pendingCelebrationStateRef.current) {
-      return
-    }
-
-    const nextCelebrationState = buildCelebrationState()
-    if (!nextCelebrationState) {
-      return
-    }
-
-    const celebrationHandoffDelayMs = foundationGlowEnabled
-      ? WIN_CELEBRATION_HANDOFF_DELAY_MS
-      : CARD_ANIMATION_DURATION_MS
-
-    // Task 28-2: Let the last winning move flight/glow finish before celebration motion starts.
-    pendingCelebrationStateRef.current = nextCelebrationState
-    updateBoardLocked(true)
-    clearCelebrationStartTimer()
-    celebrationStartTimeoutRef.current = setTimeout(() => {
-      celebrationStartTimeoutRef.current = null
-      startPendingCelebration()
-    }, celebrationHandoffDelayMs)
+    previousFoundationTopCardIdsRef.current = currentTopCardIds
   }, [
     animationsEnabled,
     buildCelebrationState,
-    celebrationState,
     celebrationAnimationsEnabled,
-    clearCelebrationStartTimer,
+    celebrationState,
     foundationGlowEnabled,
+    logCelebrationHandoff,
+    scheduleCelebrationFallback,
+    state.foundations,
     state.winCelebrations,
-    startPendingCelebration,
     updateBoardLocked,
     winCelebrationsRef,
   ])
 
   return {
     celebrationState,
+    celebrationPending,
     setCelebrationState,
     celebrationBindings,
     celebrationLabel,
     handleCelebrationAbort,
     handleCelebrationComplete,
+    handleWinningCardFlightSettled,
     clearCelebrationDialogTimer,
   }
 }

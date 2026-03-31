@@ -170,6 +170,7 @@ export type CardViewProps = {
   // Card onLayout → measure() → shared value updates can be extremely noisy during rapid SCRUB_TO_INDEX commits.
   layoutTrackingEnabled?: boolean
   onCardMeasured?: (cardId: string, snapshot: CardFlightSnapshot) => void
+  onFlightSettled?: (cardId: string) => void
   cardFlightMemory?: Record<string, CardFlightSnapshot>
   celebrationBindings?: CelebrationBindings
 }
@@ -185,6 +186,7 @@ export const CardView = ({
   cardFlights,
   layoutTrackingEnabled = true,
   onCardMeasured,
+  onFlightSettled,
   cardFlightMemory,
   celebrationBindings,
 }: CardViewProps) => {
@@ -206,6 +208,7 @@ export const CardView = ({
     cardFlights,
     cardFlightMemory,
     onCardMeasured,
+    onFlightSettled,
     celebrationBindings,
   })
 

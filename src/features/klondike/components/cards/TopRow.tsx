@@ -38,6 +38,7 @@ export type TopRowProps = {
   onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
   onFoundationArrival?: (cardId: string | null | undefined) => void
+  onFoundationCardFlightSettled?: (cardId: string) => void
   interactionsLocked: boolean
   // requirement 20-6: When scrubbing, reduce board churn to avoid iOS gesture cancellation
   scrubbingActive: boolean
@@ -46,6 +47,7 @@ export type TopRowProps = {
   onFoundationLayout?: (suit: Suit, layout: LayoutRectangle) => void
   celebrationBindings?: CelebrationBindings
   celebrationActive?: boolean
+  celebrationPending?: boolean
 }
 
 export const TopRow = ({
@@ -62,6 +64,7 @@ export const TopRow = ({
   onCardMeasured,
   cardFlightMemory,
   onFoundationArrival,
+  onFoundationCardFlightSettled,
   interactionsLocked,
   scrubbingActive,
   hideFoundations,
@@ -69,6 +72,7 @@ export const TopRow = ({
   onFoundationLayout,
   celebrationBindings,
   celebrationActive = false,
+  celebrationPending = false,
 }: TopRowProps) => {
   const handleRowLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -92,8 +96,9 @@ export const TopRow = ({
     : state.stock.length
       ? 'stock'
       : 'empty'
-  // Task 1-8: When the game is won, hide empty outlines so celebration looks cleaner.
-  const hideEmptyOutlines = state.hasWon
+  // Task 28-2: Keep the board stable until the final winning card finishes settling.
+  const showWinCleanup = state.hasWon && !celebrationPending
+  const hideEmptyOutlines = showWinCleanup
 
   const handleWastePress = useCallback(() => {
     if (interactionsLocked) {
@@ -147,6 +152,7 @@ export const TopRow = ({
                 onCardMeasured={onCardMeasured}
                 cardFlightMemory={cardFlightMemory}
                 onCardArrived={onFoundationArrival}
+                onTopCardFlightSettled={onFoundationCardFlightSettled}
                 disableInteractions={interactionsLocked}
                 hideTopCard={hideFoundations && !celebrationActive}
                 celebrationBindings={celebrationBindings}
@@ -195,7 +201,7 @@ export const TopRow = ({
         if (columnIndex === stockColumnIndex) {
           return (
             <Stack key="stock" style={slotStyle}>
-              {!state.hasWon && (
+              {!showWinCleanup && (
                 <PileButton
                   label={`${state.stock.length}`}
                   onPress={onDraw}

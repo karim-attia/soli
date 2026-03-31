@@ -41,6 +41,7 @@ export type FoundationPileProps = {
   onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
   onCardArrived?: (cardId: string | null | undefined) => void
+  onTopCardFlightSettled?: (cardId: string) => void
   disableInteractions?: boolean
   hideTopCard?: boolean
   celebrationBindings?: CelebrationBindings
@@ -61,6 +62,7 @@ export const FoundationPile = ({
   onCardMeasured,
   cardFlightMemory,
   onCardArrived,
+  onTopCardFlightSettled,
   disableInteractions = false,
   hideTopCard = false,
   celebrationBindings,
@@ -141,6 +143,7 @@ export const FoundationPile = ({
                 cardFlights={cardFlights}
                 layoutTrackingEnabled={layoutTrackingEnabled}
                 onCardMeasured={onCardMeasured}
+                onFlightSettled={isTop ? onTopCardFlightSettled : undefined}
                 cardFlightMemory={cardFlightMemory}
                 celebrationBindings={celebrationBindings}
               />

@@ -355,10 +355,12 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Hook: own the celebration animation lifecycle and bindings.
   const {
     celebrationState,
+    celebrationPending,
     setCelebrationState,
     celebrationBindings,
     celebrationLabel,
     handleCelebrationAbort,
+    handleWinningCardFlightSettled,
     clearCelebrationDialogTimer,
   } = useCelebrationController({
     state,
@@ -553,6 +555,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   )
 
   const { handleLaunchDemoGame } = useDemoGameLauncher({
+    stateRef,
     dispatch,
     dispatchWithFlight,
     developerModeEnabled,
@@ -637,22 +640,36 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       const pathname = parsed.pathname.toLowerCase()
       const demoParam =
         parsed.searchParams.get('demo') ?? parsed.searchParams.get('demoGame')
+      const normalizedDemoParam = demoParam?.toLowerCase()
+      const demoRequestsAutoSolve =
+        normalizedDemoParam === 'autosolve' || normalizedDemoParam === 'solve'
+      const demoRequestsAutoReveal =
+        demoRequestsAutoSolve ||
+        normalizedDemoParam === 'autoreveal' ||
+        normalizedDemoParam === 'auto'
 
       if (
         host === 'demo-game' ||
         pathname === '/demo-game' ||
         pathname === '/demo' ||
         demoParam === '1' ||
-        demoParam?.toLowerCase() === 'true'
+        normalizedDemoParam === 'true' ||
+        demoRequestsAutoReveal
       ) {
         lastDemoLinkRef.current = incomingUrl
         const autoParam =
           parsed.searchParams.get('auto') ?? parsed.searchParams.get('autoreveal')
         const solveParam =
           parsed.searchParams.get('solve') ?? parsed.searchParams.get('autosolve')
-        const autoSolve = solveParam === '1' || solveParam?.toLowerCase() === 'true'
+        const autoSolve =
+          demoRequestsAutoSolve ||
+          solveParam === '1' ||
+          solveParam?.toLowerCase() === 'true'
         const autoReveal =
-          autoSolve || autoParam === '1' || autoParam?.toLowerCase() === 'true'
+          demoRequestsAutoReveal ||
+          autoSolve ||
+          autoParam === '1' ||
+          autoParam?.toLowerCase() === 'true'
 
         if (!settingsState.developerMode) {
           setDeveloperMode(true)
@@ -925,6 +942,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     cardFlights,
     onCardMeasured: handleCardMeasured,
     cardFlightMemory: cardFlightMemoryRef.current,
+    onFoundationCardFlightSettled: handleWinningCardFlightSettled,
     interactionsLocked: boardLocked,
     // requirement 20-6: Reduce board churn during undo scrubbing (iOS gesture stability)
     scrubbingActive: Platform.OS === 'ios' && isScrubbing,
@@ -933,6 +951,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     onFoundationLayout: handleFoundationLayout,
     celebrationBindings,
     celebrationActive: Boolean(celebrationState),
+    celebrationPending,
   }
 
   const tableauProps: TableauSectionProps = {

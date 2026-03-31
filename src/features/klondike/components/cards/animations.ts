@@ -51,6 +51,7 @@ export type UseCardAnimationsParams = {
   cardFlights: CardFlightRegistry
   cardFlightMemory?: Record<string, CardFlightSnapshot>
   onCardMeasured?: (cardId: string, snapshot: CardFlightSnapshot) => void
+  onFlightSettled?: (cardId: string) => void
   celebrationBindings?: CelebrationBindings
 }
 
@@ -66,6 +67,7 @@ export const useCardAnimations = ({
   cardFlights,
   cardFlightMemory,
   onCardMeasured,
+  onFlightSettled,
   celebrationBindings,
 }: UseCardAnimationsParams) => {
   const {
@@ -86,6 +88,12 @@ export const useCardAnimations = ({
   const lastTriggerRef = useRef(invalidWiggle.key)
   const shouldFloat = typeof offsetTop === 'number' || typeof offsetLeft === 'number'
   const baseZIndex = shouldFloat ? 2 : 0
+  const notifyFlightSettled = useCallback(
+    (settledCardId: string) => {
+      onFlightSettled?.(settledCardId)
+    },
+    [onFlightSettled]
+  )
 
   const positionStyle = useMemo<ViewStyle | undefined>(
     () =>
@@ -317,6 +325,9 @@ export const useCardAnimations = ({
           if (onCardMeasured) {
             runOnJS(onCardMeasured)(cardId, snapshot)
           }
+          if (onFlightSettled) {
+            runOnJS(notifyFlightSettled)(cardId)
+          }
           return
         }
 
@@ -328,16 +339,38 @@ export const useCardAnimations = ({
         if (previous) {
           const deltaX = previous.pageX - layout.pageX
           const deltaY = previous.pageY - layout.pageY
-          if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
+          const hasXMovement = Math.abs(deltaX) > 0.5
+          const hasYMovement = Math.abs(deltaY) > 0.5
+          if (hasXMovement || hasYMovement) {
             flightX.value = deltaX
             flightY.value = deltaY
             flightZ.value = 1000
-            flightX.value = withTiming(0, CARD_FLIGHT_TIMING, (finished) => {
-              if (finished) {
-                flightZ.value = 0
+
+            const handleFlightComplete = (finished?: boolean) => {
+              if (!finished) {
+                return
               }
-            })
-            flightY.value = withTiming(0, CARD_FLIGHT_TIMING)
+              flightZ.value = 0
+              if (onFlightSettled) {
+                runOnJS(notifyFlightSettled)(cardId)
+              }
+            }
+
+            if (hasXMovement) {
+              flightX.value = withTiming(0, CARD_FLIGHT_TIMING, handleFlightComplete)
+            } else {
+              flightX.value = 0
+            }
+
+            if (hasYMovement) {
+              flightY.value = withTiming(
+                0,
+                CARD_FLIGHT_TIMING,
+                hasXMovement ? undefined : handleFlightComplete
+              )
+            } else {
+              flightY.value = 0
+            }
           }
         }
 
@@ -355,6 +388,15 @@ export const useCardAnimations = ({
         if (onCardMeasured) {
           runOnJS(onCardMeasured)(cardId, nextSnapshot)
         }
+        if (
+          !previous ||
+          (Math.abs(previous.pageX - layout.pageX) <= 0.5 &&
+            Math.abs(previous.pageY - layout.pageY) <= 0.5)
+        ) {
+          if (onFlightSettled) {
+            runOnJS(notifyFlightSettled)(cardId)
+          }
+        }
       }
 
       requestAnimationFrame(attemptMeasure)
@@ -370,6 +412,8 @@ export const useCardAnimations = ({
     flightY,
     flightZ,
     onCardMeasured,
+    onFlightSettled,
+    notifyFlightSettled,
   ])
 
   const containerStyle = useMemo(

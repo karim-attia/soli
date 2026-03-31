@@ -5,6 +5,7 @@ import type { LayoutRectangle } from 'react-native'
 import {
   createDemoGameState,
   type GameAction,
+  type GameState,
   type Selection,
   type Suit,
 } from '../../../solitaire/klondike'
@@ -13,6 +14,7 @@ import { devLog } from '../../../utils/devLogger'
 type DispatchWithFlightFn = (action: GameAction, selection?: Selection | null) => void
 
 type UseDemoGameLauncherOptions = {
+  stateRef: MutableRefObject<GameState>
   dispatch: Dispatch<GameAction>
   dispatchWithFlight: DispatchWithFlightFn
   developerModeEnabled: boolean
@@ -40,6 +42,7 @@ type LaunchOptions = {
 export const DEMO_AUTO_STEP_INTERVAL_MS = 300
 
 export const useDemoGameLauncher = ({
+  stateRef,
   dispatch,
   dispatchWithFlight,
   developerModeEnabled,
@@ -60,14 +63,19 @@ export const useDemoGameLauncher = ({
     (options?: { autoReveal?: boolean; autoSolve?: boolean }) => {
       const steps: Array<() => void> = []
 
-      const pushTableauSequence = (columnIndex: number, suit: Suit, maxRank: number) => {
-        for (let rank = 1; rank <= maxRank; rank += 1) {
-          const selection: Selection = {
-            source: 'tableau',
-            columnIndex,
-            cardIndex: Math.max(rank - 1, 0),
-          }
+      const pushTableauSequence = (columnIndex: number, suit: Suit, moveCount: number) => {
+        for (let moveIndex = 0; moveIndex < moveCount; moveIndex += 1) {
           steps.push(() => {
+            const column = stateRef.current.tableau[columnIndex] ?? []
+            const topCardIndex = column.length - 1
+            if (topCardIndex < 0) {
+              return
+            }
+            const selection: Selection = {
+              source: 'tableau',
+              columnIndex,
+              cardIndex: topCardIndex,
+            }
             dispatchWithFlight(
               {
                 type: 'APPLY_MOVE',
@@ -82,15 +90,15 @@ export const useDemoGameLauncher = ({
       }
 
       if (options?.autoReveal) {
-        pushTableauSequence(0, 'clubs', 5)
-        pushTableauSequence(1, 'spades', 5)
+        pushTableauSequence(0, 'hearts', 3)
+        pushTableauSequence(1, 'diamonds', 3)
         pushTableauSequence(4, 'hearts', 5)
         pushTableauSequence(5, 'diamonds', 5)
       }
 
       if (options?.autoSolve) {
-        pushTableauSequence(0, 'clubs', 13)
-        pushTableauSequence(1, 'spades', 13)
+        pushTableauSequence(0, 'hearts', 3)
+        pushTableauSequence(1, 'diamonds', 3)
         pushTableauSequence(4, 'hearts', 5)
         pushTableauSequence(5, 'diamonds', 5)
         pushTableauSequence(2, 'clubs', 13)
@@ -140,7 +148,7 @@ export const useDemoGameLauncher = ({
         )
       }
     },
-    [dispatchWithFlight]
+    [dispatchWithFlight, stateRef]
   )
 
   const handleLaunchDemoGame = useCallback(
