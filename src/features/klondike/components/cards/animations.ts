@@ -230,6 +230,17 @@ export const useCardAnimations = ({
   }, [card.id, invalidMoveEnabled, invalidWiggle.key, invalidWiggle.lookup, wiggle])
 
   useEffect(() => {
+    return () => {
+      cancelAnimation(wiggle)
+      cancelAnimation(flightX)
+      cancelAnimation(flightY)
+      cancelAnimation(flightZ)
+      cancelAnimation(flightOpacity)
+      cancelAnimation(flipScale)
+    }
+  }, [flightOpacity, flightX, flightY, flightZ, flipScale, wiggle])
+
+  useEffect(() => {
     if (!cardFlipEnabled) {
       setRenderFaceUp(card.faceUp)
       flipScale.value = 1
@@ -451,6 +462,12 @@ export const useWasteFanCardAnimation = (targetOffset: number) => {
     })
   }, [targetOffset, translateX, wasteFanEnabled])
 
+  useEffect(() => {
+    return () => {
+      cancelAnimation(translateX)
+    }
+  }, [translateX])
+
   return { positionStyle }
 }
 
@@ -526,6 +543,12 @@ export const useFoundationGlowAnimation = ({
     glowOpacity,
     onCardArrived,
   ])
+
+  useEffect(() => {
+    return () => {
+      cancelAnimation(glowOpacity)
+    }
+  }, [glowOpacity])
 
   return {
     glowStyle,

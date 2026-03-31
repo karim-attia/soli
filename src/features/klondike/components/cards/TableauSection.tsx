@@ -34,6 +34,7 @@ export type TableauSectionProps = {
   interactionsLocked: boolean
   // requirement 20-6: When scrubbing, reduce board churn to avoid iOS gesture cancellation
   scrubbingActive: boolean
+  celebrationPending?: boolean
 }
 
 export const TableauSection = ({
@@ -47,6 +48,7 @@ export const TableauSection = ({
   cardFlightMemory,
   interactionsLocked,
   scrubbingActive,
+  celebrationPending = false,
 }: TableauSectionProps) => (
   <View style={styles.tableauRow}>
     {state.tableau.map((column, columnIndex) => (
@@ -66,6 +68,7 @@ export const TableauSection = ({
         cardFlightMemory={cardFlightMemory}
         disableInteractions={interactionsLocked}
         scrubbingActive={scrubbingActive}
+        celebrationPending={celebrationPending}
       />
     ))}
   </View>
@@ -84,6 +87,7 @@ export type TableauColumnProps = {
   cardFlightMemory: Record<string, CardFlightSnapshot>
   disableInteractions: boolean
   scrubbingActive: boolean
+  celebrationPending?: boolean
 }
 
 export const TableauColumn = ({
@@ -99,6 +103,7 @@ export const TableauColumn = ({
   cardFlightMemory,
   disableInteractions,
   scrubbingActive,
+  celebrationPending = false,
 }: TableauColumnProps) => {
   // Task 1-9: Keep face-up spacing (tap targets), but halve the visible spacing for face-down stacks.
   const faceDownStackOffset = Math.round(
@@ -121,6 +126,7 @@ export const TableauColumn = ({
   const selectedCardIndex = tableauSelection ? tableauSelection.cardIndex : null
   const isFirstColumn = columnIndex === 0
   const isLastColumn = columnIndex === state.tableau.length - 1
+  const showWinCleanup = state.hasWon && !celebrationPending
 
   return (
     <View
@@ -143,9 +149,13 @@ export const TableauColumn = ({
       ]}
       pointerEvents={disableInteractions ? 'none' : 'auto'}
     >
-      {/* Task 1-8: Hide empty-slot outlines during celebration (won state). */}
-      {column.length === 0 && !state.hasWon ? (
-        <EmptySlot highlight={isDroppable} metrics={cardMetrics} />
+      {/* Task 28-2: Fade empty tableau outlines after the visual win handoff, instead of unmounting them in one frame. */}
+      {column.length === 0 ? (
+        <EmptySlot
+          highlight={isDroppable}
+          hidden={showWinCleanup}
+          metrics={cardMetrics}
+        />
       ) : null}
       {column.map((card, cardIndex) => (
         <CardView

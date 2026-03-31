@@ -2,7 +2,7 @@ import React from 'react'
 import { Pressable, View } from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
 import { Text } from 'tamagui'
-import Animated from 'react-native-reanimated'
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated'
 import { RefreshCcw } from '@tamagui/lucide-icons'
 
 import type { Card } from '../../../../solitaire/klondike'
@@ -15,6 +15,7 @@ import {
   COLOR_DROP_BORDER,
   SUIT_COLORS,
   SUIT_SYMBOLS,
+  WIN_CLEANUP_OUTLINE_FADE_TIMING,
 } from '../../constants'
 import type {
   CardFlightRegistry,
@@ -279,23 +280,41 @@ export const CardBack = ({ label, metrics, variant }: CardBackProps) => {
 export const EmptySlot = ({
   label,
   highlight,
+  hidden = false,
   metrics,
 }: {
   label?: string
   highlight: boolean
+  hidden?: boolean
   metrics: CardMetrics
-}) => (
-  <View
-    style={[
-      styles.emptySlot,
-      {
-        width: metrics.width,
-        height: metrics.height,
-        borderRadius: metrics.radius,
-        borderColor: highlight ? COLOR_DROP_BORDER : COLOR_COLUMN_BORDER,
-      },
-    ]}
-  >
-    {!!label && <Text style={styles.emptyLabel}>{label}</Text>}
-  </View>
-)
+}) => {
+  const animatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: withTiming(hidden ? 0 : 1, WIN_CLEANUP_OUTLINE_FADE_TIMING),
+      transform: [
+        {
+          scale: withTiming(hidden ? 0.985 : 1, WIN_CLEANUP_OUTLINE_FADE_TIMING),
+        },
+      ],
+    }),
+    [hidden]
+  )
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.emptySlot,
+        animatedStyle,
+        {
+          width: metrics.width,
+          height: metrics.height,
+          borderRadius: metrics.radius,
+          borderColor: highlight ? COLOR_DROP_BORDER : COLOR_COLUMN_BORDER,
+        },
+      ]}
+    >
+      {!!label && <Text style={styles.emptyLabel}>{label}</Text>}
+    </Animated.View>
+  )
+}

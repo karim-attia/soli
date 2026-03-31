@@ -99,6 +99,7 @@ export const useFlightController = (
 
   const reset = useCallback(() => {
     memoryRef.current = {}
+    invalidSnapshotLoggedRef.current.clear()
     cardFlights.value = {}
   }, [cardFlights])
 

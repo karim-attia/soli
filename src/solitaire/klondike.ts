@@ -104,8 +104,6 @@ export type AutoAction =
   | { type: 'draw' }
   | { type: 'recycle' }
 
-let cardIdCounter = 0
-
 const revealInitialWaste = (stock: Card[]): { stock: Card[]; waste: Card[] } => {
   if (!stock.length) {
     return { stock, waste: [] }
@@ -1263,7 +1261,9 @@ const createDeck = (): Card[] => {
     for (let rankIndex = 0; rankIndex < TOTAL_CARDS_PER_SUIT; rankIndex += 1) {
       const rank = (rankIndex + 1) as Rank
       deck.push({
-        id: `${suit}-${rank}-${(cardIdCounter += 1)}`,
+        // One physical card exists per suit/rank pair, so stable ids are sufficient.
+        // Reusing ids across deals reduces animated-card churn over long sessions.
+        id: `${suit}-${rank}`,
         suit,
         rank,
         faceUp: false,

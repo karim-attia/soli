@@ -966,6 +966,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     interactionsLocked: boardLocked,
     // requirement 20-6: Reduce board churn during undo scrubbing (iOS gesture stability)
     scrubbingActive: Platform.OS === 'ios' && isScrubbing,
+    celebrationPending,
   }
 
   // requirement 20-6: onUndoPress removed - tap is handled by composed gesture

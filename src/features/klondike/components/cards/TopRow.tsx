@@ -187,10 +187,12 @@ export const TopRow = ({
                       cardFlightMemory={cardFlightMemory}
                       disabled={interactionsLocked}
                     />
-                  ) : hideEmptyOutlines ? (
-                    <Stack width={cardMetrics.width} height={cardMetrics.height} />
                   ) : (
-                    <EmptySlot highlight={false} metrics={cardMetrics} />
+                    <EmptySlot
+                      highlight={false}
+                      hidden={hideEmptyOutlines}
+                      metrics={cardMetrics}
+                    />
                   )}
                 </Stack>
               </PileButton>

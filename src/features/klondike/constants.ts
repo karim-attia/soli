@@ -88,6 +88,11 @@ export const WIN_CELEBRATION_GLOW_TAIL_DELAY_MS = Math.max(
   0,
   FOUNDATION_GLOW_TOTAL_DURATION_MS - CARD_ANIMATION_DURATION_MS
 )
+export const WIN_CLEANUP_OUTLINE_FADE_DURATION_MS = 180
+export const WIN_CLEANUP_OUTLINE_FADE_TIMING = {
+  duration: WIN_CLEANUP_OUTLINE_FADE_DURATION_MS,
+  easing: Easing.bezier(0.2, 0, 0.2, 1),
+} as const
 export const FOUNDATION_FALLBACK_GAP = 16
 
 // Colour palette

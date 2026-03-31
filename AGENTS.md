@@ -4,6 +4,8 @@ Use web search to research a tool, library, pattern, etc. to see how others do s
 
 Compatibility notice (explicit): This repo makes NO backward-compatibility guarantees. Breaking changes to are allowed and expected.
 
+Leave small documentation notes throughout the app to better understand reasons why we did something in a certain way. E.g. we do this this way instead of that way because we learned if we do it that way, we will run into issue X.
+
 # Implementation plan
 
 Create a detailed implementation plan for every feature. IF THERE IS NO IMPLEMENTATION PLAN, SEARCH FOR AN EXISTING ONE.
