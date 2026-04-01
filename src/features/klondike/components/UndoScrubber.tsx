@@ -54,6 +54,8 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
 }) => {
   const trackRef = useRef<View>(null)
   const safeArea = useSafeAreaInsets()
+  const bottomDockOffset =
+    safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING
 
   const measureTrack = useCallback(() => {
     const track = trackRef.current
@@ -105,7 +107,17 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
     >
       <AnimatedView
         pointerEvents="none"
-        style={[styles.overlay, { opacity: isScrubbing ? 1 : 0 }]}
+        style={[
+          styles.overlay,
+          {
+            opacity: isScrubbing ? 1 : 0,
+            // Task 20-6: The button can safely use container padding, but the scrubber
+            // overlay is absolutely positioned and will otherwise keep stretching into
+            // the Android system-bar area. Mirror the same dock offset here so the
+            // active scrubber panel stays above the nav/home indicator zone too.
+            bottom: bottomDockOffset,
+          },
+        ]}
       >
         <Slider
           value={sliderValue}
@@ -144,7 +156,6 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
     justifyContent: 'center',
     paddingHorizontal: UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING,
     paddingVertical: 18,

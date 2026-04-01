@@ -12,6 +12,7 @@ Current investigation notes:
 - Follow-up note: the first `maximum`-margin fix also reduced some of the old visual breathing room, because it intentionally stopped stacking the system inset and the fixed dock gap together.
 - Follow-up note 2: raising the fixed dock-gap constant alone did not move the button on devices whose bottom inset was already larger than that constant, because `maximum` semantics ignore the smaller value.
 - Follow-up note 3: even after switching to additive `SafeAreaView` margin, the wrapper itself still differed from the older scrubber geometry enough that the right-side placement did not feel fully restored.
+- Follow-up note 4: restoring the old container padding fixed the button placement, but not the active scrubber panel itself, because the panel is an absolutely positioned overlay.
 
 ## Acceptance Criteria
 
@@ -20,6 +21,7 @@ Current investigation notes:
 - The fix is scoped to the undo scrubber container only and does not retune the board, header, or celebration overlays.
 - The implementation leaves a concise code note explaining why a safe-area-aware floating-bar pattern is used instead of additive manual padding.
 - The undo button retains a little extra bottom breathing room so it does not feel tighter than the pre-fix layout.
+- The active scrubber overlay also stays out of the Android navigation / home-indicator area instead of only the button doing so.
 - The recent-commit analysis is captured here so later regressions can be traced back quickly.
 
 ## Design links
@@ -82,6 +84,19 @@ Cons:
 Recommended:
 - Use this when "make it like before" matters more than keeping the wrapper abstraction.
 
+### 6. Keep the restored button geometry, but inset the absolute scrubber overlay separately
+
+Pros:
+- Preserves the button placement that now feels correct again.
+- Fixes the real remaining regression: the active scrubber panel was still covering the Android system-bar area.
+- Small, targeted change that matches the current component structure.
+
+Cons:
+- Requires remembering that the container and the absolute overlay do not inherit safe-area behavior the same way.
+
+Recommended:
+- Use this now. It cleanly separates "button dock offset" from "active scrubber panel inset."
+
 ### 3. Move all bottom safe-area handling to the parent screen container
 
 Pros:
@@ -136,6 +151,8 @@ Cons:
 - [completed] Restore a small amount of visual bottom breathing room after the first `maximum`-margin pass trimmed it.
 - [completed] Change the bottom safe-area edge mode from `maximum` to additive margin after confirming the device inset was swallowing the extra dock gap.
 - [completed] Restore the scrubber to additive container padding after the wrapper-based versions still felt slightly off on the right side.
+- [completed] Reproduce the active scrubber on-device and confirm the remaining regression only affects the absolute overlay, not the restored button.
+- [completed] Inset the active scrubber overlay with the same bottom dock offset used by the button container.
 
 ## Plan: Files to modify
 
@@ -163,6 +180,8 @@ Cons:
   Status: confirmed on physical Android `A065`; fixed by switching the wrapper to additive bottom margin so the fixed dock gap is applied on top of the inset again.
 - The `SafeAreaView` wrapper versions still did not feel identical to the older scrubber placement.
   Status: treated as a layout-fidelity issue; mitigated by restoring the original additive `paddingBottom` approach directly on the scrubber container.
+- The restored container padding fixes the idle button but does not automatically fix the active scrubber overlay because the overlay is absolutely positioned.
+  Status: confirmed by physical-device screenshot; fixed by mirroring the bottom dock offset on the overlay itself.
 
 ## Testing
 
@@ -193,3 +212,8 @@ Cons:
   - Layout-fidelity follow-up: the scrubber wrapper was then removed so the container once again uses direct additive `paddingBottom` (`safe area + 20`) just like the pre-wrapper layout.
   - Wrapper-removal verification: the rebuilt app installed on `A065` with `lastUpdateTime=2026-04-01 16:26:38`.
   - The final screenshot showed the scrubber on the restored additive container layout, which is the closest match to the older pre-wrapper geometry on both the bottom and right edges.
+  - Regression follow-up: a later on-device scrub screenshot showed that the button was correct again, but the active scrubber overlay still stretched into the Android nav-bar area because it is an absolute layer.
+  - Final fix: the overlay now receives the same bottom dock offset as the button container, so both states respect the safe area again.
+  - Overlay-safe-area verification: the rebuilt app installed on `A065` with `lastUpdateTime=2026-04-01 23:08:36`.
+  - Idle-state screenshot verified the button still sits above the Android nav bar.
+  - Active-scrub screenshot verified the scrubber panel now stops above the nav-bar area too, instead of stretching through it.
