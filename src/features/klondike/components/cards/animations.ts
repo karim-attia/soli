@@ -47,6 +47,7 @@ export type UseCardAnimationsParams = {
   offsetTop?: number
   offsetLeft?: number
   isSelected?: boolean
+  suppressFlightOnFaceUpChange?: boolean
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
   cardFlightMemory?: Record<string, CardFlightSnapshot>
@@ -63,6 +64,7 @@ export const useCardAnimations = ({
   offsetTop,
   offsetLeft,
   isSelected: _isSelected,
+  suppressFlightOnFaceUpChange = false,
   invalidWiggle,
   cardFlights,
   cardFlightMemory,
@@ -86,8 +88,10 @@ export const useCardAnimations = ({
   const flightOpacity = useSharedValue(cardFlightsEnabled && previousSnapshot ? 0 : 1)
   const flipScale = useSharedValue(1)
   const lastTriggerRef = useRef(invalidWiggle.key)
+  const previousFaceUpRef = useRef(card.faceUp)
   const shouldFloat = typeof offsetTop === 'number' || typeof offsetLeft === 'number'
   const baseZIndex = shouldFloat ? 2 : 0
+  const faceUpChanged = previousFaceUpRef.current !== card.faceUp
   const notifyFlightSettled = useCallback(
     (settledCardId: string) => {
       onFlightSettled?.(settledCardId)
@@ -258,9 +262,14 @@ export const useCardAnimations = ({
     })
   }, [card.faceUp, cardFlipEnabled, flipScale, renderFaceUp])
 
+  useEffect(() => {
+    previousFaceUpRef.current = card.faceUp
+  }, [card.faceUp])
+
   const handleCardLayout = useCallback(() => {
     const cardId = card.id
-    const snapshotBeforeLayout = cardFlightMemory?.[cardId]
+    const snapshotBeforeLayout =
+      suppressFlightOnFaceUpChange && faceUpChanged ? undefined : cardFlightMemory?.[cardId]
     if (cardFlightsEnabled && snapshotBeforeLayout) {
       flightOpacity.value = 0
     }
@@ -418,6 +427,7 @@ export const useCardAnimations = ({
     cardFlights,
     cardFlightsEnabled,
     cardRef,
+    faceUpChanged,
     flightOpacity,
     flightX,
     flightY,
@@ -425,6 +435,7 @@ export const useCardAnimations = ({
     onCardMeasured,
     onFlightSettled,
     notifyFlightSettled,
+    suppressFlightOnFaceUpChange,
   ])
 
   const containerStyle = useMemo(

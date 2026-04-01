@@ -12,6 +12,7 @@ const ACE_RANK = 1
 const KING_RANK = 13
 const TOTAL_CARDS_PER_SUIT = 13
 const RED_SUITS = new Set(['hearts', 'diamonds'])
+let deckInstanceCounter = 0
 const SUIT_HASH_VALUES: Record<Suit, number> = {
   clubs: 1,
   diamonds: 2,
@@ -1256,14 +1257,15 @@ const cloneTableau = (tableau: Tableau): Tableau =>
   tableau.map((column) => cloneCards(column))
 
 const createDeck = (): Card[] => {
+  const deckInstanceId = (deckInstanceCounter += 1).toString(36)
   const deck: Card[] = []
   SUITS.forEach((suit) => {
     for (let rankIndex = 0; rankIndex < TOTAL_CARDS_PER_SUIT; rankIndex += 1) {
       const rank = (rankIndex + 1) as Rank
       deck.push({
-        // One physical card exists per suit/rank pair, so stable ids are sufficient.
-        // Reusing ids across deals reduces animated-card churn over long sessions.
-        id: `${suit}-${rank}`,
+        // Card ids must be unique per deal so animated card views do not reuse
+        // face-up or flight state from a previous game.
+        id: `${suit}-${rank}-${deckInstanceId}`,
         suit,
         rank,
         faceUp: false,

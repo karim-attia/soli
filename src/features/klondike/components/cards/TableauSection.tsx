@@ -163,6 +163,7 @@ export const TableauColumn = ({
           card={card}
           metrics={cardMetrics}
           offsetTop={cardOffsets[cardIndex]}
+          suppressFlightOnFaceUpChange
           isSelected={
             columnSelected &&
             selectedCardIndex !== null &&

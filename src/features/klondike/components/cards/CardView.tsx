@@ -164,6 +164,7 @@ export type CardViewProps = {
   offsetTop?: number
   offsetLeft?: number
   isSelected?: boolean
+  suppressFlightOnFaceUpChange?: boolean
   onPress?: () => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
@@ -182,6 +183,7 @@ export const CardView = ({
   offsetTop,
   offsetLeft,
   isSelected,
+  suppressFlightOnFaceUpChange,
   onPress,
   invalidWiggle,
   cardFlights,
@@ -205,6 +207,7 @@ export const CardView = ({
     offsetTop,
     offsetLeft,
     isSelected,
+    suppressFlightOnFaceUpChange,
     invalidWiggle,
     cardFlights,
     cardFlightMemory,
