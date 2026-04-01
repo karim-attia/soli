@@ -90,6 +90,7 @@ export const FoundationPile = ({
         ? COLOR_FOUNDATION_BORDER
         : COLOR_COLUMN_BORDER
   const highlightOutlineOnTop = !showEmptyOutline && (isSelected || isDroppable)
+  const renderedCards = celebrationActive ? cards : topCard ? [topCard] : []
 
   return (
     <Pressable
@@ -123,8 +124,9 @@ export const FoundationPile = ({
         ]}
       />
       {topCard ? (
-        cards.map((card, index) => {
-          const isTop = index === cards.length - 1
+        renderedCards.map((card, index) => {
+          const actualIndex = celebrationActive ? index : cards.length - 1
+          const isTop = actualIndex === cards.length - 1
           return (
             <AnimatedView
               key={card.id}
@@ -133,7 +135,7 @@ export const FoundationPile = ({
                 styles.foundationCard,
                 !isTop && !celebrationActive ? styles.foundationStackedCard : undefined,
                 hideTopCard && isTop ? styles.hiddenCard : undefined,
-                { zIndex: index + 1 },
+                { zIndex: actualIndex + 1 },
               ]}
             >
               <CardView
@@ -141,7 +143,7 @@ export const FoundationPile = ({
                 metrics={cardMetrics}
                 invalidWiggle={isTop ? invalidWiggle : EMPTY_INVALID_WIGGLE}
                 cardFlights={cardFlights}
-                layoutTrackingEnabled={layoutTrackingEnabled}
+                layoutTrackingEnabled={layoutTrackingEnabled && isTop}
                 onCardMeasured={onCardMeasured}
                 onFlightSettled={isTop ? onTopCardFlightSettled : undefined}
                 cardFlightMemory={cardFlightMemory}

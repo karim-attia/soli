@@ -273,7 +273,9 @@ export const useCardAnimations = ({
   const handleCardLayout = useCallback(() => {
     const cardId = card.id
     const snapshotBeforeLayout =
-      suppressFlightOnFaceUpChange && faceUpChanged ? undefined : cardFlightMemory?.[cardId]
+      suppressFlightOnFaceUpChange && faceUpChanged
+        ? undefined
+        : cardFlightMemory?.[cardId]
     if (cardFlightsEnabled && snapshotBeforeLayout) {
       flightOpacity.value = 0
     }
@@ -341,7 +343,10 @@ export const useCardAnimations = ({
             width: layout.width,
             height: layout.height,
           }
-          const snapshotChanged = upsertSharedSnapshot(snapshot)
+          const snapshotChanged = !areCardFlightSnapshotsEquivalent(
+            prevSnapshot,
+            snapshot
+          )
           flightX.value = 0
           flightY.value = 0
           flightZ.value = 0
@@ -359,7 +364,9 @@ export const useCardAnimations = ({
           | CardFlightSnapshot
           | undefined
         const previousCandidate = prevSnapshot ?? existingSnapshot
-        const previous = isValidCardFlightSnapshot(previousCandidate) ? previousCandidate : null
+        const previous = isValidCardFlightSnapshot(previousCandidate)
+          ? previousCandidate
+          : null
         if (previous) {
           const deltaX = previous.pageX - layout.pageX
           const deltaY = previous.pageY - layout.pageY
@@ -416,7 +423,7 @@ export const useCardAnimations = ({
         }
       }
 
-      requestAnimationFrame(attemptMeasure)
+      attemptMeasure()
     })(snapshotBeforeLayout ?? null)
   }, [
     card.id,
@@ -465,9 +472,7 @@ export const useWasteFanCardAnimation = (targetOffset: number) => {
       translateX.value = targetOffset
       return
     }
-    translateX.value = withTiming(targetOffset, WASTE_TIMING_CONFIG, () => {
-      translateX.value = targetOffset
-    })
+    translateX.value = withTiming(targetOffset, WASTE_TIMING_CONFIG)
   }, [targetOffset, translateX, wasteFanEnabled])
 
   useEffect(() => {
@@ -520,6 +525,14 @@ export const useFoundationGlowAnimation = ({
       return
     }
 
+    if (celebrationActive) {
+      // Once celebration takes over, the foundation glow no longer adds useful
+      // feedback and just keeps extra animation work alive on the UI thread.
+      lastGlowCardRef.current = currentId
+      glowOpacity.value = 0
+      return
+    }
+
     if (!currentId) {
       lastGlowCardRef.current = null
       glowOpacity.value = 0
@@ -544,13 +557,7 @@ export const useFoundationGlowAnimation = ({
       withTiming(FOUNDATION_GLOW_MAX_OPACITY, FOUNDATION_GLOW_IN_TIMING),
       withTiming(0, FOUNDATION_GLOW_OUT_TIMING)
     )
-  }, [
-    cards,
-    celebrationActive,
-    foundationGlowEnabled,
-    glowOpacity,
-    onCardArrived,
-  ])
+  }, [cards, celebrationActive, foundationGlowEnabled, glowOpacity, onCardArrived])
 
   useEffect(() => {
     return () => {

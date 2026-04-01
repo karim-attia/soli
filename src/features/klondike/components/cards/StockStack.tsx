@@ -5,7 +5,6 @@ import { Text, Stack } from 'tamagui'
 import type { Card } from '../../../../solitaire/klondike'
 import type { CardFlightSnapshot } from '../../../../animation/flightController'
 import type { CardFlightRegistry, CardMetrics, InvalidWiggleConfig } from '../../types'
-import { EMPTY_INVALID_WIGGLE } from '../../types'
 import { CardView } from './CardView'
 import { styles } from './styles'
 
@@ -47,6 +46,8 @@ export const StockStack = ({
     )
   }
 
+  const topCard = cards[cards.length - 1]
+
   return (
     <Stack
       pointerEvents="none"
@@ -59,30 +60,20 @@ export const StockStack = ({
         },
       ]}
     >
-      {cards.map((card, index) => {
-        const isTopCard = index === cards.length - 1
-        return (
-          <View
-            key={card.id}
-            pointerEvents="none"
-            style={[
-              styles.stockCardWrapper,
-              { zIndex: index + 1 },
-              !isTopCard && styles.hiddenCard,
-            ]}
-          >
-            <CardView
-              card={card}
-              metrics={metrics}
-              invalidWiggle={isTopCard ? invalidWiggle : EMPTY_INVALID_WIGGLE}
-              cardFlights={cardFlights}
-              layoutTrackingEnabled={layoutTrackingEnabled}
-              onCardMeasured={onCardMeasured}
-              cardFlightMemory={cardFlightMemory}
-            />
-          </View>
-        )
-      })}
+      <View
+        pointerEvents="none"
+        style={[styles.stockCardWrapper, { zIndex: cards.length }]}
+      >
+        <CardView
+          card={topCard}
+          metrics={metrics}
+          invalidWiggle={invalidWiggle}
+          cardFlights={cardFlights}
+          layoutTrackingEnabled={layoutTrackingEnabled}
+          onCardMeasured={onCardMeasured}
+          cardFlightMemory={cardFlightMemory}
+        />
+      </View>
       {label ? (
         <Text pointerEvents="none" style={[styles.cardBackText, styles.stockLabel]}>
           {label}

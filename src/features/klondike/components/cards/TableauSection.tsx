@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { memo } from 'react'
 import { View } from 'react-native'
 
 import type { Card } from '../../../../solitaire/klondike'
@@ -22,6 +22,26 @@ import { styles } from './styles'
 
 const FACE_DOWN_STACK_OFFSET_DIVISOR = 2
 
+const areCardMetricsEqual = (previous: CardMetrics, next: CardMetrics): boolean => {
+  return (
+    previous.width === next.width &&
+    previous.height === next.height &&
+    previous.stackOffset === next.stackOffset &&
+    previous.radius === next.radius
+  )
+}
+
+const getTableauSelectionKey = (selection: GameState['selected']): string => {
+  if (!selection || selection.source !== 'tableau') {
+    return 'none'
+  }
+  return `${selection.columnIndex}:${selection.cardIndex}`
+}
+
+const areTableauDropHintsEqual = (previous: DropHints, next: DropHints): boolean => {
+  return previous.tableau.every((value, index) => value === next.tableau[index])
+}
+
 export type TableauSectionProps = {
   state: GameState
   cardMetrics: CardMetrics
@@ -37,7 +57,7 @@ export type TableauSectionProps = {
   celebrationPending?: boolean
 }
 
-export const TableauSection = ({
+const TableauSectionComponent = ({
   state,
   cardMetrics,
   dropHints,
@@ -72,6 +92,25 @@ export const TableauSection = ({
       />
     ))}
   </View>
+)
+
+export const TableauSection = memo(
+  TableauSectionComponent,
+  (previous, next) =>
+    previous.state.tableau === next.state.tableau &&
+    previous.state.hasWon === next.state.hasWon &&
+    getTableauSelectionKey(previous.state.selected) ===
+      getTableauSelectionKey(next.state.selected) &&
+    previous.interactionsLocked === next.interactionsLocked &&
+    previous.scrubbingActive === next.scrubbingActive &&
+    previous.celebrationPending === next.celebrationPending &&
+    previous.invalidWiggle.key === next.invalidWiggle.key &&
+    previous.cardFlights === next.cardFlights &&
+    previous.cardFlightMemory === next.cardFlightMemory &&
+    previous.onAutoMove === next.onAutoMove &&
+    previous.onCardMeasured === next.onCardMeasured &&
+    areCardMetricsEqual(previous.cardMetrics, next.cardMetrics) &&
+    areTableauDropHintsEqual(previous.dropHints, next.dropHints)
 )
 
 export type TableauColumnProps = {

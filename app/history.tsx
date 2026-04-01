@@ -27,6 +27,7 @@ import {
   type HistoryPreviewColumn,
   useHistory,
 } from '../src/state/history'
+import { useReducedMotionPreference } from '../src/state/settings'
 import { devLog } from '../src/utils/devLogger'
 import { formatElapsedDuration } from '../src/utils/time'
 import { useDrawerOpener } from '../src/navigation/useDrawerOpener'
@@ -38,6 +39,7 @@ function HistoryScreen() {
   const navigation = useNavigation()
   const openDrawer = useDrawerOpener()
   const { entries, solvedCount, hydrated } = useHistory()
+  const reducedMotionEnabled = useReducedMotionPreference()
   const totalEntries = entries.length
   // Task 10-6: Count incomplete entries (not solved and not active)
   const incompleteCount = useMemo(
@@ -56,15 +58,22 @@ function HistoryScreen() {
     setSheetOpen(true)
   }, [])
 
-  const handleSheetOpenChange = useCallback((nextOpen: boolean) => {
-    setSheetOpen(nextOpen)
-    if (!nextOpen) {
-      // Allow sheet close animation to finish before clearing state
-      setTimeout(() => {
-        setSelectedEntry(null)
-      }, 240)
-    }
-  }, [])
+  const handleSheetOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setSheetOpen(nextOpen)
+      if (!nextOpen) {
+        if (reducedMotionEnabled) {
+          setSelectedEntry(null)
+          return
+        }
+        // Allow sheet close animation to finish before clearing state only when motion is enabled.
+        setTimeout(() => {
+          setSelectedEntry(null)
+        }, 240)
+      }
+    },
+    [reducedMotionEnabled]
+  )
 
   const theme = useTheme()
   useLayoutEffect(() => {
@@ -118,6 +127,7 @@ function HistoryScreen() {
         entry={selectedEntry}
         open={sheetOpen}
         onOpenChange={handleSheetOpenChange}
+        reducedMotionEnabled={reducedMotionEnabled}
         snapPoints={sheetSnapPoints}
         onSnapPointsChange={setSheetSnapPoints}
       />
@@ -390,6 +400,7 @@ type HistoryPreviewSheetProps = {
   entry: HistoryEntry | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  reducedMotionEnabled?: boolean
   snapPoints: number[]
   onSnapPointsChange: Dispatch<SetStateAction<number[]>>
 }
@@ -430,6 +441,7 @@ const HistoryPreviewSheet = ({
   entry,
   open,
   onOpenChange,
+  reducedMotionEnabled = false,
   snapPoints,
   onSnapPointsChange,
 }: HistoryPreviewSheetProps) => {
@@ -476,7 +488,7 @@ const HistoryPreviewSheet = ({
       snapPointsMode="percent"
       snapPoints={snapPoints}
       dismissOnSnapToBottom
-      animation="medium"
+      animation={reducedMotionEnabled ? 'quickest' : 'medium'}
     >
       <Sheet.Overlay bg="rgba(0,0,0,0.35)" />
       <Sheet.Frame

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { AccessibilityInfo } from 'react-native'
 import {
   createContext,
   useCallback,
@@ -48,6 +49,7 @@ export type SettingsState = {
 type SettingsContextValue = {
   state: SettingsState
   hydrated: boolean
+  reducedMotionEnabled: boolean
   setThemeMode: (mode: ThemeMode) => void
   setGlobalAnimationsEnabled: (enabled: boolean) => void
   setAnimationPreference: (key: AnimationPreferenceKey, enabled: boolean) => void
@@ -140,6 +142,7 @@ const SettingsContext = createContext<SettingsContextValue | undefined>(undefine
 export const SettingsProvider = ({ children }: PropsWithChildren) => {
   const [state, setState] = useState<SettingsState>(DEFAULT_SETTINGS)
   const [hydrated, setHydrated] = useState(false)
+  const [reducedMotionEnabled, setReducedMotionEnabled] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -162,6 +165,37 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
 
     return () => {
       cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    // Keep our motion policy aligned with the OS accessibility setting instead of
+    // relying only on in-app toggles. The provider owns this subscription so card-level
+    // animation hooks can read the value cheaply without adding one OS listener per card.
+    void AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (!cancelled) {
+          setReducedMotionEnabled(enabled)
+        }
+      })
+      .catch(() => {
+        // If the query fails on a platform/runtime, fall back to the persisted app setting only.
+      })
+
+    const subscription = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      (enabled) => {
+        if (!cancelled) {
+          setReducedMotionEnabled(enabled)
+        }
+      }
+    )
+
+    return () => {
+      cancelled = true
+      subscription.remove()
     }
   }, [])
 
@@ -304,6 +338,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     () => ({
       state,
       hydrated,
+      reducedMotionEnabled,
       setThemeMode,
       setGlobalAnimationsEnabled,
       setAnimationPreference,
@@ -315,6 +350,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     }),
     [
       hydrated,
+      reducedMotionEnabled,
       setAnimationPreference,
       setGlobalAnimationsEnabled,
       setStatisticsPreference,
@@ -338,13 +374,19 @@ export function useSettings(): SettingsContextValue {
   return context
 }
 
+export function useReducedMotionPreference(): boolean {
+  const { reducedMotionEnabled } = useSettings()
+  return reducedMotionEnabled
+}
+
 export function useAnimationToggles(): AnimationPreferences {
   const {
     state: { animations },
   } = useSettings()
+  const reducedMotionEnabled = useReducedMotionPreference()
 
   return useMemo(() => {
-    if (!animations.master) {
+    if (!animations.master || reducedMotionEnabled) {
       return {
         ...animations,
         cardFlights: false,
@@ -357,7 +399,7 @@ export function useAnimationToggles(): AnimationPreferences {
     }
 
     return animations
-  }, [animations])
+  }, [animations, reducedMotionEnabled])
 }
 
 export function useStatisticsPreferences(): StatisticsPreferences {

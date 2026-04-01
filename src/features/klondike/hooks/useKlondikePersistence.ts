@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { devLog } from '../../../utils/devLogger'
 import {
@@ -18,6 +18,32 @@ type UseKlondikePersistenceParams = {
   currentGameEntryIdRef: React.MutableRefObject<string | null>
 }
 
+const PERSISTENCE_WRITE_DEBOUNCE_MS = 180
+
+const didGameShapeChange = (previous: GameState | null, next: GameState): boolean => {
+  if (!previous) {
+    return true
+  }
+
+  return (
+    previous.stock !== next.stock ||
+    previous.waste !== next.waste ||
+    previous.foundations !== next.foundations ||
+    previous.tableau !== next.tableau ||
+    previous.history !== next.history ||
+    previous.future !== next.future ||
+    previous.selected !== next.selected ||
+    previous.moveCount !== next.moveCount ||
+    previous.autoCompleteRuns !== next.autoCompleteRuns ||
+    previous.autoQueue !== next.autoQueue ||
+    previous.isAutoCompleting !== next.isAutoCompleting ||
+    previous.hasWon !== next.hasWon ||
+    previous.winCelebrations !== next.winCelebrations ||
+    previous.shuffleId !== next.shuffleId ||
+    previous.solvableId !== next.solvableId
+  )
+}
+
 export const useKlondikePersistence = ({
   state,
   dispatch,
@@ -26,6 +52,8 @@ export const useKlondikePersistence = ({
   currentGameEntryIdRef,
 }: UseKlondikePersistenceParams) => {
   const [storageHydrationComplete, setStorageHydrationComplete] = useState(false)
+  const lastQueuedStateRef = useRef<GameState | null>(null)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     let isCancelled = false
@@ -98,22 +126,53 @@ export const useKlondikePersistence = ({
       return
     }
 
-    let isCancelled = false
+    const previousQueuedState = lastQueuedStateRef.current
+    const gameShapeChanged = didGameShapeChange(previousQueuedState, state)
+    const timerBoundaryChanged =
+      !previousQueuedState ||
+      previousQueuedState.timerState !== state.timerState ||
+      previousQueuedState.timerStartedAt !== state.timerStartedAt
 
-    ;(async () => {
-      try {
-        await saveGameStateWithHistory(state, currentGameEntryIdRef.current)
-      } catch (error) {
-        if (!isCancelled) {
+    // We intentionally skip writes for pure TIMER_TICK updates while the timer is
+    // already running. Writing every tick steals JS time from animation-heavy play,
+    // and saving on real board changes / timer boundaries still preserves the session well.
+    if (!gameShapeChanged && state.timerState === 'running' && !timerBoundaryChanged) {
+      return
+    }
+
+    lastQueuedStateRef.current = state
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = null
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = null
+
+      void saveGameStateWithHistory(state, currentGameEntryIdRef.current).catch(
+        (error) => {
           devLog('warn', 'Failed to persist Klondike game state', error)
         }
-      }
-    })()
+      )
+    }, PERSISTENCE_WRITE_DEBOUNCE_MS)
 
     return () => {
-      isCancelled = true
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = null
+      }
     }
   }, [currentGameEntryIdRef, state, storageHydrationComplete])
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = null
+      }
+    }
+  }, [])
 
   return storageHydrationComplete
 }

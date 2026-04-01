@@ -29,6 +29,14 @@ type DispatchArgs = {
   dispatch: DispatchFn
 }
 
+type PendingDispatch = {
+  action: GameAction
+  dispatch: DispatchFn
+  requiredCardIds: string[]
+  deadline: number
+  timeoutId: ReturnType<typeof setTimeout>
+}
+
 export type FlightController = {
   cardFlights: SharedValue<Record<string, CardFlightSnapshot>>
   cardFlightMemoryRef: React.MutableRefObject<Record<string, CardFlightSnapshot>>
@@ -77,6 +85,7 @@ export const useFlightController = (
   // Keep a JS-thread mirror for readiness checks so we don't block by reading
   // shared values from JS during draw/undo/auto-play dispatch prep.
   const memoryRef = useRef<Record<string, CardFlightSnapshot>>({})
+  const pendingDispatchesRef = useRef<PendingDispatch[]>([])
   const invalidSnapshotLoggedRef = useRef<Set<string>>(new Set())
   const enabledRef = useRef<boolean>(options.enabled)
   const waitTimeoutRef = useRef<number>(options.waitTimeoutMs)
@@ -94,62 +103,103 @@ export const useFlightController = (
     selectionResolverRef.current = options.getSelectionCardIds
   }, [options.getSelectionCardIds])
 
-  const registerSnapshot = useCallback((cardId: string, snapshot: CardFlightSnapshot) => {
-    // PBI-14-4: Defensive guard against invalid LayoutMetrics snapshots entering controller memory.
-    if (!isValidCardFlightSnapshot(snapshot)) {
-      if (getDeveloperLoggingEnabled() && !invalidSnapshotLoggedRef.current.has(cardId)) {
-        invalidSnapshotLoggedRef.current.add(cardId)
-        devLog('warn', '[Flight] Ignoring invalid snapshot', { cardId, snapshot })
+  const ensureReady = useCallback(
+    (cardIds?: string[]) => {
+      if (!enabledRef.current) {
+        return
       }
-      return
-    }
-    const previous = memoryRef.current[cardId]
-    if (areCardFlightSnapshotsEquivalent(previous, snapshot)) {
-      return
-    }
-    memoryRef.current[cardId] = snapshot
-  }, [])
+      const memory = memoryRef.current
+      const ids = cardIds ?? Object.keys(memory)
+      if (!ids.length) {
+        return
+      }
+      const seeds = ids.reduce<Array<[string, CardFlightSnapshot]>>(
+        (accumulator, cardId) => {
+          const snapshot = memory[cardId]
+          if (isValidCardFlightSnapshot(snapshot)) {
+            accumulator.push([cardId, snapshot])
+          }
+          return accumulator
+        },
+        []
+      )
+      if (!seeds.length) {
+        return
+      }
 
-  const ensureReady = useCallback((cardIds?: string[]) => {
-    if (!enabledRef.current) {
-      return
-    }
-    const memory = memoryRef.current
-    const ids = cardIds ?? Object.keys(memory)
-    if (!ids.length) {
-      return
-    }
-    const seeds = ids.reduce<Array<[string, CardFlightSnapshot]>>((accumulator, cardId) => {
-      const snapshot = memory[cardId]
-      if (isValidCardFlightSnapshot(snapshot)) {
-        accumulator.push([cardId, snapshot])
-      }
-      return accumulator
-    }, [])
-    if (!seeds.length) {
+      // Seed only holes so an older JS-thread mirror snapshot does not overwrite
+      // a fresher measurement that already exists in the UI-thread registry.
+      cardFlights.modify((currentFlights) => {
+        'worklet'
+        const currentRegistry = currentFlights as Record<string, CardFlightSnapshot>
+        for (const [cardId, snapshot] of seeds) {
+          if (isValidCardFlightSnapshot(currentRegistry[cardId])) {
+            continue
+          }
+          currentRegistry[cardId] = snapshot
+        }
+        return currentRegistry as typeof currentFlights
+      }, true)
+    },
+    [cardFlights]
+  )
+
+  const flushPendingDispatches = useCallback(() => {
+    const pendingDispatches = pendingDispatchesRef.current
+    if (!pendingDispatches.length) {
       return
     }
 
-    // Seed only holes so an older JS-thread mirror snapshot does not overwrite
-    // a fresher measurement that already exists in the UI-thread registry.
-    cardFlights.modify((currentFlights) => {
-      'worklet'
-      const currentRegistry = currentFlights as Record<string, CardFlightSnapshot>
-      let nextFlights = currentRegistry
-      for (const [cardId, snapshot] of seeds) {
-        if (isValidCardFlightSnapshot(currentRegistry[cardId])) {
-          continue
-        }
-        if (nextFlights === currentRegistry) {
-          nextFlights = { ...currentRegistry }
-        }
-        nextFlights[cardId] = snapshot
+    const now = Date.now()
+    const nextPendingDispatches: PendingDispatch[] = []
+
+    for (const pending of pendingDispatches) {
+      const snapshotsReady =
+        pending.requiredCardIds.length === 0 ||
+        pending.requiredCardIds.every((cardId) => !!memoryRef.current[cardId])
+
+      if (!enabledRef.current || snapshotsReady || now >= pending.deadline) {
+        clearTimeout(pending.timeoutId)
+        ensureReady(pending.requiredCardIds)
+        pending.dispatch(pending.action)
+        continue
       }
-      return nextFlights as typeof currentFlights
-    }, false)
-  }, [cardFlights])
+
+      nextPendingDispatches.push(pending)
+    }
+
+    pendingDispatchesRef.current = nextPendingDispatches
+  }, [ensureReady])
+
+  const registerSnapshot = useCallback(
+    (cardId: string, snapshot: CardFlightSnapshot) => {
+      // PBI-14-4: Defensive guard against invalid LayoutMetrics snapshots entering controller memory.
+      if (!isValidCardFlightSnapshot(snapshot)) {
+        if (
+          getDeveloperLoggingEnabled() &&
+          !invalidSnapshotLoggedRef.current.has(cardId)
+        ) {
+          invalidSnapshotLoggedRef.current.add(cardId)
+          devLog('warn', '[Flight] Ignoring invalid snapshot', { cardId, snapshot })
+        }
+        return
+      }
+      const previous = memoryRef.current[cardId]
+      if (areCardFlightSnapshotsEquivalent(previous, snapshot)) {
+        flushPendingDispatches()
+        return
+      }
+      memoryRef.current[cardId] = snapshot
+      flushPendingDispatches()
+    },
+    [flushPendingDispatches]
+  )
 
   const reset = useCallback(() => {
+    pendingDispatchesRef.current.forEach((pending) => {
+      clearTimeout(pending.timeoutId)
+    })
+    pendingDispatchesRef.current = []
     memoryRef.current = {}
     invalidSnapshotLoggedRef.current.clear()
     cardFlights.value = {}
@@ -166,23 +216,44 @@ export const useFlightController = (
         return
       }
 
-      const waitStart = Date.now()
-      const attemptDispatch = () => {
-        const snapshotsReady =
-          cards.length === 0 || cards.every((id) => !!memoryRef.current[id])
-        const elapsed = Date.now() - waitStart
-        if (snapshotsReady || elapsed >= waitTimeoutRef.current) {
-          ensureReady(cards)
-          dispatch(action)
-          return
-        }
-        requestAnimationFrame(attemptDispatch)
+      const snapshotsReady =
+        cards.length === 0 || cards.every((cardId) => !!memoryRef.current[cardId])
+      if (snapshotsReady) {
+        ensureReady(cards)
+        dispatch(action)
+        return
       }
 
-      attemptDispatch()
+      const timeoutMs = waitTimeoutRef.current
+      const pendingDispatch: PendingDispatch = {
+        action,
+        dispatch,
+        requiredCardIds: cards,
+        deadline: Date.now() + timeoutMs,
+        timeoutId: setTimeout(() => {
+          flushPendingDispatches()
+        }, timeoutMs),
+      }
+
+      pendingDispatchesRef.current = [...pendingDispatchesRef.current, pendingDispatch]
     },
-    [ensureReady]
+    [ensureReady, flushPendingDispatches]
   )
+
+  useEffect(() => {
+    if (!options.enabled) {
+      flushPendingDispatches()
+    }
+  }, [flushPendingDispatches, options.enabled])
+
+  useEffect(() => {
+    return () => {
+      pendingDispatchesRef.current.forEach((pending) => {
+        clearTimeout(pending.timeoutId)
+      })
+      pendingDispatchesRef.current = []
+    }
+  }, [])
 
   return useMemo(
     () => ({

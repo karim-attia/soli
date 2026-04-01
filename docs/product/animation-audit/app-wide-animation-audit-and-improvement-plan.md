@@ -123,12 +123,15 @@ Current animation surface area reviewed:
 
 - [completed] Audit the animation surface area and document the current architecture.
 - [completed] Review current React Native / Reanimated / Gesture Handler best practices from primary sources.
-- [pending] Add memo boundaries around heavy pure animation consumers (`TopRow`, `TableauSection`, `CardView` subtree entry points) while React Compiler is off.
-- [pending] Reduce hidden mounted animation work in stock and foundation piles.
-- [pending] Stop broad object-spread writes in the flight snapshot registry hot path.
-- [pending] Replace polling-style readiness / measurement loops with narrower invalidation and bounded retry paths.
+- [completed] Add memo boundaries around heavy pure animation consumers (`TopRow`, `TableauSection`, `CardView` subtree entry points) while React Compiler is off.
+- [completed] Reduce hidden mounted animation work in stock and foundation piles.
+- [completed] Stop broad object-spread writes in the flight snapshot registry hot path.
+- [completed] Replace polling-style readiness / measurement loops with narrower invalidation and bounded retry paths.
+- [completed] Respect system reduced-motion across gameplay motion policy, toast motion, history sheet behavior, and stack navigation.
+- [completed] Reduce JS-thread persistence churn caused by timer-only writes during active games.
 - [pending] Move cross-pile flights into a dedicated overlay host.
-- [pending] Reduce celebration workload or degrade it gracefully for reduced-motion / lower-end cases.
+- [completed] Degrade celebration-related work gracefully for reduced-motion users and stop redundant glow work once celebration takes over.
+- [pending] Reduce celebration per-frame math further for lower-end devices that still keep celebrations enabled.
 - [pending] Revisit undo scrubber so gestures can move back toward UI-thread handling after board churn drops.
 - [pending] Validate Reanimated static feature flags in a native dev build.
 
@@ -152,6 +155,19 @@ Current animation surface area reviewed:
 
 ## Files actually modified
 
+- `app/_layout.tsx`
+- `app/history.tsx`
+- `app/settings.tsx`
+- `components/CurrentToast.tsx`
+- `src/animation/flightController.ts`
+- `src/features/klondike/components/cards/animations.ts`
+- `src/features/klondike/components/cards/CardView.tsx`
+- `src/features/klondike/components/cards/FoundationPile.tsx`
+- `src/features/klondike/components/cards/StockStack.tsx`
+- `src/features/klondike/components/cards/TableauSection.tsx`
+- `src/features/klondike/components/cards/TopRow.tsx`
+- `src/features/klondike/hooks/useKlondikePersistence.ts`
+- `src/state/settings.tsx`
 - `docs/product/animation-audit/app-wide-animation-audit-and-improvement-plan.md`
 
 ## Identified issues and status of these issues
@@ -160,37 +176,39 @@ Current animation surface area reviewed:
 - Card-flight layering is still structurally fragile because flights stay inside pile wrappers.
   - Status: known, not fixed in this audit.
 - Hidden cards in stock/foundation still mount full `CardView` animation state even when visually hidden.
-  - Status: known, not fixed in this audit.
+  - Status: fixed first pass by rendering only the top stock card and only the top foundation card outside celebration mode.
 - Card snapshot registry updates use broad object spreads inside a hot path.
-  - Status: known, not fixed in this audit.
+  - Status: fixed first pass in the controller seed path and narrowed further in card measurement callbacks.
 - Whole-board churn still affects animation smoothness because timer/persistence/render pressure sits close to gameplay updates.
-  - Status: known from earlier performance work, still relevant.
+  - Status: partially improved via memo boundaries and debounced persistence writes that skip timer-only ticks while the timer is already running.
 
 ### Medium priority
 - Celebration worklet math is heavy for a long-running, many-card animation.
-  - Status: known, not fixed in this audit.
+  - Status: partially mitigated by honoring system reduced-motion and stopping foundation glow once celebration takes over; deeper simplification still pending.
 - Undo scrubber depends on JS-thread gesture callbacks for stability, which is understandable but not ideal long term.
-  - Status: mitigated workaround in place.
+  - Status: unchanged in this pass because there is parallel scrubber safe-area work in flight and the threading refactor should be handled together.
 - Reduced-motion is controlled only by in-app settings, not by system accessibility preference.
-  - Status: missing.
+  - Status: fixed for gameplay motion policy, toast motion, history sheet behavior, and stack navigation.
 - Motion configuration is spread across several files and patterns.
-  - Status: known, not fixed.
+  - Status: partially improved by routing more surfaces through the shared reduced-motion preference, but not yet centralized into a single motion config module.
 
 ### Low priority
 - Toast and history sheet animations are fine functionally, but they are not yet tied into a shared motion policy.
-  - Status: acceptable for now.
+  - Status: fixed.
 - Navigation transitions are default/native and not a current bottleneck.
-  - Status: keep as-is.
+  - Status: still native/default, now reduced-motion aware.
 
 ## Testing
 
-- This audit did not run device builds because the request was analysis/proposal-focused, not implementation-focused.
-- Follow-up validation should happen in a real native build, not only in debug or web mode.
-- Minimum verification plan for follow-up tasks:
+- Validation completed in this pass:
+  - `yarn typecheck:fallback`
+  - `yarn lint`
+  - `oxfmt` on the files modified for this task
+- Native/device validation is still required:
   - iOS simulator/device: repeated draw, recycle, undo scrub, tableau-to-foundation, auto-complete, and win celebration.
   - Android emulator/device: the same flows, plus check lower-end frame stability.
   - Verify card layering mid-flight against HUD, scrubber, and celebration blocker.
-  - Verify reduced-motion behavior once added.
+  - Verify reduced-motion behavior with the OS accessibility setting enabled.
   - Validate any Reanimated static feature flag changes only after a full native rebuild.
 
 ## Audit Summary

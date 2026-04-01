@@ -18,6 +18,7 @@ import {
   animationPreferenceDescriptors,
   type RefreshRateMode,
   type ThemeMode,
+  useReducedMotionPreference,
   useSettings,
   statisticsPreferenceDescriptors,
 } from '../src/state/settings'
@@ -77,6 +78,7 @@ export default function SettingsScreen() {
     setStatisticsPreference,
     setRefreshRateMode,
   } = useSettings()
+  const reducedMotionEnabled = useReducedMotionPreference()
 
   // PBI-27: Check if high refresh rate is supported (Android only)
   const [isHighRefreshRateSupported, setIsHighRefreshRateSupported] = useState(false)
@@ -112,6 +114,12 @@ export default function SettingsScreen() {
           <Text fontSize={16} fontWeight="700">
             Animations
           </Text>
+          {reducedMotionEnabled ? (
+            <Paragraph color="$color10">
+              System Reduce Motion is enabled, so the game will minimize motion effects
+              even if the toggles below stay on.
+            </Paragraph>
+          ) : null}
           <ToggleRow
             label="All animations"
             description="Turn this off to disable motion effects across the game."

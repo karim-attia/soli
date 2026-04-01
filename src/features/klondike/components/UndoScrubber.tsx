@@ -4,7 +4,7 @@ import Animated, { createAnimatedComponent } from 'react-native-reanimated'
 import { GestureDetector, type GestureType } from 'react-native-gesture-handler'
 import { Slider } from 'tamagui'
 import { Undo2 } from '@tamagui/lucide-icons'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 import {
   UNDO_BUTTON_DISABLED_OPACITY,
@@ -25,6 +25,12 @@ export type UndoScrubberProps = {
 }
 
 const AnimatedView = createAnimatedComponent(View)
+const SCRUBBER_SAFE_AREA_EDGES = {
+  top: 'off',
+  right: 'off',
+  bottom: 'maximum',
+  left: 'off',
+} as const
 
 // requirement 20-6: Approach A - Isolate gesture component to prevent re-renders during scrubbing
 // This wrapper NEVER re-renders, preventing iOS gesture cancellation from React updates
@@ -54,7 +60,6 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
   onTrackMetrics,
 }) => {
   const trackRef = useRef<View>(null)
-  const safeArea = useSafeAreaInsets()
 
   const measureTrack = useCallback(() => {
     const track = trackRef.current
@@ -94,38 +99,48 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
       : UNDO_BUTTON_DISABLED_OPACITY
 
   return (
-    <View
-      style={[
-        styles.container,
-        // Task 20-6: Respect iOS home indicator and Android navigation/gesture areas.
-        { paddingBottom: safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING },
-      ]}
+    <SafeAreaView
+      mode="margin"
+      edges={SCRUBBER_SAFE_AREA_EDGES}
+      style={styles.safeAreaContainer}
     >
-      <AnimatedView
-        pointerEvents="none"
-        style={[styles.overlay, { opacity: isScrubbing ? 1 : 0 }]}
-      >
-        <Slider
-          value={sliderValue}
-          min={0}
-          max={sliderMax}
-          step={1}
-          size="$4"
-          style={styles.slider}
+      <View style={styles.container}>
+        <AnimatedView
+          pointerEvents="none"
+          style={[styles.overlay, { opacity: isScrubbing ? 1 : 0 }]}
         >
-          <Slider.Track ref={trackRef} onLayout={handleTrackLayout} style={styles.track}>
-            <Slider.TrackActive style={styles.trackActive} />
-          </Slider.Track>
-          <Slider.Thumb circular size="$3" index={0} style={styles.thumb} />
-        </Slider>
-      </AnimatedView>
-      {/* requirement 20-6: Approach A - Use memoized gesture wrapper to isolate from re-renders */}
-      <GestureWrapper gesture={gesture} opacity={buttonOpacity} />
-    </View>
+          <Slider
+            value={sliderValue}
+            min={0}
+            max={sliderMax}
+            step={1}
+            size="$4"
+            style={styles.slider}
+          >
+            <Slider.Track
+              ref={trackRef}
+              onLayout={handleTrackLayout}
+              style={styles.track}
+            >
+              <Slider.TrackActive style={styles.trackActive} />
+            </Slider.Track>
+            <Slider.Thumb circular size="$3" index={0} style={styles.thumb} />
+          </Slider>
+        </AnimatedView>
+        {/* Task 20-6: Expo 55 enabled Android edge-to-edge, so a floating bottom
+            control should use `maximum` safe-area margin instead of additive inset
+            padding; otherwise the visual dock height drifts with reported insets. */}
+        <GestureWrapper gesture={gesture} opacity={buttonOpacity} />
+      </View>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
+  safeAreaContainer: {
+    width: '100%',
+    marginBottom: UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING,
+  },
   container: {
     marginTop: 12,
     width: '100%',
