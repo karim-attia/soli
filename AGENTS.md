@@ -49,17 +49,17 @@ Update the status of the steps after the implementation of each step. NEVER SKIP
 
 # Testing
 
-Test everything you do in a real environment. Use sub-agents to test to save context (GPT 5.4 medium reasoning). Give detailed testing instructions and get a detailed test report, though. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
+Test everything you do in a real environment. In order to save context, always use sub-agents to test. Use GPT 5.4 medium reasoning for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
 
 Native: Use agent-device skill
 Web: Use Playwright with skill
 
 iOS: Always run a clean build on the connected simulator. Make sure the build is finished before checking on the device.
-Android: Run "yarn android" and wait until the build is complete. Use scripts/android-unlock-pattern.sh script to unlock physical Android device if it's locked.
+Android: Run "yarn release" and wait until the build is complete. Use scripts/android-unlock-pattern.sh script to unlock physical Android device if it's locked.
 
-Never run two builds at the same time as otherwise the computer nearly crashes when running builds in parallel, e.g. iOS and Android in parallel. Also check if there are other processes running a build and kill them first. 
+Never run two builds at the same time as otherwise the computer nearly crashes when running builds in parallel, e.g. iOS and Android in parallel. Also check if there are other processes running a build and kill them first. If there is already a build running, this is no excuse to not run the build and test on an outdated build. Kill the other build first, then build, then test.
 
-Check if the build was actually installed on the device or the emulator.
+Check if the build was actually installed on the device or the device/emulator.
 
 # Components
 

@@ -14,7 +14,11 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 
-import type { CardFlightSnapshot } from '../../../../animation/flightController'
+import {
+  areCardFlightSnapshotsEquivalent,
+  isValidCardFlightSnapshot,
+  type CardFlightSnapshot,
+} from '../../../../animation/flightController'
 import {
   CELEBRATION_WOBBLE_FREQUENCY,
   TAU,
@@ -276,8 +280,25 @@ export const useCardAnimations = ({
 
     runOnUI((prevSnapshot: CardFlightSnapshot | null) => {
       'worklet'
+      const snapshotTolerance = 0.5
       const isFiniteNumber = (value: unknown): value is number =>
         typeof value === 'number' && isFinite(value)
+
+      // Keep the shared registry quiet when layout metrics have not materially
+      // changed; this avoids extra worklet churn and redundant JS callbacks.
+      const upsertSharedSnapshot = (snapshot: CardFlightSnapshot): boolean => {
+        const previous = cardFlights.value[cardId] as CardFlightSnapshot | undefined
+        if (areCardFlightSnapshotsEquivalent(previous, snapshot)) {
+          return false
+        }
+        cardFlights.modify((currentFlights) => {
+          'worklet'
+          const currentRegistry = currentFlights as Record<string, CardFlightSnapshot>
+          currentRegistry[cardId] = snapshot
+          return currentRegistry as typeof currentFlights
+        })
+        return true
+      }
 
       type MeasuredLayout = NonNullable<ReturnType<typeof measure>>
 
@@ -292,20 +313,6 @@ export const useCardAnimations = ({
           isFiniteNumber(layout.height) &&
           layout.width > 0 &&
           layout.height > 0
-        )
-      }
-
-      const isValidSnapshot = (
-        snapshot: CardFlightSnapshot | null | undefined
-      ): snapshot is CardFlightSnapshot => {
-        return (
-          !!snapshot &&
-          isFiniteNumber(snapshot.pageX) &&
-          isFiniteNumber(snapshot.pageY) &&
-          isFiniteNumber(snapshot.width) &&
-          isFiniteNumber(snapshot.height) &&
-          snapshot.width > 0 &&
-          snapshot.height > 0
         )
       }
 
@@ -334,15 +341,12 @@ export const useCardAnimations = ({
             width: layout.width,
             height: layout.height,
           }
-          cardFlights.value = {
-            ...cardFlights.value,
-            [cardId]: snapshot,
-          }
+          const snapshotChanged = upsertSharedSnapshot(snapshot)
           flightX.value = 0
           flightY.value = 0
           flightZ.value = 0
           flightOpacity.value = 1
-          if (onCardMeasured) {
+          if (snapshotChanged && onCardMeasured) {
             runOnJS(onCardMeasured)(cardId, snapshot)
           }
           if (onFlightSettled) {
@@ -355,12 +359,12 @@ export const useCardAnimations = ({
           | CardFlightSnapshot
           | undefined
         const previousCandidate = prevSnapshot ?? existingSnapshot
-        const previous = isValidSnapshot(previousCandidate) ? previousCandidate : null
+        const previous = isValidCardFlightSnapshot(previousCandidate) ? previousCandidate : null
         if (previous) {
           const deltaX = previous.pageX - layout.pageX
           const deltaY = previous.pageY - layout.pageY
-          const hasXMovement = Math.abs(deltaX) > 0.5
-          const hasYMovement = Math.abs(deltaY) > 0.5
+          const hasXMovement = Math.abs(deltaX) > snapshotTolerance
+          const hasYMovement = Math.abs(deltaY) > snapshotTolerance
           if (hasXMovement || hasYMovement) {
             flightX.value = deltaX
             flightY.value = deltaY
@@ -400,19 +404,12 @@ export const useCardAnimations = ({
           width: layout.width,
           height: layout.height,
         }
-        cardFlights.value = {
-          ...cardFlights.value,
-          [cardId]: nextSnapshot,
-        }
+        const snapshotChanged = upsertSharedSnapshot(nextSnapshot)
         flightOpacity.value = 1
-        if (onCardMeasured) {
+        if (snapshotChanged && onCardMeasured) {
           runOnJS(onCardMeasured)(cardId, nextSnapshot)
         }
-        if (
-          !previous ||
-          (Math.abs(previous.pageX - layout.pageX) <= 0.5 &&
-            Math.abs(previous.pageY - layout.pageY) <= 0.5)
-        ) {
+        if (!previous || areCardFlightSnapshotsEquivalent(previous, nextSnapshot)) {
           if (onFlightSettled) {
             runOnJS(notifyFlightSettled)(cardId)
           }

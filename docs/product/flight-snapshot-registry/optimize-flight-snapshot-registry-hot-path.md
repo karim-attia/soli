@@ -147,11 +147,11 @@ Principles:
 
 - [completed] Audit current snapshot write/read paths and document all known call sites.
 - [completed] Review Reanimated guidance for complex-object shared values and JS-thread read costs.
-- [pending] Extract a snapshot equality helper using the current movement tolerance policy.
-- [pending] Replace `cardFlights.value = { ...cardFlights.value, [id]: snapshot }` with `cardFlights.modify(...)` in `useCardAnimations`.
-- [pending] Skip `runOnJS(onCardMeasured)` when the snapshot is materially unchanged.
-- [pending] Change `ensureReady()` to accept `cardIds` and seed only the requested missing/invalid ids.
-- [pending] Add concise developer notes explaining why we keep dual registries for now instead of reading shared values from JS.
+- [completed] Extract a snapshot equality helper using the current movement tolerance policy.
+- [completed] Replace `cardFlights.value = { ...cardFlights.value, [id]: snapshot }` with `cardFlights.modify(...)` in `useCardAnimations`.
+- [completed] Skip `runOnJS(onCardMeasured)` when the snapshot is materially unchanged.
+- [completed] Change `ensureReady()` to accept `cardIds` and seed only the requested missing/invalid ids.
+- [completed] Add concise developer notes explaining why we keep dual registries for now instead of reading shared values from JS.
 - [pending] Validate draw / undo / auto-play stress flows.
 - [pending] Decide whether a follow-up task is needed for frozen origin snapshots.
 
@@ -165,23 +165,25 @@ Principles:
 ## Files actually modified
 
 - `docs/product/flight-snapshot-registry/optimize-flight-snapshot-registry-hot-path.md`
+- `src/animation/flightController.ts`
+- `src/features/klondike/components/cards/animations.ts`
 
 ## Identified issues and status of these issues
 
 ### 1. Broad object copying in hot paths
-- Current status: confirmed.
+- Current status: addressed in phase 1.
 - Evidence:
   - `useCardAnimations` writes `cardFlights.value = { ...cardFlights.value, [cardId]: snapshot }`.
   - `useFlightController.ensureReady()` writes `cardFlights.value = { ...cardFlights.value, ...memory }`.
-- Status: open.
+- Status: mitigated by `modify(...)`-based narrow updates.
 
 ### 2. Stale overwrite risk from JS mirror seeding
-- Current status: confirmed design risk.
+- Current status: mitigated for phase 1.
 - Why:
   - `cardFlights` is updated first on the UI thread.
   - `memoryRef.current` is updated later through `runOnJS`.
   - A later `ensureReady()` merge can theoretically push an older JS snapshot back into the UI registry.
-- Status: open.
+- Status: reduced by seeding only missing / invalid requested ids instead of broad merges.
 
 ### 3. Duplicate source of truth
 - Current status: accepted temporarily.
@@ -203,17 +205,25 @@ Principles:
 
 ## Testing
 
-- This deep-dive did not change runtime code yet.
-- When implemented, test in a real native build:
-  - rapid repeated Draw taps,
-  - draw → undo → draw loops,
-  - auto-complete (`yarn demo:auto-solve`),
-  - undo scrubber start/end on iOS,
-  - new game / reset flows to confirm registry cleanup.
-- Verify both correctness and performance:
-  - no new missing-origin / zero-delta regressions,
-  - no visible snap regressions,
-  - reduced dev logging noise from unchanged snapshots.
+- Static validation completed:
+  - `yarn typecheck:fallback`
+  - `yarn lint src/animation/flightController.ts src/features/klondike/components/cards/animations.ts`
+- Real Android verification completed on physical `A065`:
+  - installed latest app build via `yarn release`
+  - confirmed the package updated on-device (`lastUpdateTime=2026-04-01 12:02:10`)
+  - reproduced a startup crash in the first implementation:
+    - `ReferenceError: Property 'CARD_FLIGHT_SNAPSHOT_TOLERANCE' doesn't exist`
+  - fixed the worklet crash by removing the exported-constant dependency from the worklet path
+  - reinstalled and confirmed the app launches in the foreground with no fresh crash-buffer entries
+- Interaction verification status:
+  - startup and basic foregrounding are verified on-device
+  - automated physical-device taps around Draw / Undo were not yet conclusive because raw ADB input on `A065` frequently collides with the drawer / edge gesture region, so full draw → undo smoke coverage remains pending
+- Still recommended:
+  - rapid repeated Draw taps
+  - draw → undo → draw loops
+  - auto-complete (`yarn demo:auto-solve`)
+  - undo scrubber start/end on iOS
+  - new game / reset flows to confirm registry cleanup
 
 ## What we would do
 
