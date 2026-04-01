@@ -423,7 +423,11 @@ export const useCardAnimations = ({
         }
       }
 
-      attemptMeasure()
+      // Let newly mounted cards land in their destination layout before we
+      // compare against the previous snapshot. Draw/undo flights are especially
+      // sensitive to measuring one frame too early because the card often mounts
+      // inside a new waste/foundation wrapper on the same commit.
+      requestAnimationFrame(attemptMeasure)
     })(snapshotBeforeLayout ?? null)
   }, [
     card.id,

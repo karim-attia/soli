@@ -5,6 +5,7 @@
 Audit the entire animation surface area in the app, compare the current implementation against current React Native / Reanimated / Gesture Handler guidance, and propose concrete improvements for performance, code simplicity, layering correctness, accessibility, and maintainability.
 
 Current animation surface area reviewed:
+
 - Klondike card flights, flips, waste fan slide, invalid-move wiggle, foundation glow, win celebration, and undo scrubber.
 - Navigation and modal/sheet/toast motion.
 - Supporting animation settings and platform configuration.
@@ -33,6 +34,7 @@ Current animation surface area reviewed:
 ## Possible approaches incl. pros and cons
 
 ### 1. Incremental optimization on top of the current architecture
+
 - Pros:
   - Lowest migration risk.
   - Preserves the current board behavior and timing feel.
@@ -42,6 +44,7 @@ Current animation surface area reviewed:
   - Card-flight measurement and per-card animation state stay fairly complex.
 
 ### 2. Refactor flights into a dedicated overlay host
+
 - Pros:
   - Solves current stacking-context fragility.
   - Makes layering logic easier to reason about.
@@ -51,6 +54,7 @@ Current animation surface area reviewed:
   - Requires coordinate conversion and source-card hiding rules.
 
 ### 3. Broader animation-system simplification
+
 - Pros:
   - Can remove duplicated timing/state patterns across cards, celebration, and scrubber.
   - Makes future tuning safer.
@@ -59,6 +63,7 @@ Current animation surface area reviewed:
   - Should happen only after the main hotspots are fixed.
 
 ### Recommendation
+
 - Use approach 1 immediately.
 - Start approach 2 for card flights once the hot-path cleanup lands.
 - Use approach 3 only where it naturally falls out of the earlier refactors.
@@ -90,6 +95,7 @@ Current animation surface area reviewed:
 ## Components
 
 ### Reuse
+
 - `CardView` / `CardVisual`
 - `useCardAnimations`
 - `useFoundationGlowAnimation`
@@ -99,6 +105,7 @@ Current animation surface area reviewed:
 - History `Sheet`
 
 ### Create
+
 - A board-level flight overlay host for cross-pile card flights.
 - A shared animation config module for naming timings, durations, and motion policies.
 - A reduced-motion adapter that maps system preference + in-app settings into one motion policy.
@@ -125,6 +132,7 @@ Current animation surface area reviewed:
 - [completed] Review current React Native / Reanimated / Gesture Handler best practices from primary sources.
 - [completed] Add memo boundaries around heavy pure animation consumers (`TopRow`, `TableauSection`, `CardView` subtree entry points) while React Compiler is off.
 - [completed] Reduce hidden mounted animation work in stock and foundation piles.
+- [completed] Restore keyed remount behavior for the top stock card so every newly exposed draw card records a fresh stock snapshot before it can be drawn.
 - [completed] Stop broad object-spread writes in the flight snapshot registry hot path.
 - [completed] Replace polling-style readiness / measurement loops with narrower invalidation and bounded retry paths.
 - [completed] Respect system reduced-motion across gameplay motion policy, toast motion, history sheet behavior, and stack navigation.
@@ -173,18 +181,26 @@ Current animation surface area reviewed:
 ## Identified issues and status of these issues
 
 ### High priority
+
 - Card-flight layering is still structurally fragile because flights stay inside pile wrappers.
   - Status: known, not fixed in this audit.
+- Custom `React.memo` comparators on interactive card surfaces regressed correctness by letting stale press handlers survive state changes.
+  - Status: fixed in follow-up by removing the comparator-based memoization from `CardView`, `TopRow`, and `TableauSection`.
 - Hidden cards in stock/foundation still mount full `CardView` animation state even when visually hidden.
   - Status: fixed first pass by rendering only the top stock card and only the top foundation card outside celebration mode.
+- The top-only stock optimization initially dropped the per-card `key`, which meant newly exposed stock cards reused the previous `CardView` instance and could skip `onLayout`/snapshot registration.
+  - Status: fixed in follow-up by keying the visible stock-card wrapper with `topCard.id`, preserving the lighter render path without breaking repeated draw flights.
 - Card snapshot registry updates use broad object spreads inside a hot path.
   - Status: fixed first pass in the controller seed path and narrowed further in card measurement callbacks.
 - Whole-board churn still affects animation smoothness because timer/persistence/render pressure sits close to gameplay updates.
   - Status: partially improved via memo boundaries and debounced persistence writes that skip timer-only ticks while the timer is already running.
 
 ### Medium priority
+
 - Celebration worklet math is heavy for a long-running, many-card animation.
   - Status: partially mitigated by honoring system reduced-motion and stopping foundation glow once celebration takes over; deeper simplification still pending.
+- The lighter top-only foundation rendering regressed celebration visibility because non-top cards could remount with remembered flight snapshots and stay at `opacity: 0` unless they also got a celebration-time layout pass.
+  - Status: fixed in follow-up by re-enabling layout tracking for all foundation cards while celebration is active.
 - Undo scrubber depends on JS-thread gesture callbacks for stability, which is understandable but not ideal long term.
   - Status: unchanged in this pass because there is parallel scrubber safe-area work in flight and the threading refactor should be handled together.
 - Reduced-motion is controlled only by in-app settings, not by system accessibility preference.
@@ -193,6 +209,7 @@ Current animation surface area reviewed:
   - Status: partially improved by routing more surfaces through the shared reduced-motion preference, but not yet centralized into a single motion config module.
 
 ### Low priority
+
 - Toast and history sheet animations are fine functionally, but they are not yet tied into a shared motion policy.
   - Status: fixed.
 - Navigation transitions are default/native and not a current bottleneck.
@@ -214,22 +231,26 @@ Current animation surface area reviewed:
 ## Audit Summary
 
 ### Keep as-is
+
 - Transform/opacity-based motion choices are generally good.
 - The app already has the correct Reanimated Babel setup and iOS 120fps flag.
 - Card flip, waste fan, glow, and empty-slot cleanup are conceptually sound.
 
 ### Optimize soon
+
 - Reduce hidden animated nodes.
 - Add memo boundaries to heavy pure board subtrees while React Compiler is off.
 - Stop copying large snapshot maps in flight hot paths.
 - Reduce JS-thread work that competes with animation: timer-wide rerenders and persistence writes.
 
 ### Simplify
+
 - Separate “measurement / flight orchestration” from “card visual rendering” more clearly.
 - Unify motion policy across app/game/system reduced-motion.
 - Consolidate animation constants and naming into one small vocabulary.
 
 ### Investigate later
+
 - Reanimated static feature flags:
   - `IOS_SYNCHRONOUSLY_UPDATE_UI_PROPS`
   - `ANDROID_SYNCHRONOUSLY_UPDATE_UI_PROPS`

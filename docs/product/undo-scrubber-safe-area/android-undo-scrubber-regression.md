@@ -149,3 +149,6 @@ Cons:
   - `yarn release` completed successfully and installed `ch.karimattia.soli` version `0.6.0` on physical Android `A065`.
   - Device package metadata reported `lastUpdateTime=2026-04-01 12:58:38`.
   - Manual screenshot verification on `A065` showed the undo scrubber sitting above the Android three-button navigation bar again, with the button no longer colliding with the system controls.
+  - Follow-up tweak: increasing the minimum dock gap from `20` to `28` restored a little of the pre-refactor breathing room without reverting to additive inset math.
+  - The follow-up Android rebuild installed successfully on `A065`, with `lastUpdateTime=2026-04-01 13:20:55`.
+  - The follow-up screenshot confirmed the Undo button now sits slightly higher than the first `maximum`-margin pass while still clearing the Android system controls cleanly.

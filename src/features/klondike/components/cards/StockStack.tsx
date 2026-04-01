@@ -60,7 +60,10 @@ export const StockStack = ({
         },
       ]}
     >
+      {/* Keep the wrapper keyed by card id so each newly exposed stock card remounts
+          and records its own layout snapshot before the next draw. */}
       <View
+        key={topCard.id}
         pointerEvents="none"
         style={[styles.stockCardWrapper, { zIndex: cards.length }]}
       >

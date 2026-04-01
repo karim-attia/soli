@@ -56,24 +56,6 @@ const deriveCardScale = (metrics: CardMetrics) => {
   return 1
 }
 
-const areCardMetricsEqual = (previous: CardMetrics, next: CardMetrics): boolean => {
-  return (
-    previous.width === next.width &&
-    previous.height === next.height &&
-    previous.stackOffset === next.stackOffset &&
-    previous.radius === next.radius
-  )
-}
-
-const areCardsEquivalent = (previous: Card, next: Card): boolean => {
-  return (
-    previous.id === next.id &&
-    previous.suit === next.suit &&
-    previous.rank === next.rank &&
-    previous.faceUp === next.faceUp
-  )
-}
-
 export type CardVisualProps = {
   card: Card
   metrics: CardMetrics
@@ -81,7 +63,7 @@ export type CardVisualProps = {
   disabled?: boolean
 }
 
-const CardVisualComponent = ({ card, metrics, onPress, disabled }: CardVisualProps) => {
+export const CardVisual = ({ card, metrics, onPress, disabled }: CardVisualProps) => {
   // PBI-25: keep cards proportional via a single reference scale
   const cardScale = deriveCardScale(metrics)
   const scaleValue = (value: number) => value * cardScale
@@ -172,15 +154,6 @@ const CardVisualComponent = ({ card, metrics, onPress, disabled }: CardVisualPro
   return <View style={baseStyle}>{body}</View>
 }
 
-export const CardVisual = React.memo(
-  CardVisualComponent,
-  (previous, next) =>
-    areCardsEquivalent(previous.card, next.card) &&
-    areCardMetricsEqual(previous.metrics, next.metrics) &&
-    Boolean(previous.onPress) === Boolean(next.onPress) &&
-    previous.disabled === next.disabled
-)
-
 export type CardViewProps = {
   card: Card
   metrics: CardMetrics
@@ -200,7 +173,7 @@ export type CardViewProps = {
   celebrationBindings?: CelebrationBindings
 }
 
-const CardViewComponent = ({
+export const CardView = ({
   card,
   metrics,
   offsetTop,
@@ -270,36 +243,13 @@ const CardViewComponent = ({
   )
 }
 
-export const CardView = React.memo(CardViewComponent, (previous, next) => {
-  const previousWiggleActive = previous.invalidWiggle.lookup.has(previous.card.id)
-  const nextWiggleActive = next.invalidWiggle.lookup.has(next.card.id)
-
-  return (
-    areCardsEquivalent(previous.card, next.card) &&
-    areCardMetricsEqual(previous.metrics, next.metrics) &&
-    previous.offsetTop === next.offsetTop &&
-    previous.offsetLeft === next.offsetLeft &&
-    previous.isSelected === next.isSelected &&
-    previous.suppressFlightOnFaceUpChange === next.suppressFlightOnFaceUpChange &&
-    Boolean(previous.onPress) === Boolean(next.onPress) &&
-    previous.layoutTrackingEnabled === next.layoutTrackingEnabled &&
-    previous.cardFlights === next.cardFlights &&
-    previous.cardFlightMemory === next.cardFlightMemory &&
-    previous.onCardMeasured === next.onCardMeasured &&
-    previous.onFlightSettled === next.onFlightSettled &&
-    previous.celebrationBindings === next.celebrationBindings &&
-    previousWiggleActive === nextWiggleActive &&
-    (!previousWiggleActive || previous.invalidWiggle.key === next.invalidWiggle.key)
-  )
-})
-
 export type CardBackProps = {
   label?: string
   metrics: CardMetrics
   variant: 'stock' | 'recycle' | 'empty'
 }
 
-const CardBackComponent = ({ label, metrics, variant }: CardBackProps) => {
+export const CardBack = ({ label, metrics, variant }: CardBackProps) => {
   const containerStyle: StyleProp<ViewStyle> = [
     variant === 'stock'
       ? styles.cardBack
@@ -326,15 +276,7 @@ const CardBackComponent = ({ label, metrics, variant }: CardBackProps) => {
   )
 }
 
-export const CardBack = React.memo(
-  CardBackComponent,
-  (previous, next) =>
-    previous.label === next.label &&
-    previous.variant === next.variant &&
-    areCardMetricsEqual(previous.metrics, next.metrics)
-)
-
-const EmptySlotComponent = ({
+export const EmptySlot = ({
   label,
   highlight,
   hidden = false,
@@ -375,12 +317,3 @@ const EmptySlotComponent = ({
     </Animated.View>
   )
 }
-
-export const EmptySlot = React.memo(
-  EmptySlotComponent,
-  (previous, next) =>
-    previous.label === next.label &&
-    previous.highlight === next.highlight &&
-    previous.hidden === next.hidden &&
-    areCardMetricsEqual(previous.metrics, next.metrics)
-)

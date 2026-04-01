@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from 'react'
+import React, { useCallback } from 'react'
 import { LayoutChangeEvent, LayoutRectangle } from 'react-native'
 import { Stack, XStack } from 'tamagui'
 
@@ -23,34 +23,6 @@ import { StockStack } from './StockStack'
 import { WasteFan } from './WasteFan'
 import { FoundationPile } from './FoundationPile'
 import { BOARD_COLUMN_GAP, BOARD_COLUMN_MARGIN } from '../../constants'
-
-const areCardMetricsEqual = (previous: CardMetrics, next: CardMetrics): boolean => {
-  return (
-    previous.width === next.width &&
-    previous.height === next.height &&
-    previous.stackOffset === next.stackOffset &&
-    previous.radius === next.radius
-  )
-}
-
-const getTopRowSelectionKey = (selection: GameState['selected']): string => {
-  if (!selection) {
-    return 'none'
-  }
-  if (selection.source === 'waste') {
-    return 'waste'
-  }
-  if (selection.source === 'foundation') {
-    return `foundation:${selection.suit}`
-  }
-  return 'none'
-}
-
-const areFoundationDropHintsEqual = (previous: DropHints, next: DropHints): boolean => {
-  return FOUNDATION_SUIT_ORDER.every(
-    (suit) => previous.foundations[suit] === next.foundations[suit]
-  )
-}
 
 export type TopRowProps = {
   state: GameState
@@ -78,7 +50,7 @@ export type TopRowProps = {
   celebrationPending?: boolean
 }
 
-const TopRowComponent = ({
+export const TopRow = ({
   state,
   drawLabel,
   onDraw,
@@ -269,35 +241,3 @@ const TopRowComponent = ({
     </XStack>
   )
 }
-
-export const TopRow = memo(
-  TopRowComponent,
-  (previous, next) =>
-    previous.state.stock === next.state.stock &&
-    previous.state.waste === next.state.waste &&
-    previous.state.foundations === next.state.foundations &&
-    previous.state.hasWon === next.state.hasWon &&
-    getTopRowSelectionKey(previous.state.selected) ===
-      getTopRowSelectionKey(next.state.selected) &&
-    previous.drawLabel === next.drawLabel &&
-    previous.interactionsLocked === next.interactionsLocked &&
-    previous.scrubbingActive === next.scrubbingActive &&
-    previous.hideFoundations === next.hideFoundations &&
-    previous.celebrationActive === next.celebrationActive &&
-    previous.celebrationPending === next.celebrationPending &&
-    previous.invalidWiggle.key === next.invalidWiggle.key &&
-    previous.cardFlights === next.cardFlights &&
-    previous.cardFlightMemory === next.cardFlightMemory &&
-    previous.celebrationBindings === next.celebrationBindings &&
-    previous.onDraw === next.onDraw &&
-    previous.onWasteTap === next.onWasteTap &&
-    previous.onFoundationPress === next.onFoundationPress &&
-    previous.notifyInvalidMove === next.notifyInvalidMove &&
-    previous.onCardMeasured === next.onCardMeasured &&
-    previous.onFoundationArrival === next.onFoundationArrival &&
-    previous.onFoundationCardFlightSettled === next.onFoundationCardFlightSettled &&
-    previous.onTopRowLayout === next.onTopRowLayout &&
-    previous.onFoundationLayout === next.onFoundationLayout &&
-    areCardMetricsEqual(previous.cardMetrics, next.cardMetrics) &&
-    areFoundationDropHintsEqual(previous.dropHints, next.dropHints)
-)

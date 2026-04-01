@@ -143,7 +143,12 @@ export const FoundationPile = ({
                 metrics={cardMetrics}
                 invalidWiggle={isTop ? invalidWiggle : EMPTY_INVALID_WIGGLE}
                 cardFlights={cardFlights}
-                layoutTrackingEnabled={layoutTrackingEnabled && isTop}
+                // Celebration remounts the whole foundation stack. Those cards can
+                // carry a remembered flight snapshot, so they need one layout pass
+                // to rehydrate opacity/position instead of staying hidden at 0.
+                layoutTrackingEnabled={
+                  layoutTrackingEnabled && (celebrationActive || isTop)
+                }
                 onCardMeasured={onCardMeasured}
                 onFlightSettled={isTop ? onTopCardFlightSettled : undefined}
                 cardFlightMemory={cardFlightMemory}
