@@ -10,6 +10,8 @@ Current investigation notes:
 - Expo’s current Android system-bar guidance says edge-to-edge layouts now need explicit safe-area handling.
 - The current scrubber uses additive bottom padding (`safeArea.bottom + fixedPadding`), which is a less precise fit for a floating bottom control than the library’s documented `SafeAreaView` `maximum` edge mode.
 - Follow-up note: the first `maximum`-margin fix also reduced some of the old visual breathing room, because it intentionally stopped stacking the system inset and the fixed dock gap together.
+- Follow-up note 2: raising the fixed dock-gap constant alone did not move the button on devices whose bottom inset was already larger than that constant, because `maximum` semantics ignore the smaller value.
+- Follow-up note 3: even after switching to additive `SafeAreaView` margin, the wrapper itself still differed from the older scrubber geometry enough that the right-side placement did not feel fully restored.
 
 ## Acceptance Criteria
 
@@ -53,6 +55,32 @@ Cons:
 
 Recommended:
 - Approach 2.
+
+### 4. Use `SafeAreaView` `mode="margin"` with additive bottom spacing
+
+Pros:
+- Preserves the important separation between safe-area placement and the scrubber's internal height.
+- Restores the previous "safe area + extra dock gap" feel that the user noticed.
+- Makes small dock-gap tuning visible again on devices with large Android bottom insets.
+
+Cons:
+- Intentionally returns to additive spacing for bottom placement, so the total dock height will be larger than the `maximum` pass.
+
+Recommended:
+- Use this as the final refinement after confirming `maximum` made the control feel too tight.
+
+### 5. Restore the older additive `paddingBottom` layout directly on the scrubber container
+
+Pros:
+- Most faithful to the geometry that existed before the wrapper experiments.
+- Keeps the total dock height as `safe area + explicit gap`.
+- Avoids any subtle wrapper-layout differences if the user is sensitive to the right-edge placement too.
+
+Cons:
+- Slightly less "framework-pure" than delegating the bottom inset to `SafeAreaView`.
+
+Recommended:
+- Use this when "make it like before" matters more than keeping the wrapper abstraction.
 
 ### 3. Move all bottom safe-area handling to the parent screen container
 
@@ -106,6 +134,8 @@ Cons:
 - [completed] Replace the scrubber’s additive bottom padding with a safer floating-element bottom-spacing pattern.
 - [completed] Verify the scrubber position in a real app run and record the result.
 - [completed] Restore a small amount of visual bottom breathing room after the first `maximum`-margin pass trimmed it.
+- [completed] Change the bottom safe-area edge mode from `maximum` to additive margin after confirming the device inset was swallowing the extra dock gap.
+- [completed] Restore the scrubber to additive container padding after the wrapper-based versions still felt slightly off on the right side.
 
 ## Plan: Files to modify
 
@@ -129,6 +159,10 @@ Cons:
   Status: confirmed; replaced with `SafeAreaView` `mode="margin"` plus `bottom: 'maximum'` so the scrubber keeps a minimum dock gap without stacking the inset on top.
 - The first `maximum`-margin pass can feel a bit tighter than before because it removes the old “inset + fixed gap” double-count.
   Status: confirmed in code review; mitigated by increasing the minimum dock gap while keeping the `maximum` safe-area strategy.
+- Devices with a bottom inset larger than the chosen minimum gap do not visibly respond to small `maximum`-mode gap tweaks.
+  Status: confirmed on physical Android `A065`; fixed by switching the wrapper to additive bottom margin so the fixed dock gap is applied on top of the inset again.
+- The `SafeAreaView` wrapper versions still did not feel identical to the older scrubber placement.
+  Status: treated as a layout-fidelity issue; mitigated by restoring the original additive `paddingBottom` approach directly on the scrubber container.
 
 ## Testing
 
@@ -152,3 +186,10 @@ Cons:
   - Follow-up tweak: increasing the minimum dock gap from `20` to `28` restored a little of the pre-refactor breathing room without reverting to additive inset math.
   - The follow-up Android rebuild installed successfully on `A065`, with `lastUpdateTime=2026-04-01 13:20:55`.
   - The follow-up screenshot confirmed the Undo button now sits slightly higher than the first `maximum`-margin pass while still clearing the Android system controls cleanly.
+  - Final follow-up: the `20 -> 28` tweak did not materially move the control on `A065`, because the device bottom inset was already larger than both values under `maximum` semantics.
+  - Final refinement: switching the wrapper to additive bottom margin restores the intended "safe area + extra dock gap" behavior, which should produce a visible lift on large-inset Android layouts too.
+  - Additive-margin verification: the rebuilt app installed on `A065` with `lastUpdateTime=2026-04-01 16:19:17`.
+  - The final screenshot showed the Undo button visibly higher than the `maximum`-margin version, with the extra breathing room now clearly present above the Android nav bar.
+  - Layout-fidelity follow-up: the scrubber wrapper was then removed so the container once again uses direct additive `paddingBottom` (`safe area + 20`) just like the pre-wrapper layout.
+  - Wrapper-removal verification: the rebuilt app installed on `A065` with `lastUpdateTime=2026-04-01 16:26:38`.
+  - The final screenshot showed the scrubber on the restored additive container layout, which is the closest match to the older pre-wrapper geometry on both the bottom and right edges.
