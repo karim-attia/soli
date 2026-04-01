@@ -276,12 +276,21 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const foundationLayoutsRef = useRef<Partial<Record<Suit, LayoutRectangle>>>({})
   const boardLockedRef = useRef(false)
   const lastDemoLinkRef = useRef<string | null>(null)
+  const pendingSolvedResultRef = useRef(false)
+  const pendingSolvedResultTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [boardLocked, setBoardLocked] = useState(false)
 
   // Synchronizes the board-locked flag between refs and React state.
   const updateBoardLocked = useCallback((locked: boolean) => {
     boardLockedRef.current = locked
     setBoardLocked(locked)
+  }, [])
+
+  const clearPendingSolvedResultTimer = useCallback(() => {
+    if (pendingSolvedResultTimeoutRef.current) {
+      clearTimeout(pendingSolvedResultTimeoutRef.current)
+      pendingSolvedResultTimeoutRef.current = null
+    }
   }, [])
 
   // Stores the top-row layout for later celebration positioning.
@@ -351,31 +360,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
 
   // Hook: pick the next solvable shuffle weighted by prior play history when needed.
   const selectNextSolvableShuffle = useSolvableShuffleSelector(historyEntries)
-
-  // Hook: own the celebration animation lifecycle and bindings.
-  const {
-    celebrationState,
-    celebrationPending,
-    setCelebrationState,
-    celebrationBindings,
-    celebrationLabel,
-    handleCelebrationAbort,
-    handleWinningCardFlightSettled,
-    clearCelebrationDialogTimer,
-  } = useCelebrationController({
-    state,
-    developerModeEnabled,
-    animationsEnabled,
-    celebrationAnimationsEnabled,
-    boardLayout,
-    cardMetrics,
-    foundationLayoutsRef,
-    topRowLayoutRef,
-    ensureCardFlightsReady,
-    updateBoardLocked,
-    winCelebrationsRef,
-    requestNewGameRef,
-  })
 
   // Deals a new game, respecting solvable-only settings and history bookkeeping.
   const dealNewGame = useCallback(() => {
@@ -490,6 +474,55 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     },
     [historyEntries, recordResult, updateEntry]
   )
+
+  const flushPendingSolvedResultAfterHandoff = useCallback(() => {
+    if (!pendingSolvedResultRef.current) {
+      return
+    }
+    pendingSolvedResultRef.current = false
+    clearPendingSolvedResultTimer()
+    // Task 28-2: Let the last winning-card settle/handoff breathe before history persistence
+    // runs, otherwise the exact `hasWon` frame does extra JS work that earlier moves avoid.
+    pendingSolvedResultTimeoutRef.current = setTimeout(() => {
+      pendingSolvedResultTimeoutRef.current = null
+      if (!stateRef.current.hasWon) {
+        return
+      }
+      recordCurrentGameResult({ solved: true })
+    }, 0)
+  }, [clearPendingSolvedResultTimer, recordCurrentGameResult])
+
+  useEffect(() => {
+    return () => {
+      clearPendingSolvedResultTimer()
+    }
+  }, [clearPendingSolvedResultTimer])
+
+  // Hook: own the celebration animation lifecycle and bindings.
+  const {
+    celebrationState,
+    celebrationPending,
+    setCelebrationState,
+    celebrationBindings,
+    celebrationLabel,
+    handleCelebrationAbort,
+    handleWinningCardFlightSettled,
+    clearCelebrationDialogTimer,
+  } = useCelebrationController({
+    state,
+    developerModeEnabled,
+    animationsEnabled,
+    celebrationAnimationsEnabled,
+    boardLayout,
+    cardMetrics,
+    foundationLayoutsRef,
+    topRowLayoutRef,
+    ensureCardFlightsReady,
+    updateBoardLocked,
+    winCelebrationsRef,
+    onWinVisualHandoffStart: flushPendingSolvedResultAfterHandoff,
+    requestNewGameRef,
+  })
 
   const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(
     createEmptyInvalidWiggle
@@ -715,6 +748,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   useEffect(() => {
     const wasWon = previousHasWonRef.current
     const isWon = state.hasWon
+    const delaySolvedResultRecording = animationsEnabled && celebrationAnimationsEnabled
 
     if (!wasWon && isWon) {
       if (state.timerState === 'running') {
@@ -724,11 +758,25 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         'info',
         `[Game] hasWon set true (moves=${state.moveCount}, winCelebrations=${state.winCelebrations}).`
       )
-      recordCurrentGameResult({ solved: true })
+      if (delaySolvedResultRecording) {
+        pendingSolvedResultRef.current = true
+      } else {
+        pendingSolvedResultRef.current = false
+        clearPendingSolvedResultTimer()
+        recordCurrentGameResult({ solved: true })
+      }
+    }
+
+    if (wasWon && !isWon) {
+      pendingSolvedResultRef.current = false
+      clearPendingSolvedResultTimer()
     }
 
     previousHasWonRef.current = isWon
   }, [
+    animationsEnabled,
+    celebrationAnimationsEnabled,
+    clearPendingSolvedResultTimer,
     dispatch,
     recordCurrentGameResult,
     state.hasWon,

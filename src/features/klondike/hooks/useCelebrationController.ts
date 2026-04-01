@@ -57,6 +57,7 @@ type UseCelebrationControllerParams = {
   ensureCardFlightsReady: () => void
   updateBoardLocked: (locked: boolean) => void
   winCelebrationsRef: React.MutableRefObject<number>
+  onWinVisualHandoffStart?: (options: { reason: CelebrationStartReason }) => void
   requestNewGameRef: React.MutableRefObject<
     ((options?: { reason?: 'manual' | 'celebration' }) => void) | null
   >
@@ -103,6 +104,7 @@ export const useCelebrationController = ({
   ensureCardFlightsReady,
   updateBoardLocked,
   winCelebrationsRef,
+  onWinVisualHandoffStart,
   requestNewGameRef,
 }: UseCelebrationControllerParams) => {
   const [celebrationState, setCelebrationState] = useState<CelebrationState | null>(null)
@@ -122,7 +124,7 @@ export const useCelebrationController = ({
   const celebrationDialogShownRef = useRef(false)
   const celebrationStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const celebrationFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingCelebrationStateRef = useRef<CelebrationState | null>(null)
+  const pendingCelebrationActiveRef = useRef(false)
   const pendingCelebrationQueuedAtRef = useRef<number | null>(null)
   const pendingWinningCardIdRef = useRef<string | null>(null)
   const pendingWinningCardSettledRef = useRef(false)
@@ -260,13 +262,12 @@ export const useCelebrationController = ({
 
   const startPendingCelebration = useCallback(
     (reason: CelebrationStartReason) => {
-      const pendingCelebration = pendingCelebrationStateRef.current
-      if (!pendingCelebration) {
+      if (!pendingCelebrationActiveRef.current) {
         return
       }
 
       const pendingWinningCardId = pendingWinningCardIdRef.current
-      pendingCelebrationStateRef.current = null
+      pendingCelebrationActiveRef.current = false
       pendingCelebrationQueuedAtRef.current = null
       pendingWinningCardIdRef.current = null
       pendingWinningCardSettledRef.current = false
@@ -274,25 +275,41 @@ export const useCelebrationController = ({
       clearCelebrationStartTimer()
       clearCelebrationFallbackTimer()
       ensureCardFlightsReady()
+      onWinVisualHandoffStart?.({ reason })
+      // Task 28-2: Build the celebration payload only once the visual handoff is actually
+      // starting so the exact win frame stays as light as possible.
+      const nextCelebrationState = buildCelebrationState()
+      if (!nextCelebrationState) {
+        logCelebrationHandoff('start_skipped_no_state', {
+          ts: Date.now(),
+          reason,
+          pendingWinningCardId,
+        })
+        updateBoardLocked(false)
+        return
+      }
       logCelebrationHandoff('start', {
         ts: Date.now(),
         reason,
         pendingWinningCardId,
       })
-      setCelebrationState((current) => current ?? pendingCelebration)
+      setCelebrationState((current) => current ?? nextCelebrationState)
     },
     [
+      buildCelebrationState,
       clearCelebrationFallbackTimer,
       clearCelebrationStartTimer,
       ensureCardFlightsReady,
       logCelebrationHandoff,
+      onWinVisualHandoffStart,
+      updateBoardLocked,
     ]
   )
 
   const clearCelebrationAnimations = useCallback(() => {
     celebrationAbortRef.current = false
     celebrationDialogShownRef.current = false
-    pendingCelebrationStateRef.current = null
+    pendingCelebrationActiveRef.current = false
     pendingCelebrationQueuedAtRef.current = null
     pendingWinningCardIdRef.current = null
     pendingWinningCardSettledRef.current = false
@@ -376,7 +393,7 @@ export const useCelebrationController = ({
   const handleWinningCardFlightSettled = useCallback(
     (cardId: string) => {
       const pendingWinningCardId = pendingWinningCardIdRef.current
-      if (!pendingCelebrationStateRef.current || !pendingWinningCardId) {
+      if (!pendingCelebrationActiveRef.current || !pendingWinningCardId) {
         return
       }
       if (cardId !== pendingWinningCardId || pendingWinningCardSettledRef.current) {
@@ -512,45 +529,41 @@ export const useCelebrationController = ({
         celebrations: state.winCelebrations,
       })
 
-      if (!celebrationState && !pendingCelebrationStateRef.current) {
-        const nextCelebrationState = buildCelebrationState()
-        if (nextCelebrationState) {
-          const winningCardId = findWinningTopCardId(previousTopCardIds, currentTopCardIds)
-          const celebrationHandoffDelayMs = foundationGlowEnabled
-            ? WIN_CELEBRATION_HANDOFF_DELAY_MS
-            : CARD_ANIMATION_DURATION_MS
-          const queuedAt = Date.now()
+      if (!celebrationState && !pendingCelebrationActiveRef.current) {
+        const winningCardId = findWinningTopCardId(previousTopCardIds, currentTopCardIds)
+        const celebrationHandoffDelayMs = foundationGlowEnabled
+          ? WIN_CELEBRATION_HANDOFF_DELAY_MS
+          : CARD_ANIMATION_DURATION_MS
+        const queuedAt = Date.now()
 
-          // Task 28-2: Wait for the actual winning card settle event, with a guarded fallback.
-          pendingCelebrationStateRef.current = nextCelebrationState
-          pendingCelebrationQueuedAtRef.current = queuedAt
-          pendingWinningCardIdRef.current = winningCardId
-          pendingWinningCardSettledRef.current = false
-          setCelebrationPending(true)
-          updateBoardLocked(true)
+        // Task 28-2: Keep the winning-card handoff light on the exact win frame; build the full celebration state later.
+        pendingCelebrationActiveRef.current = true
+        pendingCelebrationQueuedAtRef.current = queuedAt
+        pendingWinningCardIdRef.current = winningCardId
+        pendingWinningCardSettledRef.current = false
+        setCelebrationPending(true)
+        updateBoardLocked(true)
 
-          logCelebrationHandoff('queued', {
-            ts: queuedAt,
-            celebrations: state.winCelebrations,
-            winningCardId,
-            celebrationHandoffDelayMs,
-          })
-          logCelebrationHandoff('winning_card_selected', {
-            ts: queuedAt,
-            previousTopCardIds,
-            currentTopCardIds,
-            winningCardId,
-          })
+        logCelebrationHandoff('queued', {
+          ts: queuedAt,
+          celebrations: state.winCelebrations,
+          winningCardId,
+          celebrationHandoffDelayMs,
+        })
+        logCelebrationHandoff('winning_card_selected', {
+          ts: queuedAt,
+          previousTopCardIds,
+          currentTopCardIds,
+          winningCardId,
+        })
 
-          scheduleCelebrationFallback(celebrationHandoffDelayMs)
-        }
+        scheduleCelebrationFallback(celebrationHandoffDelayMs)
       }
     }
 
     previousFoundationTopCardIdsRef.current = currentTopCardIds
   }, [
     animationsEnabled,
-    buildCelebrationState,
     celebrationAnimationsEnabled,
     celebrationState,
     foundationGlowEnabled,

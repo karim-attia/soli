@@ -1,8 +1,8 @@
-# Auto Up Win Handoff [28-2] End-of-auto-up jitter + outline fade + Android demo automation
+# Auto Up Win Handoff [28-2] End-of-auto-up jitter + outline fade + win-boundary JS deferral + Android demo automation
 
 ## Description
 
-Follow up on `28-2` to remove the small end-of-auto-up jitter that can happen right before the win celebration starts, smooth out the empty-board outline cleanup that can read as a lag spike during the celebration handoff, and repair the Android demo automation so `yarn demo:auto-solve` reliably reproduces the winning auto-up path on a connected device.
+Follow up on `28-2` to remove the small end-of-auto-up jitter that can happen right before the win celebration starts, smooth out the empty-board outline cleanup that can read as a lag spike during the celebration handoff, defer non-visual win bookkeeping away from the exact `hasWon` frame so the final winning card has less JS-thread contention, and repair the Android demo automation so `yarn demo:auto-solve` reliably reproduces the winning auto-up path on a connected device.
 
 This work is scoped to the final win handoff and the demo automation path only. It must not retune unrelated board animations or expand the release tooling beyond what the demo runner needs.
 
@@ -14,6 +14,7 @@ This work is scoped to the final win handoff and the demo automation path only. 
 - The board does not visibly reconfigure during the pending win-handoff window just because `hasWon` became `true`.
 - Empty tableau outlines do not disappear in one frame at celebration start; they fade smoothly once the visual win cleanup begins.
 - The follow-up investigation records whether the perceived lag is actual blocking work or abrupt board churn, with a code-backed conclusion.
+- Non-visual win bookkeeping does not run on the exact `hasWon` edge when celebration handoff is active; it is deferred until the winning move’s visual handoff has completed.
 - `yarn demo:auto-solve` builds and installs a release APK using the same signing assumptions as the normal Android release flow.
 - `yarn demo:auto-solve` no longer waits for stale demo-log tokens that the app does not emit.
 - If the demo APK signing still does not match the installed app, the script fails with a targeted diagnostic instead of trying to recover by uninstalling the app.
@@ -73,6 +74,20 @@ Cons:
 Recommended:
 - Pair this with Approach 3.
 
+### 5. Defer heavy win-only JS work until the visual handoff starts
+
+Pros:
+- Reduces JS-thread contention during the exact frame window where the last winning card measures and begins its destination flight
+- Keeps the visual last-card move closer to a normal foundation move
+- Preserves the event-driven handoff while moving result recording and celebration-state assembly later
+
+Cons:
+- Introduces more lifecycle coordination between `useKlondikeGame` and `useCelebrationController`
+- Needs careful fallback behavior so solved games still get recorded when celebration cannot start
+
+Recommended:
+- Pair this with Approach 3 instead of reverting to timeout-only handoff.
+
 ## Open questions to the user incl. recommendations
 
 - None currently blocking.
@@ -86,6 +101,7 @@ Recommended:
 - The last winning move should feel complete before the celebration starts.
 - The board should not “jump” or clean itself up while the last card is still arriving.
 - The empty tableau slots should dissolve quietly into the celebration instead of popping out all at once.
+- The final auto-up move should not feel uniquely sticky just because solved-game bookkeeping happened at the same moment.
 - The Android demo flow should stay narrow and predictable: build, install, launch the demo URI, and wait for completion or a precise failure.
 
 ## Components
@@ -115,8 +131,9 @@ Recommended:
 - [completed] Keep the board visually stable during the pending win-handoff window.
 - [completed] Investigate the perceived end-of-auto-up lag and confirm the empty-outline cleanup is abrupt render churn, not a separate heavy blocking task.
 - [completed] Fade empty board outlines out smoothly during the visual win cleanup.
+- [completed] Defer non-visual win bookkeeping away from the exact `hasWon` frame while preserving the existing handoff fallback behavior.
 - [completed] Repair `yarn demo:auto-solve` so it matches the release signing path and current demo logs.
-- [completed] Run static checks and Android device validation for the outline fade follow-up, then update task documentation with results.
+- [completed] Run static checks and Android device validation for the win-boundary JS deferral follow-up, then update task documentation with results.
 
 ## Plan: Files to modify
 
@@ -152,14 +169,18 @@ Recommended:
 
 ## Identified issues and status of these issues
 
-- The win celebration handoff is currently time-based, not tied to the actual last winning card settling.
-  Status: confirmed.
+- The win celebration handoff previously depended only on fixed timing, which let the celebration overlap the final foundation arrival on slower frames.
+  Status: mitigated by winning-card settle tracking, with the remaining fallback race called out separately below.
 - The board uses raw `state.hasWon` for some top-row cleanup, which can cause visible churn before the celebration visually begins.
-  Status: confirmed.
+  Status: confirmed and mitigated by holding win cleanup behind the pending-handoff state instead of flipping the board immediately.
 - The tableau empty-slot cleanup still removes all empty outlines in one render commit when the win visual phase starts, which can read like a lag spike even without a separate blocking task.
   Status: confirmed and fixed by keeping the slots mounted through the handoff and fading them out on the UI thread.
 - The foundation glow callback exists but fires when the top card changes, not when the flight completes.
   Status: confirmed and mitigated by waiting for the winning-card settle signal and computing the remaining handoff delay from the queued timestamp.
+- The final winning move is also the only move that immediately triggers solved-game bookkeeping and celebration-state assembly on the JS thread, which can compete with the last-card destination-measure/flight window.
+  Status: confirmed and mitigated by deferring solved-result recording until the visual handoff starts and building the celebration payload lazily when celebration actually begins.
+- The guarded fallback timeout still reaches the same absolute handoff deadline as the settle-driven path, so on some runs the fallback can still win the final start race even though the winning card already settled first.
+  Status: still observed in the 2026-04-01 Android emulator capture; treat as a separate follow-up if we want the settle event to become the authoritative start path.
 - `yarn demo:auto-solve` waits for `[Demo] Auto sequence started`, but the app emits `[Demo] Auto sequence queued ...` and `[Demo] Auto sequence completed dispatch queue.` instead.
   Status: fixed.
 - `yarn demo:auto-solve` does not currently load the release signing env from `.env`, which can produce a signature mismatch against the installed release app.
@@ -182,10 +203,13 @@ Recommended:
   - Review the developer-gated handoff logs to confirm winning-card selection, flight settle, queued handoff, and actual celebration start ordering.
 - Visual:
   - Confirm the empty tableau outlines fade away smoothly after the celebration boundary instead of disappearing in a single frame.
+- Endgame responsiveness:
+  - Confirm the last winning card no longer appears uniquely slow or sticky compared with earlier auto-up foundation moves.
 - Result:
   - `yarn exec tsc --noEmit` passed.
   - `yarn lint` passed.
-  - `yarn android` rebuilt the debug APK successfully, then failed at install with the expected `INSTALL_FAILED_UPDATE_INCOMPATIBLE` signature mismatch against the already-installed release app on the device.
-  - `yarn demo:auto-solve` on the connected Android device built and installed the release APK, launched `soli:///?demo=autosolve`, auto-solved the demo game, detected foundations-complete, and waited through celebration start.
-  - Device logs captured the endgame handoff ordering for the updated flow: winning-card settled at `12:39:45.907`, fallback/start at `12:39:45.949` / `12:39:45.953`.
-  - Frame captures triggered off `[CelebrationHandoff] start` showed the empty tableau outlines still present at celebration start, then gone by the follow-up captures at `+90ms` / `+180ms`, which confirms the board cleanup no longer preempts the celebration motion.
+  - `yarn android` built successfully and launched the Android emulator, then hit the expected debug-vs-release install mismatch (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) against the already-installed release package.
+  - `yarn demo:auto-solve` on `emulator-5554` built and installed the release APK, launched `soli:///?demo=autosolve`, auto-solved the demo game, and waited through celebration start.
+  - Android logcat on 2026-04-01 captured the updated handoff ordering at `10:38:51.266` queued / `10:38:51.475` winning-card settled / `10:38:51.594` celebration start.
+  - The winning-card settle happened `209ms` after queue in that capture, which is earlier than the older physical-device capture we had documented for this path.
+  - The same capture still logged `fallback_timeout_reached` at `10:38:51.593`, so this follow-up reduced exact-win-frame JS contention but did not yet make the settle-driven path fully authoritative.
