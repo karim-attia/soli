@@ -16,6 +16,8 @@ Create a markdown file in the folder with the name of the story.
 
 Fill in the following sections:
 - # [Feature Name] [Story Name]
+- ## User prompt
+Add all prompts from the chat 1:1 in here.
 - ## Description
 - ## Acceptance Criteria -> add more details than in the product document if it makes sense
 - ## Design links
