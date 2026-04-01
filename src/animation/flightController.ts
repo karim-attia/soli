@@ -26,6 +26,8 @@ type DispatchArgs = {
   action: GameAction
   selection?: Selection | null
   cardIds?: string[]
+  pendingKey?: string
+  canDispatch?: () => boolean
   dispatch: DispatchFn
 }
 
@@ -33,6 +35,8 @@ type PendingDispatch = {
   action: GameAction
   dispatch: DispatchFn
   requiredCardIds: string[]
+  pendingKey?: string
+  canDispatch?: () => boolean
   deadline: number
   timeoutId: ReturnType<typeof setTimeout>
 }
@@ -154,6 +158,12 @@ export const useFlightController = (
     const nextPendingDispatches: PendingDispatch[] = []
 
     for (const pending of pendingDispatches) {
+      const dispatchStillValid = pending.canDispatch ? pending.canDispatch() : true
+      if (!dispatchStillValid) {
+        clearTimeout(pending.timeoutId)
+        continue
+      }
+
       const snapshotsReady =
         pending.requiredCardIds.length === 0 ||
         pending.requiredCardIds.every((cardId) => !!memoryRef.current[cardId])
@@ -206,9 +216,12 @@ export const useFlightController = (
   }, [cardFlights])
 
   const dispatchWithFlight = useCallback(
-    ({ action, selection, cardIds, dispatch }: DispatchArgs) => {
+    ({ action, selection, cardIds, pendingKey, canDispatch, dispatch }: DispatchArgs) => {
       const resolver = selectionResolverRef.current
       const cards = cardIds ?? (resolver ? resolver(selection) : [])
+      if (canDispatch && !canDispatch()) {
+        return
+      }
 
       if (!enabledRef.current) {
         ensureReady(cards)
@@ -225,10 +238,21 @@ export const useFlightController = (
       }
 
       const timeoutMs = waitTimeoutRef.current
+      if (
+        pendingKey &&
+        pendingDispatchesRef.current.some(
+          (pending) => pending.pendingKey && pending.pendingKey === pendingKey
+        )
+      ) {
+        return
+      }
+
       const pendingDispatch: PendingDispatch = {
         action,
         dispatch,
         requiredCardIds: cards,
+        pendingKey,
+        canDispatch,
         deadline: Date.now() + timeoutMs,
         timeoutId: setTimeout(() => {
           flushPendingDispatches()

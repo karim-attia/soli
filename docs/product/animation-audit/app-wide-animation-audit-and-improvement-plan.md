@@ -135,6 +135,7 @@ Current animation surface area reviewed:
 - [completed] Restore keyed remount behavior for the top stock card so every newly exposed draw card records a fresh stock snapshot before it can be drawn.
 - [completed] Stop broad object-spread writes in the flight snapshot registry hot path.
 - [completed] Replace polling-style readiness / measurement loops with narrower invalidation and bounded retry paths.
+- [completed] Dedupe delayed flight-gated actions and drop stale queued work when the originating card identities no longer match the live board.
 - [completed] Respect system reduced-motion across gameplay motion policy, toast motion, history sheet behavior, and stack navigation.
 - [completed] Reduce JS-thread persistence churn caused by timer-only writes during active games.
 - [pending] Move cross-pile flights into a dedicated overlay host.
@@ -190,6 +191,8 @@ Current animation surface area reviewed:
   - Status: fixed first pass by rendering only the top stock card and only the top foundation card outside celebration mode.
 - The top-only stock optimization initially dropped the per-card `key`, which meant newly exposed stock cards reused the previous `CardView` instance and could skip `onLayout`/snapshot registration.
   - Status: fixed in follow-up by keying the visible stock-card wrapper with `topCard.id`, preserving the lighter render path without breaking repeated draw flights.
+- The bounded pending-dispatch queue introduced in the flight controller could accumulate duplicate delayed actions and later replay them against a changed board state.
+  - Status: fixed in follow-up by adding pending-action dedupe keys plus board-state validation before delayed dispatches are allowed to run.
 - Card snapshot registry updates use broad object spreads inside a hot path.
   - Status: fixed first pass in the controller seed path and narrowed further in card measurement callbacks.
 - Whole-board churn still affects animation smoothness because timer/persistence/render pressure sits close to gameplay updates.
@@ -201,6 +204,8 @@ Current animation surface area reviewed:
   - Status: partially mitigated by honoring system reduced-motion and stopping foundation glow once celebration takes over; deeper simplification still pending.
 - The lighter top-only foundation rendering regressed celebration visibility because non-top cards could remount with remembered flight snapshots and stay at `opacity: 0` unless they also got a celebration-time layout pass.
   - Status: fixed in follow-up by re-enabling layout tracking for all foundation cards while celebration is active.
+- Remembered flight snapshots could still hide cards that mount with layout tracking intentionally disabled, because `useCardAnimations` initialized them at `opacity: 0` without a recovery path.
+  - Status: fixed in follow-up by making the shared card hook render those mounts in-place and reset any inherited flight opacity/offset state when layout tracking is off.
 - Undo scrubber depends on JS-thread gesture callbacks for stability, which is understandable but not ideal long term.
   - Status: unchanged in this pass because there is parallel scrubber safe-area work in flight and the threading refactor should be handled together.
 - Reduced-motion is controlled only by in-app settings, not by system accessibility preference.
@@ -221,9 +226,13 @@ Current animation surface area reviewed:
   - `yarn typecheck:fallback`
   - `yarn lint`
   - `oxfmt` on the files modified for this task
-- Native/device validation is still required:
+- Native/device validation completed in this follow-up:
+  - `yarn release` completed successfully on April 1, 2026 and produced a fresh Android release APK.
+  - Installed the fresh release APK on `emulator-5554` and launched the app against Metro.
+  - Verified manual draw behavior on the release build after the queue/hook fixes.
+  - Verified the demo auto-solve flow reached win celebration, and the live celebration showed mixed ranks instead of the earlier kings-only regression.
+- Native/device validation still pending:
   - iOS simulator/device: repeated draw, recycle, undo scrub, tableau-to-foundation, auto-complete, and win celebration.
-  - Android emulator/device: the same flows, plus check lower-end frame stability.
   - Verify card layering mid-flight against HUD, scrubber, and celebration blocker.
   - Verify reduced-motion behavior with the OS accessibility setting enabled.
   - Validate any Reanimated static feature flag changes only after a full native rebuild.

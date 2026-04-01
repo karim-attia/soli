@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
+  FOUNDATION_SUIT_ORDER,
   createInitialState,
   createSolvableGameState,
   findAutoMoveTargetWithTableauAdjacentFallback,
@@ -105,6 +106,18 @@ type CardSignatureSnapshot = Pick<
   'stock' | 'waste' | 'foundations' | 'tableau'
 >
 
+type PendingActionValidationSnapshot = Pick<
+  GameState,
+  | 'stock'
+  | 'waste'
+  | 'foundations'
+  | 'tableau'
+  | 'selected'
+  | 'history'
+  | 'autoQueue'
+  | 'isAutoCompleting'
+>
+
 const buildCardSignatureMap = (snapshot: CardSignatureSnapshot): Map<string, string> => {
   const map = new Map<string, string>()
 
@@ -150,6 +163,74 @@ const collectChangedCardIds = (current: GameState, target: GameSnapshot): string
   }
 
   return changed
+}
+
+const serializeCardsForPendingValidation = (
+  cards: Array<{ id: string; faceUp: boolean }>
+): string => cards.map((card) => `${card.id}:${card.faceUp ? 1 : 0}`).join(',')
+
+const getBoardTokenForPendingValidation = (snapshot: CardSignatureSnapshot): string => {
+  const foundationToken = FOUNDATION_SUIT_ORDER.map(
+    (suit) => `${suit}[${serializeCardsForPendingValidation(snapshot.foundations[suit])}]`
+  ).join('|')
+  const tableauToken = snapshot.tableau
+    .map(
+      (column, columnIndex) =>
+        `${columnIndex}[${serializeCardsForPendingValidation(column)}]`
+    )
+    .join('|')
+
+  return [
+    `stock[${serializeCardsForPendingValidation(snapshot.stock)}]`,
+    `waste[${serializeCardsForPendingValidation(snapshot.waste)}]`,
+    `foundations[${foundationToken}]`,
+    `tableau[${tableauToken}]`,
+  ].join('||')
+}
+
+const getPendingActionValidationToken = (
+  snapshot: PendingActionValidationSnapshot
+): string => {
+  const topHistorySnapshot = snapshot.history[snapshot.history.length - 1]
+  const topHistoryToken = topHistorySnapshot
+    ? getBoardTokenForPendingValidation(topHistorySnapshot)
+    : 'none'
+  const nextQueuedAction = snapshot.autoQueue[0]
+
+  // Bind queued animation dispatches to the exact board-selection/history state
+  // they were created from. If any gameplay action sneaks in before the queued
+  // dispatch flushes, dropping the stale work is safer than replaying it late.
+  return [
+    getBoardTokenForPendingValidation(snapshot),
+    `selected:${JSON.stringify(snapshot.selected)}`,
+    `history:${snapshot.history.length}:${topHistoryToken}`,
+    `auto:${snapshot.isAutoCompleting ? 1 : 0}:${snapshot.autoQueue.length}:${JSON.stringify(nextQueuedAction ?? null)}`,
+  ].join('||')
+}
+
+const getPendingActionKey = (action: GameAction, cardIds: string[]): string => {
+  const cardKey = cardIds.join(',') || 'none'
+
+  switch (action.type) {
+    case 'DRAW_OR_RECYCLE':
+    case 'UNDO':
+    case 'ADVANCE_AUTO_QUEUE':
+      return `${action.type}:${cardKey}`
+    case 'APPLY_MOVE':
+      return [
+        action.type,
+        JSON.stringify(action.selection),
+        JSON.stringify(action.target),
+        action.recordHistory === false ? 'history:off' : 'history:on',
+        cardKey,
+      ].join(':')
+    case 'PLACE_ON_FOUNDATION':
+      return `${action.type}:${action.suit}:${cardKey}`
+    case 'PLACE_ON_TABLEAU':
+      return `${action.type}:${action.columnIndex}:${cardKey}`
+    default:
+      return `${action.type}:${cardKey}`
+  }
 }
 
 type UseKlondikeGameResult = {
@@ -577,10 +658,18 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
                 })()
               : undefined
 
+      const trackedCardIds =
+        inferredCardIds ?? collectSelectionCardIds(current, selection)
+      const pendingValidationToken = getPendingActionValidationToken(current)
+      const pendingKey = getPendingActionKey(action, trackedCardIds)
+
       dispatchWithFlightInternal({
         action,
         selection,
-        cardIds: inferredCardIds,
+        cardIds: trackedCardIds,
+        pendingKey,
+        canDispatch: () =>
+          getPendingActionValidationToken(stateRef.current) === pendingValidationToken,
         dispatch,
       })
     },
@@ -918,7 +1007,14 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         return
       }
       if (dropHints.foundations[suit]) {
-        dispatchWithFlight({ type: 'PLACE_ON_FOUNDATION', suit }, state.selected)
+        dispatchWithFlight(
+          {
+            type: 'APPLY_MOVE',
+            selection: state.selected,
+            target: { type: 'foundation', suit },
+          },
+          state.selected
+        )
       } else {
         notifyInvalidMove({ selection: state.selected })
       }

@@ -204,6 +204,7 @@ export const CardView = ({
     offsetLeft,
     isSelected,
     suppressFlightOnFaceUpChange,
+    layoutTrackingEnabled,
     invalidWiggle,
     cardFlights,
     cardFlightMemory,

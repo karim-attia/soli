@@ -52,6 +52,7 @@ export type UseCardAnimationsParams = {
   offsetLeft?: number
   isSelected?: boolean
   suppressFlightOnFaceUpChange?: boolean
+  layoutTrackingEnabled?: boolean
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
   cardFlightMemory?: Record<string, CardFlightSnapshot>
@@ -69,6 +70,7 @@ export const useCardAnimations = ({
   offsetLeft,
   isSelected: _isSelected,
   suppressFlightOnFaceUpChange = false,
+  layoutTrackingEnabled = true,
   invalidWiggle,
   cardFlights,
   cardFlightMemory,
@@ -89,7 +91,9 @@ export const useCardAnimations = ({
   const flightY = useSharedValue(0)
   const flightZ = useSharedValue(0)
   const previousSnapshot = cardFlightMemory?.[card.id]
-  const flightOpacity = useSharedValue(cardFlightsEnabled && previousSnapshot ? 0 : 1)
+  const flightOpacity = useSharedValue(
+    cardFlightsEnabled && layoutTrackingEnabled && previousSnapshot ? 0 : 1
+  )
   const flipScale = useSharedValue(1)
   const lastTriggerRef = useRef(invalidWiggle.key)
   const previousFaceUpRef = useRef(card.faceUp)
@@ -247,6 +251,24 @@ export const useCardAnimations = ({
       cancelAnimation(flipScale)
     }
   }, [flightOpacity, flightX, flightY, flightZ, flipScale, wiggle])
+
+  useEffect(() => {
+    if (layoutTrackingEnabled) {
+      return
+    }
+
+    // If a card mounts while layout tracking is intentionally disabled
+    // (for example during scrubber stabilization), do not leave it hidden just
+    // because an older flight snapshot exists.
+    cancelAnimation(flightX)
+    cancelAnimation(flightY)
+    cancelAnimation(flightZ)
+    cancelAnimation(flightOpacity)
+    flightX.value = 0
+    flightY.value = 0
+    flightZ.value = 0
+    flightOpacity.value = 1
+  }, [flightOpacity, flightX, flightY, flightZ, layoutTrackingEnabled])
 
   useEffect(() => {
     if (!cardFlipEnabled) {
