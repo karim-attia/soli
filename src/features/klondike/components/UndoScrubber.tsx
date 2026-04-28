@@ -1,8 +1,12 @@
 import React, { useCallback, useEffect, useRef } from 'react'
 import { type LayoutChangeEvent, StyleSheet, View, Text } from 'react-native'
-import Animated, { createAnimatedComponent } from 'react-native-reanimated'
+import Animated, {
+  createAnimatedComponent,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue,
+} from 'react-native-reanimated'
 import { GestureDetector, type GestureType } from 'react-native-gesture-handler'
-import { Slider } from 'tamagui'
 import { Undo2 } from '@tamagui/lucide-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -16,7 +20,7 @@ import {
 export type UndoScrubberProps = {
   visible: boolean
   isScrubbing: boolean
-  sliderValue: number[]
+  scrubIndex: SharedValue<number>
   sliderMax: number
   gesture: GestureType
   boardLocked: boolean
@@ -25,6 +29,9 @@ export type UndoScrubberProps = {
 }
 
 const AnimatedView = createAnimatedComponent(View)
+const SCRUBBER_THUMB_SIZE = 20
+const SCRUBBER_THUMB_RADIUS = SCRUBBER_THUMB_SIZE / 2
+
 // requirement 20-6: Approach A - Isolate gesture component to prevent re-renders during scrubbing
 // This wrapper NEVER re-renders, preventing iOS gesture cancellation from React updates
 const GestureWrapper = React.memo(
@@ -45,7 +52,7 @@ const GestureWrapper = React.memo(
 export const UndoScrubber: React.FC<UndoScrubberProps> = ({
   visible,
   isScrubbing,
-  sliderValue,
+  scrubIndex,
   sliderMax,
   gesture,
   boardLocked: _boardLocked,
@@ -53,9 +60,9 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
   onTrackMetrics,
 }) => {
   const trackRef = useRef<View>(null)
+  const trackWidth = useSharedValue(0)
   const safeArea = useSafeAreaInsets()
-  const bottomDockOffset =
-    safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING
+  const bottomDockOffset = safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING
 
   const measureTrack = useCallback(() => {
     const track = trackRef.current
@@ -71,10 +78,11 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
   }, [onTrackMetrics])
 
   const handleTrackLayout = useCallback(
-    (_event: LayoutChangeEvent) => {
+    (event: LayoutChangeEvent) => {
+      trackWidth.value = event.nativeEvent.layout.width
       measureTrack()
     },
-    [measureTrack]
+    [measureTrack, trackWidth]
   )
 
   useEffect(() => {
@@ -83,6 +91,25 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
     }
     measureTrack()
   }, [measureTrack, sliderMax, visible])
+
+  const activeTrackStyle = useAnimatedStyle(() => {
+    const clampedIndex = Math.max(0, Math.min(scrubIndex.value, sliderMax))
+    const normalized = sliderMax <= 0 ? 0 : clampedIndex / sliderMax
+    const travelWidth = Math.max(trackWidth.value - SCRUBBER_THUMB_SIZE, 0)
+    const thumbCenter = normalized * travelWidth + SCRUBBER_THUMB_RADIUS
+    return {
+      width: Math.min(trackWidth.value, Math.max(SCRUBBER_THUMB_RADIUS, thumbCenter)),
+    }
+  }, [scrubIndex, sliderMax, trackWidth])
+
+  const thumbStyle = useAnimatedStyle(() => {
+    const clampedIndex = Math.max(0, Math.min(scrubIndex.value, sliderMax))
+    const normalized = sliderMax <= 0 ? 0 : clampedIndex / sliderMax
+    const travelWidth = Math.max(trackWidth.value - SCRUBBER_THUMB_SIZE, 0)
+    return {
+      transform: [{ translateX: normalized * travelWidth }],
+    }
+  }, [scrubIndex, sliderMax, trackWidth])
 
   if (!visible) {
     return null
@@ -119,23 +146,14 @@ export const UndoScrubber: React.FC<UndoScrubberProps> = ({
           },
         ]}
       >
-        <Slider
-          value={sliderValue}
-          min={0}
-          max={sliderMax}
-          step={1}
-          size="$4"
-          style={styles.slider}
-        >
-          <Slider.Track
-            ref={trackRef}
-            onLayout={handleTrackLayout}
-            style={styles.track}
-          >
-            <Slider.TrackActive style={styles.trackActive} />
-          </Slider.Track>
-          <Slider.Thumb circular size="$3" index={0} style={styles.thumb} />
-        </Slider>
+        {/* Keep the visual scrub overlay on shared values instead of Slider props:
+            we learned that React-driven per-step updates add avoidable churn during long scrubs. */}
+        <View style={styles.slider}>
+          <View ref={trackRef} onLayout={handleTrackLayout} style={styles.track}>
+            <AnimatedView style={[styles.trackActive, activeTrackStyle]} />
+            <AnimatedView style={[styles.thumb, thumbStyle]} />
+          </View>
+        </View>
       </AnimatedView>
       <GestureWrapper gesture={gesture} opacity={buttonOpacity} />
     </View>
@@ -172,14 +190,27 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   track: {
+    position: 'relative',
     height: 12,
     borderRadius: 999,
     backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    overflow: 'visible',
   },
   trackActive: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    borderRadius: 999,
     backgroundColor: 'rgba(255, 255, 255, 0.85)',
   },
   thumb: {
+    position: 'absolute',
+    top: -4,
+    left: 0,
+    width: SCRUBBER_THUMB_SIZE,
+    height: SCRUBBER_THUMB_SIZE,
+    borderRadius: SCRUBBER_THUMB_RADIUS,
     backgroundColor: '#ffffff',
     borderWidth: 2,
     borderColor: 'rgba(148, 163, 184, 0.45)',

@@ -51,7 +51,7 @@ Update the status of the steps after the implementation of each step. NEVER SKIP
 
 # Testing
 
-Test everything you do in a real environment. In order to save context, always use sub-agents to test. Use GPT 5.4 medium reasoning for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
+Test everything you do in a real environment. In order to save context, always use sub-agents to test. Use GPT 5.5 medium reasoning for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
 
 Native: Use agent-device skill
 Web: Use Playwright with skill

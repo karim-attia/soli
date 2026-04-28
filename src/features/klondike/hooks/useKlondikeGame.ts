@@ -299,6 +299,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   } = useSettings()
   const { showMoves, showTime } = settingsState.statistics
   const solvableGamesOnly = settingsState.solvableGamesOnly
+  const autoUpEnabled = settingsState.autoUpEnabled
   const developerModeEnabled = settingsState.developerMode
 
   const animationToggles = useAnimationToggles()
@@ -408,6 +409,16 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Hook: drive the Klondike timer lifecycle (start/pause/tick) away from the main component.
   useKlondikeTimer({ state, dispatch, stateRef })
 
+  useEffect(() => {
+    if (!settingsHydrated) {
+      return
+    }
+
+    // Auto Up lives in settings, but queue scheduling is pure reducer logic.
+    // Mirror it into runtime state so turning it off can stop an active queue immediately.
+    dispatch({ type: 'SET_AUTO_UP_ENABLED', enabled: autoUpEnabled })
+  }, [autoUpEnabled, dispatch, settingsHydrated])
+
   // Hook: hydrate and persist game state via AsyncStorage once per relevant change.
   // Task 10-7: Persist the current history entry linkage across restarts.
   useKlondikePersistence({
@@ -416,6 +427,8 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     resetCardFlights,
     previousHasWonRef,
     currentGameEntryIdRef,
+    settingsHydrated,
+    autoUpEnabled,
   })
 
   // Task 10-7: After hydration, ensure the persisted/linked entry is the only active one.
@@ -1033,7 +1046,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     shouldShowUndo,
     canUndo,
     isScrubbing,
-    scrubSliderValue,
+    scrubAnimatedIndex,
     scrubSliderMax,
     undoScrubGesture,
     handleTrackMetrics,
@@ -1117,7 +1130,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const undoScrubProps: UndoScrubberProps = {
     visible: shouldShowUndo,
     isScrubbing,
-    sliderValue: scrubSliderValue,
+    scrubIndex: scrubAnimatedIndex,
     sliderMax: scrubSliderMax,
     gesture: undoScrubGesture,
     boardLocked,

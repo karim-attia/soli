@@ -41,6 +41,7 @@ export type SettingsState = {
   themeMode: ThemeMode
   shareSolvedGames: boolean
   solvableGamesOnly: boolean
+  autoUpEnabled: boolean
   developerMode: boolean
   statistics: StatisticsPreferences
   refreshRateMode: RefreshRateMode // PBI-27
@@ -55,6 +56,7 @@ type SettingsContextValue = {
   setAnimationPreference: (key: AnimationPreferenceKey, enabled: boolean) => void
   setShareSolvedGames: (enabled: boolean) => void
   setSolvableGamesOnly: (enabled: boolean) => void
+  setAutoUpEnabled: (enabled: boolean) => void
   setDeveloperMode: (enabled: boolean) => void
   setStatisticsPreference: (key: StatisticsPreferenceKey, enabled: boolean) => void
   setRefreshRateMode: (mode: RefreshRateMode) => void // PBI-27
@@ -75,6 +77,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   themeMode: 'auto',
   shareSolvedGames: false,
   solvableGamesOnly: true,
+  autoUpEnabled: true,
   developerMode: false,
   statistics: {
     showMoves: true,
@@ -277,6 +280,14 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     )
   }, [])
 
+  const setAutoUpEnabled = useCallback((enabled: boolean) => {
+    setState((previous) =>
+      previous.autoUpEnabled === enabled
+        ? previous
+        : { ...previous, autoUpEnabled: enabled }
+    )
+  }, [])
+
   const setDeveloperMode = useCallback((enabled: boolean) => {
     setDeveloperLoggingEnabled(enabled)
     setState((previous) =>
@@ -344,6 +355,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setAnimationPreference,
       setShareSolvedGames,
       setSolvableGamesOnly,
+      setAutoUpEnabled,
       setDeveloperMode,
       setStatisticsPreference,
       setRefreshRateMode,
@@ -354,6 +366,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setAnimationPreference,
       setGlobalAnimationsEnabled,
       setStatisticsPreference,
+      setAutoUpEnabled,
       setShareSolvedGames,
       setSolvableGamesOnly,
       setThemeMode,
@@ -440,6 +453,7 @@ const mergeSettings = (
     themeMode: isThemeMode(incoming.themeMode) ? incoming.themeMode : current.themeMode,
     shareSolvedGames: getBoolean(incoming.shareSolvedGames, current.shareSolvedGames),
     solvableGamesOnly: getBoolean(incoming.solvableGamesOnly, current.solvableGamesOnly),
+    autoUpEnabled: getBoolean(incoming.autoUpEnabled, current.autoUpEnabled),
     developerMode: getBoolean(incoming.developerMode, current.developerMode),
     statistics: {
       showMoves: getBoolean(statistics.showMoves, current.statistics.showMoves),

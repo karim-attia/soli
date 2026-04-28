@@ -16,6 +16,8 @@ type UseKlondikePersistenceParams = {
   previousHasWonRef: React.MutableRefObject<boolean>
   // Task 10-7: Persist linkage to the active history entry across restarts.
   currentGameEntryIdRef: React.MutableRefObject<string | null>
+  settingsHydrated: boolean
+  autoUpEnabled: boolean
 }
 
 const PERSISTENCE_WRITE_DEBOUNCE_MS = 180
@@ -50,12 +52,20 @@ export const useKlondikePersistence = ({
   resetCardFlights,
   previousHasWonRef,
   currentGameEntryIdRef,
+  settingsHydrated,
+  autoUpEnabled,
 }: UseKlondikePersistenceParams) => {
   const [storageHydrationComplete, setStorageHydrationComplete] = useState(false)
   const lastQueuedStateRef = useRef<GameState | null>(null)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoUpEnabledRef = useRef(autoUpEnabled)
+  autoUpEnabledRef.current = autoUpEnabled
 
   useEffect(() => {
+    if (!settingsHydrated) {
+      return
+    }
+
     let isCancelled = false
 
     ;(async () => {
@@ -88,7 +98,11 @@ export const useKlondikePersistence = ({
         // Task 10-7: Restore history linkage so completion updates the same entry.
         currentGameEntryIdRef.current = persisted.historyEntryId
         resetCardFlights()
-        dispatch({ type: 'HYDRATE_STATE', state: persisted.state })
+        dispatch({
+          type: 'HYDRATE_STATE',
+          state: persisted.state,
+          autoUpEnabled: autoUpEnabledRef.current,
+        })
       } catch (error) {
         if (isCancelled) {
           return
@@ -119,7 +133,13 @@ export const useKlondikePersistence = ({
     return () => {
       isCancelled = true
     }
-  }, [currentGameEntryIdRef, dispatch, previousHasWonRef, resetCardFlights])
+  }, [
+    currentGameEntryIdRef,
+    dispatch,
+    previousHasWonRef,
+    resetCardFlights,
+    settingsHydrated,
+  ])
 
   useEffect(() => {
     if (!storageHydrationComplete) {

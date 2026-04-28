@@ -74,6 +74,7 @@ export default function SettingsScreen() {
     setAnimationPreference,
     setThemeMode,
     setSolvableGamesOnly,
+    setAutoUpEnabled,
     setDeveloperMode,
     setStatisticsPreference,
     setRefreshRateMode,
@@ -154,6 +155,13 @@ export default function SettingsScreen() {
             description="Use curated solvable layouts when starting a new game."
             value={state.solvableGamesOnly}
             onValueChange={setSolvableGamesOnly}
+            disabled={!hydrated}
+          />
+          <ToggleRow
+            label="Auto Up"
+            description="Automatically move remaining cards to foundations once every tableau card is face up."
+            value={state.autoUpEnabled}
+            onValueChange={setAutoUpEnabled}
             disabled={!hydrated}
           />
         </YStack>

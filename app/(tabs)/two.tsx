@@ -180,9 +180,14 @@ export default function TabOneScreen() {
   const cardMetrics = useMemo(() => computeCardMetrics(boardWidth), [boardWidth])
   const navigation = useNavigation()
   const {
-    state: { developerMode },
+    state: { developerMode, autoUpEnabled },
   } = useSettings()
   const developerModeEnabled = developerMode
+
+  useEffect(() => {
+    dispatch({ type: 'SET_AUTO_UP_ENABLED', enabled: autoUpEnabled })
+  }, [autoUpEnabled, dispatch])
+
   const dropHints = useMemo(() => getDropHints(state), [state])
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
   const winCelebrationsRef = useRef(state.winCelebrations)

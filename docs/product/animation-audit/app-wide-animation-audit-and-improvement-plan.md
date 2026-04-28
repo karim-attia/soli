@@ -138,10 +138,11 @@ Current animation surface area reviewed:
 - [completed] Dedupe delayed flight-gated actions and drop stale queued work when the originating card identities no longer match the live board.
 - [completed] Respect system reduced-motion across gameplay motion policy, toast motion, history sheet behavior, and stack navigation.
 - [completed] Reduce JS-thread persistence churn caused by timer-only writes during active games.
+- [completed] Re-measure mounted cards when layout tracking is re-enabled after iOS scrubbing so post-scrub flights have fresh origins again.
 - [pending] Move cross-pile flights into a dedicated overlay host.
 - [completed] Degrade celebration-related work gracefully for reduced-motion users and stop redundant glow work once celebration takes over.
 - [pending] Reduce celebration per-frame math further for lower-end devices that still keep celebrations enabled.
-- [pending] Revisit undo scrubber so gestures can move back toward UI-thread handling after board churn drops.
+- [completed] Move undo scrubber pan tracking and overlay visuals back toward UI-thread handling while keeping reducer commits as coarse JS-boundary work.
 - [pending] Validate Reanimated static feature flags in a native dev build.
 
 ## Plan: Files to modify
@@ -169,12 +170,15 @@ Current animation surface area reviewed:
 - `app/settings.tsx`
 - `components/CurrentToast.tsx`
 - `src/animation/flightController.ts`
+- `src/features/klondike/components/UndoScrubber.tsx`
 - `src/features/klondike/components/cards/animations.ts`
 - `src/features/klondike/components/cards/CardView.tsx`
 - `src/features/klondike/components/cards/FoundationPile.tsx`
 - `src/features/klondike/components/cards/StockStack.tsx`
 - `src/features/klondike/components/cards/TableauSection.tsx`
 - `src/features/klondike/components/cards/TopRow.tsx`
+- `src/features/klondike/hooks/useUndoScrubber.ts`
+- `src/features/klondike/hooks/useKlondikeGame.ts`
 - `src/features/klondike/hooks/useKlondikePersistence.ts`
 - `src/state/settings.tsx`
 - `docs/product/animation-audit/app-wide-animation-audit-and-improvement-plan.md`
@@ -206,8 +210,10 @@ Current animation surface area reviewed:
   - Status: fixed in follow-up by re-enabling layout tracking for all foundation cards while celebration is active.
 - Remembered flight snapshots could still hide cards that mount with layout tracking intentionally disabled, because `useCardAnimations` initialized them at `opacity: 0` without a recovery path.
   - Status: fixed in follow-up by making the shared card hook render those mounts in-place and reset any inherited flight opacity/offset state when layout tracking is off.
-- Undo scrubber depends on JS-thread gesture callbacks for stability, which is understandable but not ideal long term.
-  - Status: unchanged in this pass because there is parallel scrubber safe-area work in flight and the threading refactor should be handled together.
+- Undo scrubber depended on JS-thread gesture callbacks for stability, which kept the hottest scrub path off the UI thread.
+  - Status: improved in follow-up by moving pan index math and overlay thumb/track visuals onto shared values/worklets, while keeping `SCRUB_TO_INDEX` reducer commits coalesced on JS.
+- The iOS scrubber reset path clears flight snapshots on scrub start, but unchanged mounted cards do not automatically re-measure when scrubbing ends.
+  - Status: fixed in follow-up by triggering one shared-hook re-measure when layout tracking is re-enabled after scrubbing.
 - Reduced-motion is controlled only by in-app settings, not by system accessibility preference.
   - Status: fixed for gameplay motion policy, toast motion, history sheet behavior, and stack navigation.
 - Motion configuration is spread across several files and patterns.
@@ -231,8 +237,16 @@ Current animation surface area reviewed:
   - Installed the fresh release APK on `emulator-5554` and launched the app against Metro.
   - Verified manual draw behavior on the release build after the queue/hook fixes.
   - Verified the demo auto-solve flow reached win celebration, and the live celebration showed mixed ranks instead of the earlier kings-only regression.
+- Native/device validation completed in this scrubber follow-up:
+  - `npx expo run:ios -d 'iPhone 17 Pro' --no-build-cache` completed successfully on April 1, 2026 and installed a fresh debug build on the booted simulator.
+  - Verified the iOS scrubber on the fresh build with a real long swipe over `Undo`; the board rewound from multiple drawn cards back to the far-left timeline state, and a normal `Draw` still worked immediately afterward.
+  - `yarn release` completed successfully again on April 1, 2026.
+  - Installed the fresh release APK on physical device `A065` and confirmed the app opened there.
+  - Installed the same fresh release APK on `emulator-5554`, verified a long swipe over the real `Undo` bounds rewound the board back to the far-left timeline state, and verified `Draw` still worked after the scrub.
 - Native/device validation still pending:
-  - iOS simulator/device: repeated draw, recycle, undo scrub, tableau-to-foundation, auto-complete, and win celebration.
+  - iOS simulator/device: repeatable automated scrub-gesture verification with a hittable `Undo` accessibility node. The current runner still reports the button as non-hittable, so the iOS assertion relies on coordinate-driven interaction instead of direct element taps.
+  - Android physical device: deeper accessibility-driven scrub assertions. The fresh release install opened correctly on `A065`, but the automation snapshot returned no accessible nodes there, so the detailed gesture verification was completed on the freshly installed emulator build instead.
+  - iOS simulator/device: recycle, tableau-to-foundation, auto-complete, and win celebration on the latest scrubber follow-up build.
   - Verify card layering mid-flight against HUD, scrubber, and celebration blocker.
   - Verify reduced-motion behavior with the OS accessibility setting enabled.
   - Validate any Reanimated static feature flag changes only after a full native rebuild.

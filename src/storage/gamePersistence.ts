@@ -210,6 +210,10 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
     future: futureSnapshots,
     shuffleId,
     solvableId: solvableIdValue,
+    autoUpEnabled:
+      typeof (parsed.state as { autoUpEnabled?: unknown }).autoUpEnabled === 'boolean'
+        ? (parsed.state as { autoUpEnabled: boolean }).autoUpEnabled
+        : true,
   }
 
   const status: PersistedGameStatus =

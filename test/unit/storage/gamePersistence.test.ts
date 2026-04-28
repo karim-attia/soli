@@ -54,6 +54,24 @@ describe('gamePersistence', () => {
     expect(restored?.state.selected).toBeNull()
   })
 
+  it('defaults Auto Up to enabled for legacy saved states', async () => {
+    const initial = createInitialState()
+    const legacyState = { ...initial } as Partial<typeof initial>
+    delete legacyState.autoUpEnabled
+    const payload = {
+      version: PERSISTENCE_VERSION,
+      savedAt: new Date().toISOString(),
+      status: 'in-progress' as const,
+      state: legacyState,
+    }
+
+    ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+
+    const restored = await loadGameState()
+
+    expect(restored?.state.autoUpEnabled).toBe(true)
+  })
+
   it('throws PersistedGameError for invalid JSON', async () => {
     ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue('not-json')
 

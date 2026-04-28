@@ -69,6 +69,7 @@ export interface GameState extends GameSnapshot {
   history: GameSnapshot[]
   future: GameSnapshot[]
   selected: Selection | null
+  autoUpEnabled: boolean
 }
 
 export type GameAction =
@@ -76,7 +77,7 @@ export type GameAction =
   | { type: 'DRAW_OR_RECYCLE' }
   | { type: 'UNDO' }
   | { type: 'SCRUB_TO_INDEX'; index: number }
-  | { type: 'HYDRATE_STATE'; state: GameState }
+  | { type: 'HYDRATE_STATE'; state: GameState; autoUpEnabled?: boolean }
   | { type: 'SELECT_TABLEAU'; columnIndex: number; cardIndex: number }
   | { type: 'SELECT_WASTE' }
   | { type: 'SELECT_FOUNDATION_TOP'; suit: Suit }
@@ -84,6 +85,7 @@ export type GameAction =
   | { type: 'PLACE_ON_TABLEAU'; columnIndex: number }
   | { type: 'PLACE_ON_FOUNDATION'; suit: Suit }
   | { type: 'ADVANCE_AUTO_QUEUE' }
+  | { type: 'SET_AUTO_UP_ENABLED'; enabled: boolean }
   | {
       type: 'APPLY_MOVE'
       selection: Selection
@@ -146,6 +148,7 @@ export const createInitialState = (): GameState => {
     history: [],
     future: [],
     selected: null,
+    autoUpEnabled: true,
   }
 }
 
@@ -222,6 +225,7 @@ export const createSolvableGameState = (
     history: [],
     future: [],
     selected: null,
+    autoUpEnabled: true,
   }
 }
 
@@ -380,6 +384,7 @@ export const createDemoGameState = (): GameState => {
     history: [],
     future: [],
     selected: null,
+    autoUpEnabled: true,
   }
 }
 
@@ -410,7 +415,7 @@ const takeCardFromLookup = (
 export const klondikeReducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
     case 'NEW_GAME':
-      return createInitialState()
+      return { ...createInitialState(), autoUpEnabled: state.autoUpEnabled }
     case 'DRAW_OR_RECYCLE':
       return finalizeState(drawFromStock(haltAutoQueue(state)))
     case 'UNDO':
@@ -420,11 +425,16 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
       const nextState = scrubToIndex(workingState, action.index)
       return nextState === workingState ? workingState : finalizeState(nextState)
     }
-    case 'HYDRATE_STATE':
-      return finalizeState({
+    case 'HYDRATE_STATE': {
+      const hydratedState = {
         ...action.state,
         selected: null,
-      })
+        autoUpEnabled: action.autoUpEnabled ?? state.autoUpEnabled,
+      }
+      return finalizeState(
+        hydratedState.autoUpEnabled ? hydratedState : haltAutoQueue(hydratedState)
+      )
+    }
     case 'SELECT_TABLEAU':
       return handleSelectTableau(
         haltAutoQueue(state),
@@ -465,6 +475,14 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
       }
     case 'ADVANCE_AUTO_QUEUE':
       return finalizeState(advanceAutoQueue(state))
+    case 'SET_AUTO_UP_ENABLED': {
+      const nextState =
+        state.autoUpEnabled === action.enabled
+          ? state
+          : { ...state, autoUpEnabled: action.enabled }
+
+      return action.enabled ? finalizeState(nextState) : haltAutoQueue(nextState)
+    }
     case 'APPLY_MOVE': {
       const workingState = haltAutoQueue(state)
       const nextState = applyMove(workingState, action.selection, action.target, {
@@ -670,7 +688,7 @@ const handleUndo = (state: GameState): GameState => {
   const nextHistory = state.history.slice(0, -1)
   const nextFuture = [snapshotFromState(state), ...state.future]
 
-  const restoredState = cloneSnapshot(previousSnapshot)
+  const restoredState = cloneSnapshot(previousSnapshot, state.autoUpEnabled)
   return {
     ...restoredState,
     history: nextHistory,
@@ -704,7 +722,7 @@ const scrubToIndex = (state: GameState, targetIndex: number): GameState => {
   const nextHistory = timeline.slice(0, clampedIndex)
   const nextFuture = timeline.slice(clampedIndex + 1)
 
-  const baseState = cloneSnapshot(nextSnapshot)
+  const baseState = cloneSnapshot(nextSnapshot, state.autoUpEnabled)
   return {
     ...baseState,
     history: nextHistory,
@@ -954,7 +972,12 @@ const maybeSetWinFlag = (state: GameState): GameState => {
 }
 
 const scheduleAutoQueue = (state: GameState): GameState => {
-  if (!isAutoCompleteReady(state) || state.isAutoCompleting || state.autoQueue.length) {
+  if (
+    !state.autoUpEnabled ||
+    !isAutoCompleteReady(state) ||
+    state.isAutoCompleting ||
+    state.autoQueue.length
+  ) {
     return state
   }
 
@@ -1224,7 +1247,10 @@ const snapshotFromState = (state: GameState): GameSnapshot => ({
   timerStartedAt: state.timerStartedAt,
 })
 
-const cloneSnapshot = (snapshot: GameSnapshot): GameState => ({
+const cloneSnapshot = (
+  snapshot: GameSnapshot,
+  autoUpEnabled = true
+): GameState => ({
   stock: cloneCards(snapshot.stock),
   waste: cloneCards(snapshot.waste),
   foundations: cloneFoundations(snapshot.foundations),
@@ -1243,6 +1269,7 @@ const cloneSnapshot = (snapshot: GameSnapshot): GameState => ({
   history: [],
   future: [],
   selected: null,
+  autoUpEnabled,
 })
 
 const cloneCards = (cards: Card[]): Card[] => cards.map((card) => ({ ...card }))

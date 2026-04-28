@@ -29,6 +29,7 @@ const createEmptyState = (): GameState => ({
   history: [],
   future: [],
   selected: null,
+  autoUpEnabled: true,
 })
 
 describe('findAutoMoveTargetWithTableauAdjacentFallback', () => {

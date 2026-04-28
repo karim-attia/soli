@@ -97,6 +97,7 @@ export const useCardAnimations = ({
   const flipScale = useSharedValue(1)
   const lastTriggerRef = useRef(invalidWiggle.key)
   const previousFaceUpRef = useRef(card.faceUp)
+  const previousLayoutTrackingEnabledRef = useRef(layoutTrackingEnabled)
   const shouldFloat = typeof offsetTop === 'number' || typeof offsetLeft === 'number'
   const baseZIndex = shouldFloat ? 2 : 0
   const faceUpChanged = previousFaceUpRef.current !== card.faceUp
@@ -467,6 +468,20 @@ export const useCardAnimations = ({
     notifyFlightSettled,
     suppressFlightOnFaceUpChange,
   ])
+
+  useEffect(() => {
+    const trackingWasDisabled = !previousLayoutTrackingEnabledRef.current
+    previousLayoutTrackingEnabledRef.current = layoutTrackingEnabled
+
+    if (!layoutTrackingEnabled || !trackingWasDisabled) {
+      return
+    }
+
+    // iOS scrubbing temporarily disables onLayout tracking for mounted cards.
+    // When tracking comes back, unchanged cards will not emit a fresh layout event
+    // on their own, so proactively re-measure once to repopulate flight origins.
+    handleCardLayout()
+  }, [handleCardLayout, layoutTrackingEnabled])
 
   const containerStyle = useMemo(
     () => ({ width: metrics.width, height: metrics.height }),
