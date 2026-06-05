@@ -19,7 +19,7 @@ No ads, in-app purchases, or gamification to get you to play more.
 
 - Performance lag after 20+ games.
 - Visual animation bug when drawing cards after many undos.
-- Draw 1-5 cards instead of only 1.
+- Setting to draw 1-5 cards instead of only 1.
 - Hints.
 - Automatically move cards to the foundation when the move is risk-free (behind a setting).
 - Cumulative Vegas scoring (behind a setting).
