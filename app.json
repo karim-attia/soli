@@ -2,7 +2,7 @@
   "expo": {
     "name": "Soli",
     "slug": "soli",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "description": "A polished Klondike Solitaire experience with responsive animations and a solvable shuffle catalog.",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -19,7 +19,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ch.karimattia.soli",
-      "buildNumber": "12",
+      "buildNumber": "13",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -30,7 +30,7 @@
         "backgroundColor": "#0b8b3c"
       },
       "package": "ch.karimattia.soli",
-      "versionCode": 12,
+      "versionCode": 13,
       "permissions": []
     },
     "web": {

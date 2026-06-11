@@ -20,3 +20,5 @@ version
 @android/app/build.gradle
 versionCode
 versionName
+
+Don't create implementation plan etc., just do the bump.
