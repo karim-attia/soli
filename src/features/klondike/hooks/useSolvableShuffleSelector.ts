@@ -7,6 +7,9 @@ import {
 } from '../../../data/solvableShuffles'
 import type { HistoryEntry } from '../../../state/history'
 
+export const isDrawOneSolvabilityResult = (entry: HistoryEntry): boolean =>
+  entry.solvable && entry.drawCount === 1
+
 export const useSolvableShuffleSelector = (historyEntries: HistoryEntry[]) => {
   return useCallback(() => {
     if (!SOLVABLE_SHUFFLES.length) {
@@ -16,7 +19,9 @@ export const useSolvableShuffleSelector = (historyEntries: HistoryEntry[]) => {
     const stats = new Map<string, { plays: number; solves: number }>()
 
     historyEntries.forEach((entry) => {
-      if (!entry.solvable) {
+      // Curated deals are only proven for Draw 1, so higher-draw outcomes must not
+      // make a Draw 1-solvable shuffle look exhausted or solved.
+      if (!isDrawOneSolvabilityResult(entry)) {
         return
       }
       const baseId = extractSolvableBaseId(entry.shuffleId) ?? entry.shuffleId

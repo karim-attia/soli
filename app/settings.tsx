@@ -14,6 +14,7 @@ import {
 } from 'tamagui'
 import { Menu } from '@tamagui/lucide-icons'
 
+import { DrawCountSelector } from '../components/settings/DrawCountSelector'
 import {
   animationPreferenceDescriptors,
   type RefreshRateMode,
@@ -73,6 +74,7 @@ export default function SettingsScreen() {
     setGlobalAnimationsEnabled,
     setAnimationPreference,
     setThemeMode,
+    setDrawCount,
     setSolvableGamesOnly,
     setAutoUpEnabled,
     setDeveloperMode,
@@ -150,6 +152,11 @@ export default function SettingsScreen() {
           <Text fontSize={16} fontWeight="700">
             Gameplay
           </Text>
+          <DrawCountSelector
+            value={state.drawCount}
+            onValueChange={setDrawCount}
+            disabled={!hydrated}
+          />
           <ToggleRow
             label="Only deal solvable games"
             description="Use curated solvable layouts when starting a new game."
@@ -159,7 +166,7 @@ export default function SettingsScreen() {
           />
           <ToggleRow
             label="Auto Up"
-            description="Automatically move remaining cards to foundations once every tableau card is face up."
+            description="Automatically move remaining cards to foundations once every card is uncovered."
             value={state.autoUpEnabled}
             onValueChange={setAutoUpEnabled}
             disabled={!hydrated}

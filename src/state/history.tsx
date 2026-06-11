@@ -13,6 +13,11 @@ import {
 
 import type { GameSnapshot, GameState, Rank, Suit } from '../solitaire/klondike'
 import { FOUNDATION_SUIT_ORDER, TABLEAU_COLUMN_COUNT } from '../solitaire/klondike'
+import {
+  DEFAULT_DRAW_COUNT,
+  normalizeDrawCount,
+  type DrawCount,
+} from '../solitaire/drawCount'
 import { extractSolvableBaseId, SOLVABLE_SHUFFLES } from '../data/solvableShuffles'
 import { devLog } from '../utils/devLogger'
 import { computeElapsedWithReference } from '../utils/time'
@@ -39,6 +44,8 @@ export type HistoryEntry = {
   finishedAt: string | null // Task 10-6: When game completed (null if still active/incomplete)
   solved: boolean
   solvable: boolean
+  drawCount: DrawCount
+  solvableForDrawCount: DrawCount | null
   moves: number | null
   durationMs: number | null
   preview: HistoryPreview
@@ -49,6 +56,8 @@ export type RecordGameResultInput = {
   shuffleId: string
   solved: boolean
   solvable?: boolean
+  drawCount?: DrawCount
+  solvableForDrawCount?: DrawCount | null
   startedAt?: string | Date // Task 10-6: When game started
   finishedAt?: string | Date | null // Task 10-6: When game completed
   moves?: number
@@ -316,6 +325,9 @@ export const recordGameResultFromState = ({
     shuffleId: state.shuffleId,
     solved,
     solvable: Boolean(state.solvableId),
+    drawCount: state.drawCount,
+    solvableForDrawCount:
+      state.dealSolvabilityBasis === 'draw1' ? DEFAULT_DRAW_COUNT : null,
     finishedAt: new Date().toISOString(),
     moves: state.moveCount,
     durationMs: elapsedForRecord,
@@ -348,12 +360,18 @@ const createEntry = (input: RecordGameResultInput): HistoryEntry => {
   const displayName = input.displayName ?? formatShuffleDisplayName(input.shuffleId)
   // Task 10-6: derive status from input or solved boolean
   const status: HistoryEntryStatus = input.status ?? (input.solved ? 'solved' : 'active')
+  const drawCount = normalizeDrawCount(input.drawCount)
+  const solvableForDrawCount = input.solvable
+    ? normalizeDrawCount(input.solvableForDrawCount)
+    : null
   return {
     id: generateHistoryId(),
     shuffleId: input.shuffleId,
     displayName,
     solved: input.solved,
     solvable: input.solvable ?? false,
+    drawCount,
+    solvableForDrawCount,
     startedAt,
     finishedAt,
     moves: typeof input.moves === 'number' ? input.moves : null,
@@ -406,10 +424,10 @@ const mergeEntries = (
 
   const map = new Map<string, HistoryEntry>()
   incoming.forEach((entry) => {
-    map.set(entry.id, normalizeEntry(entry))
+    map.set(entry.id, normalizeHistoryEntry(entry))
   })
   current.forEach((entry) => {
-    map.set(entry.id, normalizeEntry(entry))
+    map.set(entry.id, normalizeHistoryEntry(entry))
   })
 
   const merged = normalizeActiveEntries(Array.from(map.values()))
@@ -447,7 +465,7 @@ const isValidEntry = (entry: unknown): entry is HistoryEntry => {
 const generateHistoryId = () =>
   `hist_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
 
-const normalizeEntry = (entry: HistoryEntry): HistoryEntry => {
+export const normalizeHistoryEntry = (entry: HistoryEntry): HistoryEntry => {
   const preview = sanitizePreview(entry.preview)
   const displayName = entry.displayName || formatShuffleDisplayName(entry.shuffleId)
   // Task 10-6: backward compatibility - derive status from solved if missing
@@ -457,6 +475,10 @@ const normalizeEntry = (entry: HistoryEntry): HistoryEntry => {
   const startedAt = entry.startedAt ?? entry.finishedAt ?? new Date().toISOString()
   // For old entries, finishedAt was always set; keep it for solved, null for incomplete
   const finishedAt = entry.finishedAt ?? (entry.solved ? startedAt : null)
+  const drawCount = normalizeDrawCount(entry.drawCount)
+  const solvableForDrawCount = entry.solvable
+    ? normalizeDrawCount(entry.solvableForDrawCount)
+    : null
 
   return {
     ...entry,
@@ -466,6 +488,8 @@ const normalizeEntry = (entry: HistoryEntry): HistoryEntry => {
     finishedAt,
     moves: typeof entry.moves === 'number' ? entry.moves : null,
     durationMs: typeof entry.durationMs === 'number' ? entry.durationMs : null,
+    drawCount,
+    solvableForDrawCount,
     status,
   }
 }

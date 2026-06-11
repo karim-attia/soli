@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-import type { GameSnapshot, GameState, TimerState } from '../solitaire/klondike'
+import type {
+  DealSolvabilityBasis,
+  GameSnapshot,
+  GameState,
+  TimerState,
+} from '../solitaire/klondike'
+import { normalizeDrawCount, type DrawCount } from '../solitaire/drawCount'
 
 // Requirement PBI-13: persist in-progress Klondike sessions locally.
 export const KLONDIKE_STORAGE_KEY = 'soli/klondike/v1'
@@ -165,6 +171,8 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
       : null
 
   const parsedState = parsed.state as Partial<GameState> & {
+    drawCount?: unknown
+    dealSolvabilityBasis?: unknown
     elapsedMs?: unknown
     timerState?: unknown
     timerStartedAt?: unknown
@@ -176,6 +184,11 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
     parsedState.elapsedMs >= 0
       ? parsedState.elapsedMs
       : 0
+  const drawCount = normalizeDrawCount(parsedState.drawCount)
+  const dealSolvabilityBasis = normalizeDealSolvabilityBasis(
+    parsedState.dealSolvabilityBasis,
+    solvableIdValue
+  )
 
   const rawTimerState = isTimerState(parsedState.timerState)
     ? parsedState.timerState
@@ -196,17 +209,27 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
     timerStartedAt = rawTimerStartedAt
   }
 
-  const futureSnapshots = Array.isArray((parsed.state as { future?: unknown }).future)
-    ? ((parsed.state as { future: GameSnapshot[] }).future ?? [])
-    : []
+  const historySnapshots = normalizeSnapshots(parsed.state.history, {
+    drawCount,
+    dealSolvabilityBasis,
+  })
+  const futureSnapshots = normalizeSnapshots(
+    (parsed.state as { future?: unknown }).future,
+    {
+      drawCount,
+      dealSolvabilityBasis,
+    }
+  )
 
   const sanitizedState: GameState = {
     ...parsed.state,
     elapsedMs,
     timerState,
     timerStartedAt,
+    drawCount,
+    dealSolvabilityBasis,
     selected: null,
-    history: Array.isArray(parsed.state.history) ? parsed.state.history : [],
+    history: historySnapshots,
     future: futureSnapshots,
     shuffleId,
     solvableId: solvableIdValue,
@@ -242,3 +265,57 @@ const createLegacyShuffleId = (): string =>
 
 const isTimerState = (value: unknown): value is TimerState =>
   value === 'idle' || value === 'running' || value === 'paused'
+
+const normalizeDealSolvabilityBasis = (
+  value: unknown,
+  solvableId: string | null
+): DealSolvabilityBasis => (value === 'draw1' || solvableId ? 'draw1' : null)
+
+const normalizeSnapshots = (
+  value: unknown,
+  fallback: {
+    drawCount: DrawCount
+    dealSolvabilityBasis: DealSolvabilityBasis
+  }
+): GameSnapshot[] => {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((snapshot) => normalizeSnapshot(snapshot, fallback))
+    .filter((snapshot): snapshot is GameSnapshot => snapshot !== null)
+}
+
+const normalizeSnapshot = (
+  value: unknown,
+  fallback: {
+    drawCount: DrawCount
+    dealSolvabilityBasis: DealSolvabilityBasis
+  }
+): GameSnapshot | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const snapshot = value as Partial<GameSnapshot>
+  if (
+    !Array.isArray(snapshot.stock) ||
+    !Array.isArray(snapshot.waste) ||
+    !snapshot.foundations ||
+    !Array.isArray(snapshot.tableau)
+  ) {
+    return null
+  }
+
+  const solvableId = typeof snapshot.solvableId === 'string' ? snapshot.solvableId : null
+  return {
+    ...(snapshot as GameSnapshot),
+    solvableId,
+    drawCount: normalizeDrawCount(snapshot.drawCount ?? fallback.drawCount),
+    dealSolvabilityBasis: normalizeDealSolvabilityBasis(
+      snapshot.dealSolvabilityBasis ?? fallback.dealSolvabilityBasis,
+      solvableId
+    ),
+  }
+}

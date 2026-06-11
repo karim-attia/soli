@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-import { createInitialState } from '../../../src/solitaire/klondike'
+import { createInitialState, klondikeReducer } from '../../../src/solitaire/klondike'
 import {
   KLONDIKE_STORAGE_KEY,
   PERSISTENCE_VERSION,
@@ -70,6 +70,58 @@ describe('gamePersistence', () => {
     const restored = await loadGameState()
 
     expect(restored?.state.autoUpEnabled).toBe(true)
+  })
+
+  it('defaults legacy games and every undo snapshot to Draw 1', async () => {
+    let current = createInitialState(4)
+    current = klondikeReducer(current, { type: 'DRAW_OR_RECYCLE' })
+    current = klondikeReducer(current, { type: 'DRAW_OR_RECYCLE' })
+    current = klondikeReducer(current, { type: 'UNDO' })
+
+    const legacyState = JSON.parse(JSON.stringify(current)) as Record<string, any>
+    delete legacyState.drawCount
+    delete legacyState.dealSolvabilityBasis
+    legacyState.history.forEach((snapshot: Record<string, any>) => {
+      delete snapshot.drawCount
+      delete snapshot.dealSolvabilityBasis
+    })
+    legacyState.future.forEach((snapshot: Record<string, any>) => {
+      delete snapshot.drawCount
+      delete snapshot.dealSolvabilityBasis
+    })
+
+    ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue(
+      JSON.stringify({
+        version: PERSISTENCE_VERSION,
+        savedAt: new Date().toISOString(),
+        status: 'in-progress',
+        state: legacyState,
+      })
+    )
+
+    const restored = await loadGameState()
+
+    expect(restored?.state.drawCount).toBe(1)
+    expect(restored?.state.history.every((snapshot) => snapshot.drawCount === 1)).toBe(
+      true
+    )
+    expect(restored?.state.future.every((snapshot) => snapshot.drawCount === 1)).toBe(
+      true
+    )
+  })
+
+  it('preserves valid draw counts in saved games and snapshots', async () => {
+    let state = createInitialState(5)
+    state = klondikeReducer(state, { type: 'DRAW_OR_RECYCLE' })
+
+    await saveGameState(state)
+    const [, serialized] = (AsyncStorage.setItem as jest.Mock).mock.calls[0]
+    ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue(serialized)
+
+    const restored = await loadGameState()
+
+    expect(restored?.state.drawCount).toBe(5)
+    expect(restored?.state.history[0].drawCount).toBe(5)
   })
 
   it('throws PersistedGameError for invalid JSON', async () => {

@@ -221,7 +221,17 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
         <Paragraph color="$color10">{metadata}</Paragraph>
 
         <XStack gap="$2" flexWrap="wrap">
-          {entry.solvable ? <Badge label="Solvable" tone="info" /> : null}
+          <Badge label={`Draw ${entry.drawCount}`} tone="neutral" />
+          {entry.solvable ? (
+            <Badge
+              label={
+                entry.drawCount === entry.solvableForDrawCount
+                  ? `Solvable for Draw ${entry.drawCount}`
+                  : `Draw ${entry.solvableForDrawCount ?? 1}-solvable deal`
+              }
+              tone="info"
+            />
+          ) : null}
         </XStack>
       </YStack>
     </Pressable>
@@ -521,6 +531,17 @@ const HistoryPreviewSheet = ({
               </Paragraph>
             </YStack>
             <XStack gap="$2" flexWrap="wrap">
+              <Badge label={`Draw ${entry.drawCount}`} tone="neutral" />
+              {entry.solvable ? (
+                <Badge
+                  label={
+                    entry.drawCount === entry.solvableForDrawCount
+                      ? `Solvable for Draw ${entry.drawCount}`
+                      : `Draw ${entry.solvableForDrawCount ?? 1}-solvable deal`
+                  }
+                  tone="info"
+                />
+              ) : null}
               {typeof entry.moves === 'number' && entry.moves >= 0 ? (
                 <Badge
                   label={`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`}

@@ -1,5 +1,6 @@
 import type { SolvableShuffleConfig } from '../data/solvableShuffles'
 import { createSolvableShuffleId } from '../data/solvableShuffles'
+import { DEFAULT_DRAW_COUNT, normalizeDrawCount, type DrawCount } from './drawCount'
 
 const SUITS = ['clubs', 'diamonds', 'hearts', 'spades'] as const
 const RANKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] as const
@@ -42,6 +43,7 @@ export type Selection =
   | { source: 'foundation'; suit: Suit }
 
 export type TimerState = 'idle' | 'running' | 'paused'
+export type DealSolvabilityBasis = 'draw1' | null
 
 export type MoveTarget =
   | { type: 'tableau'; columnIndex: number }
@@ -60,6 +62,10 @@ export interface GameSnapshot {
   winCelebrations: number
   shuffleId: string
   solvableId: string | null
+  drawCount: DrawCount
+  // Curated tableau layouts are proven only against the Draw 1 solver even when
+  // a player chooses a higher draw rule for the resulting game.
+  dealSolvabilityBasis: DealSolvabilityBasis
   elapsedMs: number
   timerState: TimerState
   timerStartedAt: number | null
@@ -73,7 +79,7 @@ export interface GameState extends GameSnapshot {
 }
 
 export type GameAction =
-  | { type: 'NEW_GAME' }
+  | { type: 'NEW_GAME'; drawCount?: DrawCount }
   | { type: 'DRAW_OR_RECYCLE' }
   | { type: 'UNDO' }
   | { type: 'SCRUB_TO_INDEX'; index: number }
@@ -107,24 +113,37 @@ export type AutoAction =
   | { type: 'draw' }
   | { type: 'recycle' }
 
-const revealInitialWaste = (stock: Card[]): { stock: Card[]; waste: Card[] } => {
+export const getNextStockDrawCards = ({
+  stock,
+  drawCount,
+}: Pick<GameSnapshot, 'stock' | 'drawCount'>): Card[] => {
+  const count = Math.min(stock.length, normalizeDrawCount(drawCount))
+  return stock.slice(stock.length - count).reverse()
+}
+
+const revealInitialWaste = (
+  stock: Card[],
+  drawCount: DrawCount
+): { stock: Card[]; waste: Card[] } => {
   if (!stock.length) {
     return { stock, waste: [] }
   }
 
-  const nextStock = stock.slice(0, -1)
-  const topCard = stock[stock.length - 1]
+  const drawn = getNextStockDrawCards({ stock, drawCount })
+  const nextStock = stock.slice(0, stock.length - drawn.length)
   return {
     stock: nextStock,
-    waste: [{ ...topCard, faceUp: true }],
+    waste: drawn.map((card) => ({ ...card, faceUp: true })),
   }
 }
 
-export const createInitialState = (): GameState => {
+export const createInitialState = (
+  drawCount: DrawCount = DEFAULT_DRAW_COUNT
+): GameState => {
   const deck = shuffle(createDeck())
   const shuffleId = computeShuffleId(deck)
   const { tableau, stock: dealtStock } = dealTableau(deck)
-  const { stock, waste } = revealInitialWaste(dealtStock)
+  const { stock, waste } = revealInitialWaste(dealtStock, drawCount)
   const snapshot: GameSnapshot = {
     stock,
     waste,
@@ -138,6 +157,8 @@ export const createInitialState = (): GameState => {
     winCelebrations: 0,
     shuffleId,
     solvableId: null,
+    drawCount,
+    dealSolvabilityBasis: null,
     elapsedMs: 0,
     timerState: 'idle',
     timerStartedAt: null,
@@ -153,7 +174,8 @@ export const createInitialState = (): GameState => {
 }
 
 export const createSolvableGameState = (
-  shuffleConfig: SolvableShuffleConfig
+  shuffleConfig: SolvableShuffleConfig,
+  drawCount: DrawCount = DEFAULT_DRAW_COUNT
 ): GameState => {
   const deck = createDeck()
   const lookup = new Map<string, Card>()
@@ -200,7 +222,7 @@ export const createSolvableGameState = (
     faceUp: false,
   }))
   const stockShuffled = shuffle(remainingCards)
-  const { stock, waste } = revealInitialWaste(stockShuffled)
+  const { stock, waste } = revealInitialWaste(stockShuffled, drawCount)
 
   const snapshot: GameSnapshot = {
     stock,
@@ -215,6 +237,8 @@ export const createSolvableGameState = (
     winCelebrations: 0,
     shuffleId: createSolvableShuffleId(shuffleConfig.id),
     solvableId: shuffleConfig.id,
+    drawCount,
+    dealSolvabilityBasis: 'draw1',
     elapsedMs: 0,
     timerState: 'idle',
     timerStartedAt: null,
@@ -322,7 +346,9 @@ const DEMO_STOCK_ORDER: Array<{ suit: Suit; rank: Rank }> = [
   { suit: 'diamonds', rank: 13 },
 ]
 
-export const createDemoGameState = (): GameState => {
+export const createDemoGameState = (
+  drawCount: DrawCount = DEFAULT_DRAW_COUNT
+): GameState => {
   const deck = createDeck()
   const lookup = new Map<string, Card>()
   deck.forEach((card) => {
@@ -359,7 +385,7 @@ export const createDemoGameState = (): GameState => {
   const demoStock = DEMO_STOCK_ORDER.map(({ suit, rank }) =>
     takeDemoCard(suit, rank, false)
   )
-  const { stock, waste } = revealInitialWaste(demoStock)
+  const { stock, waste } = revealInitialWaste(demoStock, drawCount)
 
   const snapshot: GameSnapshot = {
     stock,
@@ -374,6 +400,8 @@ export const createDemoGameState = (): GameState => {
     winCelebrations: 0,
     shuffleId: 'DEMO-GAME-0001',
     solvableId: DEMO_SHUFFLE_CONFIG.id,
+    drawCount,
+    dealSolvabilityBasis: 'draw1',
     elapsedMs: 0,
     timerState: 'idle',
     timerStartedAt: null,
@@ -415,7 +443,10 @@ const takeCardFromLookup = (
 export const klondikeReducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
     case 'NEW_GAME':
-      return { ...createInitialState(), autoUpEnabled: state.autoUpEnabled }
+      return {
+        ...createInitialState(action.drawCount ?? state.drawCount),
+        autoUpEnabled: state.autoUpEnabled,
+      }
     case 'DRAW_OR_RECYCLE':
       return finalizeState(drawFromStock(haltAutoQueue(state)))
     case 'UNDO':
@@ -638,9 +669,9 @@ const drawFromStock = (
   }
 
   const history = recordHistory ? pushHistory(state) : state.history
-  const nextStock = state.stock.slice(0, -1)
-  const drawn = state.stock[state.stock.length - 1]
-  const nextWaste = [...state.waste, { ...drawn, faceUp: true }]
+  const drawn = getNextStockDrawCards(state)
+  const nextStock = state.stock.slice(0, state.stock.length - drawn.length)
+  const nextWaste = [...state.waste, ...drawn.map((card) => ({ ...card, faceUp: true }))]
 
   return {
     ...state,
@@ -1107,8 +1138,18 @@ const advanceAutoQueue = (state: GameState): GameState => {
   }
 }
 
-const isAutoCompleteReady = (state: GameState): boolean =>
-  state.tableau.every((column) => column.every((card) => card.faceUp))
+const isAutoCompleteReady = (state: GameState): boolean => {
+  const tableauIsFaceUp = state.tableau.every((column) =>
+    column.every((card) => card.faceUp)
+  )
+
+  // Draw 1 keeps its established early trigger. Higher draw rules wait until the
+  // whole top-right draw area is empty: no face-down stock and no face-up waste.
+  return (
+    tableauIsFaceUp &&
+    (state.drawCount === 1 || (!state.stock.length && !state.waste.length))
+  )
+}
 
 const findAutoCompleteSource = (state: GameState): Selection | null => {
   for (let columnIndex = 0; columnIndex < state.tableau.length; columnIndex += 1) {
@@ -1242,15 +1283,14 @@ const snapshotFromState = (state: GameState): GameSnapshot => ({
   winCelebrations: state.winCelebrations,
   shuffleId: state.shuffleId,
   solvableId: state.solvableId ?? null,
+  drawCount: state.drawCount,
+  dealSolvabilityBasis: state.dealSolvabilityBasis,
   elapsedMs: state.elapsedMs,
   timerState: state.timerState,
   timerStartedAt: state.timerStartedAt,
 })
 
-const cloneSnapshot = (
-  snapshot: GameSnapshot,
-  autoUpEnabled = true
-): GameState => ({
+const cloneSnapshot = (snapshot: GameSnapshot, autoUpEnabled = true): GameState => ({
   stock: cloneCards(snapshot.stock),
   waste: cloneCards(snapshot.waste),
   foundations: cloneFoundations(snapshot.foundations),
@@ -1263,6 +1303,9 @@ const cloneSnapshot = (
   winCelebrations: snapshot.winCelebrations,
   shuffleId: snapshot.shuffleId,
   solvableId: snapshot.solvableId,
+  drawCount: normalizeDrawCount(snapshot.drawCount),
+  dealSolvabilityBasis:
+    snapshot.dealSolvabilityBasis === 'draw1' || snapshot.solvableId ? 'draw1' : null,
   elapsedMs: snapshot.elapsedMs,
   timerState: snapshot.timerState,
   timerStartedAt: snapshot.timerStartedAt,

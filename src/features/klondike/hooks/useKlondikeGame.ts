@@ -299,6 +299,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   } = useSettings()
   const { showMoves, showTime } = settingsState.statistics
   const solvableGamesOnly = settingsState.solvableGamesOnly
+  const preferredDrawCount = settingsState.drawCount
   const autoUpEnabled = settingsState.autoUpEnabled
   const developerModeEnabled = settingsState.developerMode
 
@@ -429,6 +430,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     currentGameEntryIdRef,
     settingsHydrated,
     autoUpEnabled,
+    preferredDrawCount,
   })
 
   // Task 10-7: After hydration, ensure the persisted/linked entry is the only active one.
@@ -460,7 +462,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     if (settingsHydrated && solvableGamesOnly) {
       const solvableShuffle = selectNextSolvableShuffle()
       if (solvableShuffle) {
-        const solvableState = createSolvableGameState(solvableShuffle)
+        const solvableState = createSolvableGameState(solvableShuffle, preferredDrawCount)
         const solvablePreview = createHistoryPreviewFromState(solvableState)
         const solvableDisplayName = formatShuffleDisplayName(solvableState.shuffleId)
 
@@ -472,6 +474,8 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
           shuffleId: solvableState.shuffleId,
           solved: false,
           solvable: true,
+          drawCount: solvableState.drawCount,
+          solvableForDrawCount: solvableState.dealSolvabilityBasis === 'draw1' ? 1 : null,
           startedAt: new Date().toISOString(),
           finishedAt: null, // Not finished yet
           moves: 0,
@@ -487,10 +491,11 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       }
     }
 
-    dispatch({ type: 'NEW_GAME' })
+    dispatch({ type: 'NEW_GAME', drawCount: preferredDrawCount })
     currentGameEntryIdRef.current = null
   }, [
     dispatch,
+    preferredDrawCount,
     recordResult,
     selectNextSolvableShuffle,
     settingsHydrated,
@@ -538,7 +543,9 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         // of creating a duplicate solved/incomplete row.
         const matchingActive = historyEntries.find(
           (entry) =>
-            entry.status === 'active' && entry.shuffleId === currentState.shuffleId
+            entry.status === 'active' &&
+            entry.shuffleId === currentState.shuffleId &&
+            entry.drawCount === currentState.drawCount
         )
         if (matchingActive) {
           updateEntry(matchingActive.id, {
@@ -555,6 +562,8 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
           shuffleId: currentState.shuffleId,
           solved,
           solvable: Boolean(currentState.solvableId),
+          drawCount: currentState.drawCount,
+          solvableForDrawCount: currentState.dealSolvabilityBasis === 'draw1' ? 1 : null,
           startedAt: new Date().toISOString(), // Best approximation when no tracked entry
           finishedAt,
           moves: currentState.moveCount,
@@ -706,6 +715,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     currentGameEntryIdRef,
     updateBoardLocked,
     clearGameState,
+    preferredDrawCount,
   })
 
   // Triggers the invalid-move wiggle animation for the provided selection.

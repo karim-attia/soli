@@ -36,6 +36,8 @@ export const WasteFan = ({
   cardFlightMemory,
   disabled = false,
 }: WasteFanProps) => {
+  // Keep the fan inside its fixed board column. Draw 4/5 still moves every card,
+  // but only the top three are shown so the waste cannot overlap the stock.
   const visibleCards = cards.slice(-3)
   const overlap = Math.min(metrics.width * WASTE_FAN_OVERLAP_RATIO, WASTE_FAN_MAX_OFFSET)
   const width = metrics.width + overlap * (visibleCards.length - 1)

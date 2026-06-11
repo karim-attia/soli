@@ -10,6 +10,11 @@ import {
   type PropsWithChildren,
 } from 'react'
 
+import {
+  DEFAULT_DRAW_COUNT,
+  normalizeDrawCount,
+  type DrawCount,
+} from '../solitaire/drawCount'
 import { devLog, setDeveloperLoggingEnabled } from '../utils/devLogger'
 
 export type ThemeMode = 'auto' | 'light' | 'dark'
@@ -39,6 +44,7 @@ export type StatisticsPreferenceKey = keyof StatisticsPreferences
 export type SettingsState = {
   animations: AnimationPreferences
   themeMode: ThemeMode
+  drawCount: DrawCount
   shareSolvedGames: boolean
   solvableGamesOnly: boolean
   autoUpEnabled: boolean
@@ -52,6 +58,7 @@ type SettingsContextValue = {
   hydrated: boolean
   reducedMotionEnabled: boolean
   setThemeMode: (mode: ThemeMode) => void
+  setDrawCount: (drawCount: DrawCount) => void
   setGlobalAnimationsEnabled: (enabled: boolean) => void
   setAnimationPreference: (key: AnimationPreferenceKey, enabled: boolean) => void
   setShareSolvedGames: (enabled: boolean) => void
@@ -75,6 +82,7 @@ const DEFAULT_SETTINGS: SettingsState = {
     celebrations: true,
   },
   themeMode: 'auto',
+  drawCount: DEFAULT_DRAW_COUNT,
   shareSolvedGames: false,
   solvableGamesOnly: true,
   autoUpEnabled: true,
@@ -218,6 +226,12 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     )
   }, [])
 
+  const setDrawCount = useCallback((drawCount: DrawCount) => {
+    setState((previous) =>
+      previous.drawCount === drawCount ? previous : { ...previous, drawCount }
+    )
+  }, [])
+
   const setGlobalAnimationsEnabled = useCallback((enabled: boolean) => {
     setState((previous) =>
       previous.animations.master === enabled
@@ -351,6 +365,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       hydrated,
       reducedMotionEnabled,
       setThemeMode,
+      setDrawCount,
       setGlobalAnimationsEnabled,
       setAnimationPreference,
       setShareSolvedGames,
@@ -369,6 +384,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setAutoUpEnabled,
       setShareSolvedGames,
       setSolvableGamesOnly,
+      setDrawCount,
       setThemeMode,
       setDeveloperMode,
       setRefreshRateMode,
@@ -451,6 +467,7 @@ const mergeSettings = (
       celebrations: getBoolean(animations.celebrations, current.animations.celebrations),
     },
     themeMode: isThemeMode(incoming.themeMode) ? incoming.themeMode : current.themeMode,
+    drawCount: normalizeDrawCount(incoming.drawCount),
     shareSolvedGames: getBoolean(incoming.shareSolvedGames, current.shareSolvedGames),
     solvableGamesOnly: getBoolean(incoming.solvableGamesOnly, current.solvableGamesOnly),
     autoUpEnabled: getBoolean(incoming.autoUpEnabled, current.autoUpEnabled),

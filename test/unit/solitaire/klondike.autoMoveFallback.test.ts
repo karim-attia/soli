@@ -23,6 +23,8 @@ const createEmptyState = (): GameState => ({
   winCelebrations: 0,
   shuffleId: 'test',
   solvableId: null,
+  drawCount: 1,
+  dealSolvabilityBasis: null,
   elapsedMs: 0,
   timerState: 'idle',
   timerStartedAt: null,

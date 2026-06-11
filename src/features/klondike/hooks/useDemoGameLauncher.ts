@@ -9,6 +9,7 @@ import {
   type Selection,
   type Suit,
 } from '../../../solitaire/klondike'
+import { DEFAULT_DRAW_COUNT, type DrawCount } from '../../../solitaire/drawCount'
 import { devLog } from '../../../utils/devLogger'
 
 type DispatchWithFlightFn = (action: GameAction, selection?: Selection | null) => void
@@ -31,6 +32,7 @@ type UseDemoGameLauncherOptions = {
   currentGameEntryIdRef: MutableRefObject<string | null>
   updateBoardLocked: (locked: boolean) => void
   clearGameState: () => Promise<void>
+  preferredDrawCount: DrawCount
 }
 
 type LaunchOptions = {
@@ -58,12 +60,17 @@ export const useDemoGameLauncher = ({
   currentGameEntryIdRef,
   updateBoardLocked,
   clearGameState,
+  preferredDrawCount,
 }: UseDemoGameLauncherOptions) => {
   const runDemoSequence = useCallback(
     (options?: { autoReveal?: boolean; autoSolve?: boolean }) => {
       const steps: Array<() => void> = []
 
-      const pushTableauSequence = (columnIndex: number, suit: Suit, moveCount: number) => {
+      const pushTableauSequence = (
+        columnIndex: number,
+        suit: Suit,
+        moveCount: number
+      ) => {
         for (let moveIndex = 0; moveIndex < moveCount; moveIndex += 1) {
           steps.push(() => {
             const column = stateRef.current.tableau[columnIndex] ?? []
@@ -174,7 +181,10 @@ export const useDemoGameLauncher = ({
       currentGameEntryIdRef.current = null
       updateBoardLocked(false)
 
-      const demoState = createDemoGameState()
+      // The hidden auto-solve script assumes each draw exposes exactly one waste card.
+      // Plain demo games still mirror the player's chosen setting.
+      const demoDrawCount = options?.autoSolve ? DEFAULT_DRAW_COUNT : preferredDrawCount
+      const demoState = createDemoGameState(demoDrawCount)
       dispatch({ type: 'HYDRATE_STATE', state: demoState })
 
       devLog('info', '[Demo] Game loaded (options=' + JSON.stringify(options ?? {}) + ')')
@@ -198,6 +208,7 @@ export const useDemoGameLauncher = ({
       developerModeEnabled,
       dispatch,
       foundationLayoutsRef,
+      preferredDrawCount,
       recordCurrentGameResult,
       resetCardFlights,
       runDemoSequence,

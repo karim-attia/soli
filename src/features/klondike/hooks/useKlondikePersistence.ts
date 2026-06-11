@@ -8,6 +8,7 @@ import {
   saveGameStateWithHistory,
 } from '../../../storage/gamePersistence'
 import type { GameAction, GameState } from '../../../solitaire/klondike'
+import type { DrawCount } from '../../../solitaire/drawCount'
 
 type UseKlondikePersistenceParams = {
   state: GameState
@@ -18,6 +19,7 @@ type UseKlondikePersistenceParams = {
   currentGameEntryIdRef: React.MutableRefObject<string | null>
   settingsHydrated: boolean
   autoUpEnabled: boolean
+  preferredDrawCount: DrawCount
 }
 
 const PERSISTENCE_WRITE_DEBOUNCE_MS = 180
@@ -42,7 +44,9 @@ const didGameShapeChange = (previous: GameState | null, next: GameState): boolea
     previous.hasWon !== next.hasWon ||
     previous.winCelebrations !== next.winCelebrations ||
     previous.shuffleId !== next.shuffleId ||
-    previous.solvableId !== next.solvableId
+    previous.solvableId !== next.solvableId ||
+    previous.drawCount !== next.drawCount ||
+    previous.dealSolvabilityBasis !== next.dealSolvabilityBasis
   )
 }
 
@@ -54,12 +58,15 @@ export const useKlondikePersistence = ({
   currentGameEntryIdRef,
   settingsHydrated,
   autoUpEnabled,
+  preferredDrawCount,
 }: UseKlondikePersistenceParams) => {
   const [storageHydrationComplete, setStorageHydrationComplete] = useState(false)
   const lastQueuedStateRef = useRef<GameState | null>(null)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const autoUpEnabledRef = useRef(autoUpEnabled)
   autoUpEnabledRef.current = autoUpEnabled
+  const preferredDrawCountRef = useRef(preferredDrawCount)
+  preferredDrawCountRef.current = preferredDrawCount
 
   useEffect(() => {
     if (!settingsHydrated) {
@@ -71,7 +78,15 @@ export const useKlondikePersistence = ({
     ;(async () => {
       try {
         const persisted = await loadGameState()
-        if (isCancelled || !persisted) {
+        if (isCancelled) {
+          return
+        }
+
+        if (!persisted) {
+          // The reducer starts before settings hydration. Replace that placeholder
+          // only when there is no active game, so returning users get their saved rule.
+          resetCardFlights()
+          dispatch({ type: 'NEW_GAME', drawCount: preferredDrawCountRef.current })
           return
         }
 
@@ -87,6 +102,7 @@ export const useKlondikePersistence = ({
           }
           resetCardFlights()
           previousHasWonRef.current = false
+          dispatch({ type: 'NEW_GAME', drawCount: preferredDrawCountRef.current })
           return
         }
 
@@ -122,6 +138,9 @@ export const useKlondikePersistence = ({
           devLog('warn', 'Failed clearing invalid saved game state', clearError)
         }
 
+        resetCardFlights()
+        previousHasWonRef.current = false
+        dispatch({ type: 'NEW_GAME', drawCount: preferredDrawCountRef.current })
         devLog('warn', '[Toast suppressed] Game reset', { message })
       } finally {
         if (!isCancelled) {

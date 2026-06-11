@@ -43,6 +43,8 @@ const createEmptyState = (overrides: Partial<GameState> = {}): GameState => ({
   selected: null,
   autoUpEnabled: true,
   ...overrides,
+  drawCount: overrides.drawCount ?? 1,
+  dealSolvabilityBasis: overrides.dealSolvabilityBasis ?? null,
 })
 
 const createPileThrough = (suit: Suit, topRank: Rank): Card[] =>
@@ -109,13 +111,87 @@ describe('Auto Up setting', () => {
     expect(nextState.autoQueue).toHaveLength(1)
   })
 
+  it('keeps the existing Draw 1 trigger while cards remain in the stock', () => {
+    const state = createEmptyState({
+      drawCount: 1,
+      stock: [card('hearts', 1, false)],
+    })
+
+    const nextState = klondikeReducer(state, {
+      type: 'SET_AUTO_UP_ENABLED',
+      enabled: true,
+    })
+
+    expect(nextState.isAutoCompleting).toBe(true)
+    expect(nextState.autoQueue).toEqual([
+      { type: 'draw' },
+      {
+        type: 'move',
+        selection: { source: 'waste' },
+        target: { type: 'foundation', suit: 'hearts' },
+      },
+    ])
+  })
+
+  it('waits for an empty top-right draw area before starting Auto Up for Draw 2-5', () => {
+    const state = createEmptyState({
+      drawCount: 2,
+      stock: [card('hearts', 1, false)],
+    })
+
+    const nextState = klondikeReducer(state, {
+      type: 'SET_AUTO_UP_ENABLED',
+      enabled: true,
+    })
+
+    expect(nextState.isAutoCompleting).toBe(false)
+    expect(nextState.autoQueue).toHaveLength(0)
+  })
+
+  it('does not start Auto Up for Draw 2-5 after the final draw if waste remains', () => {
+    const state = createEmptyState({
+      drawCount: 2,
+      stock: [card('hearts', 1, false)],
+    })
+
+    const nextState = klondikeReducer(state, { type: 'DRAW_OR_RECYCLE' })
+
+    expect(nextState.stock).toHaveLength(0)
+    expect(nextState.waste).toHaveLength(1)
+    expect(nextState.isAutoCompleting).toBe(false)
+    expect(nextState.autoQueue).toHaveLength(0)
+  })
+
+  it('starts Auto Up for Draw 2-5 after the last waste card leaves the top-right area', () => {
+    const state = createEmptyState({
+      drawCount: 2,
+      waste: [card('hearts', 1)],
+      tableau: [[card('clubs', 1)], ...Array.from({ length: 6 }, () => [])],
+    })
+
+    const nextState = klondikeReducer(state, {
+      type: 'APPLY_MOVE',
+      selection: { source: 'waste' },
+      target: { type: 'foundation', suit: 'hearts' },
+    })
+
+    expect(nextState.stock).toHaveLength(0)
+    expect(nextState.waste).toHaveLength(0)
+    expect(nextState.isAutoCompleting).toBe(true)
+    expect(nextState.autoQueue).toEqual([
+      {
+        type: 'move',
+        selection: { source: 'tableau', columnIndex: 0, cardIndex: 0 },
+        target: { type: 'foundation', suit: 'clubs' },
+      },
+    ])
+  })
+
   it('lets the player manually finish and win with Auto Up disabled', () => {
     const foundations = FOUNDATION_SUIT_ORDER.reduce(
       (acc, suit) => {
         acc[suit] =
-          suit === 'hearts'
-            ? createPileThrough(suit, 12)
-            : createPileThrough(suit, 13)
+          suit === 'hearts' ? createPileThrough(suit, 12) : createPileThrough(suit, 13)
         return acc
       },
       {} as GameState['foundations']
