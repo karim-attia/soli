@@ -11737,6 +11737,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-native-teleport@npm:1.1.9":
+  version: 1.1.9
+  resolution: "react-native-teleport@npm:1.1.9"
+  peerDependencies:
+    react: "*"
+    react-dom: "*"
+    react-native: "*"
+  checksum: 10/4d18ca535a5b434951d36ea3681177a9314b81e439a56b6ac0e711d563be30cbc78d4410eb0e5718b54ca4077abfe20eb7e788ce1840f2deef3f2dfd82fd2385
+  languageName: node
+  linkType: hard
+
 "react-native-web@npm:^0.21.0, react-native-web@npm:^0.21.2":
   version: 0.21.2
   resolution: "react-native-web@npm:0.21.2"
@@ -12480,6 +12491,7 @@ __metadata:
     "@tamagui/font-inter": "npm:2.2.0"
     "@tamagui/lucide-icons-2": "npm:2.2.0"
     "@tamagui/metro-plugin": "npm:2.2.0"
+    "@tamagui/native": "npm:2.2.0"
     "@tamagui/toast": "npm:2.2.0"
     "@types/jest": "npm:29.5.14"
     "@types/react": "npm:^19.2.0"
@@ -12509,6 +12521,7 @@ __metadata:
     react-native-safe-area-context: "npm:^5.6.2"
     react-native-screens: "npm:~4.23.0"
     react-native-svg: "npm:15.15.3"
+    react-native-teleport: "npm:1.1.9"
     react-native-web: "npm:^0.21.2"
     react-native-worklets: "npm:0.7.4"
     tamagui: "npm:2.2.0"

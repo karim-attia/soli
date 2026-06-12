@@ -601,22 +601,23 @@ entire Config v4 migration complete.
 
 ### Conditional follow-up A: Add explicit native integrations
 
-- [pending] Begin only after Phase 5 and separate approval based on a demonstrated
-  portal-context or native gesture need.
-- [pending] Add `@tamagui/native@2.2.0` and
+- [completed] Begin after separate user approval for native portal/context hardening.
+- [completed] Add `@tamagui/native@2.2.0` and
   `react-native-teleport@1.1.9`.
-- [pending] Create a custom Expo Router entry file that executes native setup before
+- [completed] Create a custom Expo Router entry file that executes native setup before
   `expo-router/entry`.
-- [pending] Add `@tamagui/native/setup-teleport`.
-- [pending] Configure Tamagui Gesture Handler for Sheet only, with Tamagui press-event
+- [completed] Add `@tamagui/native/setup-teleport`.
+- [completed] Configure Tamagui Gesture Handler for Sheet only, with Tamagui press-event
   integration disabled initially.
-- [pending] Keep the existing `GestureHandlerRootView`.
-- [pending] Do not add Burnt or Tamagui LinearGradient setup because those integrations
+- [completed] Keep the existing `GestureHandlerRootView`.
+- [completed] Do not add Burnt or Tamagui LinearGradient setup because those integrations
   are not active in current product code.
-- [pending] Run clean iOS and Android builds after native dependency installation.
-- [pending] Verify Sheet context, safe area, gestures, and reduced motion; verify Toast
-  provider/viewport startup because no live product Toast trigger exists.
-- [pending] Rerun the applicable Phase 5 validation matrix.
+- [completed] Run clean iOS and Android builds after native dependency installation.
+- [completed] Verify Sheet context, z-order, and dismissal gestures on physical Android;
+  verify provider/viewport startup on both platforms. iOS had no history entries, so its
+  History Sheet content path was unavailable.
+- [completed] Rerun the applicable static, web export, iOS simulator, and physical
+  Android validation matrix.
 
 ### Conditional follow-up B: Move Config v4 to Config v5
 
@@ -807,8 +808,9 @@ migration work.
 - `@tamagui/react-native-web-lite` may reduce web bundle size.
   - Status: explicitly deferred pending isolated compatibility and bundle testing.
 - Native Teleport may improve custom-context behavior in Sheet/Toast portals.
-  - Status: optional separate follow-up; do not add native dependencies without a
-    demonstrated need and separate approval.
+  - Status: completed as a separately approved follow-up. Fresh iOS and Android builds
+    passed, and the populated physical-Android History Sheet preserved content,
+    z-order, and dismissal behavior.
 - `external-packages.mdc` is referenced by repository instructions but was not found.
   - Status: dated package guides were created from primary sources; locate the
     authoritative rule file before implementation if it exists elsewhere.

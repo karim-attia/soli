@@ -1,6 +1,7 @@
 # Tamagui 2 React Native Teleport Guide
 
 Research date: 2026-06-11
+Follow-up verification date: 2026-06-12
 
 ## Purpose
 
@@ -27,6 +28,10 @@ Pin exact version during this migration:
 ```sh
 yarn add react-native-teleport@1.1.9
 ```
+
+This follow-up installed `react-native-teleport@1.1.9` directly in the Expo app and
+validated it through fresh native builds because the package contains iOS and Android
+native code.
 
 ## Why Tamagui recommends it
 

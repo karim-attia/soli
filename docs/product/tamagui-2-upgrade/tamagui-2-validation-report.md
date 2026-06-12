@@ -83,10 +83,28 @@ build/install checks, and physical Android smoke validation.
     deprecated `props.pointerEvents`, and Tamagui global config fallback/duplicate
     instance detection.
 
+## Native Teleport Follow-Up
+
+- Added `@tamagui/native@2.2.0` and `react-native-teleport@1.1.9`.
+- `package.json` now uses `index.js`, which imports `tamagui.native.setup.ts` before
+  `expo-router/entry`.
+- Native setup enables Teleport and Sheet-only Gesture Handler integration with
+  `pressEvents: false`.
+- Static checks, Expo checks, Jest, Tamagui checks, and web export passed.
+- Clean iOS simulator build compiled Teleport native code, installed `0.8.0 (13)`, and
+  passed Play/Settings/draw-count/History-empty/Draw/Undo smoke coverage.
+- Android `yarn release` compiled and installed a fresh `0.8.0 (13)` release on the
+  physical A065/Pong device.
+- The populated Android History Sheet opened above app content, displayed current game
+  metadata/tableau, preserved expected z-order/context, and dismissed normally.
+- Teleport codegen libraries loaded successfully on both platforms. No Soli crash,
+  uncaught JS error, or native-module load failure was found.
+- Non-blocking Android logs include generated-setter fallback warnings for Teleport view
+  managers. Keep an eye on these after React Native/Tamagui upgrades, but no functional
+  issue was observed.
+
 ## Follow-Up
 
 - Treat Config v5 migration as a separate task.
-- Treat optional `@tamagui/native` / `react-native-teleport` adoption as a separate
-  task only if a concrete native portal or gesture issue appears.
 - Keep future screenshots as local QA artifacts unless a reviewer explicitly asks for
   them in the repository.

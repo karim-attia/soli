@@ -2,7 +2,7 @@
   "name": "soli",
   "version": "0.8.0",
   "private": true,
-  "main": "expo-router/entry",
+  "main": "index.js",
   "scripts": {
     "check:tamagui": "tamagui check",
     "generate:tamagui-css": "tamagui generate-css --output ./tamagui-web.css",
@@ -38,6 +38,7 @@
     "@tamagui/config": "2.2.0",
     "@tamagui/font-inter": "2.2.0",
     "@tamagui/lucide-icons-2": "2.2.0",
+    "@tamagui/native": "2.2.0",
     "@tamagui/toast": "2.2.0",
     "babel-preset-expo": "^55.0.0",
     "expo": "~55.0.26",
@@ -60,6 +61,7 @@
     "react-native-safe-area-context": "^5.6.2",
     "react-native-screens": "~4.23.0",
     "react-native-svg": "15.15.3",
+    "react-native-teleport": "1.1.9",
     "react-native-web": "^0.21.2",
     "react-native-worklets": "0.7.4",
     "tamagui": "2.2.0"

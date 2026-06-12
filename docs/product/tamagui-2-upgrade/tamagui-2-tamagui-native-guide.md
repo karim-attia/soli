@@ -20,7 +20,7 @@ optional native Teleport or Gesture Handler integrations.
 a light setup package for optional native adapters. Add it only in a separately
 approved follow-up after the Config v4 migration is complete and validated.
 
-Latest stable version on 2026-06-11: `2.2.0`.
+Latest stable version on 2026-06-11 and rechecked on 2026-06-12: `2.2.0`.
 
 ## Available integrations relevant to Soli
 
@@ -33,6 +33,9 @@ import '@tamagui/native/setup-teleport'
 This requires `react-native-teleport` and preserves custom React contexts in native
 Sheet, Dialog, Popover, Select, and Toast portals.
 
+This follow-up enables the Teleport setup module through a root entry file before
+`expo-router/entry`.
+
 Selective Gesture Handler adapter:
 
 ```ts
@@ -44,6 +47,9 @@ setupGestureHandler({ pressEvents: false, sheet: true })
 Soli already has `react-native-gesture-handler` and a `GestureHandlerRootView`. Keep
 global Tamagui press integration disabled initially because gameplay contains nested
 and timing-sensitive press interactions.
+
+This follow-up uses `setupGestureHandler({ pressEvents: false, sheet: true })`, so the
+Sheet can use Tamagui's native gesture adapter without changing global press ownership.
 
 ## Expo Router ordering
 
