@@ -1,4 +1,4 @@
-import { Paragraph, Text, ToggleGroup, YStack } from 'tamagui'
+import { Paragraph, Text, ToggleGroup, XGroup, YStack } from 'tamagui'
 
 import {
   DRAW_COUNT_OPTIONS,
@@ -35,40 +35,54 @@ export const DrawCountSelector = ({
       disableDeactivation
       disabled={disabled}
       orientation="horizontal"
-      width="100%"
-      size="$3"
-      gap="$1"
-      // bordered
-      // radiused
-      // padded
-      // backgrounded
+      aria-label="Cards drawn from stock"
     >
-      {DRAW_COUNT_OPTIONS.map((option) => {
-        const isSelected = value === option
+      {/*
+        ToggleGroup v2 owns selection/focus behavior; XGroup replaces the removed v1
+        visual frame, and selected-aware one-sided borders create separators without
+        doubling the selected segment edge.
+      */}
+      <XGroup
+        width="100%"
+        gap={0}
+        bg="$color2"
+        borderWidth={1}
+        borderColor="$borderColor"
+        size="$5"
+      >
+        {DRAW_COUNT_OPTIONS.map((option, index) => {
+          const isSelected = value === option
+          const isFirstOption = index === 0
+          const previousOption = DRAW_COUNT_OPTIONS[index - 1]
+          const isNextToSelected = isSelected || value === previousOption
+          const separatorColor = isNextToSelected ? 'transparent' : '$borderColor'
 
-        return (
-          <ToggleGroup.Item
-            key={option}
-            value={String(option)}
-            flex={1}
-            minHeight={44}
-            borderWidth={0}
-            bordered
-            radiused
-            accessibilityLabel={`Draw ${option}`}
-            bg={isSelected ? '$color10' : 'transparent'}
-            pressStyle={{ backgroundColor: isSelected ? '$color10' : '$color5' }}
-          >
-            <Text
-              fontSize="$5"
-              fontWeight="800"
-              color={isSelected ? '$color1' : '$color11'}
-            >
-              {option}
-            </Text>
-          </ToggleGroup.Item>
-        )
-      })}
+          return (
+            <XGroup.Item key={option}>
+              <ToggleGroup.Item
+                value={String(option)}
+                flex={1}
+                minHeight={44}
+                borderWidth={0}
+                borderLeftWidth={isFirstOption ? 0 : 1}
+                borderColor={separatorColor}
+                borderRadius="$4"
+                aria-label={`Draw ${option}`}
+                backgroundColor={isSelected ? '$color10' : 'transparent'}
+                pressStyle={{ backgroundColor: isSelected ? '$color10' : '$color5' }}
+              >
+                <Text
+                  fontSize="$5"
+                  fontWeight="800"
+                  color={isSelected ? '$color1' : '$color11'}
+                >
+                  {option}
+                </Text>
+              </ToggleGroup.Item>
+            </XGroup.Item>
+          )
+        })}
+      </XGroup>
     </ToggleGroup>
     <Paragraph color="$color10" fontSize="$3">
       Deals are generated to be solvable with Draw 1. Higher draw counts use the same

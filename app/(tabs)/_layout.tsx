@@ -1,7 +1,7 @@
 import { Drawer } from 'expo-router/drawer'
 import { useTheme } from 'tamagui'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Atom, AudioWaveform, Clock, Settings, Smile } from '@tamagui/lucide-icons'
+import { Atom, AudioWaveform, Clock, Settings, Smile } from '@tamagui/lucide-icons-2'
 
 import { useSettings } from '../../src/state/settings'
 
@@ -17,17 +17,17 @@ export default function DrawerLayout() {
   return (
     <Drawer
       screenOptions={{
-        drawerActiveTintColor: theme.red10.val,
-        drawerInactiveTintColor: theme.color.val,
+        drawerActiveTintColor: theme.red10?.val,
+        drawerInactiveTintColor: theme.color?.val,
         swipeEnabled: false,
         drawerStyle: {
-          backgroundColor: theme.background.val,
+          backgroundColor: theme.background?.val,
         },
         headerStyle: {
-          backgroundColor: theme.background.val,
-          borderBottomColor: theme.borderColor.val,
+          backgroundColor: theme.background?.val,
+          borderBottomColor: theme.borderColor?.val,
         },
-        headerTintColor: theme.color.val,
+        headerTintColor: theme.color?.val,
         headerStatusBarHeight: insets.top,
         headerLeft: () => null,
         headerRightContainerStyle: {

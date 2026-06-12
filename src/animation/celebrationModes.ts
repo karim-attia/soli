@@ -107,8 +107,7 @@ export function computeCelebrationFrame({
     1,
     Math.max(
       0,
-      CELEBRATION_LAUNCH_INITIAL_PROGRESS +
-        progress * CELEBRATION_LAUNCH_SPEED_MULTIPLIER
+      CELEBRATION_LAUNCH_INITIAL_PROGRESS + progress * CELEBRATION_LAUNCH_SPEED_MULTIPLIER
     )
   )
   const launchEased = easeOutCubic(launchProgress)

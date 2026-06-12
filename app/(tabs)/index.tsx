@@ -2,8 +2,8 @@ import { useLayoutEffect } from 'react'
 import { Platform } from 'react-native'
 import { HeaderButton } from '@react-navigation/elements'
 import { useNavigation } from 'expo-router'
-import { Button, Text, XStack, useTheme } from 'tamagui'
-import { Menu } from '@tamagui/lucide-icons'
+import { Button, Text, XStack } from 'tamagui'
+import { Menu } from '@tamagui/lucide-icons-2'
 
 import { KlondikeGameView } from '../../src/features/klondike/components/KlondikeGameView'
 import { useKlondikeGame } from '../../src/features/klondike/hooks/useKlondikeGame'
@@ -123,8 +123,6 @@ type IOSHeaderMenuButtonProps = {
 }
 
 const IOSHeaderMenuButton = ({ onPress }: IOSHeaderMenuButtonProps) => {
-  const theme = useTheme()
-
   return (
     <HeaderButton
       // PBI-32: Use the shared header-button primitive on iOS so both sides of the
@@ -140,7 +138,7 @@ const IOSHeaderMenuButton = ({ onPress }: IOSHeaderMenuButtonProps) => {
       <Menu
         size={IOS_HEADER_ICON_SIZE}
         strokeWidth={IOS_HEADER_ICON_STROKE_WIDTH}
-        color={theme.color.val as any}
+        color="$color"
       />
     </HeaderButton>
   )
@@ -151,19 +149,17 @@ type HeaderMenuButtonProps = {
 }
 
 const HeaderMenuButton = ({ onPress }: HeaderMenuButtonProps) => {
-  const theme = useTheme()
-
   return (
     <Button
       unstyled
       onPress={onPress}
       width={ANDROID_HEADER_CONTROL_SIZE}
       height={ANDROID_HEADER_CONTROL_SIZE}
-      accessibilityLabel="Open navigation menu"
+      aria-label="Open navigation menu"
       pressStyle={{ opacity: 0.65 }}
       style={{ alignItems: 'center', justifyContent: 'center' }}
     >
-      <Menu size={ANDROID_HEADER_ICON_SIZE} color={theme.color.val as any} />
+      <Menu size={ANDROID_HEADER_ICON_SIZE} color="$color" />
     </Button>
   )
 }
@@ -179,8 +175,6 @@ const IOSHeaderTextAction = ({
   onPress,
   accessibilityLabel,
 }: HeaderTextActionProps) => {
-  const theme = useTheme()
-
   return (
     <HeaderButton
       onPress={onPress}
@@ -193,7 +187,7 @@ const IOSHeaderTextAction = ({
       }}
     >
       <Text
-        color={theme.color.val as any}
+        color="$color"
         fontSize={IOS_HEADER_TEXT_SIZE}
         fontWeight={IOS_HEADER_ACTION_FONT_WEIGHT}
         numberOfLines={1}

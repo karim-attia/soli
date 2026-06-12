@@ -17,7 +17,7 @@ import {
 } from 'react-native'
 import { useNavigation } from 'expo-router'
 import { Paragraph, Separator, Sheet, Text, XStack, YStack, useTheme } from 'tamagui'
-import { Menu } from '@tamagui/lucide-icons'
+import { Menu } from '@tamagui/lucide-icons-2'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
@@ -75,7 +75,6 @@ function HistoryScreen() {
     [reducedMotionEnabled]
   )
 
-  const theme = useTheme()
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTitle: 'Game History',
@@ -85,11 +84,11 @@ function HistoryScreen() {
           accessibilityLabel="Open navigation menu"
           style={{ padding: 8 }}
         >
-          <Menu size={32} color={theme.color.val as any} />
+          <Menu size={32} color="$color" />
         </Pressable>
       ),
     })
-  }, [navigation, openDrawer, theme])
+  }, [navigation, openDrawer])
 
   const listHeader = useMemo(() => {
     const stats: HistoryStat[] = [
@@ -189,14 +188,12 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
       borderRadius: 16,
       borderWidth: 1,
       borderColor: theme.color6?.val ?? '#cbd5f5',
-      // Shadow for elevation
-      shadowColor: theme.color10?.val ?? '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
+      // Tamagui 2 maps CSS box shadows to the native RN 0.76+ shadow API.
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+      // Keep Android elevation for pre-9 shadows and native stacking behavior.
       elevation: 2,
     }),
-    [theme.color6?.val, theme.color10?.val]
+    [theme.color6?.val]
   )
 
   return (
@@ -498,7 +495,7 @@ const HistoryPreviewSheet = ({
       snapPointsMode="percent"
       snapPoints={snapPoints}
       dismissOnSnapToBottom
-      animation={reducedMotionEnabled ? 'quickest' : 'medium'}
+      transition={reducedMotionEnabled ? 'quickest' : 'medium'}
     >
       <Sheet.Overlay bg="rgba(0,0,0,0.35)" />
       <Sheet.Frame
@@ -510,9 +507,8 @@ const HistoryPreviewSheet = ({
         borderTopLeftRadius="$6"
         borderTopRightRadius="$6"
         style={{
-          shadowColor: 'rgba(0,0,0,0.2)',
-          shadowOpacity: 0.2,
-          shadowRadius: 12,
+          boxShadow: '0 0 12px rgba(0, 0, 0, 0.2)',
+          // Elevation remains necessary for older Android shadow/z-order behavior.
           elevation: 6,
         }}
       >

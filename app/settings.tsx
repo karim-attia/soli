@@ -12,7 +12,7 @@ import {
   YStack,
   useTheme,
 } from 'tamagui'
-import { Menu } from '@tamagui/lucide-icons'
+import { Menu } from '@tamagui/lucide-icons-2'
 
 import { DrawCountSelector } from '../components/settings/DrawCountSelector'
 import {
@@ -51,7 +51,6 @@ const refreshRateOptions: Array<{
 
 export default function SettingsScreen() {
   const navigation = useNavigation()
-  const theme = useTheme()
   const openDrawer = useDrawerOpener()
 
   useLayoutEffect(() => {
@@ -62,11 +61,11 @@ export default function SettingsScreen() {
           accessibilityLabel="Open navigation menu"
           style={{ padding: 8 }}
         >
-          <Menu size={32} color={theme.color.val as any} />
+          <Menu size={32} color="$color" />
         </Pressable>
       ),
     })
-  }, [navigation, openDrawer, theme])
+  }, [navigation, openDrawer])
 
   const {
     state,
@@ -308,10 +307,10 @@ const ToggleRow = ({
   const androidNativeProps =
     Platform.OS === 'android'
       ? {
-          thumbColor: value ? theme.color.val : theme.color6.val,
+          thumbColor: value ? theme.color?.val : theme.color6?.val,
           trackColor: {
-            false: theme.color4.val,
-            true: theme.color10.val,
+            false: theme.color4?.val,
+            true: theme.color10?.val,
           },
         }
       : undefined

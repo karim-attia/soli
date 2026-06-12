@@ -85,7 +85,8 @@
           "imageWidth": 368,
           "resizeMode": "contain"
         }
-      ]
+      ],
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true

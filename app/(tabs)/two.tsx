@@ -16,8 +16,8 @@ import {
   ScrollView,
 } from 'react-native'
 import { useFocusEffect, useNavigation } from 'expo-router'
-import { Button, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
-import { Menu, RefreshCcw, Undo2 } from '@tamagui/lucide-icons'
+import { Button, Paragraph, Text, XStack, YStack } from 'tamagui'
+import { Menu, RefreshCcw, Undo2 } from '@tamagui/lucide-icons-2'
 
 import { devLog } from '../../src/utils/devLogger'
 
@@ -391,7 +391,6 @@ export default function TabOneScreen() {
     ]
   )
 
-  const theme = useTheme()
   const openDrawer = useDrawerOpener()
 
   useLayoutEffect(() => {
@@ -403,11 +402,11 @@ export default function TabOneScreen() {
           accessibilityLabel="Open navigation menu"
           style={{ padding: 8 }}
         >
-          <Menu size={32} color={theme.color.val as any} />
+          <Menu size={32} color="$color" />
         </Pressable>
       ),
     })
-  }, [developerModeEnabled, navigation, openDrawer, theme])
+  }, [developerModeEnabled, navigation, openDrawer])
 
   useEffect(() => {
     if (!developerModeEnabled) {

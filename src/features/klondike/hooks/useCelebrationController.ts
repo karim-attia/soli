@@ -131,10 +131,8 @@ export const useCelebrationController = ({
   const previousFoundationTopCardIdsRef = useRef<FoundationTopCardIds>(
     buildFoundationTopCardIds(state.foundations)
   )
-  const {
-    foundationGlow: foundationGlowEnabled,
-    cardFlights: cardFlightsEnabled,
-  } = useAnimationToggles()
+  const { foundationGlow: foundationGlowEnabled, cardFlights: cardFlightsEnabled } =
+    useAnimationToggles()
 
   const celebrationBindings = useMemo<CelebrationBindings>(
     () => ({

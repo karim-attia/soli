@@ -1,6 +1,5 @@
 import React from 'react'
-import { View } from 'react-native'
-import { Text, Stack } from 'tamagui'
+import { Text, View } from 'tamagui'
 
 import type { Card } from '../../../../solitaire/klondike'
 import type { CardFlightSnapshot } from '../../../../animation/flightController'
@@ -32,7 +31,7 @@ export const StockStack = ({
 }: StockStackProps) => {
   if (!cards.length) {
     return (
-      <Stack
+      <View
         pointerEvents="none"
         style={[
           styles.stockContainer,
@@ -49,7 +48,7 @@ export const StockStack = ({
   const topCard = cards[cards.length - 1]
 
   return (
-    <Stack
+    <View
       pointerEvents="none"
       style={[
         styles.stockContainer,
@@ -82,6 +81,6 @@ export const StockStack = ({
           {label}
         </Text>
       ) : null}
-    </Stack>
+    </View>
   )
 }

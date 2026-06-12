@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react'
-import { LayoutChangeEvent, LayoutRectangle } from 'react-native'
-import { Stack, XStack } from 'tamagui'
+import type { LayoutChangeEvent, LayoutRectangle } from 'react-native'
+import { View, XStack } from 'tamagui'
 
 import {
   FOUNDATION_SUIT_ORDER,
@@ -136,7 +136,7 @@ export const TopRow = ({
         if (columnIndex < FOUNDATION_SUIT_ORDER.length) {
           const suit = FOUNDATION_SUIT_ORDER[columnIndex] as Suit
           return (
-            <Stack key={`foundation-${suit}`} style={slotStyle}>
+            <View key={`foundation-${suit}`} style={slotStyle}>
               <FoundationPile
                 suit={suit}
                 cards={state.foundations[suit]}
@@ -159,13 +159,13 @@ export const TopRow = ({
                 celebrationActive={celebrationActive}
                 onLayout={createFoundationLayoutHandler(suit)}
               />
-            </Stack>
+            </View>
           )
         }
 
         if (columnIndex === wasteColumnIndex) {
           return (
-            <Stack key="waste" style={slotStyle}>
+            <View key="waste" style={slotStyle}>
               <PileButton
                 label={`${state.waste.length}`}
                 onPress={handleWastePress}
@@ -173,7 +173,7 @@ export const TopRow = ({
                 disablePress
                 width={cardMetrics.width}
               >
-                <Stack width={cardMetrics.width} items="flex-end" overflow="visible">
+                <View width={cardMetrics.width} items="flex-end" overflow="visible">
                   {state.waste.length ? (
                     <WasteFan
                       cards={state.waste}
@@ -194,15 +194,15 @@ export const TopRow = ({
                       metrics={cardMetrics}
                     />
                   )}
-                </Stack>
+                </View>
               </PileButton>
-            </Stack>
+            </View>
           )
         }
 
         if (columnIndex === stockColumnIndex) {
           return (
-            <Stack key="stock" style={slotStyle}>
+            <View key="stock" style={slotStyle}>
               {!showWinCleanup && (
                 <PileButton
                   label={`${state.stock.length}`}
@@ -222,7 +222,7 @@ export const TopRow = ({
                       label={state.stock.length ? drawLabel : undefined}
                     />
                   ) : hideEmptyOutlines ? (
-                    <Stack width={cardMetrics.width} height={cardMetrics.height} />
+                    <View width={cardMetrics.width} height={cardMetrics.height} />
                   ) : (
                     <CardBack
                       label={state.stock.length ? drawLabel : undefined}
@@ -232,11 +232,11 @@ export const TopRow = ({
                   )}
                 </PileButton>
               )}
-            </Stack>
+            </View>
           )
         }
 
-        return <Stack key={`empty-${columnIndex}`} style={slotStyle} />
+        return <View key={`empty-${columnIndex}`} style={slotStyle} />
       })}
     </XStack>
   )

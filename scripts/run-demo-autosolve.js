@@ -185,11 +185,9 @@ const loadReleaseSigningEnv = () => {
 
 const installReleaseApk = async (deviceSerial) => {
   try {
-    await runCommand(
-      'adb',
-      ['-s', deviceSerial, 'install', '-r', RELEASE_APK_PATH],
-      { capture: true }
-    )
+    await runCommand('adb', ['-s', deviceSerial, 'install', '-r', RELEASE_APK_PATH], {
+      capture: true,
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     const isSignatureMismatch = SIGNATURE_MISMATCH_MARKERS.some((marker) =>
@@ -261,8 +259,7 @@ const getUriForMode = (mode, launchCount = 0) => {
   }
   return `${baseUri}#retry-${launchCount}`
 }
-const createLauncherForMode =
-  ({ deviceSerial, mode }) =>
+const createLauncherForMode = ({ deviceSerial, mode }) =>
   (() => {
     let launchCount = 0
 

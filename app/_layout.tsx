@@ -81,7 +81,7 @@ function RootLayoutNav() {
             gestureEnabled: true,
             gestureDirection: 'horizontal',
             contentStyle: {
-              backgroundColor: theme.background.val,
+              backgroundColor: theme.background?.val,
             },
           }}
         />
@@ -92,7 +92,7 @@ function RootLayoutNav() {
             title: 'Settings',
             animation: reducedMotionEnabled ? 'none' : undefined,
             contentStyle: {
-              backgroundColor: theme.background.val,
+              backgroundColor: theme.background?.val,
             },
           }}
         />
@@ -103,7 +103,7 @@ function RootLayoutNav() {
             title: 'History',
             animation: reducedMotionEnabled ? 'none' : undefined,
             contentStyle: {
-              backgroundColor: theme.background.val,
+              backgroundColor: theme.background?.val,
             },
           }}
         />

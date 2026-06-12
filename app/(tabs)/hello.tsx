@@ -1,13 +1,12 @@
 import { useLayoutEffect } from 'react'
 import { Pressable } from 'react-native'
 import { useNavigation } from 'expo-router'
-import { Anchor, Paragraph, View, XStack, YStack, useTheme } from 'tamagui'
-import { Menu } from '@tamagui/lucide-icons'
+import { Anchor, Paragraph, View, XStack, YStack } from 'tamagui'
+import { Menu } from '@tamagui/lucide-icons-2'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
 
 export default function HelloScreen() {
   const navigation = useNavigation()
-  const theme = useTheme()
   const openDrawer = useDrawerOpener()
 
   useLayoutEffect(() => {
@@ -19,11 +18,11 @@ export default function HelloScreen() {
           accessibilityLabel="Open navigation menu"
           style={{ padding: 8 }}
         >
-          <Menu size={32} color={theme.color.val as any} />
+          <Menu size={32} color="$color" />
         </Pressable>
       ),
     })
-  }, [navigation, openDrawer, theme])
+  }, [navigation, openDrawer])
 
   return (
     <View

@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
 import { Text } from 'tamagui'
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated'
-import { RefreshCcw } from '@tamagui/lucide-icons'
+import { RefreshCcw } from '@tamagui/lucide-icons-2'
 
 import type { Card } from '../../../../solitaire/klondike'
 import type { CardFlightSnapshot } from '../../../../animation/flightController'

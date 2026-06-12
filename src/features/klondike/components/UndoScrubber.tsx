@@ -7,7 +7,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated'
 import { GestureDetector, type GestureType } from 'react-native-gesture-handler'
-import { Undo2 } from '@tamagui/lucide-icons'
+import { Undo2 } from '@tamagui/lucide-icons-2'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {

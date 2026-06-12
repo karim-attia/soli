@@ -8,7 +8,9 @@ import { HistoryProvider } from '../src/state/history'
 import { resolveThemeName } from '../src/theme'
 import { config } from '../tamagui.config'
 
-export function Provider({ children, ...rest }: Omit<TamaguiProviderProps, 'config'>) {
+type ProviderProps = Omit<TamaguiProviderProps, 'config' | 'defaultTheme'>
+
+export function Provider({ children, ...rest }: ProviderProps) {
   return (
     // requirement 20-6: GestureHandlerRootView must wrap the app root on iOS.
     // Without it, iOS gestures can cancel during React Native refresh/commits.
@@ -22,10 +24,7 @@ export function Provider({ children, ...rest }: Omit<TamaguiProviderProps, 'conf
   )
 }
 
-const TamaguiWithSettings = ({
-  children,
-  ...rest
-}: Omit<TamaguiProviderProps, 'config'>) => {
+const TamaguiWithSettings = ({ children, ...rest }: ProviderProps) => {
   const colorScheme = useColorScheme()
   const {
     state: { themeMode },

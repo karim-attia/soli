@@ -1,10 +1,8 @@
 import React, { useMemo, useState } from 'react'
 import { ScrollView, useColorScheme } from 'react-native'
-import { Button, Paragraph, Stack, Text, XStack, YStack } from 'tamagui'
-import { Image } from '@tamagui/image'
+import { Button, Image, Paragraph, Text, View, XStack, YStack } from 'tamagui'
 import { LinearGradient } from 'expo-linear-gradient'
-import type { ImageSourcePropType } from 'react-native'
-import { purple } from '@tamagui/colors'
+import { purple } from '@tamagui/colors/legacy'
 
 import type { Card, Rank, Suit } from '../src/solitaire/klondike'
 import type { CardMetrics } from '../src/features/klondike/types'
@@ -28,7 +26,7 @@ const SAFE_CONTENT_WIDTH = SAFE_WIDTH - SAFE_INNER_PADDING * 2
 const SAFE_CONTENT_HEIGHT = SAFE_HEIGHT - SAFE_INNER_PADDING * 2
 const LAYOUT_GAP = 24
 
-const ICON_SOURCE: ImageSourcePropType = require('../assets/images/icon.png')
+const ICON_SOURCE = require('../assets/images/icon.png')
 const BENEFITS = ['Free & no ads', 'Solvable games', 'Undo time travel']
 
 type FeatureVariant =
@@ -113,29 +111,28 @@ const IconBadge = ({ size = 140 }: { size?: number }) => {
   const iconSize = Math.round(size * 0.79)
   const iconRadius = Math.round(iconSize * 0.25)
   return (
-    <Stack
+    <View
       width={size}
       height={size}
       items="center"
       justify="center"
       style={{
-        shadowColor: 'rgba(4, 17, 9, 0.35)',
-        shadowOpacity: 0.35,
-        shadowRadius: 16,
-        shadowOffset: { width: 0, height: 6 },
+        boxShadow: '0 6px 16px rgba(4, 17, 9, 0.1225)',
       }}
     >
       <Image
-        source={ICON_SOURCE}
-        style={{ width: iconSize, height: iconSize, borderRadius: iconRadius }}
-        resizeMode="contain"
+        src={ICON_SOURCE}
+        width={iconSize}
+        height={iconSize}
+        borderRadius={iconRadius}
+        objectFit="contain"
       />
-    </Stack>
+    </View>
   )
 }
 
 const SafeFrameOverlay = ({ color }: { color: string }) => (
-  <Stack
+  <View
     pointerEvents="none"
     position="absolute"
     l={SAFE_MARGIN_X}
@@ -193,9 +190,9 @@ const BadgeHighlightsRightSide = ({
             borderRadius: 16,
           }}
         >
-          <Stack rounded={14} px={18} py={12} style={{ backgroundColor: '#fdfdfc' }}>
+          <View rounded={14} px={18} py={12} style={{ backgroundColor: '#fdfdfc' }}>
             <XStack items="center" gap="$2.5">
-              <Stack
+              <View
                 width={6}
                 height={6}
                 rounded={999}
@@ -205,7 +202,7 @@ const BadgeHighlightsRightSide = ({
                 {benefit}
               </Text>
             </XStack>
-          </Stack>
+          </View>
         </LinearGradient>
       ))}
     </YStack>
@@ -246,7 +243,7 @@ const GlassBadgesRightSide = ({
     </YStack>
     <YStack gap="$3" pt="$2">
       {BENEFITS.map((benefit) => (
-        <Stack
+        <View
           key={benefit}
           style={{
             backgroundColor: palette.infoBackground,
@@ -255,22 +252,17 @@ const GlassBadgesRightSide = ({
             borderRadius: 20,
             paddingHorizontal: 24,
             paddingVertical: 16,
-            shadowColor: palette.accent,
-            shadowOpacity: 0.1,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 6 },
+            boxShadow: `0 6px 12px ${palette.accent}1a`,
           }}
         >
           <XStack items="center" gap="$3">
-            <Stack
+            <View
               width={8}
               height={8}
               rounded={999}
               style={{
                 backgroundColor: palette.accent,
-                shadowColor: palette.accent,
-                shadowOpacity: 0.6,
-                shadowRadius: 6,
+                boxShadow: `0 0 6px ${palette.accent}99`,
               }}
             />
             <Text
@@ -282,7 +274,7 @@ const GlassBadgesRightSide = ({
               {benefit}
             </Text>
           </XStack>
-        </Stack>
+        </View>
       ))}
     </YStack>
   </YStack>
@@ -313,10 +305,10 @@ const FixedWidthTwoColumnLayout = ({
       justify="center"
       py={verticalPadding}
     >
-      <Stack width={leftWidth} items="center">
+      <View width={leftWidth} items="center">
         {leftContent}
-      </Stack>
-      <Stack width={rightWidth}>{rightContent}</Stack>
+      </View>
+      <View width={rightWidth}>{rightContent}</View>
     </XStack>
   </YStack>
 )
@@ -335,20 +327,17 @@ const renderBadgesVariant = (ctx: VariantContext) => {
       {iconBadge}
       <XStack gap="$2" items="center">
         {SIMPLE_FAN_CARDS.map((card, index) => (
-          <Stack
+          <View
             key={card.id}
             width={cardMetrics.width}
             height={cardMetrics.height}
             style={{
               transform: [{ rotate: `${-8 + index * 8}deg` }],
-              shadowColor: 'rgba(15, 23, 42, 0.4)',
-              shadowOpacity: 0.4,
-              shadowRadius: 16,
-              shadowOffset: { width: 0, height: 8 },
+              boxShadow: '0 8px 16px rgba(15, 23, 42, 0.16)',
             }}
           >
             <CardVisual card={card} metrics={cardMetrics} />
-          </Stack>
+          </View>
         ))}
       </XStack>
     </YStack>
@@ -378,7 +367,7 @@ const renderIconVariant = (ctx: VariantContext) => {
 
   const leftSide = (
     <YStack flex={1} items="center" justify="center" gap="$4" p="$5">
-      <Stack
+      <View
         width={diameter}
         height={diameter}
         position="relative"
@@ -391,7 +380,7 @@ const renderIconVariant = (ctx: VariantContext) => {
           const x = Math.cos(angle) * ringRadius
           const y = Math.sin(angle) * ringRadius
           return (
-            <Stack
+            <View
               key={card.id}
               position="absolute"
               l={center + x - cardMetrics.width / 2}
@@ -400,17 +389,14 @@ const renderIconVariant = (ctx: VariantContext) => {
               height={cardMetrics.height}
               style={{
                 transform: [{ rotate: `${(angle * 180) / Math.PI}deg` }],
-                shadowColor: 'rgba(0, 0, 0, 0.32)',
-                shadowOpacity: 0.32,
-                shadowRadius: 12,
-                shadowOffset: { width: 0, height: 6 },
+                boxShadow: '0 6px 12px rgba(0, 0, 0, 0.1024)',
               }}
             >
               <CardVisual card={card} metrics={cardMetrics} />
-            </Stack>
+            </View>
           )
         })}
-      </Stack>
+      </View>
     </YStack>
   )
 
@@ -441,7 +427,7 @@ const renderPremiumBadgesVariant = (ctx: VariantContext) => {
   const leftSide = (
     <YStack gap="$4" items="center" justify="center">
       {iconBadge}
-      <Stack height={20} />
+      <View height={20} />
       <XStack items="center" justify="center">
         {PREMIUM_FAN_CARDS.map((card, index) => {
           // Tighter fan with slight vertical arc
@@ -449,22 +435,19 @@ const renderPremiumBadgesVariant = (ctx: VariantContext) => {
           const yOffset = Math.abs(index - 1.5) * 8
 
           return (
-            <Stack
+            <View
               key={card.id}
               width={cardMetrics.width}
               height={cardMetrics.height}
               ml={index === 0 ? 0 : -40} // Overlap cards
               style={{
                 transform: [{ rotate: `${rotation}deg` }, { translateY: yOffset }],
-                shadowColor: 'rgba(15, 23, 42, 0.5)',
-                shadowOpacity: 0.5,
-                shadowRadius: 20,
-                shadowOffset: { width: 0, height: 10 },
+                boxShadow: '0 10px 20px rgba(15, 23, 42, 0.25)',
                 zIndex: index,
               }}
             >
               <CardVisual card={card} metrics={cardMetrics} />
-            </Stack>
+            </View>
           )
         })}
       </XStack>
@@ -506,22 +489,19 @@ const renderBadgesRemixVariant = (ctx: VariantContext) => {
           const yOffset = Math.abs(index - 1.5) * 8
 
           return (
-            <Stack
+            <View
               key={card.id}
               width={cardMetrics.width}
               height={cardMetrics.height}
               ml={index === 0 ? 0 : -40} // Overlap cards
               style={{
                 transform: [{ rotate: `${rotation}deg` }, { translateY: yOffset }],
-                shadowColor: 'rgba(15, 23, 42, 0.5)',
-                shadowOpacity: 0.5,
-                shadowRadius: 20,
-                shadowOffset: { width: 0, height: 10 },
+                boxShadow: '0 10px 20px rgba(15, 23, 42, 0.25)',
                 zIndex: index,
               }}
             >
               <CardVisual card={card} metrics={cardMetrics} />
-            </Stack>
+            </View>
           )
         })}
       </XStack>
@@ -556,8 +536,8 @@ const renderGlassModernVariant = (ctx: VariantContext) => {
   const leftSide = (
     <YStack gap="$3" items="center">
       {/* Glow behind the icon */}
-      <Stack position="relative">
-        <Stack
+      <View position="relative">
+        <View
           position="absolute"
           width={200}
           height={200}
@@ -568,13 +548,11 @@ const renderGlassModernVariant = (ctx: VariantContext) => {
           style={{
             backgroundColor: palette.accent,
             filter: 'blur(40px)', // Note: standard RN might not support filter, but we can try or rely on shadow
-            shadowColor: palette.accent,
-            shadowOpacity: 0.4,
-            shadowRadius: 60,
+            boxShadow: `0 0 60px ${palette.accent}66`,
           }}
         />
         {iconBadge}
-      </Stack>
+      </View>
 
       <XStack items="center" justify="center">
         {GLASS_CARDS.map((card, index) => {
@@ -582,22 +560,19 @@ const renderGlassModernVariant = (ctx: VariantContext) => {
           const yOffset = Math.abs(index - 1.5) * 8
 
           return (
-            <Stack
+            <View
               key={card.id}
               width={cardMetrics.width}
               height={cardMetrics.height}
               ml={index === 0 ? 0 : -40}
               style={{
                 transform: [{ rotate: `${rotation}deg` }, { translateY: yOffset }],
-                shadowColor: 'rgba(0, 0, 0, 0.6)', // Stronger shadow for depth
-                shadowOpacity: 0.6,
-                shadowRadius: 24,
-                shadowOffset: { width: 0, height: 12 },
+                boxShadow: '0 12px 24px rgba(0, 0, 0, 0.36)', // Stronger shadow for depth
                 zIndex: index,
               }}
             >
               <CardVisual card={card} metrics={cardMetrics} />
-            </Stack>
+            </View>
           )
         })}
       </XStack>
@@ -899,7 +874,7 @@ export default function FeatureGraphicScreen() {
           </XStack>
         </XStack>
 
-        <Stack
+        <View
           width={FEATURE_WIDTH}
           height={FEATURE_HEIGHT}
           self="center"
@@ -908,11 +883,11 @@ export default function FeatureGraphicScreen() {
         >
           {/* Safe-area padding derived from Task 24-1 (15% bleed documented). */}
           <FeltBackground />
-          <Stack flex={1} p={SAFE_INNER_PADDING} justify="center">
+          <View flex={1} p={SAFE_INNER_PADDING} justify="center">
             {VARIANT_RENDERERS[activeVariant.id](variantContext)}
-          </Stack>
+          </View>
           {showSafeFrame ? <SafeFrameOverlay color={palette.safeFrame} /> : null}
-        </Stack>
+        </View>
 
         <YStack maxW={FEATURE_WIDTH} self="center" gap="$3">
           <Text style={{ color: palette.bodyText }} fontSize={22} fontWeight="700">
@@ -1010,14 +985,14 @@ export default function FeatureGraphicScreen() {
           ))}
           <YStack gap="$3" pt="$2">
             {VARIANT_DEFINITIONS.map((variant) => (
-              <Stack key={`${variant.id}-detail`} gap="$1">
+              <View key={`${variant.id}-detail`} gap="$1">
                 <Text style={{ color: palette.bodyText }} fontSize={18} fontWeight="700">
                   {variant.label}
                 </Text>
                 <Paragraph style={{ color: palette.bodySubduedText }} fontSize={15}>
                   {variant.description}
                 </Paragraph>
-              </Stack>
+              </View>
             ))}
           </YStack>
         </YStack>
