@@ -621,20 +621,23 @@ entire Config v4 migration complete.
 
 ### Conditional follow-up B: Move Config v4 to Config v5
 
-- [pending] Begin only after Phase 5 and separate approval; Config v5 is optional.
-- [pending] Change the config import to `@tamagui/config/v5`.
-- [pending] Select CSS animations on web and Reanimated animations on native.
-- [pending] Initially set `styleCompat: 'legacy'` and
+- [completed] Begin only after Phase 5 and separate approval; Config v5 was explicitly
+  approved as a separate follow-up.
+- [completed] Change the config import to `@tamagui/config/v5`.
+- [completed] Select CSS animations on web and Reanimated animations on native.
+- [completed] Initially set `styleCompat: 'legacy'` and
   `defaultPosition: 'relative'` to isolate token/theme changes.
-- [pending] Audit Radix v3 colors, component themes, typography, spacing, radius,
+- [completed] Audit Radix v3 colors, component themes, typography, spacing, radius,
   shadows, and light/dark theme output.
-- [pending] Audit every Tamagui absolute-positioning parent and add explicit
+- [completed] Audit every Tamagui absolute-positioning parent and add explicit
   `position="relative"` where required.
-- [pending] Audit flex layouts and add explicit basis/sizing where required.
-- [pending] Remove temporary legacy compatibility settings after affected layout
+- [completed] Audit flex layouts and add explicit basis/sizing where required.
+- [completed] Remove temporary legacy compatibility settings after affected layout
   assumptions are explicit.
-- [pending] Regenerate CSS and the Tamagui prompt from the final v5 config.
-- [pending] Rerun the full Phase 5 validation matrix.
+- [completed] Regenerate CSS from the final v5 config. No prompt artifact is generated
+  by the current v2 CLI workflow.
+- [completed] Rerun the full relevant validation matrix. Static, web, clean iOS
+  simulator build/smoke, and physical Android release build/smoke passed.
 
 ## Plan: Files to modify
 
@@ -756,7 +759,9 @@ migration work.
 ### Medium priority
 
 - Config v5 changes flex, position, breakpoints, colors, themes, and animations.
-  - Status: optional separate follow-up after the Config v4 migration is complete.
+  - Status: implemented as a separately approved follow-up. The feature canvas now
+    declares its required relative positioning, CSS/Reanimated drivers are selected
+    explicitly, and the draw-count selected/focus styles were hardened for v5.
 - `animation` is used by Toast and Sheet.
   - Status: fixed; Tamagui component animation props were renamed to `transition`.
     Expo Router animation options were left unchanged.

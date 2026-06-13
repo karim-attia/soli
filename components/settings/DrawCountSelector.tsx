@@ -68,8 +68,20 @@ export const DrawCountSelector = ({
                 borderColor={separatorColor}
                 borderRadius="$4"
                 aria-label={`Draw ${option}`}
-                backgroundColor={isSelected ? '$color10' : 'transparent'}
+                // The controlled fill is required on native, while activeStyle keeps
+                // Tamagui v5's web hover/focus pseudos from overriding selection.
+                bg={isSelected ? '$color10' : 'transparent'}
+                activeStyle={{ bg: '$color10' }}
                 pressStyle={{ backgroundColor: isSelected ? '$color10' : '$color5' }}
+                // Config v5's translucent outline token is too faint on both themes.
+                // Match the current text color so focus contrasts with either fill.
+                focusVisibleStyle={{
+                  outlineColor: isSelected ? '$color1' : '$color12',
+                  outlineWidth: 2,
+                  outlineStyle: 'solid',
+                  outlineOffset: -3,
+                  zIndex: 10,
+                }}
               >
                 <Text
                   fontSize="$5"

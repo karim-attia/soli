@@ -103,8 +103,34 @@ build/install checks, and physical Android smoke validation.
   managers. Keep an eye on these after React Native/Tamagui upgrades, but no functional
   issue was observed.
 
+## Config v5 Follow-Up
+
+- Config v5 was implemented as a separately approved follow-up using
+  `@tamagui/config/v5`, the CSS animation driver on web, and the Reanimated animation
+  driver on native.
+- Temporary legacy layout compatibility settings were removed after auditing flex and
+  positioned layouts. The feature-graphic canvas now declares its required relative
+  positioning explicitly.
+- Config v5 theme interaction required the draw-count selector to keep a controlled
+  native selected fill, an `activeStyle` for web pseudo-state precedence, and a
+  high-contrast inset focus-visible outline that follows the current text color.
+- Static checks, Expo checks, web export, focused web visual checks, and the final clean
+  iOS simulator build passed. The final iOS build installed `0.8.0 (13)` on the
+  iPhone 17 Pro simulator with bundle timestamp `2026-06-13 09:05:14 +0200`.
+- Android `yarn release` installed `0.8.0 (13)` on the physical A065 with
+  `lastUpdateTime = 2026-06-13 09:18:03` and passed launch, Draw/Undo card-state
+  restore, Settings, Draw 1/3/5/1 in light and app-dark themes, History, and populated
+  History Sheet open/backdrop-dismiss checks. The selector retained one rounded outer
+  frame and single separators without a doubled selected edge.
+- No Android crash, ANR, fatal React Native/Reanimated/Teleport error, or native-module
+  load failure was found. Existing Teleport generated-setter warnings remain
+  non-blocking.
+- Two product behaviors observed during Android smoke are separate from Config v5:
+  Undo restored cards and stock but not the displayed move count, and Android Back
+  changed the underlying route while the History Sheet remained open. Track these
+  separately rather than expanding this migration.
+
 ## Follow-Up
 
-- Treat Config v5 migration as a separate task.
 - Keep future screenshots as local QA artifacts unless a reviewer explicitly asks for
   them in the repository.

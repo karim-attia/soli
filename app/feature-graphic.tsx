@@ -879,6 +879,9 @@ export default function FeatureGraphicScreen() {
           height={FEATURE_HEIGHT}
           self="center"
           overflow="hidden"
+          // Config v5 no longer makes every Tamagui View relative; this canvas owns
+          // the absolutely positioned safe-frame overlay below.
+          position="relative"
           style={{ backgroundColor: palette.canvasBackground }}
         >
           {/* Safe-area padding derived from Task 24-1 (15% bleed documented). */}
