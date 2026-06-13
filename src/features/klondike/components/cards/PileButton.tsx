@@ -40,9 +40,10 @@ export const PileButton = ({
     <YStack gap="$1" items="center" style={containerStyle}>
       {body}
       <Text
-        color="$color10"
-        fontSize={12}
-        style={{ width: '100%', textAlign: 'center' }}
+        color="$color8"
+        fontSize={11}
+        fontWeight="400"
+        style={{ width: '100%', textAlign: 'center', opacity: 0.45 }}
         numberOfLines={1}
         ellipsizeMode="clip"
       >

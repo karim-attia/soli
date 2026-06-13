@@ -725,6 +725,8 @@ const handleUndo = (state: GameState): GameState => {
     history: nextHistory,
     future: nextFuture,
     selected: null,
+    // Undo rewinds board state, but not the move counter: taking the undo is still
+    // player activity and should remain visible in game stats/history.
     moveCount: state.moveCount,
   }
 }

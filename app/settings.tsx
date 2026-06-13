@@ -1,6 +1,7 @@
 import { useLayoutEffect, useEffect, useState } from 'react'
 import { Platform, Pressable, ScrollView } from 'react-native'
 import { useNavigation } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   Button,
   H2,
@@ -52,6 +53,7 @@ const refreshRateOptions: Array<{
 export default function SettingsScreen() {
   const navigation = useNavigation()
   const openDrawer = useDrawerOpener()
+  const safeArea = useSafeAreaInsets()
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -81,13 +83,16 @@ export default function SettingsScreen() {
     setRefreshRateMode,
   } = useSettings()
   const reducedMotionEnabled = useReducedMotionPreference()
+  // Android edge-to-edge can place scroll content behind the system dock, so keep
+  // the existing visual breathing room and add the device bottom inset.
+  const settingsContentPaddingBottom = 48 + safeArea.bottom
 
   // PBI-27: Check if high refresh rate is supported (Android only)
   const [isHighRefreshRateSupported, setIsHighRefreshRateSupported] = useState(false)
   const [maxRefreshRate, setMaxRefreshRate] = useState<number | null>(null)
 
   useEffect(() => {
-    if (Platform.OS !== 'android') return
+    if (Platform.OS !== 'android' || !state.developerMode) return
 
     import('../modules/expo-refresh-rate/src')
       .then((module) => {
@@ -97,51 +102,18 @@ export default function SettingsScreen() {
       .catch(() => {
         // Module not available
       })
-  }, [])
+  }, [state.developerMode])
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 48 }}>
+    <ScrollView
+      contentContainerStyle={{ padding: 24, paddingBottom: settingsContentPaddingBottom }}
+    >
       <YStack gap="$5">
         <YStack gap="$2">
           <H2>Settings</H2>
           {!hydrated && (
             <Paragraph color="$color9">Loading your saved preferences…</Paragraph>
           )}
-        </YStack>
-
-        <YStack gap="$3">
-          <Text fontSize={16} fontWeight="700">
-            Animations
-          </Text>
-          {reducedMotionEnabled ? (
-            <Paragraph color="$color10">
-              System Reduce Motion is enabled, so the game will minimize motion effects
-              even if the toggles below stay on.
-            </Paragraph>
-          ) : null}
-          <ToggleRow
-            label="All animations"
-            description="Turn this off to disable motion effects across the game."
-            value={state.animations.master}
-            onValueChange={setGlobalAnimationsEnabled}
-            disabled={!hydrated}
-          />
-
-          <Separator />
-
-          <YStack gap="$3" opacity={state.animations.master ? 1 : 0.6}>
-            {animationPreferenceDescriptors.map(({ key, label, description }) => (
-              <ToggleRow
-                key={key}
-                label={label}
-                description={description}
-                value={state.animations[key]}
-                onValueChange={(enabled) => setAnimationPreference(key, enabled)}
-                disabled={!hydrated}
-                inactive={!state.animations.master}
-              />
-            ))}
-          </YStack>
         </YStack>
 
         <YStack gap="$3">
@@ -171,7 +143,34 @@ export default function SettingsScreen() {
 
         <YStack gap="$3">
           <Text fontSize={16} fontWeight="700">
-            Game statistics
+            Appearance
+          </Text>
+          <Paragraph color="$color10">
+            Choose how the app adapts to light and dark environments.
+          </Paragraph>
+
+          <XStack gap="$2" flexWrap="wrap">
+            {themeOptions.map((option) => {
+              const isSelected = state.themeMode === option.mode
+              return (
+                <Button
+                  key={option.mode}
+                  size="$2"
+                  variant="outlined"
+                  bg={isSelected ? '$color4' : undefined}
+                  onPress={() => setThemeMode(option.mode)}
+                  disabled={!hydrated}
+                >
+                  {option.label}
+                </Button>
+              )
+            })}
+          </XStack>
+        </YStack>
+
+        <YStack gap="$3">
+          <Text fontSize={16} fontWeight="700">
+            Statistics
           </Text>
           {statisticsPreferenceDescriptors.map(({ key, label, description }) => (
             <ToggleRow
@@ -197,8 +196,49 @@ export default function SettingsScreen() {
             disabled={!hydrated}
           />
 
+          {/* Developer mode keeps motion tuning and display experiments out of the
+              everyday settings flow while still making them easy to reach. */}
+          {state.developerMode ? (
+            <>
+              <Separator my="$2" />
+              <YStack gap="$3">
+                <Text fontWeight="600">Animations</Text>
+                {reducedMotionEnabled ? (
+                  <Paragraph color="$color10">
+                    System Reduce Motion is enabled, so the game will minimize motion
+                    effects even if the toggles below stay on.
+                  </Paragraph>
+                ) : null}
+                <ToggleRow
+                  label="All animations"
+                  description="Turn this off to disable motion effects across the game."
+                  value={state.animations.master}
+                  onValueChange={setGlobalAnimationsEnabled}
+                  disabled={!hydrated}
+                />
+
+                <Separator />
+
+                <YStack gap="$3" opacity={state.animations.master ? 1 : 0.6}>
+                  {animationPreferenceDescriptors.map(({ key, label, description }) => (
+                    <ToggleRow
+                      key={key}
+                      label={label}
+                      description={description}
+                      value={state.animations[key]}
+                      onValueChange={(enabled) => setAnimationPreference(key, enabled)}
+                      disabled={!hydrated}
+                      inactive={!state.animations.master}
+                    />
+                  ))}
+                </YStack>
+              </YStack>
+            </>
+          ) : null}
+
           {/* PBI-27: Refresh rate control - Android only, devices with >60Hz support */}
-          {Platform.OS === 'android' &&
+          {state.developerMode &&
+            Platform.OS === 'android' &&
             isHighRefreshRateSupported &&
             maxRefreshRate !== null &&
             maxRefreshRate > 60 && (
@@ -240,33 +280,6 @@ export default function SettingsScreen() {
                 </YStack>
               </>
             )}
-        </YStack>
-
-        <YStack gap="$3">
-          <Text fontSize={16} fontWeight="700">
-            Appearance
-          </Text>
-          <Paragraph color="$color10">
-            Choose how the app adapts to light and dark environments.
-          </Paragraph>
-
-          <XStack gap="$2" flexWrap="wrap">
-            {themeOptions.map((option) => {
-              const isSelected = state.themeMode === option.mode
-              return (
-                <Button
-                  key={option.mode}
-                  size="$2"
-                  variant="outlined"
-                  bg={isSelected ? '$color4' : undefined}
-                  onPress={() => setThemeMode(option.mode)}
-                  disabled={!hydrated}
-                >
-                  {option.label}
-                </Button>
-              )
-            })}
-          </XStack>
         </YStack>
       </YStack>
     </ScrollView>

@@ -16,10 +16,11 @@ import {
   View,
 } from 'react-native'
 import { useNavigation } from 'expo-router'
-import { Paragraph, Separator, Sheet, Text, XStack, YStack, useTheme } from 'tamagui'
+import { Paragraph, Separator, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu } from '@tamagui/lucide-icons-2'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { AppSheet } from '../components/AppSheet'
 import {
   type HistoryEntry,
   type HistoryEntryStatus,
@@ -186,14 +187,10 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
     () => ({
       padding: 14,
       borderRadius: 16,
-      borderWidth: 1,
-      borderColor: theme.color6?.val ?? '#cbd5f5',
-      // Tamagui 2 maps CSS box shadows to the native RN 0.76+ shadow API.
-      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
-      // Keep Android elevation for pre-9 shadows and native stacking behavior.
-      elevation: 2,
+      borderWidth: 0.5,
+      borderColor: theme.color4?.val ?? '#cbd5f5',
     }),
-    [theme.color6?.val]
+    [theme.color4?.val]
   )
 
   return (
@@ -488,7 +485,7 @@ const HistoryPreviewSheet = ({
   )
 
   return (
-    <Sheet
+    <AppSheet
       modal
       open={open}
       onOpenChange={onOpenChange}
@@ -497,8 +494,8 @@ const HistoryPreviewSheet = ({
       dismissOnSnapToBottom
       transition={reducedMotionEnabled ? 'quickest' : 'medium'}
     >
-      <Sheet.Overlay bg="rgba(0,0,0,0.35)" />
-      <Sheet.Frame
+      <AppSheet.Overlay bg="rgba(0,0,0,0.35)" />
+      <AppSheet.Frame
         px="$4"
         pt="$3"
         pb={Math.max(insets.bottom, 16)}
@@ -512,7 +509,7 @@ const HistoryPreviewSheet = ({
           elevation: 6,
         }}
       >
-        <Sheet.Handle bg="$color5" />
+        <AppSheet.Handle bg="$color5" />
         {entry ? (
           <YStack gap="$3">
             <YStack gap="$1">
@@ -564,8 +561,8 @@ const HistoryPreviewSheet = ({
         ) : (
           <Paragraph color="$color10">Select a game to preview its tableau.</Paragraph>
         )}
-      </Sheet.Frame>
-    </Sheet>
+      </AppSheet.Frame>
+    </AppSheet>
   )
 }
 

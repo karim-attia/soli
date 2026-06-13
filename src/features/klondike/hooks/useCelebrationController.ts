@@ -512,6 +512,16 @@ export const useCelebrationController = ({
     return `Celebration ${padded} · ${metadata?.name ?? 'Unknown'}`
   }, [celebrationState, developerModeEnabled])
 
+  const celebrationQueuedThisRender =
+    animationsEnabled &&
+    celebrationAnimationsEnabled &&
+    !celebrationState &&
+    !pendingCelebrationActiveRef.current &&
+    state.winCelebrations > winCelebrationsRef.current
+  // The queue effect runs after paint. Treat the exact winning render as pending too,
+  // otherwise win-cleanup visuals can flash on for one frame before the effect catches up.
+  const effectiveCelebrationPending = celebrationPending || celebrationQueuedThisRender
+
   useEffect(() => {
     const currentTopCardIds = buildFoundationTopCardIds(state.foundations)
     const previousTopCardIds = previousFoundationTopCardIdsRef.current
@@ -575,7 +585,7 @@ export const useCelebrationController = ({
 
   return {
     celebrationState,
-    celebrationPending,
+    celebrationPending: effectiveCelebrationPending,
     setCelebrationState,
     celebrationBindings,
     celebrationLabel,

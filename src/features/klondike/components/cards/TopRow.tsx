@@ -1,5 +1,6 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, type PropsWithChildren } from 'react'
 import type { LayoutChangeEvent, LayoutRectangle } from 'react-native'
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated'
 import { View, XStack } from 'tamagui'
 
 import {
@@ -22,7 +23,32 @@ import { PileButton } from './PileButton'
 import { StockStack } from './StockStack'
 import { WasteFan } from './WasteFan'
 import { FoundationPile } from './FoundationPile'
-import { BOARD_COLUMN_GAP, BOARD_COLUMN_MARGIN } from '../../constants'
+import {
+  BOARD_COLUMN_GAP,
+  BOARD_COLUMN_MARGIN,
+  WIN_CLEANUP_OUTLINE_FADE_TIMING,
+} from '../../constants'
+
+const WinCleanupPile = ({
+  hidden,
+  children,
+}: PropsWithChildren<{
+  hidden: boolean
+}>) => {
+  const animatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: withTiming(hidden ? 0 : 1, WIN_CLEANUP_OUTLINE_FADE_TIMING),
+    }),
+    [hidden]
+  )
+
+  // Opacity keeps the pile and slot mounted so win cleanup cannot disturb board geometry or measurements.
+  return (
+    <Animated.View style={[animatedStyle, { pointerEvents: hidden ? 'none' : 'auto' }]}>
+      {children}
+    </Animated.View>
+  )
+}
 
 export type TopRowProps = {
   state: GameState
@@ -98,7 +124,6 @@ export const TopRow = ({
       : 'empty'
   // Task 28-2: Keep the board stable until the final winning card finishes settling.
   const showWinCleanup = state.hasWon && !celebrationPending
-  const hideEmptyOutlines = showWinCleanup
 
   const handleWastePress = useCallback(() => {
     if (interactionsLocked) {
@@ -166,36 +191,34 @@ export const TopRow = ({
         if (columnIndex === wasteColumnIndex) {
           return (
             <View key="waste" style={slotStyle}>
-              <PileButton
-                label={`${state.waste.length}`}
-                onPress={handleWastePress}
-                disabled={!state.waste.length || interactionsLocked}
-                disablePress
-                width={cardMetrics.width}
-              >
-                <View width={cardMetrics.width} items="flex-end" overflow="visible">
-                  {state.waste.length ? (
-                    <WasteFan
-                      cards={state.waste}
-                      metrics={cardMetrics}
-                      isSelected={wasteSelected}
-                      onPress={handleWastePress}
-                      invalidWiggle={invalidWiggle}
-                      cardFlights={cardFlights}
-                      layoutTrackingEnabled={!scrubbingActive}
-                      onCardMeasured={onCardMeasured}
-                      cardFlightMemory={cardFlightMemory}
-                      disabled={interactionsLocked}
-                    />
-                  ) : (
-                    <EmptySlot
-                      highlight={false}
-                      hidden={hideEmptyOutlines}
-                      metrics={cardMetrics}
-                    />
-                  )}
-                </View>
-              </PileButton>
+              <WinCleanupPile hidden={showWinCleanup}>
+                <PileButton
+                  label={`${state.waste.length}`}
+                  onPress={handleWastePress}
+                  disabled={!state.waste.length || interactionsLocked}
+                  disablePress
+                  width={cardMetrics.width}
+                >
+                  <View width={cardMetrics.width} items="flex-end" overflow="visible">
+                    {state.waste.length ? (
+                      <WasteFan
+                        cards={state.waste}
+                        metrics={cardMetrics}
+                        isSelected={wasteSelected}
+                        onPress={handleWastePress}
+                        invalidWiggle={invalidWiggle}
+                        cardFlights={cardFlights}
+                        layoutTrackingEnabled={!scrubbingActive}
+                        onCardMeasured={onCardMeasured}
+                        cardFlightMemory={cardFlightMemory}
+                        disabled={interactionsLocked}
+                      />
+                    ) : (
+                      <EmptySlot highlight={false} metrics={cardMetrics} />
+                    )}
+                  </View>
+                </PileButton>
+              </WinCleanupPile>
             </View>
           )
         }
@@ -203,7 +226,7 @@ export const TopRow = ({
         if (columnIndex === stockColumnIndex) {
           return (
             <View key="stock" style={slotStyle}>
-              {!showWinCleanup && (
+              <WinCleanupPile hidden={showWinCleanup}>
                 <PileButton
                   label={`${state.stock.length}`}
                   onPress={onDraw}
@@ -221,8 +244,6 @@ export const TopRow = ({
                       cardFlightMemory={cardFlightMemory}
                       label={state.stock.length ? drawLabel : undefined}
                     />
-                  ) : hideEmptyOutlines ? (
-                    <View width={cardMetrics.width} height={cardMetrics.height} />
                   ) : (
                     <CardBack
                       label={state.stock.length ? drawLabel : undefined}
@@ -231,7 +252,7 @@ export const TopRow = ({
                     />
                   )}
                 </PileButton>
-              )}
+              </WinCleanupPile>
             </View>
           )
         }
