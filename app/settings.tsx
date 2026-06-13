@@ -104,9 +104,6 @@ export default function SettingsScreen() {
       <YStack gap="$5">
         <YStack gap="$2">
           <H2>Settings</H2>
-          <Paragraph color="$color10">
-            Personalise Solitaire animations and appearance to match your preference.
-          </Paragraph>
           {!hydrated && (
             <Paragraph color="$color9">Loading your saved preferences…</Paragraph>
           )}
@@ -176,9 +173,6 @@ export default function SettingsScreen() {
           <Text fontSize={16} fontWeight="700">
             Game statistics
           </Text>
-          <Paragraph color="$color10">
-            Select which in-game statistics are visible while playing Klondike.
-          </Paragraph>
           {statisticsPreferenceDescriptors.map(({ key, label, description }) => (
             <ToggleRow
               key={key}
@@ -195,10 +189,6 @@ export default function SettingsScreen() {
           <Text fontSize={16} fontWeight="700">
             Advanced
           </Text>
-          <Paragraph color="$color10">
-            Developer tooling for internal builds. Toggle to reveal experimental utilities
-            in the app.
-          </Paragraph>
           <ToggleRow
             label="Developer mode"
             description="Expose internal tooling such as solver experiments and demo games."
