@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef } from 'react'
 import { AppState, type AppStateStatus } from 'react-native'
 import { useFocusEffect } from 'expo-router/react-navigation'
 
@@ -20,6 +20,10 @@ export const useKlondikeTimer = ({
   const previousMoveCountRef = useRef(state.moveCount)
   const previousAutoCompletingRef = useRef(state.isAutoCompleting)
 
+  const dispatchTimerTick = useEffectEvent(() => {
+    dispatch({ type: 'TIMER_TICK', timestamp: Date.now() })
+  })
+
   const pauseTimer = useCallback(() => {
     const snapshot = stateRef.current
     if (snapshot.timerState === 'running') {
@@ -38,6 +42,14 @@ export const useKlondikeTimer = ({
       dispatch({ type: 'TIMER_START', startedAt: Date.now() })
     }
   }, [dispatch, stateRef])
+
+  const handleAppStateChange = useEffectEvent((nextState: AppStateStatus) => {
+    if (nextState === 'active') {
+      resumeTimerIfNeeded()
+    } else if (nextState === 'inactive' || nextState === 'background') {
+      pauseTimer()
+    }
+  })
 
   useFocusEffect(
     useCallback(() => {
@@ -90,10 +102,9 @@ export const useKlondikeTimer = ({
     }
 
     if (!timerIntervalRef.current) {
-      timerIntervalRef.current = setInterval(() => {
-        dispatch({ type: 'TIMER_TICK', timestamp: Date.now() })
-      }, TIMER_TICK_INTERVAL_MS)
-      dispatch({ type: 'TIMER_TICK', timestamp: Date.now() })
+      // Effect Events keep the timer callback current without recreating the interval.
+      timerIntervalRef.current = setInterval(dispatchTimerTick, TIMER_TICK_INTERVAL_MS)
+      dispatchTimerTick()
     }
 
     return () => {
@@ -102,7 +113,7 @@ export const useKlondikeTimer = ({
         timerIntervalRef.current = null
       }
     }
-  }, [dispatch, state.timerState])
+  }, [state.timerState])
 
   useEffect(() => {
     return () => {
@@ -114,20 +125,13 @@ export const useKlondikeTimer = ({
   }, [])
 
   useEffect(() => {
-    const handleAppStateChange = (nextState: AppStateStatus) => {
-      if (nextState === 'active') {
-        resumeTimerIfNeeded()
-      } else if (nextState === 'inactive' || nextState === 'background') {
-        pauseTimer()
-      }
-    }
-
+    // Effect Events let this native listener observe latest timer helpers without resubscribing.
     const subscription = AppState.addEventListener('change', handleAppStateChange)
 
     return () => {
       subscription.remove()
     }
-  }, [pauseTimer, resumeTimerIfNeeded])
+  }, [])
 
   return { pauseTimer, resumeTimerIfNeeded }
 }
