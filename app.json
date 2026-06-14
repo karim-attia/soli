@@ -8,11 +8,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "soli",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/images/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0b8b3c"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -86,7 +81,15 @@
           "resizeMode": "contain"
         }
       ],
-      "expo-build-properties"
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.4"
+          }
+        }
+      ],
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true

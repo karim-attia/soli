@@ -4,7 +4,7 @@ import {
   type NavigationProp,
   type ParamListBase,
   useNavigation,
-} from '@react-navigation/native'
+} from 'expo-router/react-navigation'
 
 type AnyNavigation = NavigationProp<ParamListBase>
 

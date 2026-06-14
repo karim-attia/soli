@@ -1,6 +1,6 @@
 import { useLayoutEffect } from 'react'
 import { Platform } from 'react-native'
-import { HeaderButton } from '@react-navigation/elements'
+import { HeaderButton } from 'expo-router/react-navigation'
 import { useNavigation } from 'expo-router'
 import { Button, Text, XStack } from 'tamagui'
 import { Menu } from '@tamagui/lucide-icons-2'

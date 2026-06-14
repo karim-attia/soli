@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { AppState, type AppStateStatus } from 'react-native'
-import { useFocusEffect } from '@react-navigation/native'
+import { useFocusEffect } from 'expo-router/react-navigation'
 
 import type { GameAction, GameState } from '../../../solitaire/klondike'
 import { TIMER_TICK_INTERVAL_MS } from '../../../utils/time'

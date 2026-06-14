@@ -17,6 +17,10 @@ import { Menu } from '@tamagui/lucide-icons-2'
 
 import { DrawCountSelector } from '../components/settings/DrawCountSelector'
 import {
+  getMaxRefreshRate,
+  isHighRefreshRateSupported as checkHighRefreshRateSupport,
+} from '../modules/expo-refresh-rate/src'
+import {
   animationPreferenceDescriptors,
   type RefreshRateMode,
   type ThemeMode,
@@ -94,14 +98,11 @@ export default function SettingsScreen() {
   useEffect(() => {
     if (Platform.OS !== 'android' || !state.developerMode) return
 
-    import('../modules/expo-refresh-rate/src')
-      .then((module) => {
-        setIsHighRefreshRateSupported(module.isHighRefreshRateSupported())
-        setMaxRefreshRate(module.getMaxRefreshRate())
-      })
-      .catch(() => {
-        // Module not available
-      })
+    // SDK 56 native Metro redboxes on this local module when it is loaded through
+    // dynamic import on non-Android paths. The module itself owns safe fallbacks, so a
+    // static import plus platform guard keeps the setting predictable.
+    setIsHighRefreshRateSupported(checkHighRefreshRateSupport())
+    setMaxRefreshRate(getMaxRefreshRate())
   }, [state.developerMode])
 
   return (

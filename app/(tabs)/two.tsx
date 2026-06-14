@@ -1496,7 +1496,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   solverOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(9, 14, 22, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',

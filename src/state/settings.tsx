@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { AccessibilityInfo } from 'react-native'
+import { AccessibilityInfo, Platform } from 'react-native'
 import {
   createContext,
   useCallback,
@@ -16,6 +16,7 @@ import {
   type DrawCount,
 } from '../solitaire/drawCount'
 import { devLog, setDeveloperLoggingEnabled } from '../utils/devLogger'
+import { setRefreshRateMode as applyRefreshRateMode } from '../../modules/expo-refresh-rate/src'
 
 export type ThemeMode = 'auto' | 'light' | 'dark'
 
@@ -345,18 +346,13 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
 
   // PBI-27: Apply refresh rate preference when it changes or on startup
   useEffect(() => {
-    if (!hydrated) return
+    if (!hydrated || Platform.OS !== 'android') return
 
-    // Dynamic import to avoid bundling issues on iOS/web
-    import('../../modules/expo-refresh-rate/src')
-      .then(({ setRefreshRateMode: applyRefreshRate }) => {
-        applyRefreshRate(state.refreshRateMode).catch(() => {
-          // Silently ignore errors - refresh rate is a hint, not critical
-        })
-      })
-      .catch(() => {
-        // Module not available on this platform
-      })
+    // Refresh rate is an Android-only hint. Keep non-Android providers from touching
+    // the local native module so dev-client reloads do not depend on optional module IDs.
+    applyRefreshRateMode(state.refreshRateMode).catch(() => {
+      // Silently ignore errors - refresh rate is a hint, not critical
+    })
   }, [hydrated, state.refreshRateMode])
 
   const value = useMemo<SettingsContextValue>(
