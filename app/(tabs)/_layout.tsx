@@ -1,18 +1,12 @@
 import { Drawer } from 'expo-router/drawer'
 import { useTheme } from 'tamagui'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Atom, AudioWaveform, Clock, Settings, Smile } from '@tamagui/lucide-icons-2'
-
-import { useSettings } from '../../src/state/settings'
+import { Atom, Clock, Settings, Smile } from '@tamagui/lucide-icons-2'
 
 export default function DrawerLayout() {
   const theme = useTheme()
   const insets = useSafeAreaInsets()
   const headerRightPadding = 16
-  const {
-    state: { developerMode },
-  } = useSettings()
-  const developerModeEnabled = developerMode
 
   return (
     <Drawer
@@ -42,17 +36,6 @@ export default function DrawerLayout() {
           headerTitle: 'Soli',
           drawerLabel: 'Play',
           drawerIcon: ({ color, size }) => <Atom color={color as any} size={size} />,
-        }}
-      />
-      <Drawer.Screen
-        name="two"
-        options={{
-          title: 'Solver Lab',
-          drawerLabel: 'Solver Lab',
-          drawerIcon: ({ color, size }) => (
-            <AudioWaveform color={color as any} size={size} />
-          ),
-          drawerItemStyle: developerModeEnabled ? undefined : { display: 'none' },
         }}
       />
       <Drawer.Screen

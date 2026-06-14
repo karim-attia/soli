@@ -191,7 +191,7 @@ export default function SettingsScreen() {
           </Text>
           <ToggleRow
             label="Developer mode"
-            description="Expose internal tooling such as solver experiments and demo games."
+            description="Expose internal tools such as demo games and motion or display tuning."
             value={state.developerMode}
             onValueChange={setDeveloperMode}
             disabled={!hydrated}
