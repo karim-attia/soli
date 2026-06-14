@@ -31,6 +31,7 @@
     "prebuild": "npx expo prebuild --platform android --clean"
   },
   "dependencies": {
+    "@expo/ui": "~56.0.17",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@tamagui/colors": "2.2.0",
     "@tamagui/config": "2.2.0",

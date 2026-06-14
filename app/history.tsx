@@ -1,24 +1,8 @@
-import {
-  Dispatch,
-  SetStateAction,
-  memo,
-  useCallback,
-  useLayoutEffect,
-  useMemo,
-  useState,
-} from 'react'
-import {
-  Dimensions,
-  FlatList,
-  LayoutChangeEvent,
-  Pressable,
-  StyleSheet,
-  View,
-} from 'react-native'
+import { memo, useLayoutEffect, useMemo, useState } from 'react'
+import { FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { useNavigation } from 'expo-router'
 import { Paragraph, Separator, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu } from '@tamagui/lucide-icons-2'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AppSheet } from '../components/AppSheet'
 import {
@@ -28,19 +12,15 @@ import {
   type HistoryPreviewColumn,
   useHistory,
 } from '../src/state/history'
-import { useReducedMotionPreference } from '../src/state/settings'
 import { devLog } from '../src/utils/devLogger'
 import { formatElapsedDuration } from '../src/utils/time'
 import { useDrawerOpener } from '../src/navigation/useDrawerOpener'
-
-const DEFAULT_SHEET_SNAP_POINTS = [65]
 
 // PBI-17: Memoize to prevent re-renders during navigation
 function HistoryScreen() {
   const navigation = useNavigation()
   const openDrawer = useDrawerOpener()
   const { entries, solvedCount, hydrated } = useHistory()
-  const reducedMotionEnabled = useReducedMotionPreference()
   const totalEntries = entries.length
   // Task 10-6: Count incomplete entries (not solved and not active)
   const incompleteCount = useMemo(
@@ -48,33 +28,6 @@ function HistoryScreen() {
     [entries]
   )
   const [selectedEntry, setSelectedEntry] = useState<HistoryEntry | null>(null)
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [sheetSnapPoints, setSheetSnapPoints] = useState<number[]>([
-    ...DEFAULT_SHEET_SNAP_POINTS,
-  ])
-
-  const handleEntryPress = useCallback((entry: HistoryEntry) => {
-    setSelectedEntry(entry)
-    setSheetSnapPoints([...DEFAULT_SHEET_SNAP_POINTS])
-    setSheetOpen(true)
-  }, [])
-
-  const handleSheetOpenChange = useCallback(
-    (nextOpen: boolean) => {
-      setSheetOpen(nextOpen)
-      if (!nextOpen) {
-        if (reducedMotionEnabled) {
-          setSelectedEntry(null)
-          return
-        }
-        // Allow sheet close animation to finish before clearing state only when motion is enabled.
-        setTimeout(() => {
-          setSelectedEntry(null)
-        }, 240)
-      }
-    },
-    [reducedMotionEnabled]
-  )
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -117,20 +70,18 @@ function HistoryScreen() {
           <EmptyHistory hydrated={hydrated} paddingHorizontal={24} paddingVertical={48} />
         }
         renderItem={({ item }) => (
-          <HistoryListItem entry={item} onPress={() => handleEntryPress(item)} />
+          <HistoryListItem entry={item} onPress={() => setSelectedEntry(item)} />
         )}
         ItemSeparatorComponent={ListSpacer}
         contentContainerStyle={{ paddingBottom: 64 }}
       />
 
-      <HistoryPreviewSheet
-        entry={selectedEntry}
-        open={sheetOpen}
-        onOpenChange={handleSheetOpenChange}
-        reducedMotionEnabled={reducedMotionEnabled}
-        snapPoints={sheetSnapPoints}
-        onSnapPointsChange={setSheetSnapPoints}
-      />
+      {selectedEntry ? (
+        <HistoryPreviewSheet
+          entry={selectedEntry}
+          onDismiss={() => setSelectedEntry(null)}
+        />
+      ) : null}
     </>
   )
 }
@@ -401,12 +352,8 @@ const HistoryStatTile = ({ stat }: { stat: HistoryStat }) => {
 }
 
 type HistoryPreviewSheetProps = {
-  entry: HistoryEntry | null
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  reducedMotionEnabled?: boolean
-  snapPoints: number[]
-  onSnapPointsChange: Dispatch<SetStateAction<number[]>>
+  entry: HistoryEntry
+  onDismiss: () => void
 }
 
 const PREVIEW_TABLEAU_COLUMN_COUNT = 7
@@ -441,127 +388,57 @@ const PREVIEW_SUIT_COLORS: Record<HistoryPreviewCard['suit'], string> = {
   hearts: '#c92a2a',
 }
 
-const HistoryPreviewSheet = ({
-  entry,
-  open,
-  onOpenChange,
-  reducedMotionEnabled = false,
-  snapPoints,
-  onSnapPointsChange,
-}: HistoryPreviewSheetProps) => {
-  const insets = useSafeAreaInsets()
-  const [boardWidth, setBoardWidth] = useState<number | null>(null)
-
-  const metrics = useMemo(() => computePreviewMetrics(boardWidth), [boardWidth])
-
-  const handleBoardLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const { width, height } = event.nativeEvent.layout
-      setBoardWidth((previous) => (previous === width ? previous : width))
-
-      const windowHeight = Dimensions.get('window').height
-      if (windowHeight <= 0) {
-        return
-      }
-
-      const HEADER_BUFFER = 160
-      const verticalPadding = insets.bottom + HEADER_BUFFER
-      const desiredHeight = height + verticalPadding
-      const top = Math.min(99.5, Math.max(40, (desiredHeight / windowHeight) * 100))
-      const sortedPoints = [top]
-
-      onSnapPointsChange((previous) => {
-        if (
-          Array.isArray(previous) &&
-          previous.length === sortedPoints.length &&
-          previous.every((value, index) => Math.abs(value - sortedPoints[index]) < 0.5)
-        ) {
-          return previous
-        }
-        return sortedPoints
-      })
-    },
-    [insets.bottom, onSnapPointsChange]
-  )
+const HistoryPreviewSheet = ({ entry, onDismiss }: HistoryPreviewSheetProps) => {
+  const { width } = useWindowDimensions()
+  // Expo's universal sheet supplies 16 dp/pt/px of horizontal content padding per side.
+  const contentWidth = Math.max(1, width - 32)
+  const metrics = useMemo(() => computePreviewMetrics(contentWidth), [contentWidth])
 
   return (
-    <AppSheet
-      modal
-      open={open}
-      onOpenChange={onOpenChange}
-      snapPointsMode="percent"
-      snapPoints={snapPoints}
-      dismissOnSnapToBottom
-      transition={reducedMotionEnabled ? 'quickest' : 'medium'}
-    >
-      <AppSheet.Overlay bg="rgba(0,0,0,0.35)" />
-      <AppSheet.Frame
-        px="$4"
-        pt="$3"
-        pb={Math.max(insets.bottom, 16)}
-        background="$background"
-        gap="$4"
-        borderTopLeftRadius="$6"
-        borderTopRightRadius="$6"
-        style={{
-          boxShadow: '0 0 12px rgba(0, 0, 0, 0.2)',
-          // Elevation remains necessary for older Android shadow/z-order behavior.
-          elevation: 6,
-        }}
-      >
-        <AppSheet.Handle bg="$color5" />
-        {entry ? (
-          <YStack gap="$3">
-            <YStack gap="$1">
-              <Text fontSize={16} fontWeight="700">
-                {entry.displayName}
-              </Text>
-              <Paragraph color="$color10">
-                {entry.status === 'solved' && entry.finishedAt
-                  ? `Finished ${formatFinishedAt(entry.finishedAt)}`
-                  : `Started ${formatFinishedAt(entry.startedAt)}`}{' '}
-                · {STATUS_DISPLAY[entry.status]?.label ?? 'Unknown'}
-              </Paragraph>
-            </YStack>
-            <XStack gap="$2" flexWrap="wrap">
-              <Badge label={`Draw ${entry.drawCount}`} tone="neutral" />
-              {entry.solvable ? (
-                <Badge
-                  label={
-                    entry.drawCount === entry.solvableForDrawCount
-                      ? `Solvable for Draw ${entry.drawCount}`
-                      : `Draw ${entry.solvableForDrawCount ?? 1}-solvable deal`
-                  }
-                  tone="info"
-                />
-              ) : null}
-              {typeof entry.moves === 'number' && entry.moves >= 0 ? (
-                <Badge
-                  label={`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`}
-                  tone="neutral"
-                />
-              ) : null}
-              {typeof entry.durationMs === 'number' && entry.durationMs >= 0 ? (
-                <Badge label={formatElapsedDuration(entry.durationMs)} tone="info" />
-              ) : null}
-            </XStack>
+    <AppSheet isPresented onDismiss={onDismiss}>
+      <YStack gap="$3" width={contentWidth}>
+        <YStack gap="$1">
+          <Text fontSize={16} fontWeight="700">
+            {entry.displayName}
+          </Text>
+          <Paragraph color="$color10">
+            {entry.status === 'solved' && entry.finishedAt
+              ? `Finished ${formatFinishedAt(entry.finishedAt)}`
+              : `Started ${formatFinishedAt(entry.startedAt)}`}{' '}
+            · {STATUS_DISPLAY[entry.status]?.label ?? 'Unknown'}
+          </Paragraph>
+        </YStack>
+        <XStack gap="$2" flexWrap="wrap">
+          <Badge label={`Draw ${entry.drawCount}`} tone="neutral" />
+          {entry.solvable ? (
+            <Badge
+              label={
+                entry.drawCount === entry.solvableForDrawCount
+                  ? `Solvable for Draw ${entry.drawCount}`
+                  : `Draw ${entry.solvableForDrawCount ?? 1}-solvable deal`
+              }
+              tone="info"
+            />
+          ) : null}
+          {typeof entry.moves === 'number' && entry.moves >= 0 ? (
+            <Badge
+              label={`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`}
+              tone="neutral"
+            />
+          ) : null}
+          {typeof entry.durationMs === 'number' && entry.durationMs >= 0 ? (
+            <Badge label={formatElapsedDuration(entry.durationMs)} tone="info" />
+          ) : null}
+        </XStack>
 
-            <View
-              style={previewStyles.boardShell}
-              onLayout={handleBoardLayout}
-              pointerEvents="none"
-            >
-              <View style={previewStyles.tableauRow}>
-                {entry.preview.tableau.map((column, index) => (
-                  <PreviewColumn key={`col-${index}`} column={column} metrics={metrics} />
-                ))}
-              </View>
-            </View>
-          </YStack>
-        ) : (
-          <Paragraph color="$color10">Select a game to preview its tableau.</Paragraph>
-        )}
-      </AppSheet.Frame>
+        <View style={previewStyles.boardShell} pointerEvents="none">
+          <View style={previewStyles.tableauRow}>
+            {entry.preview.tableau.map((column, index) => (
+              <PreviewColumn key={`col-${index}`} column={column} metrics={metrics} />
+            ))}
+          </View>
+        </View>
+      </YStack>
     </AppSheet>
   )
 }

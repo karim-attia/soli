@@ -2136,7 +2136,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@expo/ui@npm:^56.0.17":
+"@expo/ui@npm:^56.0.17, @expo/ui@npm:~56.0.17":
   version: 56.0.17
   resolution: "@expo/ui@npm:56.0.17"
   dependencies:
@@ -12456,6 +12456,7 @@ __metadata:
   dependencies:
     "@babel/core": "npm:^7.29.0"
     "@expo/metro-runtime": "npm:~56.0.15"
+    "@expo/ui": "npm:~56.0.17"
     "@react-native-async-storage/async-storage": "npm:^2.2.0"
     "@react-native/jest-preset": "npm:0.85.3"
     "@tamagui/babel-plugin": "npm:2.2.0"
