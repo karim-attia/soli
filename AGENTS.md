@@ -24,7 +24,6 @@ Add all prompts from the chat 1:1 in here.
 - ## Possible approaches incl. pros and cons
 - ## Open questions to the user incl. recommendations (if any)
 - ## New dependencies
-Follow @external-packages.mdc for new dependencies.
 - ## UX/UI Considerations
 - ## Components -> Which components to reuse, which components to create?
 - ## How to fetch data, how to cache
