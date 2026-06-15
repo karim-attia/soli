@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { AccessibilityInfo, Platform } from 'react-native'
 import {
   createContext,
   useCallback,
@@ -16,12 +15,8 @@ import {
   type DrawCount,
 } from '../solitaire/drawCount'
 import { devLog, setDeveloperLoggingEnabled } from '../utils/devLogger'
-import { setRefreshRateMode as applyRefreshRateMode } from '../../modules/expo-refresh-rate/src'
 
 export type ThemeMode = 'auto' | 'light' | 'dark'
-
-// PBI-27: Android High Refresh Rate Control
-export type RefreshRateMode = 'auto' | 'high'
 
 type AnimationPreferences = {
   master: boolean
@@ -51,13 +46,11 @@ export type SettingsState = {
   autoUpEnabled: boolean
   developerMode: boolean
   statistics: StatisticsPreferences
-  refreshRateMode: RefreshRateMode // PBI-27
 }
 
 type SettingsContextValue = {
   state: SettingsState
   hydrated: boolean
-  reducedMotionEnabled: boolean
   setThemeMode: (mode: ThemeMode) => void
   setDrawCount: (drawCount: DrawCount) => void
   setGlobalAnimationsEnabled: (enabled: boolean) => void
@@ -67,7 +60,6 @@ type SettingsContextValue = {
   setAutoUpEnabled: (enabled: boolean) => void
   setDeveloperMode: (enabled: boolean) => void
   setStatisticsPreference: (key: StatisticsPreferenceKey, enabled: boolean) => void
-  setRefreshRateMode: (mode: RefreshRateMode) => void // PBI-27
 }
 
 const STORAGE_KEY = '@soli/settings/v1'
@@ -92,7 +84,6 @@ const DEFAULT_SETTINGS: SettingsState = {
     showMoves: true,
     showTime: true,
   },
-  refreshRateMode: 'high', // PBI-27: Default to max refresh rate for smooth animations
 }
 
 export const animationPreferenceDescriptors: Array<{
@@ -154,7 +145,6 @@ const SettingsContext = createContext<SettingsContextValue | undefined>(undefine
 export const SettingsProvider = ({ children }: PropsWithChildren) => {
   const [state, setState] = useState<SettingsState>(DEFAULT_SETTINGS)
   const [hydrated, setHydrated] = useState(false)
-  const [reducedMotionEnabled, setReducedMotionEnabled] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -177,37 +167,6 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
 
     return () => {
       cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    // Keep our motion policy aligned with the OS accessibility setting instead of
-    // relying only on in-app toggles. The provider owns this subscription so card-level
-    // animation hooks can read the value cheaply without adding one OS listener per card.
-    void AccessibilityInfo.isReduceMotionEnabled()
-      .then((enabled) => {
-        if (!cancelled) {
-          setReducedMotionEnabled(enabled)
-        }
-      })
-      .catch(() => {
-        // If the query fails on a platform/runtime, fall back to the persisted app setting only.
-      })
-
-    const subscription = AccessibilityInfo.addEventListener(
-      'reduceMotionChanged',
-      (enabled) => {
-        if (!cancelled) {
-          setReducedMotionEnabled(enabled)
-        }
-      }
-    )
-
-    return () => {
-      cancelled = true
-      subscription.remove()
     }
   }, [])
 
@@ -331,35 +290,14 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     []
   )
 
-  // PBI-27: Refresh rate mode setter
-  const setRefreshRateMode = useCallback((mode: RefreshRateMode) => {
-    setState((previous) =>
-      previous.refreshRateMode === mode
-        ? previous
-        : { ...previous, refreshRateMode: mode }
-    )
-  }, [])
-
   useEffect(() => {
     setDeveloperLoggingEnabled(hydrated ? state.developerMode : false)
   }, [hydrated, state.developerMode])
-
-  // PBI-27: Apply refresh rate preference when it changes or on startup
-  useEffect(() => {
-    if (!hydrated || Platform.OS !== 'android') return
-
-    // Refresh rate is an Android-only hint. Keep non-Android providers from touching
-    // the local native module so dev-client reloads do not depend on optional module IDs.
-    applyRefreshRateMode(state.refreshRateMode).catch(() => {
-      // Silently ignore errors - refresh rate is a hint, not critical
-    })
-  }, [hydrated, state.refreshRateMode])
 
   const value = useMemo<SettingsContextValue>(
     () => ({
       state,
       hydrated,
-      reducedMotionEnabled,
       setThemeMode,
       setDrawCount,
       setGlobalAnimationsEnabled,
@@ -369,11 +307,9 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setAutoUpEnabled,
       setDeveloperMode,
       setStatisticsPreference,
-      setRefreshRateMode,
     }),
     [
       hydrated,
-      reducedMotionEnabled,
       setAnimationPreference,
       setGlobalAnimationsEnabled,
       setStatisticsPreference,
@@ -383,7 +319,6 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setDrawCount,
       setThemeMode,
       setDeveloperMode,
-      setRefreshRateMode,
       state,
     ]
   )
@@ -399,19 +334,13 @@ export function useSettings(): SettingsContextValue {
   return context
 }
 
-export function useReducedMotionPreference(): boolean {
-  const { reducedMotionEnabled } = useSettings()
-  return reducedMotionEnabled
-}
-
 export function useAnimationToggles(): AnimationPreferences {
   const {
     state: { animations },
   } = useSettings()
-  const reducedMotionEnabled = useReducedMotionPreference()
 
   return useMemo(() => {
-    if (!animations.master || reducedMotionEnabled) {
+    if (!animations.master) {
       return {
         ...animations,
         cardFlights: false,
@@ -424,7 +353,7 @@ export function useAnimationToggles(): AnimationPreferences {
     }
 
     return animations
-  }, [animations, reducedMotionEnabled])
+  }, [animations])
 }
 
 export function useStatisticsPreferences(): StatisticsPreferences {
@@ -472,14 +401,8 @@ const mergeSettings = (
       showMoves: getBoolean(statistics.showMoves, current.statistics.showMoves),
       showTime: getBoolean(statistics.showTime, current.statistics.showTime),
     },
-    refreshRateMode: isRefreshRateMode(incoming.refreshRateMode)
-      ? incoming.refreshRateMode
-      : current.refreshRateMode,
   }
 }
-
-const isRefreshRateMode = (value: unknown): value is RefreshRateMode =>
-  value === 'auto' || value === 'high'
 
 const getBoolean = (value: unknown, fallback: boolean): boolean =>
   typeof value === 'boolean' ? value : fallback

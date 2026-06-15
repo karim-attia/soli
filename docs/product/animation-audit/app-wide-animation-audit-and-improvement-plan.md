@@ -1,5 +1,11 @@
 # Animation Audit App-Wide Animation Audit and Improvement Plan
 
+> Follow-up note (2026-06-15): the custom app-wide system reduced-motion policy added
+> during this audit was later removed by product decision. Soli now uses its in-app
+> animation toggles instead of globally suppressing motion from the OS/browser preference.
+> See
+> `docs/product/refresh-rate-setting-removal/remove-refresh-rate-setting.md`.
+
 ## Description
 
 Audit the entire animation surface area in the app, compare the current implementation against current React Native / Reanimated / Gesture Handler guidance, and propose concrete improvements for performance, code simplicity, layering correctness, accessibility, and maintainability.

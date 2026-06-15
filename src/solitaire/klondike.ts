@@ -557,7 +557,7 @@ export const getDropHints = (state: GameState): DropHints => {
   return { tableau: tableauHints, foundations: foundationHints }
 }
 
-export const findAutoMoveTarget = (
+const findAutoMoveTarget = (
   state: GameState,
   selection: Selection
 ): MoveTarget | null => {

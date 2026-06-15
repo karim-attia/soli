@@ -145,7 +145,6 @@ Cross-platform card rendering now uses a single custom font family derived from 
 
 - Configurable settings experience (draw mode, solvable games, statistics visibility, etc.)
 - Developer mode with demo game functionality, devLog, and celebration debug labels
-- Android high refresh rate control
 
 ### App Identity
 

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useEffect, useState } from 'react'
+import { useLayoutEffect } from 'react'
 import { Platform, Pressable, ScrollView } from 'react-native'
 import { useNavigation } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -17,14 +17,8 @@ import { Menu } from '@tamagui/lucide-icons-2'
 
 import { DrawCountSelector } from '../components/settings/DrawCountSelector'
 import {
-  getMaxRefreshRate,
-  isHighRefreshRateSupported as checkHighRefreshRateSupport,
-} from '../modules/expo-refresh-rate/src'
-import {
   animationPreferenceDescriptors,
-  type RefreshRateMode,
   type ThemeMode,
-  useReducedMotionPreference,
   useSettings,
   statisticsPreferenceDescriptors,
 } from '../src/state/settings'
@@ -34,24 +28,6 @@ const themeOptions: Array<{ mode: ThemeMode; label: string }> = [
   { mode: 'auto', label: 'Auto' },
   { mode: 'light', label: 'Light' },
   { mode: 'dark', label: 'Dark' },
-]
-
-// PBI-27: Refresh rate mode options
-const refreshRateOptions: Array<{
-  mode: RefreshRateMode
-  label: string
-  description: string
-}> = [
-  {
-    mode: 'high',
-    label: 'High',
-    description: 'Use maximum refresh rate for smoothest animations',
-  },
-  {
-    mode: 'auto',
-    label: 'Auto',
-    description: 'Let Android decide based on content and battery',
-  },
 ]
 
 export default function SettingsScreen() {
@@ -84,26 +60,10 @@ export default function SettingsScreen() {
     setAutoUpEnabled,
     setDeveloperMode,
     setStatisticsPreference,
-    setRefreshRateMode,
   } = useSettings()
-  const reducedMotionEnabled = useReducedMotionPreference()
   // Android edge-to-edge can place scroll content behind the system dock, so keep
   // the existing visual breathing room and add the device bottom inset.
   const settingsContentPaddingBottom = 48 + safeArea.bottom
-
-  // PBI-27: Check if high refresh rate is supported (Android only)
-  const [isHighRefreshRateSupported, setIsHighRefreshRateSupported] = useState(false)
-  const [maxRefreshRate, setMaxRefreshRate] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (Platform.OS !== 'android' || !state.developerMode) return
-
-    // SDK 56 native Metro redboxes on this local module when it is loaded through
-    // dynamic import on non-Android paths. The module itself owns safe fallbacks, so a
-    // static import plus platform guard keeps the setting predictable.
-    setIsHighRefreshRateSupported(checkHighRefreshRateSupport())
-    setMaxRefreshRate(getMaxRefreshRate())
-  }, [state.developerMode])
 
   return (
     <ScrollView
@@ -191,25 +151,19 @@ export default function SettingsScreen() {
           </Text>
           <ToggleRow
             label="Developer mode"
-            description="Expose internal tools such as demo games and motion or display tuning."
+            description="Expose internal tools such as demo games and motion tuning."
             value={state.developerMode}
             onValueChange={setDeveloperMode}
             disabled={!hydrated}
           />
 
-          {/* Developer mode keeps motion tuning and display experiments out of the
-              everyday settings flow while still making them easy to reach. */}
+          {/* Developer mode keeps motion tuning out of the everyday settings flow while
+              still making it easy to reach. */}
           {state.developerMode ? (
             <>
               <Separator my="$2" />
               <YStack gap="$3">
                 <Text fontWeight="600">Animations</Text>
-                {reducedMotionEnabled ? (
-                  <Paragraph color="$color10">
-                    System Reduce Motion is enabled, so the game will minimize motion
-                    effects even if the toggles below stay on.
-                  </Paragraph>
-                ) : null}
                 <ToggleRow
                   label="All animations"
                   description="Turn this off to disable motion effects across the game."
@@ -236,51 +190,6 @@ export default function SettingsScreen() {
               </YStack>
             </>
           ) : null}
-
-          {/* PBI-27: Refresh rate control - Android only, devices with >60Hz support */}
-          {state.developerMode &&
-            Platform.OS === 'android' &&
-            isHighRefreshRateSupported &&
-            maxRefreshRate !== null &&
-            maxRefreshRate > 60 && (
-              <>
-                <Separator my="$2" />
-                <YStack gap="$2">
-                  <Text fontWeight="600">Display refresh rate</Text>
-                  <Paragraph color="$color10">
-                    Higher refresh rates provide smoother animations but use more battery.
-                    {maxRefreshRate
-                      ? ` Your display supports up to ${Math.round(maxRefreshRate)}Hz.`
-                      : ''}
-                  </Paragraph>
-                  <XStack gap="$2" flexWrap="wrap" mt="$1">
-                    {refreshRateOptions.map((option) => {
-                      const isSelected = state.refreshRateMode === option.mode
-                      return (
-                        <Button
-                          key={option.mode}
-                          size="$2"
-                          variant="outlined"
-                          bg={isSelected ? '$color4' : undefined}
-                          onPress={() => setRefreshRateMode(option.mode)}
-                          disabled={!hydrated}
-                        >
-                          {option.mode === 'high' && maxRefreshRate
-                            ? `High (${Math.round(maxRefreshRate)}Hz)`
-                            : option.label}
-                        </Button>
-                      )
-                    })}
-                  </XStack>
-                  <Paragraph color="$color9" fontSize={12}>
-                    {
-                      refreshRateOptions.find((o) => o.mode === state.refreshRateMode)
-                        ?.description
-                    }
-                  </Paragraph>
-                </YStack>
-              </>
-            )}
         </YStack>
       </YStack>
     </ScrollView>

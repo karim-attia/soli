@@ -2,6 +2,12 @@
 
 [View in Backlog](../backlog.md#user-content-27)
 
+> **Retired on 2026-06-14.** This document describes the historical experiment. Android
+> treats these APIs as display-scheduler preferences and restricts refresh rate to 60 Hz
+> or below in Battery Saver, so the setting could not achieve its force-120-Hz goal. The
+> UI, persisted state, startup effect, and native module were removed. See
+> [the removal plan](../../product/refresh-rate-setting-removal/remove-refresh-rate-setting.md).
+
 ## Overview
 
 This PBI adds the ability to control the Android display refresh rate from within the app, allowing users to force high refresh rates (120Hz) for smoother animations or let the system decide automatically.
@@ -87,5 +93,4 @@ While Android supports per-View frame rate voting for adaptive refresh rates dur
 ## Related Tasks
 
 See [tasks.md](./tasks.md) for the implementation breakdown.
-
 

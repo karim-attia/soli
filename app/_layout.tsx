@@ -8,7 +8,7 @@ import { useFonts } from 'expo-font'
 import { SplashScreen, Stack } from 'expo-router'
 import { Provider } from 'components/Provider'
 import { useTheme } from 'tamagui'
-import { useReducedMotionPreference, useSettings } from '../src/state/settings'
+import { useSettings } from '../src/state/settings'
 import { isDarkTheme, resolveThemeName } from '../src/theme'
 
 export {
@@ -54,7 +54,6 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme()
-  const reducedMotionEnabled = useReducedMotionPreference()
   const {
     state: { themeMode },
   } = useSettings()
@@ -77,7 +76,7 @@ function RootLayoutNav() {
           options={{
             title: 'Tamagui + Expo',
             presentation: 'modal',
-            animation: reducedMotionEnabled ? 'none' : 'slide_from_right',
+            animation: 'slide_from_right',
             gestureEnabled: true,
             gestureDirection: 'horizontal',
             contentStyle: {
@@ -90,7 +89,6 @@ function RootLayoutNav() {
           name="settings"
           options={{
             title: 'Settings',
-            animation: reducedMotionEnabled ? 'none' : undefined,
             contentStyle: {
               backgroundColor: theme.background?.val,
             },
@@ -101,7 +99,6 @@ function RootLayoutNav() {
           name="history"
           options={{
             title: 'History',
-            animation: reducedMotionEnabled ? 'none' : undefined,
             contentStyle: {
               backgroundColor: theme.background?.val,
             },

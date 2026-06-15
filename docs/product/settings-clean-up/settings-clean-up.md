@@ -1,5 +1,12 @@
 # Settings Clean Up Settings clean up
 
+> Historical note (2026-06-14): the refresh-rate experiment referenced in this plan was
+> later removed because Android Battery Saver can cap the display at 60 Hz regardless of
+> app preferences. See
+> `docs/product/refresh-rate-setting-removal/remove-refresh-rate-setting.md`.
+> The custom system reduced-motion integration referenced below was also removed by the
+> same follow-up decision; animation behavior is now controlled by the in-app toggles.
+
 ## User prompt
 
 ```text
