@@ -1,7 +1,25 @@
 {
-  "extends": "./tsconfig.base",
+  "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "allowJs": false,
+    "importHelpers": true,
+    "incremental": true,
+    "noImplicitAny": false,
+    "noImplicitReturns": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "paths": {
+      "*": ["./*"]
+    },
+    "preserveConstEnums": true,
+    "removeComments": false,
+    "rootDir": ".",
+    "strict": true,
+    "strictNullChecks": true,
+    "target": "es2020",
+    "types": ["node", "jest"],
+    "useUnknownInCatchVariables": false
   },
+  "exclude": ["_", "node_modules", "dist", "build"],
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
 }

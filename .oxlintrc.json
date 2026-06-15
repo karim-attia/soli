@@ -13,7 +13,7 @@
   "rules": {
     "no-unassigned-import": "off",
     "react-in-jsx-scope": "off",
-    "jsx-uses-react": "off",
+    "react/no-unstable-nested-components": ["warn", { "allowAsProps": true }],
     "style-prop-object": "off"
   },
   "ignorePatterns": ["dist/**", "build/**"]

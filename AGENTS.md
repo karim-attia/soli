@@ -4,7 +4,7 @@ Use web search to research a tool, library, pattern, etc. to see how others do s
 
 Compatibility notice (explicit): This repo makes NO backward-compatibility guarantees. Breaking changes to are allowed and expected.
 
-Leave small documentation notes throughout the app to better understand reasons why we did something in a certain way. E.g. we do this this way instead of that way because we learned if we do it that way, we will run into issue X.
+Leave small documentation notes inline throughout the app to better understand reasons why we did something in a certain way. E.g. we do this this way instead of that way because we learned if we do it that way, we will run into issue X.
 
 # Implementation plan
 
@@ -34,7 +34,6 @@ Follow @external-packages.mdc for new dependencies.
 - ## Files actually modified
 - ## Identified issues and status of these issues
 - ## Testing
-One option: Test on http://localhost:8081/ - usually, expo web is running, if not start it with `yarn web`.
 
 Directly start implementing except if the user asks for a different approach. But always create a detailed implementation plan before starting to implement.
 
@@ -51,10 +50,10 @@ Update the status of the steps after the implementation of each step. NEVER SKIP
 
 # Testing
 
-Test everything you do in a real environment. In order to save context, always use sub-agents to test. Use GPT 5.5 medium reasoning for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
+Test everything you do in a real environment (when it makes sense!). In order to save context, always use sub-agents to test. Use GPT 5.5 medium reasoning for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
 
 Native: Use agent-device skill
-Web: Use Playwright with skill
+Web: Use Playwright with skill (but no need to test on web since the app is for native only, but it's an option.)
 
 iOS: Always run a clean build on the connected simulator. Make sure the build is finished before checking on the device.
 Android: Run "yarn release" and wait until the build is complete. Use scripts/android-unlock-pattern.sh script to unlock physical Android device if it's locked.
@@ -65,7 +64,7 @@ Check if the build was actually installed on the device or the device/emulator.
 
 # Components
 
-Use tamagui components for all UI elements.
+Use expo ui or tamagui components for all UI elements.
 
 -> to write: components in component folder, create component there with defaults instead of directly using tamagui components in the screen.
 

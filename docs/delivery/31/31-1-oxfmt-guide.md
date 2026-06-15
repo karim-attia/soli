@@ -1,24 +1,30 @@
 # Task 31-1: oxfmt package guide
 
 ## Research timestamp
-- 2026-03-02 (Europe/Zurich)
+
+- 2026-06-15 (Europe/Zurich)
 
 ## Primary sources
+
 - https://oxc.rs/docs/guide/usage/formatter
 - https://oxc.rs/docs/guide/usage/formatter/config.html
 - https://www.npmjs.com/package/oxfmt
 
 ## What this package is
+
 - `oxfmt` is the Oxc formatter CLI for JavaScript/TypeScript/JSON formatting.
 - Configuration is provided through `.oxfmtrc.json` with options similar to Prettier-style formatting preferences.
+- Current Oxfmt also supports Markdown, CSS, YAML, TOML, and other common project formats.
 
 ## Practical usage notes for this repo
+
 - Use an explicit target glob for project sources and run `--check` in verification/CI flows.
 - Keep formatter options aligned with current style decisions (`singleQuote`, `semi`, `trailingComma`, line width).
 - Use `ignorePatterns` for generated files and build artifacts to avoid churn.
 - `oxfmt` supports migration helpers such as `--migrate=biome`; keep this as a one-off migration aid rather than a recurring script.
 
 ## Recommended script pattern
+
 ```json
 {
   "scripts": {
@@ -29,6 +35,7 @@
 ```
 
 ## Example config
+
 ```json
 {
   "printWidth": 90,
@@ -47,6 +54,9 @@
 ```
 
 ## Migration best practices applied
+
 - Separate `format` and `format:check` commands for local edit vs CI enforcement workflows.
 - Restrict formatter scope to source directories to avoid accidental binary/content churn.
 - Keep formatter configuration explicit and checked into version control for deterministic team output.
+- Run `format:check` immediately after version upgrades to detect any formatter compatibility changes before accepting broad rewrites.
+- Pin the tested formatter version so clean installs produce deterministic output.
