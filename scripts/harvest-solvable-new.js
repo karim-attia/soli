@@ -6,6 +6,17 @@
   CLI:
     node scripts/harvest-solvable-new.js --trial --maxSolved 3 --beamWidth 500 --maxNodes 200000 --maxDepth 400
     node scripts/harvest-solvable-new.js --maxSolved 100 --beamWidth 4000 --maxNodes 1500000 --maxDepth 600
+
+  Batch benchmark snapshot (15.06.26):
+    - default (batch #1): target=25, beam=4000, nodes=1500000, depth=600 -> 25/59 = 42.37%
+    - default (batch #2): target=25, beam=4000, nodes=1500000, depth=600 -> 25/59 = 42.37%
+    - default combined: 50/118 = 42.37%
+    - 2x params: target=50, beam=8000, nodes=3000000, depth=1200 -> 50/72 = 69.44%
+    - 4x params: target=50, beam=16000, nodes=6000000, depth=2400 -> 50/69 = 72.46%
+
+    Default now set to 4X params.
+    
+    Logic is that these games are easier on average and i want the average difficulty of solvable games
 */
 
 const { solveDeal, extractInitialTableauConfig } = require('./klondike-solver-new')
@@ -42,10 +53,11 @@ function parseArgs(argv) {
 async function main() {
   const args = parseArgs(process.argv)
   const trial = args.get('trial') === 'true'
-  const maxSolved = Number(args.get('maxSolved') || (trial ? 3 : 100))
-  const beamWidth = Number(args.get('beamWidth') || (trial ? 500 : 4000))
-  const maxNodes = Number(args.get('maxNodes') || (trial ? 200000 : 1500000))
-  const maxDepth = Number(args.get('maxDepth') || (trial ? 400 : 600))
+  // Requirement: allow a target goal for usable games via --target.
+  const maxSolved = Number(args.get('target') || args.get('maxSolved') || (trial ? 3 : 100))
+  const beamWidth = Number(args.get('beamWidth') || (trial ? 500 : 16000))
+  const maxNodes = Number(args.get('maxNodes') || (trial ? 200000 : 6000000))
+  const maxDepth = Number(args.get('maxDepth') || (trial ? 400 : 2400))
 
   const shuffles = loadDataset()
   const seen = new Set(shuffles.map((s) => tableauSignature(s.tableau)))

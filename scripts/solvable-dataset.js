@@ -78,6 +78,8 @@ function parseDataset(rawBody) {
       })
 
       const id = meta.get('id') || ''
+      // Requirement: preserve existing entry names when rewriting the raw dataset.
+      const name = meta.get('name') || undefined
       const addedAt = meta.get('addedAt') || ''
       const source = meta.get('source') || undefined
 
@@ -103,7 +105,7 @@ function parseDataset(rawBody) {
         throw new Error(`Invalid tableau definition for ${id}`)
       }
 
-      return { id, addedAt, source, tableau }
+      return { id, name, addedAt, source, tableau }
     })
     .filter((entry) => entry !== null)
 }
@@ -117,8 +119,9 @@ function encodeColumn(column, index) {
 function stringifyDataset(shuffles) {
   const lines = []
   shuffles.forEach((shuffle) => {
+    const nameSegment = shuffle.name ? ` name=${shuffle.name}` : ''
     const sourceSegment = shuffle.source ? ` source=${shuffle.source}` : ''
-    lines.push(`id=${shuffle.id} addedAt=${shuffle.addedAt}${sourceSegment}`)
+    lines.push(`id=${shuffle.id}${nameSegment} addedAt=${shuffle.addedAt}${sourceSegment}`)
     shuffle.tableau.forEach((column, index) => {
       lines.push(encodeColumn(column, index))
     })
