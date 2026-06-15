@@ -1,7 +1,6 @@
 import { useLayoutEffect } from 'react'
-import { Pressable, ScrollView, useColorScheme } from 'react-native'
+import { Pressable, ScrollView } from 'react-native'
 import { Host, Switch } from '@expo/ui'
-import { SegmentedControl } from '@expo/ui/community/segmented-control'
 import { useNavigation } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { H2, Paragraph, Separator, Text, XStack, YStack } from 'tamagui'
@@ -10,24 +9,15 @@ import { Menu } from '@tamagui/lucide-icons-2'
 import { DrawCountSelector } from '../components/settings/DrawCountSelector'
 import {
   animationPreferenceDescriptors,
-  type ThemeMode,
   useSettings,
   statisticsPreferenceDescriptors,
 } from '../src/state/settings'
 import { useDrawerOpener } from '../src/navigation/useDrawerOpener'
-import { resolveThemeName } from '../src/theme'
-
-const themeOptions: Array<{ mode: ThemeMode; label: string }> = [
-  { mode: 'auto', label: 'Auto' },
-  { mode: 'light', label: 'Light' },
-  { mode: 'dark', label: 'Dark' },
-]
 
 export default function SettingsScreen() {
   const navigation = useNavigation()
   const openDrawer = useDrawerOpener()
   const safeArea = useSafeAreaInsets()
-  const systemColorScheme = useColorScheme()
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -48,14 +38,12 @@ export default function SettingsScreen() {
     hydrated,
     setGlobalAnimationsEnabled,
     setAnimationPreference,
-    setThemeMode,
     setDrawCount,
     setSolvableGamesOnly,
     setAutoUpEnabled,
     setDeveloperMode,
     setStatisticsPreference,
   } = useSettings()
-  const segmentedControlAppearance = resolveThemeName(state.themeMode, systemColorScheme)
   // Android edge-to-edge can place scroll content behind the system dock, so keep
   // the existing visual breathing room and add the device bottom inset.
   const settingsContentPaddingBottom = 48 + safeArea.bottom
@@ -80,7 +68,6 @@ export default function SettingsScreen() {
             value={state.drawCount}
             onValueChange={setDrawCount}
             disabled={!hydrated}
-            appearance={segmentedControlAppearance}
           />
           <ToggleRow
             label="Only deal solvable games"
@@ -95,29 +82,6 @@ export default function SettingsScreen() {
             value={state.autoUpEnabled}
             onValueChange={setAutoUpEnabled}
             disabled={!hydrated}
-          />
-        </YStack>
-
-        <YStack gap="$3">
-          <Text fontSize={16} fontWeight="700">
-            Appearance
-          </Text>
-          <Paragraph color="$color10">
-            Choose how the app adapts to light and dark environments.
-          </Paragraph>
-
-          <SegmentedControl
-            values={themeOptions.map(({ label }) => label)}
-            selectedIndex={themeOptions.findIndex(({ mode }) => mode === state.themeMode)}
-            onChange={({ nativeEvent: { selectedSegmentIndex } }) => {
-              const option = themeOptions[selectedSegmentIndex]
-              if (option) {
-                setThemeMode(option.mode)
-              }
-            }}
-            enabled={hydrated}
-            appearance={segmentedControlAppearance}
-            style={{ width: '100%' }}
           />
         </YStack>
 

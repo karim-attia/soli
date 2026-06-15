@@ -8,7 +8,6 @@ import { useFonts } from 'expo-font'
 import { SplashScreen, Stack } from 'expo-router'
 import { Provider } from 'components/Provider'
 import { useTheme } from 'tamagui'
-import { useSettings } from '../src/state/settings'
 import { isDarkTheme, resolveThemeName } from '../src/theme'
 
 export {
@@ -54,11 +53,8 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme()
-  const {
-    state: { themeMode },
-  } = useSettings()
   const theme = useTheme()
-  const resolvedThemeName = resolveThemeName(themeMode, colorScheme)
+  const resolvedThemeName = resolveThemeName(colorScheme)
   const navigationTheme = resolvedThemeName === 'dark' ? DarkTheme : DefaultTheme
   return (
     <ThemeProvider value={navigationTheme}>

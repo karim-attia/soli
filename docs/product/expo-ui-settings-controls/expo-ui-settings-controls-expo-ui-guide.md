@@ -2,7 +2,8 @@
 
 - Package: `@expo/ui`
 - Retrieved: 2026-06-15
-- Installed version range: `~56.0.17`
+- Installed version range: `~56.0.18`
+- Required Expo Modules Core patch: `56.0.17`
 - Primary docs:
   - https://docs.expo.dev/versions/latest/sdk/ui/universal/
   - https://docs.expo.dev/versions/latest/sdk/ui/universal/switch/
@@ -14,12 +15,28 @@
 - Universal Expo UI components provide one API over Jetpack Compose on Android,
   SwiftUI on iOS, and JavaScript implementations on web.
 - Universal components must be rendered under `Host`, imported from `@expo/ui`.
+- Expo UI has no Tamagui-style provider that configures every independently created
+  Host.
 - `@expo/ui/community/segmented-control` is a drop-in control that uses a Jetpack
   Compose single-choice segmented row on Android and a segmented SwiftUI picker on
   iOS.
-- Expo SDK 56 documentation lists bundled `@expo/ui` version `~56.0.17`, matching this
-  repository.
-- No installation or dependency change is needed for this task.
+- Expo SDK 56 documentation originally listed bundled `@expo/ui` version `~56.0.17`.
+  Expo's dependency alignment now installs `@expo/ui 56.0.18` in this repository.
+- No new package is needed. Existing Expo SDK packages are updated within SDK 56 so
+  the app receives the native screen lifecycle fix.
+
+## Android screen lifecycle fix
+
+- Expo UI's Android controls are Jetpack Compose views hosted inside React Native.
+- `react-native-screens` detaches inactive screens during navigation.
+- In `expo-modules-core 56.0.16`, the Compose view could observe the screen fragment
+  lifecycle, dispose its composition, and return blank when the screen reattached.
+- `expo-modules-core 56.0.17`, released 2026-06-15, pins the composition to the
+  Activity lifecycle and disposes it explicitly only when the native view is destroyed.
+- This is the preferred fix over React keys, forced remounts, wrapper components, or
+  custom navigation behavior.
+- A fresh Android build is required after updating because the fix is native Kotlin
+  code.
 
 ## Universal Host
 
@@ -90,7 +107,9 @@ Controlled props used by Settings:
 - `onChange?: (event) => void`: callback whose
   `event.nativeEvent.selectedSegmentIndex` identifies the selected segment.
 - `enabled?: boolean`: when false, prevents interaction. It defaults to true.
-- `appearance?: 'dark' | 'light'`: overrides the device theme for the control.
+- `appearance?: 'dark' | 'light'`: optional per-control override. Draw count resolves
+  it locally from the OS scheme because the Android default leaves unselected labels
+  too dark.
 - `style?: StyleProp<ViewStyle>`: use only simple layout sizing when required.
 
 Basic pattern:
@@ -106,7 +125,6 @@ Basic pattern:
     }
   }}
   enabled={!disabled}
-  appearance={appearance}
   style={{ width: '100%' }}
 />
 ```
@@ -121,14 +139,27 @@ Implementation notes:
 - String values are supported; image values are not.
 - `tintColor` is Android/web-only and is intentionally omitted so native defaults
   remain in control.
-- Expo documents that omitted `appearance` follows the device theme.
-- Soli must pass `appearance` because its Auto/Light/Dark setting can intentionally
-  differ from the device theme. Without it, a light native control can render over
-  Soli's forced dark background.
-- Passing `appearance` is the native fix. Do not replace it with custom segment text
-  or container colors.
+- Expo documents that omitted `appearance` follows the native environment.
+- Soli still follows the OS. Draw count passes the resolved OS scheme directly to
+  `appearance`; it does not accept or thread an app theme prop.
 - `onValueChange` also exists, but the task explicitly requests `onChange` and a small
   selected-index mapping.
+
+## Appearance decision
+
+- React Native documents `Appearance.setColorScheme` as an app-level override for
+  native elements.
+- Expo has an accepted Android issue reporting that this override does not update at
+  runtime in an Expo app.
+- In Soli's device test, Tamagui and navigation changed immediately while Expo UI
+  controls retained the previous scheme until restart.
+- Universal `BottomSheet` creates its own Expo UI Host internally and exposes no
+  shared color-scheme provider.
+- Passing `colorScheme` or `appearance` to each Host/control is possible for some
+  components, but recreates the lower-level plumbing this migration removed and does
+  not cleanly cover the sheet.
+- Soli therefore removes its manual theme setting and follows the OS through
+  `useColorScheme()`.
 
 ## Soli mappings
 
@@ -139,15 +170,6 @@ Draw count:
 - `onChange`: read the option at the native selected index, convert to number, call
   `normalizeDrawCount`, then call the existing `onValueChange`.
 - `enabled`: inverse of the existing `disabled` prop.
-- `appearance`: the resolved Soli theme passed from Settings.
-
-Theme:
-
-- `values`: `themeOptions.map(({ label }) => label)`.
-- `selectedIndex`: index whose `mode` equals `state.themeMode`.
-- `onChange`: read `themeOptions[selectedIndex]` and call `setThemeMode(option.mode)`.
-- `enabled`: current `hydrated` value.
-- `appearance`: the result of `resolveThemeName(themeMode, systemColorScheme)`.
 
 ## Source links
 
@@ -163,3 +185,13 @@ Theme:
   https://github.com/expo/expo/blob/sdk-56/packages/expo-ui/src/jetpack-compose/Host/index.tsx
 - Android Material 3 theming guidance:
   https://developer.android.com/develop/ui/compose/designsystems/material3
+- React Native Appearance:
+  https://reactnative.dev/docs/appearance
+- Expo color themes:
+  https://docs.expo.dev/develop/user-interface/color-themes/
+- Expo Android runtime Appearance issue:
+  https://github.com/expo/expo/issues/26556
+- Expo Modules Core 56.0.17 changelog:
+  https://github.com/expo/expo/blob/main/packages/expo-modules-core/CHANGELOG.md
+- Expo UI screen recomposition fix:
+  https://github.com/expo/expo/pull/46650

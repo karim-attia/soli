@@ -16,8 +16,6 @@ import {
 } from '../solitaire/drawCount'
 import { devLog, setDeveloperLoggingEnabled } from '../utils/devLogger'
 
-export type ThemeMode = 'auto' | 'light' | 'dark'
-
 type AnimationPreferences = {
   master: boolean
   cardFlights: boolean
@@ -39,7 +37,6 @@ export type StatisticsPreferenceKey = keyof StatisticsPreferences
 
 export type SettingsState = {
   animations: AnimationPreferences
-  themeMode: ThemeMode
   drawCount: DrawCount
   shareSolvedGames: boolean
   solvableGamesOnly: boolean
@@ -51,7 +48,6 @@ export type SettingsState = {
 type SettingsContextValue = {
   state: SettingsState
   hydrated: boolean
-  setThemeMode: (mode: ThemeMode) => void
   setDrawCount: (drawCount: DrawCount) => void
   setGlobalAnimationsEnabled: (enabled: boolean) => void
   setAnimationPreference: (key: AnimationPreferenceKey, enabled: boolean) => void
@@ -74,7 +70,6 @@ const DEFAULT_SETTINGS: SettingsState = {
     foundationGlow: true,
     celebrations: true,
   },
-  themeMode: 'auto',
   drawCount: DEFAULT_DRAW_COUNT,
   shareSolvedGames: false,
   solvableGamesOnly: true,
@@ -179,12 +174,6 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       devLog('warn', '[settings] Failed to persist settings', error)
     })
   }, [hydrated, state])
-
-  const setThemeMode = useCallback((mode: ThemeMode) => {
-    setState((previous) =>
-      previous.themeMode === mode ? previous : { ...previous, themeMode: mode }
-    )
-  }, [])
 
   const setDrawCount = useCallback((drawCount: DrawCount) => {
     setState((previous) =>
@@ -298,7 +287,6 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     () => ({
       state,
       hydrated,
-      setThemeMode,
       setDrawCount,
       setGlobalAnimationsEnabled,
       setAnimationPreference,
@@ -317,7 +305,6 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setShareSolvedGames,
       setSolvableGamesOnly,
       setDrawCount,
-      setThemeMode,
       setDeveloperMode,
       state,
     ]
@@ -391,7 +378,6 @@ const mergeSettings = (
       ),
       celebrations: getBoolean(animations.celebrations, current.animations.celebrations),
     },
-    themeMode: isThemeMode(incoming.themeMode) ? incoming.themeMode : current.themeMode,
     drawCount: normalizeDrawCount(incoming.drawCount),
     shareSolvedGames: getBoolean(incoming.shareSolvedGames, current.shareSolvedGames),
     solvableGamesOnly: getBoolean(incoming.solvableGamesOnly, current.solvableGamesOnly),
@@ -406,6 +392,3 @@ const mergeSettings = (
 
 const getBoolean = (value: unknown, fallback: boolean): boolean =>
   typeof value === 'boolean' ? value : fallback
-
-const isThemeMode = (value: unknown): value is ThemeMode =>
-  value === 'auto' || value === 'light' || value === 'dark'

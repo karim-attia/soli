@@ -3,7 +3,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { TamaguiProvider, type TamaguiProviderProps } from 'tamagui'
 import { ToastProvider, ToastViewport } from '@tamagui/toast'
 import { CurrentToast } from './CurrentToast'
-import { SettingsProvider, useSettings } from '../src/state/settings'
+import { SettingsProvider } from '../src/state/settings'
 import { HistoryProvider } from '../src/state/history'
 import { resolveThemeName } from '../src/theme'
 import { config } from '../tamagui.config'
@@ -26,10 +26,8 @@ export function Provider({ children, ...rest }: ProviderProps) {
 
 const TamaguiWithSettings = ({ children, ...rest }: ProviderProps) => {
   const colorScheme = useColorScheme()
-  const {
-    state: { themeMode },
-  } = useSettings()
-  const themeName = resolveThemeName(themeMode, colorScheme)
+  // Keep Tamagui on the OS scheme so independently hosted Expo UI controls agree.
+  const themeName = resolveThemeName(colorScheme)
 
   return (
     <TamaguiProvider config={config} defaultTheme={themeName} {...rest}>
