@@ -1,4 +1,5 @@
 import { Drawer } from 'expo-router/drawer'
+import { Platform } from 'react-native'
 import { useTheme } from 'tamagui'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Atom, Clock, Settings, Smile } from '@tamagui/lucide-icons-2'
@@ -46,14 +47,16 @@ export default function DrawerLayout() {
           drawerIcon: ({ color, size }) => <Smile color={color as any} size={size} />,
         }}
       />
-      <Drawer.Screen
-        name="history"
-        options={{
-          title: 'History',
-          drawerLabel: 'History',
-          drawerIcon: ({ color, size }) => <Clock color={color as any} size={size} />,
-        }}
-      />
+      <Drawer.Protected guard={Platform.OS !== 'web'}>
+        <Drawer.Screen
+          name="history"
+          options={{
+            title: 'History',
+            drawerLabel: 'History',
+            drawerIcon: ({ color, size }) => <Clock color={color as any} size={size} />,
+          }}
+        />
+      </Drawer.Protected>
       <Drawer.Screen
         name="settings"
         options={{

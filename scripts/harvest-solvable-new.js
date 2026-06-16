@@ -54,7 +54,9 @@ async function main() {
   const args = parseArgs(process.argv)
   const trial = args.get('trial') === 'true'
   // Requirement: allow a target goal for usable games via --target.
-  const maxSolved = Number(args.get('target') || args.get('maxSolved') || (trial ? 3 : 100))
+  const maxSolved = Number(
+    args.get('target') || args.get('maxSolved') || (trial ? 3 : 100)
+  )
   const beamWidth = Number(args.get('beamWidth') || (trial ? 500 : 16000))
   const maxNodes = Number(args.get('maxNodes') || (trial ? 200000 : 6000000))
   const maxDepth = Number(args.get('maxDepth') || (trial ? 400 : 2400))

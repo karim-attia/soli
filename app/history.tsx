@@ -1,7 +1,7 @@
-import { memo, useLayoutEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { useNavigation } from 'expo-router'
-import { Paragraph, Separator, Text, XStack, YStack, useTheme } from 'tamagui'
+import { Paragraph, Separator, Spinner, Text, XStack, YStack, useTheme } from 'tamagui'
 import { Menu } from '@tamagui/lucide-icons-2'
 
 import { AppSheet } from '../components/AppSheet'
@@ -20,13 +20,17 @@ import { useDrawerOpener } from '../src/navigation/useDrawerOpener'
 function HistoryScreen() {
   const navigation = useNavigation()
   const openDrawer = useDrawerOpener()
-  const { entries, solvedCount, hydrated } = useHistory()
-  const totalEntries = entries.length
-  // Task 10-6: Count incomplete entries (not solved and not active)
-  const incompleteCount = useMemo(
-    () => entries.filter((entry) => entry.status === 'incomplete').length,
-    [entries]
-  )
+  // Pagination totals come from storage so the stats do not change as pages are loaded.
+  const {
+    entries,
+    totalCount,
+    solvedCount,
+    incompleteCount,
+    hydrated,
+    hasMore,
+    loadingMore,
+    loadMore,
+  } = useHistory()
   const [selectedEntry, setSelectedEntry] = useState<HistoryEntry | null>(null)
 
   useLayoutEffect(() => {
@@ -44,9 +48,18 @@ function HistoryScreen() {
     })
   }, [navigation, openDrawer])
 
+  const handleEndReached = useCallback(() => {
+    // The provider owns the in-flight state and prevents repeated end events from overlapping.
+    if (!hasMore || loadingMore) {
+      return
+    }
+
+    void loadMore()
+  }, [hasMore, loadMore, loadingMore])
+
   const listHeader = useMemo(() => {
     const stats: HistoryStat[] = [
-      { label: 'Games', value: totalEntries, tone: 'neutral' },
+      { label: 'Games', value: totalCount, tone: 'neutral' },
       { label: 'Solved', value: solvedCount, tone: 'success' },
       { label: 'Incomplete', value: incompleteCount, tone: 'warning' },
     ]
@@ -58,7 +71,7 @@ function HistoryScreen() {
         <Separator />
       </YStack>
     )
-  }, [incompleteCount, solvedCount, totalEntries])
+  }, [incompleteCount, solvedCount, totalCount])
 
   return (
     <>
@@ -73,7 +86,10 @@ function HistoryScreen() {
           <HistoryListItem entry={item} onPress={() => setSelectedEntry(item)} />
         )}
         ItemSeparatorComponent={ListSpacer}
+        ListFooterComponent={loadingMore ? LoadingFooter : null}
         contentContainerStyle={{ paddingBottom: 64 }}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.4}
       />
 
       {selectedEntry ? (
@@ -184,6 +200,12 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
 }
 
 const ListSpacer = () => <YStack height="$2" />
+
+const LoadingFooter = () => (
+  <YStack py="$3" style={{ alignItems: 'center' }}>
+    <Spinner size="small" color="$color10" />
+  </YStack>
+)
 
 const EmptyHistory = ({
   hydrated,

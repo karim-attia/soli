@@ -8,9 +8,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "soli",
     "userInterfaceStyle": "automatic",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ch.karimattia.soli",
@@ -89,7 +87,8 @@
           }
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true

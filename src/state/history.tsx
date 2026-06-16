@@ -18,6 +18,20 @@ import {
   normalizeDrawCount,
   type DrawCount,
 } from '../solitaire/drawCount'
+import {
+  HISTORY_PAGE_SIZE,
+  clearHistoryEntries,
+  getHistoryEntryById,
+  getHistoryPage,
+  getHistorySummary,
+  getSolvableHistoryStats,
+  importLegacyHistory,
+  initializeHistoryRepository,
+  insertHistoryEntry,
+  isHistorySupported,
+  updateHistoryEntry,
+} from '../storage/historyRepository'
+import type { HistorySummary } from '../storage/historyRepository.types'
 import { extractSolvableBaseId, SOLVABLE_SHUFFLES } from '../data/solvableShuffles'
 import { devLog } from '../utils/devLogger'
 import { computeElapsedWithReference } from '../utils/time'
@@ -90,6 +104,12 @@ export type RecordGameResultFromStateParams = {
   options?: RecordGameResultOptions
 }
 
+export type CreateStartedHistoryEntryInputOptions = {
+  startedAt?: string | Date
+  preview?: HistoryPreview
+  displayName?: string
+}
+
 export type HistoryPreview = {
   tableau: HistoryPreviewColumn[]
   wasteTop: HistoryPreviewCard | null
@@ -107,11 +127,22 @@ export type HistoryPreviewCard = {
   faceUp: boolean
 }
 
+export type SolvableHistoryStat = {
+  plays: number
+  solves: number
+}
+
 type HistoryContextValue = {
   entries: HistoryEntry[]
   hydrated: boolean
+  totalCount: number
   solvedCount: number
+  incompleteCount: number
   activeCount: number
+  solvableStats: ReadonlyMap<string, SolvableHistoryStat>
+  hasMore: boolean
+  loadingMore: boolean
+  loadMore: () => Promise<void>
   recordResult: (input: RecordGameResultInput) => string // Task 10-6: returns entry ID
   updateEntry: (id: string, updates: UpdateEntryInput) => void // Task 10-6: update existing entry
   clearHistory: () => void
@@ -121,163 +152,285 @@ type HistoryContextValue = {
 const HistoryContext = createContext<HistoryContextValue | undefined>(undefined)
 
 const STORAGE_KEY = '@soli/history/v1'
-const STORAGE_VERSION = 1
-const MAX_HISTORY_ENTRIES = 200
 
 type HistoryStoragePayload = {
   version: number
   entries: HistoryEntry[]
 }
 
+const EMPTY_HISTORY_SUMMARY: HistorySummary = {
+  totalCount: 0,
+  solvedCount: 0,
+  incompleteCount: 0,
+  activeCount: 0,
+}
+
 export const HistoryProvider = ({ children }: PropsWithChildren) => {
   const [entries, setEntries] = useState<HistoryEntry[]>([])
   const [hydrated, setHydrated] = useState(false)
-  const hasLoadedRef = useRef(false)
+  const [summary, setSummary] = useState<HistorySummary>(EMPTY_HISTORY_SUMMARY)
+  const [solvableStats, setSolvableStats] = useState<
+    ReadonlyMap<string, SolvableHistoryStat>
+  >(() => new Map())
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const entriesRef = useRef<HistoryEntry[]>([])
+  const summaryRef = useRef<HistorySummary>(EMPTY_HISTORY_SUMMARY)
+  const loadingMoreRef = useRef(false)
+  const mountedRef = useRef(true)
+  const readyPromiseRef = useRef<Promise<void> | null>(null)
+  const operationQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   useEffect(() => {
     let cancelled = false
 
-    ;(async () => {
+    mountedRef.current = true
+    const initialize = async () => {
       try {
-        const serialized = await AsyncStorage.getItem(STORAGE_KEY)
-        if (!serialized) {
+        await initializeHistoryRepository()
+
+        if (isHistorySupported) {
+          const legacyEntries = await readLegacyHistoryEntries()
+          if (legacyEntries) {
+            // Stable history IDs plus ID-scoped conflict handling make retries safe.
+            await importLegacyHistory(legacyEntries)
+            try {
+              await AsyncStorage.removeItem(STORAGE_KEY)
+            } catch (error) {
+              // The SQLite import already committed, so cleanup failure must not hide it.
+              devLog('warn', '[history] Failed to remove migrated legacy history', error)
+            }
+          }
+        }
+
+        const [initialEntries, nextSummary, rawSolvableStats] = await Promise.all([
+          getHistoryPage(HISTORY_PAGE_SIZE, 0),
+          getHistorySummary(),
+          getSolvableHistoryStats(),
+        ])
+        if (cancelled) {
           return
         }
 
-        const parsed = JSON.parse(serialized) as HistoryStoragePayload | null
-        if (!parsed || !Array.isArray(parsed.entries)) {
-          return
-        }
-
-        const validated = parsed.entries.filter(isValidEntry)
-        if (!cancelled && validated.length) {
-          setEntries((previous) => mergeEntries(previous, validated))
-        }
+        setEntries((previous) => {
+          const merged = mergeHistoryEntries(previous, initialEntries)
+          entriesRef.current = merged
+          setHasMore(merged.length < nextSummary.totalCount)
+          return merged
+        })
+        summaryRef.current = nextSummary
+        setSummary(nextSummary)
+        setSolvableStats(createSolvableStatsMap(rawSolvableStats))
       } catch (error) {
         if (!cancelled) {
-          devLog('warn', '[history] Failed to load persisted history entries', error)
+          devLog('warn', '[history] Failed to initialize native history', error)
         }
       } finally {
         if (!cancelled) {
-          hasLoadedRef.current = true
           setHydrated(true)
         }
       }
-    })()
+    }
 
+    readyPromiseRef.current = initialize()
     return () => {
       cancelled = true
+      mountedRef.current = false
     }
   }, [])
 
-  useEffect(() => {
-    if (!hydrated && !hasLoadedRef.current) {
+  const refreshMetadata = useCallback(async () => {
+    const [nextSummary, rawSolvableStats] = await Promise.all([
+      getHistorySummary(),
+      getSolvableHistoryStats(),
+    ])
+    if (!mountedRef.current) {
+      return
+    }
+    summaryRef.current = nextSummary
+    setSummary(nextSummary)
+    setSolvableStats(createSolvableStatsMap(rawSolvableStats))
+    setHasMore(entriesRef.current.length < nextSummary.totalCount)
+  }, [])
+
+  const reconcileLoadedHistory = useCallback(async () => {
+    const requestedCount = Math.max(HISTORY_PAGE_SIZE, entriesRef.current.length)
+    const [persistedEntries, nextSummary, rawSolvableStats] = await Promise.all([
+      getHistoryPage(requestedCount, 0),
+      getHistorySummary(),
+      getSolvableHistoryStats(),
+    ])
+    if (!mountedRef.current) {
       return
     }
 
-    const payload: HistoryStoragePayload = {
-      version: STORAGE_VERSION,
-      entries,
-    }
+    entriesRef.current = persistedEntries
+    summaryRef.current = nextSummary
+    setEntries(persistedEntries)
+    setSummary(nextSummary)
+    setSolvableStats(createSolvableStatsMap(rawSolvableStats))
+    setHasMore(persistedEntries.length < nextSummary.totalCount)
+  }, [])
 
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload)).catch((error) => {
-      devLog('warn', '[history] Failed to persist history entries', error)
-    })
-  }, [entries, hydrated])
+  const queueRepositoryTask = useCallback(
+    (task: () => Promise<void>) => {
+      const ready = readyPromiseRef.current ?? Promise.resolve()
+      const next = operationQueueRef.current.then(async () => {
+        await ready
+        await task()
+        await refreshMetadata()
+      })
+      // History writes are intentionally serialized so active-row normalization and
+      // aggregate refreshes observe the same order as the synchronous gameplay API.
+      operationQueueRef.current = next.catch(async (error) => {
+        devLog('warn', '[history] Failed to persist history change', error)
+        try {
+          // Drop optimistic rows after a failed write so later offsets stay aligned.
+          await reconcileLoadedHistory()
+        } catch (reconcileError) {
+          devLog(
+            'warn',
+            '[history] Failed to reconcile persisted history',
+            reconcileError
+          )
+        }
+      })
+    },
+    [reconcileLoadedHistory, refreshMetadata]
+  )
 
   // Task 10-6: recordResult now returns the entry ID for later updates
-  const recordResult = useCallback((input: RecordGameResultInput): string => {
-    const entry = createEntry(input)
-    setEntries((previous) => {
-      const combined = [entry, ...previous]
+  const recordResult = useCallback(
+    (input: RecordGameResultInput): string => {
+      const entry = createEntry(input)
+      if (!isHistorySupported) {
+        return entry.id
+      }
+      const combined = [entry, ...entriesRef.current]
       const normalized =
         entry.status === 'active'
           ? normalizeActiveEntries(combined, entry.id)
           : normalizeActiveEntries(combined)
-      return normalized.slice(0, MAX_HISTORY_ENTRIES)
-    })
-    return entry.id
-  }, [])
+      // Keep the ref synchronous because callers receive the ID immediately and may
+      // update the same entry before React commits another render.
+      entriesRef.current = normalized
+      setEntries(normalized)
+      queueRepositoryTask(() => insertHistoryEntry(entry))
+      return entry.id
+    },
+    [queueRepositoryTask]
+  )
 
   // Task 10-6: updateEntry allows updating an existing entry by its ID
-  const updateEntry = useCallback((id: string, updates: UpdateEntryInput) => {
-    setEntries((previous) => {
-      const index = previous.findIndex((entry) => entry.id === id)
-      if (index === -1) {
-        devLog('warn', `[history] Attempted to update non-existent entry: ${id}`)
-        return previous
+  const updateEntry = useCallback(
+    (id: string, updates: UpdateEntryInput) => {
+      if (!isHistorySupported) {
+        return
+      }
+      const existingIndex = entriesRef.current.findIndex((entry) => entry.id === id)
+      if (existingIndex === -1) {
+        queueRepositoryTask(async () => {
+          const persisted = await getHistoryEntryById(id)
+          if (!persisted) {
+            devLog('warn', `[history] Attempted to update non-existent entry: ${id}`)
+            return
+          }
+          await updateHistoryEntry(applyHistoryEntryUpdates(persisted, updates))
+        })
+        return
       }
 
-      const existing = previous[index]
-      // Handle finishedAt: can be Date, string, null, or undefined (keep existing)
-      let finishedAt: string | null = existing.finishedAt
-      if (updates.finishedAt !== undefined) {
-        if (updates.finishedAt === null) {
-          finishedAt = null
-        } else if (typeof updates.finishedAt === 'string') {
-          finishedAt = updates.finishedAt
-        } else {
-          finishedAt = updates.finishedAt.toISOString()
-        }
-      }
-
-      const updated: HistoryEntry = {
-        ...existing,
-        solved: updates.solved ?? existing.solved,
-        status: updates.status ?? existing.status,
-        moves: updates.moves ?? existing.moves,
-        durationMs: updates.durationMs ?? existing.durationMs,
-        finishedAt,
-        preview: updates.preview ?? existing.preview,
-      }
-
-      const next = [...previous]
-      next[index] = updated
+      const existing = entriesRef.current[existingIndex]
+      const updated = applyHistoryEntryUpdates(existing, updates)
+      const next = [...entriesRef.current]
+      next[existingIndex] = updated
       const preferredActiveId = updated.status === 'active' ? updated.id : undefined
-      return normalizeActiveEntries(next, preferredActiveId)
-    })
-  }, [])
+      const normalized = normalizeActiveEntries(next, preferredActiveId)
+      entriesRef.current = normalized
+      setEntries(normalized)
+      queueRepositoryTask(() => updateHistoryEntry(updated))
+    },
+    [queueRepositoryTask]
+  )
 
   const clearHistory = useCallback(() => {
+    entriesRef.current = []
     setEntries([])
+    summaryRef.current = EMPTY_HISTORY_SUMMARY
+    setSummary(EMPTY_HISTORY_SUMMARY)
+    setSolvableStats(new Map())
+    setHasMore(false)
     AsyncStorage.removeItem(STORAGE_KEY).catch((error) => {
-      devLog('warn', '[history] Failed to clear persisted history entries', error)
+      devLog('warn', '[history] Failed to clear legacy history entries', error)
     })
-  }, [])
-
-  const solvedCount = useMemo(
-    () => entries.filter((entry) => entry.solved).length,
-    [entries]
-  )
-  const activeCount = useMemo(
-    () => entries.filter((entry) => entry.status === 'active').length,
-    [entries]
-  )
+    queueRepositoryTask(clearHistoryEntries)
+  }, [queueRepositoryTask])
 
   const getEntryById = useCallback(
     (id: string) => entries.find((entry) => entry.id === id),
     [entries]
   )
 
+  const loadMore = useCallback(async () => {
+    if (!hydrated || !hasMore || loadingMoreRef.current || !isHistorySupported) {
+      return
+    }
+
+    loadingMoreRef.current = true
+    setLoadingMore(true)
+    try {
+      await (readyPromiseRef.current ?? Promise.resolve())
+      // A newly inserted optimistic row must reach SQLite before its count is used as
+      // the offset, otherwise the next page can skip one database row.
+      await operationQueueRef.current
+      const page = await getHistoryPage(HISTORY_PAGE_SIZE, entriesRef.current.length)
+      if (!mountedRef.current) {
+        return
+      }
+      setEntries((previous) => {
+        const merged = mergeHistoryEntries(previous, page)
+        entriesRef.current = merged
+        setHasMore(merged.length < summaryRef.current.totalCount)
+        return merged
+      })
+    } catch (error) {
+      devLog('warn', '[history] Failed to load another history page', error)
+    } finally {
+      loadingMoreRef.current = false
+      if (mountedRef.current) {
+        setLoadingMore(false)
+      }
+    }
+  }, [hasMore, hydrated])
+
   const value = useMemo<HistoryContextValue>(
     () => ({
       entries,
       hydrated,
-      solvedCount,
-      activeCount,
+      totalCount: summary.totalCount,
+      solvedCount: summary.solvedCount,
+      incompleteCount: summary.incompleteCount,
+      activeCount: summary.activeCount,
+      solvableStats,
+      hasMore,
+      loadingMore,
+      loadMore,
       recordResult,
       updateEntry,
       clearHistory,
       getEntryById,
     }),
     [
-      activeCount,
       clearHistory,
       entries,
       getEntryById,
+      hasMore,
       hydrated,
+      loadMore,
+      loadingMore,
       recordResult,
-      solvedCount,
+      solvableStats,
+      summary,
       updateEntry,
     ]
   )
@@ -338,6 +491,31 @@ export const recordGameResultFromState = ({
   lastRecordedShuffleRef.current = state.shuffleId
 }
 
+export const createStartedHistoryEntryInputFromState = (
+  state: GameState,
+  options: CreateStartedHistoryEntryInputOptions = {}
+): RecordGameResultInput | null => {
+  if (!state.shuffleId) {
+    return null
+  }
+
+  return {
+    shuffleId: state.shuffleId,
+    solved: false,
+    solvable: Boolean(state.solvableId),
+    drawCount: state.drawCount,
+    solvableForDrawCount:
+      state.dealSolvabilityBasis === 'draw1' ? DEFAULT_DRAW_COUNT : null,
+    startedAt: options.startedAt ?? new Date().toISOString(),
+    finishedAt: null,
+    moves: 0,
+    durationMs: 0,
+    preview: options.preview ?? createHistoryPreviewFromState(state),
+    displayName: options.displayName ?? formatShuffleDisplayName(state.shuffleId),
+    status: 'active',
+  }
+}
+
 const createEntry = (input: RecordGameResultInput): HistoryEntry => {
   const now = new Date().toISOString()
   const startedAt = input.startedAt
@@ -381,6 +559,30 @@ const createEntry = (input: RecordGameResultInput): HistoryEntry => {
   }
 }
 
+function applyHistoryEntryUpdates(
+  existing: HistoryEntry,
+  updates: UpdateEntryInput
+): HistoryEntry {
+  const finishedAt =
+    updates.finishedAt === undefined
+      ? existing.finishedAt
+      : updates.finishedAt === null
+        ? null
+        : typeof updates.finishedAt === 'string'
+          ? updates.finishedAt
+          : updates.finishedAt.toISOString()
+
+  return {
+    ...existing,
+    solved: updates.solved ?? existing.solved,
+    status: updates.status ?? existing.status,
+    moves: updates.moves ?? existing.moves,
+    durationMs: updates.durationMs ?? existing.durationMs,
+    finishedAt,
+    preview: updates.preview ?? existing.preview,
+  }
+}
+
 // Task 10-7: Ensure only one entry is ever marked as active.
 const normalizeActiveEntries = (
   entries: HistoryEntry[],
@@ -414,7 +616,7 @@ const normalizeActiveEntries = (
   })
 }
 
-const mergeEntries = (
+export const mergeHistoryEntries = (
   current: HistoryEntry[],
   incoming: HistoryEntry[]
 ): HistoryEntry[] => {
@@ -431,9 +633,11 @@ const mergeEntries = (
   })
 
   const merged = normalizeActiveEntries(Array.from(map.values()))
-  // Task 10-6: Sort by startedAt since finishedAt can be null for active games
-  merged.sort((a, b) => b.startedAt.localeCompare(a.startedAt))
-  return merged.slice(0, MAX_HISTORY_ENTRIES)
+  // Match the repository's deterministic order when timestamps are identical.
+  merged.sort(
+    (a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id)
+  )
+  return merged
 }
 
 const isValidEntry = (entry: unknown): entry is HistoryEntry => {
@@ -461,6 +665,42 @@ const isValidEntry = (entry: unknown): entry is HistoryEntry => {
     candidate.preview !== undefined
   )
 }
+
+const readLegacyHistoryEntries = async (): Promise<HistoryEntry[] | null> => {
+  const serialized = await AsyncStorage.getItem(STORAGE_KEY)
+  if (!serialized) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(serialized) as HistoryStoragePayload | null
+    if (!parsed || !Array.isArray(parsed.entries)) {
+      return []
+    }
+
+    const validated = parsed.entries
+      .filter(isValidEntry)
+      .map((entry) => normalizeHistoryEntry(entry))
+    return normalizeActiveEntries(validated)
+  } catch (error) {
+    // Keep unreadable legacy data in place so a future recovery remains possible.
+    devLog('warn', '[history] Failed to parse legacy history entries', error)
+    return null
+  }
+}
+
+const createSolvableStatsMap = (
+  rows: Array<{ shuffleId: string; plays: number; solves: number }>
+): ReadonlyMap<string, SolvableHistoryStat> =>
+  new Map(
+    rows.map((row) => [
+      row.shuffleId,
+      {
+        plays: row.plays,
+        solves: row.solves,
+      },
+    ])
+  )
 
 const generateHistoryId = () =>
   `hist_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`

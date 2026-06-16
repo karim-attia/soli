@@ -28,6 +28,7 @@ import { computeElapsedWithReference } from '../../../utils/time'
 import { clearGameState } from '../../../storage/gamePersistence'
 import {
   createHistoryPreviewFromState,
+  createStartedHistoryEntryInputFromState,
   formatShuffleDisplayName,
   useHistory,
 } from '../../../state/history'
@@ -306,6 +307,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const animationToggles = useAnimationToggles()
   const {
     entries: historyEntries,
+    solvableStats,
     recordResult,
     updateEntry,
     hydrated: historyHydrated,
@@ -422,7 +424,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
 
   // Hook: hydrate and persist game state via AsyncStorage once per relevant change.
   // Task 10-7: Persist the current history entry linkage across restarts.
-  useKlondikePersistence({
+  const storageHydrated = useKlondikePersistence({
     state,
     dispatch,
     resetCardFlights,
@@ -433,35 +435,88 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     preferredDrawCount,
   })
 
-  // Task 10-7: After hydration, ensure the persisted/linked entry is the only active one.
+  // Mirrors the latest reducer state into a ref for synchronous callbacks.
   useEffect(() => {
-    if (!historyHydrated) {
+    stateRef.current = state
+  }, [state])
+
+  const currentShuffleId = state.shuffleId
+  const currentDrawCount = state.drawCount
+  const currentHasWon = state.hasWon
+
+  // Task 10-7: After hydration, ensure the current game has one active history row.
+  useEffect(() => {
+    if (!historyHydrated || !storageHydrated) {
       return
     }
-    if (state.hasWon) {
+    if (currentHasWon) {
       return
     }
+
     const entryId = currentGameEntryIdRef.current
-    if (!entryId) {
+    if (entryId) {
+      const linked = historyEntries.find((entry) => entry.id === entryId)
+      if (!linked) {
+        return
+      }
+      if (
+        linked.shuffleId !== currentShuffleId ||
+        linked.drawCount !== currentDrawCount
+      ) {
+        currentGameEntryIdRef.current = null
+      } else {
+        if (linked.status !== 'active') {
+          updateEntry(entryId, { status: 'active', solved: false, finishedAt: null })
+        }
+        return
+      }
+    }
+
+    const matchingActive = historyEntries.find(
+      (entry) =>
+        entry.status === 'active' &&
+        entry.shuffleId === currentShuffleId &&
+        entry.drawCount === currentDrawCount
+    )
+    if (matchingActive) {
+      currentGameEntryIdRef.current = matchingActive.id
       return
     }
-    const linked = historyEntries.find((entry) => entry.id === entryId)
-    if (!linked) {
+
+    const currentState = stateRef.current
+    const preview = createHistoryPreviewFromState(currentState.history[0] ?? currentState)
+    const displayName = formatShuffleDisplayName(currentShuffleId)
+    const entryInput = createStartedHistoryEntryInputFromState(currentState, {
+      preview,
+      displayName,
+    })
+    if (!entryInput) {
       return
     }
-    if (linked.status !== 'active') {
-      updateEntry(entryId, { status: 'active', solved: false, finishedAt: null })
-    }
-  }, [historyEntries, historyHydrated, state.hasWon, updateEntry])
+
+    currentStartingPreviewRef.current = preview
+    currentDisplayNameRef.current = displayName
+    currentGameEntryIdRef.current = recordResult(entryInput)
+  }, [
+    currentDrawCount,
+    currentHasWon,
+    currentShuffleId,
+    historyEntries,
+    historyHydrated,
+    recordResult,
+    storageHydrated,
+    updateEntry,
+  ])
 
   // Hook: pick the next solvable shuffle weighted by prior play history when needed.
-  const selectNextSolvableShuffle = useSolvableShuffleSelector(historyEntries)
+  const selectNextSolvableShuffle = useSolvableShuffleSelector(solvableStats)
 
   // Deals a new game, respecting solvable-only settings and history bookkeeping.
   const dealNewGame = useCallback(() => {
     if (settingsHydrated && solvableGamesOnly) {
       const solvableShuffle = selectNextSolvableShuffle()
       if (solvableShuffle) {
+        const startedAt = new Date().toISOString()
         const solvableState = createSolvableGameState(solvableShuffle, preferredDrawCount)
         const solvablePreview = createHistoryPreviewFromState(solvableState)
         const solvableDisplayName = formatShuffleDisplayName(solvableState.shuffleId)
@@ -469,30 +524,32 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         currentStartingPreviewRef.current = solvablePreview
         currentDisplayNameRef.current = solvableDisplayName
 
-        // Task 10-6: Store entry ID for later updates when game ends
-        const entryId = recordResult({
-          shuffleId: solvableState.shuffleId,
-          solved: false,
-          solvable: true,
-          drawCount: solvableState.drawCount,
-          solvableForDrawCount: solvableState.dealSolvabilityBasis === 'draw1' ? 1 : null,
-          startedAt: new Date().toISOString(),
-          finishedAt: null, // Not finished yet
-          moves: 0,
-          durationMs: 0,
+        const entryInput = createStartedHistoryEntryInputFromState(solvableState, {
+          startedAt,
           preview: solvablePreview,
           displayName: solvableDisplayName,
-          status: 'active',
         })
-        currentGameEntryIdRef.current = entryId
+        currentGameEntryIdRef.current = entryInput ? recordResult(entryInput) : null
 
         dispatch({ type: 'HYDRATE_STATE', state: solvableState })
         return
       }
     }
 
-    dispatch({ type: 'NEW_GAME', drawCount: preferredDrawCount })
-    currentGameEntryIdRef.current = null
+    const startedAt = new Date().toISOString()
+    const nextState = createInitialState(preferredDrawCount)
+    const preview = createHistoryPreviewFromState(nextState)
+    const displayName = formatShuffleDisplayName(nextState.shuffleId)
+    const entryInput = createStartedHistoryEntryInputFromState(nextState, {
+      startedAt,
+      preview,
+      displayName,
+    })
+
+    currentStartingPreviewRef.current = preview
+    currentDisplayNameRef.current = displayName
+    currentGameEntryIdRef.current = entryInput ? recordResult(entryInput) : null
+    dispatch({ type: 'HYDRATE_STATE', state: nextState })
   }, [
     dispatch,
     preferredDrawCount,
@@ -827,11 +884,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     },
     [handleLaunchDemoGame, setDeveloperMode, settingsState.developerMode]
   )
-
-  // Mirrors the latest reducer state into a ref for synchronous callbacks.
-  useEffect(() => {
-    stateRef.current = state
-  }, [state])
 
   // Subscribes to demo deep links on mount and while the app is active.
   useEffect(() => {

@@ -1,7 +1,7 @@
 import '../tamagui-web.css'
 
 import { useEffect } from 'react'
-import { useColorScheme } from 'react-native'
+import { Platform, useColorScheme } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation'
 import { useFonts } from 'expo-font'
@@ -91,15 +91,17 @@ function RootLayoutNav() {
           }}
         />
 
-        <Stack.Screen
-          name="history"
-          options={{
-            title: 'History',
-            contentStyle: {
-              backgroundColor: theme.background?.val,
-            },
-          }}
-        />
+        <Stack.Protected guard={Platform.OS !== 'web'}>
+          <Stack.Screen
+            name="history"
+            options={{
+              title: 'History',
+              contentStyle: {
+                backgroundColor: theme.background?.val,
+              },
+            }}
+          />
+        </Stack.Protected>
       </Stack>
     </ThemeProvider>
   )

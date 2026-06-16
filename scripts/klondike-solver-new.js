@@ -279,7 +279,7 @@ function bestFirstSearch(initial, opts) {
   // - default params: 50/118 = 42.37%
   // - 2x params: 50/72 = 69.44%
   // - 4x params: 50/69 = 72.46%
-  
+
   const beamWidth = opts.beamWidth ?? 2000
   const maxNodes = opts.maxNodes ?? 300000
   const maxDepth = opts.maxDepth ?? 400

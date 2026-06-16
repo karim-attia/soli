@@ -1,0 +1,29 @@
+import type { HistoryEntry } from '../state/history'
+
+export const HISTORY_PAGE_SIZE = 50
+
+export type HistorySummary = {
+  totalCount: number
+  solvedCount: number
+  incompleteCount: number
+  activeCount: number
+}
+
+export type SolvableHistoryStats = {
+  shuffleId: string
+  plays: number
+  solves: number
+}
+
+export type HistoryRepository = {
+  readonly isHistorySupported: boolean
+  initializeHistoryRepository: () => Promise<void>
+  importLegacyHistory: (entries: HistoryEntry[]) => Promise<void>
+  getHistoryPage: (limit: number, offset: number) => Promise<HistoryEntry[]>
+  getHistoryEntryById: (id: string) => Promise<HistoryEntry | null>
+  getHistorySummary: () => Promise<HistorySummary>
+  getSolvableHistoryStats: () => Promise<SolvableHistoryStats[]>
+  insertHistoryEntry: (entry: HistoryEntry) => Promise<void>
+  updateHistoryEntry: (entry: HistoryEntry) => Promise<void>
+  clearHistoryEntries: () => Promise<void>
+}

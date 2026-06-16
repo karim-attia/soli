@@ -121,7 +121,9 @@ function stringifyDataset(shuffles) {
   shuffles.forEach((shuffle) => {
     const nameSegment = shuffle.name ? ` name=${shuffle.name}` : ''
     const sourceSegment = shuffle.source ? ` source=${shuffle.source}` : ''
-    lines.push(`id=${shuffle.id}${nameSegment} addedAt=${shuffle.addedAt}${sourceSegment}`)
+    lines.push(
+      `id=${shuffle.id}${nameSegment} addedAt=${shuffle.addedAt}${sourceSegment}`
+    )
     shuffle.tableau.forEach((column, index) => {
       lines.push(encodeColumn(column, index))
     })
