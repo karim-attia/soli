@@ -54,15 +54,15 @@ describe('gamePersistence', () => {
     expect(restored?.state.selected).toBeNull()
   })
 
-  it('defaults Auto Up to enabled for legacy saved states', async () => {
+  it('defaults Auto Up to enabled when a saved state is missing the setting', async () => {
     const initial = createInitialState()
-    const legacyState = { ...initial } as Partial<typeof initial>
-    delete legacyState.autoUpEnabled
+    const savedState = { ...initial } as Partial<typeof initial>
+    delete savedState.autoUpEnabled
     const payload = {
       version: PERSISTENCE_VERSION,
       savedAt: new Date().toISOString(),
       status: 'in-progress' as const,
-      state: legacyState,
+      state: savedState,
     }
 
     ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
@@ -72,22 +72,19 @@ describe('gamePersistence', () => {
     expect(restored?.state.autoUpEnabled).toBe(true)
   })
 
-  it('defaults legacy games and every undo snapshot to Draw 1', async () => {
+  it('defaults missing draw count values to Draw 1', async () => {
     let current = createInitialState(4)
     current = klondikeReducer(current, { type: 'DRAW_OR_RECYCLE' })
     current = klondikeReducer(current, { type: 'DRAW_OR_RECYCLE' })
     current = klondikeReducer(current, { type: 'UNDO' })
 
-    const legacyState = JSON.parse(JSON.stringify(current)) as Record<string, any>
-    delete legacyState.drawCount
-    delete legacyState.dealSolvabilityBasis
-    legacyState.history.forEach((snapshot: Record<string, any>) => {
+    const savedState = JSON.parse(JSON.stringify(current)) as Record<string, any>
+    delete savedState.drawCount
+    savedState.history.forEach((snapshot: Record<string, any>) => {
       delete snapshot.drawCount
-      delete snapshot.dealSolvabilityBasis
     })
-    legacyState.future.forEach((snapshot: Record<string, any>) => {
+    savedState.future.forEach((snapshot: Record<string, any>) => {
       delete snapshot.drawCount
-      delete snapshot.dealSolvabilityBasis
     })
 
     ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue(
@@ -95,7 +92,7 @@ describe('gamePersistence', () => {
         version: PERSISTENCE_VERSION,
         savedAt: new Date().toISOString(),
         status: 'in-progress',
-        state: legacyState,
+        state: savedState,
       })
     )
 
@@ -122,6 +119,23 @@ describe('gamePersistence', () => {
 
     expect(restored?.state.drawCount).toBe(5)
     expect(restored?.state.history[0].drawCount).toBe(5)
+  })
+
+  it('rejects saved games without exact deal identity', async () => {
+    const initial = createInitialState()
+    const unidentifiedState = { ...initial, exactId: null }
+    const payload = {
+      version: PERSISTENCE_VERSION,
+      savedAt: new Date().toISOString(),
+      status: 'in-progress' as const,
+      state: unidentifiedState,
+    }
+
+    ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+
+    await expect(loadGameState()).rejects.toMatchObject({
+      reason: 'invalid',
+    })
   })
 
   it('throws PersistedGameError for invalid JSON', async () => {

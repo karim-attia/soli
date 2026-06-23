@@ -8,7 +8,6 @@ import {
   type GameState,
   type Rank,
 } from '../../../src/solitaire/klondike'
-import { SOLVABLE_SHUFFLES } from '../../../src/data/solvableShuffles'
 import { normalizeDrawCount } from '../../../src/solitaire/drawCount'
 
 const card = (id: string, rank: Rank): Card => ({
@@ -34,10 +33,9 @@ const createState = (drawCount: GameState['drawCount'], stock: Card[]): GameStat
   isAutoCompleting: false,
   hasWon: false,
   winCelebrations: 0,
-  shuffleId: 'draw-count-test',
-  solvableId: null,
+  exactId: 'E1_0',
+  deckChecksum: 'D1_TEST',
   drawCount,
-  dealSolvabilityBasis: null,
   elapsedMs: 0,
   timerState: 'idle',
   timerStartedAt: null,
@@ -66,12 +64,20 @@ describe('Klondike draw count', () => {
     expect(state.stock).toHaveLength(19)
   })
 
-  it('keeps curated deals marked as Draw 1-solvable at higher draw counts', () => {
-    const state = createSolvableGameState(SOLVABLE_SHUFFLES[0], 4)
+  it('creates curated v2 deals from exact catalog entries', () => {
+    const deal = { exactId: 'E1_0' as const, drawMask: 1 }
+    const state = createSolvableGameState(deal, 1)
 
-    expect(state.drawCount).toBe(4)
-    expect(state.waste).toHaveLength(4)
-    expect(state.dealSolvabilityBasis).toBe('draw1')
+    expect(state.drawCount).toBe(1)
+    expect(state.waste).toHaveLength(1)
+    expect(state.exactId).toBe(deal.exactId)
+    expect(state.deckChecksum).toMatch(/^D1_/)
+  })
+
+  it('rejects curated v2 deals that do not cover the selected draw count', () => {
+    const deal = { exactId: 'E1_0' as const, drawMask: 1 }
+
+    expect(() => createSolvableGameState(deal, 2)).toThrow('is not cataloged for Draw 2')
   })
 
   it('defaults the developer demo to Draw 1', () => {
@@ -80,7 +86,8 @@ describe('Klondike draw count', () => {
     expect(state.drawCount).toBe(1)
     expect(state.waste).toHaveLength(1)
     expect(state.stock).toHaveLength(9)
-    expect(state.dealSolvabilityBasis).toBe('draw1')
+    expect(state.exactId).toMatch(/^E1_/)
+    expect(state.deckChecksum).toMatch(/^D1_/)
   })
 
   it('can create the developer demo with the selected draw count', () => {
@@ -89,7 +96,6 @@ describe('Klondike draw count', () => {
     expect(state.drawCount).toBe(4)
     expect(state.waste).toHaveLength(4)
     expect(state.stock).toHaveLength(6)
-    expect(state.dealSolvabilityBasis).toBe('draw1')
   })
 
   it('normalizes missing and invalid persisted values to Draw 1', () => {

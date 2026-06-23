@@ -29,7 +29,7 @@ import { clearGameState } from '../../../storage/gamePersistence'
 import {
   createHistoryPreviewFromState,
   createStartedHistoryEntryInputFromState,
-  formatShuffleDisplayName,
+  formatDealDisplayName,
   useHistory,
 } from '../../../state/history'
 import { useAnimationToggles, useSettings } from '../../../state/settings'
@@ -44,7 +44,7 @@ import { EMPTY_INVALID_WIGGLE, type InvalidWiggleConfig } from '../types'
 import { computeCardMetrics } from '../utils/cardMetrics'
 import { useKlondikeTimer } from './useKlondikeTimer'
 import { useKlondikePersistence } from './useKlondikePersistence'
-import { useSolvableShuffleSelector } from './useSolvableShuffleSelector'
+import { useSolvableDealSelector } from './useSolvableDealSelector'
 import { useCelebrationController } from './useCelebrationController'
 import { useUndoScrubber } from './useUndoScrubber'
 import { useDemoGameLauncher, DEMO_AUTO_STEP_INTERVAL_MS } from './useDemoGameLauncher'
@@ -60,7 +60,8 @@ type RequestNewGameFn = (options?: { reason?: 'manual' | 'celebration' }) => voi
 
 // PBI-28: Run auto-up (auto-complete) much faster than manual play cadence.
 const AUTO_QUEUE_INTERVAL_MS = 25
-// pls comment that the difference between this and the one above is.
+// Interval controls when the next auto-queue action starts; this delay gives the
+// already-started card flight a tiny head start so rapid auto-up remains readable.
 const AUTO_QUEUE_MOVE_DELAY_MS = 35
 const WIGGLE_SEQUENCE_SEGMENT_COUNT = 3
 const WIGGLE_RESET_BUFFER_MS = 40
@@ -356,7 +357,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const previousHasWonRef = useRef(state.hasWon)
   const requestNewGameRef = useRef<RequestNewGameFn | null>(null)
   const currentStartingPreviewRef = useRef(createHistoryPreviewFromState(state))
-  const currentDisplayNameRef = useRef(formatShuffleDisplayName(state.shuffleId))
+  const currentDisplayNameRef = useRef(formatDealDisplayName(state.exactId))
   const topRowLayoutRef = useRef<LayoutRectangle | null>(null)
   const foundationLayoutsRef = useRef<Partial<Record<Suit, LayoutRectangle>>>({})
   const boardLockedRef = useRef(false)
@@ -440,7 +441,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     stateRef.current = state
   }, [state])
 
-  const currentShuffleId = state.shuffleId
+  const currentExactId = state.exactId
   const currentDrawCount = state.drawCount
   const currentHasWon = state.hasWon
 
@@ -459,10 +460,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       if (!linked) {
         return
       }
-      if (
-        linked.shuffleId !== currentShuffleId ||
-        linked.drawCount !== currentDrawCount
-      ) {
+      if (linked.exactId !== currentExactId || linked.drawCount !== currentDrawCount) {
         currentGameEntryIdRef.current = null
       } else {
         if (linked.status !== 'active') {
@@ -475,7 +473,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     const matchingActive = historyEntries.find(
       (entry) =>
         entry.status === 'active' &&
-        entry.shuffleId === currentShuffleId &&
+        entry.exactId === currentExactId &&
         entry.drawCount === currentDrawCount
     )
     if (matchingActive) {
@@ -485,14 +483,11 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
 
     const currentState = stateRef.current
     const preview = createHistoryPreviewFromState(currentState.history[0] ?? currentState)
-    const displayName = formatShuffleDisplayName(currentShuffleId)
+    const displayName = formatDealDisplayName(currentExactId)
     const entryInput = createStartedHistoryEntryInputFromState(currentState, {
       preview,
       displayName,
     })
-    if (!entryInput) {
-      return
-    }
 
     currentStartingPreviewRef.current = preview
     currentDisplayNameRef.current = displayName
@@ -500,7 +495,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   }, [
     currentDrawCount,
     currentHasWon,
-    currentShuffleId,
+    currentExactId,
     historyEntries,
     historyHydrated,
     recordResult,
@@ -508,18 +503,21 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     updateEntry,
   ])
 
-  // Hook: pick the next solvable shuffle weighted by prior play history when needed.
-  const selectNextSolvableShuffle = useSolvableShuffleSelector(solvableStats)
+  // Hook: pick the next solvable deal weighted by prior play history when needed.
+  const selectNextSolvableDeal = useSolvableDealSelector(
+    solvableStats,
+    preferredDrawCount
+  )
 
   // Deals a new game, respecting solvable-only settings and history bookkeeping.
   const dealNewGame = useCallback(() => {
     if (settingsHydrated && solvableGamesOnly) {
-      const solvableShuffle = selectNextSolvableShuffle()
-      if (solvableShuffle) {
+      const solvableDeal = selectNextSolvableDeal()
+      if (solvableDeal) {
         const startedAt = new Date().toISOString()
-        const solvableState = createSolvableGameState(solvableShuffle, preferredDrawCount)
+        const solvableState = createSolvableGameState(solvableDeal, preferredDrawCount)
         const solvablePreview = createHistoryPreviewFromState(solvableState)
-        const solvableDisplayName = formatShuffleDisplayName(solvableState.shuffleId)
+        const solvableDisplayName = formatDealDisplayName(solvableState.exactId)
 
         currentStartingPreviewRef.current = solvablePreview
         currentDisplayNameRef.current = solvableDisplayName
@@ -529,7 +527,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
           preview: solvablePreview,
           displayName: solvableDisplayName,
         })
-        currentGameEntryIdRef.current = entryInput ? recordResult(entryInput) : null
+        currentGameEntryIdRef.current = recordResult(entryInput)
 
         dispatch({ type: 'HYDRATE_STATE', state: solvableState })
         return
@@ -539,7 +537,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     const startedAt = new Date().toISOString()
     const nextState = createInitialState(preferredDrawCount)
     const preview = createHistoryPreviewFromState(nextState)
-    const displayName = formatShuffleDisplayName(nextState.shuffleId)
+    const displayName = formatDealDisplayName(nextState.exactId)
     const entryInput = createStartedHistoryEntryInputFromState(nextState, {
       startedAt,
       preview,
@@ -548,13 +546,13 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
 
     currentStartingPreviewRef.current = preview
     currentDisplayNameRef.current = displayName
-    currentGameEntryIdRef.current = entryInput ? recordResult(entryInput) : null
+    currentGameEntryIdRef.current = recordResult(entryInput)
     dispatch({ type: 'HYDRATE_STATE', state: nextState })
   }, [
     dispatch,
     preferredDrawCount,
     recordResult,
-    selectNextSolvableShuffle,
+    selectNextSolvableDeal,
     settingsHydrated,
     solvableGamesOnly,
   ])
@@ -563,10 +561,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const recordCurrentGameResult = useCallback(
     (options?: { solved?: boolean }) => {
       const currentState = stateRef.current
-      if (!currentState.shuffleId) {
-        return
-      }
-
       const solved = options?.solved ?? currentState.hasWon
       const status = solved ? 'solved' : 'incomplete'
       const elapsedForRecord = computeElapsedWithReference(
@@ -601,7 +595,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         const matchingActive = historyEntries.find(
           (entry) =>
             entry.status === 'active' &&
-            entry.shuffleId === currentState.shuffleId &&
+            entry.exactId === currentState.exactId &&
             entry.drawCount === currentState.drawCount
         )
         if (matchingActive) {
@@ -616,11 +610,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         }
 
         recordResult({
-          shuffleId: currentState.shuffleId,
+          exactId: currentState.exactId,
+          deckChecksum: currentState.deckChecksum,
           solved,
-          solvable: Boolean(currentState.solvableId),
           drawCount: currentState.drawCount,
-          solvableForDrawCount: currentState.dealSolvabilityBasis === 'draw1' ? 1 : null,
           startedAt: new Date().toISOString(), // Best approximation when no tracked entry
           finishedAt,
           moves: currentState.moveCount,
@@ -821,7 +814,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Sets the stock button label, fading when the stock is empty.
   const drawLabel = state.stock.length ? 'Draw' : ''
 
-  // Parses inbound deep links to trigger the demo shuffle workflow.
+  // Parses inbound deep links to trigger the developer demo deal workflow.
   const processDemoLink = useCallback(
     (incomingUrl: string | null | undefined) => {
       if (!incomingUrl) {
@@ -904,7 +897,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   useEffect(() => {
     if (state.moveCount === 0) {
       currentStartingPreviewRef.current = createHistoryPreviewFromState(state)
-      currentDisplayNameRef.current = formatShuffleDisplayName(state.shuffleId)
+      currentDisplayNameRef.current = formatDealDisplayName(state.exactId)
     }
   }, [state])
 
@@ -981,7 +974,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     dispatchWithFlight({ type: 'UNDO' })
   }, [dispatchWithFlight, notifyInvalidMove])
 
-  // Presents a confirmation dialog and seeds state for a new shuffled game.
+  // Presents a confirmation dialog and seeds state for a newly dealt game.
   const requestNewGame = useCallback<RequestNewGameFn>(
     (options) => {
       clearCelebrationDialogTimer()
@@ -1013,7 +1006,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
           topRowLayoutRef.current = null
           winCelebrationsRef.current = 0
           void clearGameState().catch((error) => {
-            devLog('warn', 'Failed to clear persisted game before new shuffle', error)
+            devLog('warn', 'Failed to clear persisted game before new deal', error)
           })
           dealNewGame()
           updateBoardLocked(false)

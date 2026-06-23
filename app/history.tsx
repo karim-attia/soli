@@ -117,6 +117,8 @@ const STATUS_DISPLAY: Record<
   active: { label: 'Active', colorKey: 'blue' },
 }
 
+const SOLVABLE_BADGE_LABEL = 'Solvable'
+
 const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
   const theme = useTheme()
   const statusDisplay = STATUS_DISPLAY[entry.status] ?? STATUS_DISPLAY.incomplete
@@ -183,16 +185,7 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
 
         <XStack gap="$2" flexWrap="wrap">
           <Badge label={`Draw ${entry.drawCount}`} tone="neutral" />
-          {entry.solvable ? (
-            <Badge
-              label={
-                entry.drawCount === entry.solvableForDrawCount
-                  ? `Solvable for Draw ${entry.drawCount}`
-                  : `Draw ${entry.solvableForDrawCount ?? 1}-solvable deal`
-              }
-              tone="info"
-            />
-          ) : null}
+          {entry.solvable ? <Badge label={SOLVABLE_BADGE_LABEL} tone="info" /> : null}
         </XStack>
       </YStack>
     </Pressable>
@@ -222,7 +215,7 @@ const EmptyHistory = ({
     </Text>
     <Paragraph color="$color10">
       {hydrated
-        ? 'Play a game of Klondike to start building your history. Completed games and their shuffles will appear here.'
+        ? 'Play a game of Klondike to start building your history. Completed games and their deals will appear here.'
         : 'Please wait while we retrieve your recent games.'}
     </Paragraph>
   </YStack>
@@ -432,16 +425,7 @@ const HistoryPreviewSheet = ({ entry, onDismiss }: HistoryPreviewSheetProps) => 
         </YStack>
         <XStack gap="$2" flexWrap="wrap">
           <Badge label={`Draw ${entry.drawCount}`} tone="neutral" />
-          {entry.solvable ? (
-            <Badge
-              label={
-                entry.drawCount === entry.solvableForDrawCount
-                  ? `Solvable for Draw ${entry.drawCount}`
-                  : `Draw ${entry.solvableForDrawCount ?? 1}-solvable deal`
-              }
-              tone="info"
-            />
-          ) : null}
+          {entry.solvable ? <Badge label={SOLVABLE_BADGE_LABEL} tone="info" /> : null}
           {typeof entry.moves === 'number' && entry.moves >= 0 ? (
             <Badge
               label={`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`}

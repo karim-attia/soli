@@ -33,8 +33,8 @@ const createEmptyState = (overrides: Partial<GameState> = {}): GameState => ({
   isAutoCompleting: false,
   hasWon: false,
   winCelebrations: 0,
-  shuffleId: 'test',
-  solvableId: null,
+  exactId: 'E1_0',
+  deckChecksum: 'D1_TEST',
   elapsedMs: 0,
   timerState: 'idle',
   timerStartedAt: null,
@@ -44,7 +44,6 @@ const createEmptyState = (overrides: Partial<GameState> = {}): GameState => ({
   autoUpEnabled: true,
   ...overrides,
   drawCount: overrides.drawCount ?? 1,
-  dealSolvabilityBasis: overrides.dealSolvabilityBasis ?? null,
 })
 
 const createPileThrough = (suit: Suit, topRank: Rank): Card[] =>

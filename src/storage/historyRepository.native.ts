@@ -1,31 +1,32 @@
 import * as SQLite from 'expo-sqlite'
 
-import { extractSolvableBaseId } from '../data/solvableShuffles'
+import { isExactDealSolvableForDrawCount } from '../data/solvableDealsV2'
 import type { HistoryEntry } from '../state/history'
 import {
   HISTORY_PAGE_SIZE,
   type HistorySummary,
-  type SolvableHistoryStats,
+  type SolvableDealHistoryStats,
 } from './historyRepository.types'
 
 export { HISTORY_PAGE_SIZE }
 
 export const isHistorySupported = true
 
-const DATABASE_NAME = 'soli-history.db'
+// Phase 1 starts exact-ID history in a fresh SQLite file. Earlier SQLite schemas
+// only existed on local test devices, so a new file is simpler than carrying
+// migration code for pre-release identity columns.
+const DATABASE_NAME = 'soli-history-v4.db'
 const DATABASE_VERSION = 1
 
 type HistoryRow = {
   id: string
-  shuffle_id: string
-  solvable_base_id: string | null
+  exact_id: string
+  deck_checksum: string
   display_name: string
   started_at: string
   finished_at: string | null
   solved: number
-  solvable: number
   draw_count: number
-  solvable_for_draw_count: number | null
   moves: number | null
   duration_ms: number | null
   preview_json: string
@@ -40,44 +41,38 @@ type SummaryRow = {
 }
 
 type SolvableStatsRow = {
-  solvable_base_id: string
-  plays: number
-  solves: number
+  exact_id: string
+  draw_count: number
+  solved: number
 }
 
 const INSERT_SQL = `
   INSERT INTO history_entries (
     id,
-    shuffle_id,
-    solvable_base_id,
+    exact_id,
+    deck_checksum,
     display_name,
     started_at,
     finished_at,
     solved,
-    solvable,
     draw_count,
-    solvable_for_draw_count,
     moves,
     duration_ms,
     preview_json,
     status
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
-
-const INSERT_IF_MISSING_SQL = `${INSERT_SQL.trim()} ON CONFLICT(id) DO NOTHING`
 
 const UPDATE_SQL = `
   UPDATE history_entries
   SET
-    shuffle_id = ?,
-    solvable_base_id = ?,
+    exact_id = ?,
+    deck_checksum = ?,
     display_name = ?,
     started_at = ?,
     finished_at = ?,
     solved = ?,
-    solvable = ?,
     draw_count = ?,
-    solvable_for_draw_count = ?,
     moves = ?,
     duration_ms = ?,
     preview_json = ?,
@@ -108,15 +103,13 @@ const openHistoryDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         await transaction.execAsync(`
           CREATE TABLE IF NOT EXISTS history_entries (
             id TEXT PRIMARY KEY NOT NULL,
-            shuffle_id TEXT NOT NULL,
-            solvable_base_id TEXT,
+            exact_id TEXT NOT NULL,
+            deck_checksum TEXT NOT NULL,
             display_name TEXT NOT NULL,
             started_at TEXT NOT NULL,
             finished_at TEXT,
             solved INTEGER NOT NULL,
-            solvable INTEGER NOT NULL,
             draw_count INTEGER NOT NULL,
-            solvable_for_draw_count INTEGER,
             moves INTEGER,
             duration_ms INTEGER,
             preview_json TEXT NOT NULL,
@@ -124,8 +117,8 @@ const openHistoryDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
           );
           CREATE INDEX IF NOT EXISTS history_entries_started_at
             ON history_entries(started_at DESC, id DESC);
-          CREATE INDEX IF NOT EXISTS history_entries_solvable_base_id
-            ON history_entries(solvable_base_id);
+          CREATE INDEX IF NOT EXISTS history_entries_exact_id
+            ON history_entries(exact_id);
           CREATE UNIQUE INDEX IF NOT EXISTS history_entries_one_active
             ON history_entries(status)
             WHERE status = 'active';
@@ -154,15 +147,13 @@ const getDatabase = (): Promise<SQLite.SQLiteDatabase> => {
 
 const toInsertParams = (entry: HistoryEntry): SQLite.SQLiteBindValue[] => [
   entry.id,
-  entry.shuffleId,
-  entry.solvable ? extractSolvableBaseId(entry.shuffleId) : null,
+  entry.exactId,
+  entry.deckChecksum,
   entry.displayName,
   entry.startedAt,
   entry.finishedAt,
   entry.solved ? 1 : 0,
-  entry.solvable ? 1 : 0,
   entry.drawCount,
-  entry.solvableForDrawCount,
   entry.moves,
   entry.durationMs,
   JSON.stringify(entry.preview),
@@ -170,15 +161,13 @@ const toInsertParams = (entry: HistoryEntry): SQLite.SQLiteBindValue[] => [
 ]
 
 const toUpdateParams = (entry: HistoryEntry): SQLite.SQLiteBindValue[] => [
-  entry.shuffleId,
-  entry.solvable ? extractSolvableBaseId(entry.shuffleId) : null,
+  entry.exactId,
+  entry.deckChecksum,
   entry.displayName,
   entry.startedAt,
   entry.finishedAt,
   entry.solved ? 1 : 0,
-  entry.solvable ? 1 : 0,
   entry.drawCount,
-  entry.solvableForDrawCount,
   entry.moves,
   entry.durationMs,
   JSON.stringify(entry.preview),
@@ -211,22 +200,27 @@ const parsePreview = (serialized: string): HistoryEntry['preview'] => {
   return createEmptyPreview()
 }
 
-const toHistoryEntry = (row: HistoryRow): HistoryEntry => ({
-  id: row.id,
-  shuffleId: row.shuffle_id,
-  displayName: row.display_name,
-  startedAt: row.started_at,
-  finishedAt: row.finished_at,
-  solved: row.solved === 1,
-  solvable: row.solvable === 1,
-  drawCount: row.draw_count as HistoryEntry['drawCount'],
-  solvableForDrawCount:
-    row.solvable_for_draw_count as HistoryEntry['solvableForDrawCount'],
-  moves: row.moves,
-  durationMs: row.duration_ms,
-  preview: parsePreview(row.preview_json),
-  status: row.status,
-})
+const toHistoryEntry = (row: HistoryRow): HistoryEntry => {
+  const drawCount = row.draw_count as HistoryEntry['drawCount']
+  const solvable = isExactDealSolvableForDrawCount(row.exact_id, drawCount)
+
+  return {
+    id: row.id,
+    exactId: row.exact_id,
+    deckChecksum: row.deck_checksum,
+    displayName: row.display_name,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    solved: row.solved === 1,
+    solvable,
+    drawCount,
+    solvableForDrawCount: solvable ? drawCount : null,
+    moves: row.moves,
+    durationMs: row.duration_ms,
+    preview: parsePreview(row.preview_json),
+    status: row.status,
+  }
+}
 
 const normalizePageArgument = (value: number): number =>
   Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0
@@ -247,33 +241,6 @@ export const initializeHistoryRepository = async (): Promise<void> => {
   await getDatabase()
 }
 
-export const importLegacyHistory = async (entries: HistoryEntry[]): Promise<void> => {
-  const database = await getDatabase()
-  if (!entries.length) {
-    return
-  }
-
-  // One exclusive transaction plus stable IDs makes interrupted imports retry-safe.
-  await database.withExclusiveTransactionAsync(async (transaction) => {
-    const existingActive = await transaction.getFirstAsync<{ id: string }>(
-      `SELECT id FROM history_entries WHERE status = 'active' LIMIT 1`
-    )
-    const statement = await transaction.prepareAsync(INSERT_IF_MISSING_SQL)
-    try {
-      for (const entry of entries) {
-        // Preserve a newer database active game when legacy cleanup previously failed.
-        const importedEntry =
-          entry.status === 'active' && existingActive && existingActive.id !== entry.id
-            ? { ...entry, status: 'incomplete' as const }
-            : entry
-        await statement.executeAsync(toInsertParams(importedEntry))
-      }
-    } finally {
-      await statement.finalizeAsync()
-    }
-  })
-}
-
 export const getHistoryPage = async (
   limit: number,
   offset: number
@@ -282,15 +249,13 @@ export const getHistoryPage = async (
   const rows = await database.getAllAsync<HistoryRow>(
     `SELECT
        id,
-       shuffle_id,
-       solvable_base_id,
+       exact_id,
+       deck_checksum,
        display_name,
        started_at,
        finished_at,
        solved,
-       solvable,
        draw_count,
-       solvable_for_draw_count,
        moves,
        duration_ms,
        preview_json,
@@ -309,15 +274,13 @@ export const getHistoryEntryById = async (id: string): Promise<HistoryEntry | nu
   const row = await database.getFirstAsync<HistoryRow>(
     `SELECT
        id,
-       shuffle_id,
-       solvable_base_id,
+       exact_id,
+       deck_checksum,
        display_name,
        started_at,
        finished_at,
        solved,
-       solvable,
        draw_count,
-       solvable_for_draw_count,
        moves,
        duration_ms,
        preview_json,
@@ -352,22 +315,40 @@ export const getHistorySummary = async (): Promise<HistorySummary> => {
   }
 }
 
-export const getSolvableHistoryStats = async (): Promise<SolvableHistoryStats[]> => {
+export const getSolvableDealHistoryStats = async (): Promise<
+  SolvableDealHistoryStats[]
+> => {
   const database = await getDatabase()
   const rows = await database.getAllAsync<SolvableStatsRow>(`
     SELECT
-      solvable_base_id,
-      COUNT(*) AS plays,
-      COALESCE(SUM(CASE WHEN solved = 1 THEN 1 ELSE 0 END), 0) AS solves
+      exact_id,
+      draw_count,
+      solved
     FROM history_entries
-    WHERE solvable = 1 AND draw_count = 1 AND solvable_base_id IS NOT NULL
-    GROUP BY solvable_base_id
+    WHERE exact_id IS NOT NULL
   `)
 
-  return rows.map((row) => ({
-    shuffleId: row.solvable_base_id,
-    plays: row.plays,
-    solves: row.solves,
+  const stats = new Map<string, { plays: number; solves: number }>()
+  rows.forEach((row) => {
+    if (
+      !isExactDealSolvableForDrawCount(
+        row.exact_id,
+        row.draw_count as HistoryEntry['drawCount']
+      )
+    ) {
+      return
+    }
+
+    const current = stats.get(row.exact_id) ?? { plays: 0, solves: 0 }
+    current.plays += 1
+    current.solves += row.solved === 1 ? 1 : 0
+    stats.set(row.exact_id, current)
+  })
+
+  return Array.from(stats.entries()).map(([exactId, record]) => ({
+    exactId,
+    plays: record.plays,
+    solves: record.solves,
   }))
 }
 

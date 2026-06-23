@@ -1,5 +1,5 @@
 import { normalizeHistoryEntry, type HistoryEntry } from '../../../src/state/history'
-import { isDrawOneSolvabilityResult } from '../../../src/features/klondike/hooks/useSolvableShuffleSelector'
+import { getSolvableDealsForDrawCount } from '../../../src/data/solvableDealsV2'
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
@@ -8,7 +8,8 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 const createEntry = (overrides: Partial<HistoryEntry> = {}): HistoryEntry =>
   ({
     id: 'history-1',
-    shuffleId: 'SOLVABLE:test',
+    exactId: 'E1_0',
+    deckChecksum: 'D1_TEST',
     displayName: 'Test',
     startedAt: '2026-06-05T10:00:00.000Z',
     finishedAt: null,
@@ -31,25 +32,28 @@ const createEntry = (overrides: Partial<HistoryEntry> = {}): HistoryEntry =>
     ...overrides,
   }) as HistoryEntry
 
-describe('history draw count migration', () => {
-  it('defaults legacy solvable entries to Draw 1 metadata', () => {
+describe('history draw count metadata', () => {
+  it('does not preserve stale solvable labels without catalog proof', () => {
     const normalized = normalizeHistoryEntry(createEntry())
 
     expect(normalized.drawCount).toBe(1)
-    expect(normalized.solvableForDrawCount).toBe(1)
-    expect(isDrawOneSolvabilityResult(normalized)).toBe(true)
+    expect(normalized.solvable).toBe(false)
+    expect(normalized.solvableForDrawCount).toBeNull()
   })
 
-  it('keeps higher-draw results out of Draw 1 solvability statistics', () => {
+  it('derives solvability from exact catalog ID and the played draw count', () => {
+    const [catalogDeal] = getSolvableDealsForDrawCount(1)
     const normalized = normalizeHistoryEntry(
       createEntry({
-        drawCount: 5,
-        solvableForDrawCount: 1,
+        exactId: catalogDeal.exactId,
+        drawCount: 1,
+        solvable: false,
+        solvableForDrawCount: null,
       })
     )
 
-    expect(normalized.drawCount).toBe(5)
+    expect(normalized.drawCount).toBe(1)
+    expect(normalized.solvable).toBe(true)
     expect(normalized.solvableForDrawCount).toBe(1)
-    expect(isDrawOneSolvabilityResult(normalized)).toBe(false)
   })
 })

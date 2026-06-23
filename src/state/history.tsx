@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
   createContext,
   useCallback,
@@ -7,52 +6,36 @@ import {
   useMemo,
   useRef,
   useState,
-  type MutableRefObject,
   type PropsWithChildren,
 } from 'react'
 
 import type { GameSnapshot, GameState, Rank, Suit } from '../solitaire/klondike'
 import { FOUNDATION_SUIT_ORDER, TABLEAU_COLUMN_COUNT } from '../solitaire/klondike'
-import {
-  DEFAULT_DRAW_COUNT,
-  normalizeDrawCount,
-  type DrawCount,
-} from '../solitaire/drawCount'
+import { normalizeDrawCount, type DrawCount } from '../solitaire/drawCount'
 import {
   HISTORY_PAGE_SIZE,
   clearHistoryEntries,
   getHistoryEntryById,
   getHistoryPage,
   getHistorySummary,
-  getSolvableHistoryStats,
-  importLegacyHistory,
+  getSolvableDealHistoryStats,
   initializeHistoryRepository,
   insertHistoryEntry,
   isHistorySupported,
   updateHistoryEntry,
 } from '../storage/historyRepository'
 import type { HistorySummary } from '../storage/historyRepository.types'
-import { extractSolvableBaseId, SOLVABLE_SHUFFLES } from '../data/solvableShuffles'
+import { isExactDealSolvableForDrawCount } from '../data/solvableDealsV2'
+import { formatExactDealDisplayName } from '../solitaire/dealIdentity'
 import { devLog } from '../utils/devLogger'
-import { computeElapsedWithReference } from '../utils/time'
-
-const SOLVABLE_SHUFFLE_NAME_LOOKUP = new Map<string, string>(
-  SOLVABLE_SHUFFLES.map((shuffle) => [shuffle.id, shuffle.name])
-)
-
-const formatTitleCase = (value: string): string =>
-  value
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
 
 // Task 10-6: Game status - 'active' for in-progress, 'incomplete' for abandoned, 'solved' for won
 export type HistoryEntryStatus = 'active' | 'incomplete' | 'solved'
 
 export type HistoryEntry = {
   id: string
-  shuffleId: string
+  exactId: string
+  deckChecksum: string
   displayName: string
   startedAt: string // Task 10-6: When game started
   finishedAt: string | null // Task 10-6: When game completed (null if still active/incomplete)
@@ -67,11 +50,10 @@ export type HistoryEntry = {
 }
 
 export type RecordGameResultInput = {
-  shuffleId: string
+  exactId: string
+  deckChecksum: string
   solved: boolean
-  solvable?: boolean
   drawCount?: DrawCount
-  solvableForDrawCount?: DrawCount | null
   startedAt?: string | Date // Task 10-6: When game started
   finishedAt?: string | Date | null // Task 10-6: When game completed
   moves?: number
@@ -79,10 +61,6 @@ export type RecordGameResultInput = {
   preview: HistoryPreview
   displayName?: string
   status?: HistoryEntryStatus
-}
-
-export type RecordGameResultOptions = {
-  solved?: boolean
 }
 
 // Task 10-6: Partial updates for existing entries
@@ -93,15 +71,6 @@ export type UpdateEntryInput = {
   durationMs?: number
   finishedAt?: string | Date | null
   preview?: HistoryPreview
-}
-
-export type RecordGameResultFromStateParams = {
-  state: GameState
-  lastRecordedShuffleRef: MutableRefObject<string | null>
-  recordResult: (input: RecordGameResultInput) => string
-  preview: HistoryPreview
-  displayName: string
-  options?: RecordGameResultOptions
 }
 
 export type CreateStartedHistoryEntryInputOptions = {
@@ -151,13 +120,6 @@ type HistoryContextValue = {
 
 const HistoryContext = createContext<HistoryContextValue | undefined>(undefined)
 
-const STORAGE_KEY = '@soli/history/v1'
-
-type HistoryStoragePayload = {
-  version: number
-  entries: HistoryEntry[]
-}
-
 const EMPTY_HISTORY_SUMMARY: HistorySummary = {
   totalCount: 0,
   solvedCount: 0,
@@ -189,24 +151,10 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
       try {
         await initializeHistoryRepository()
 
-        if (isHistorySupported) {
-          const legacyEntries = await readLegacyHistoryEntries()
-          if (legacyEntries) {
-            // Stable history IDs plus ID-scoped conflict handling make retries safe.
-            await importLegacyHistory(legacyEntries)
-            try {
-              await AsyncStorage.removeItem(STORAGE_KEY)
-            } catch (error) {
-              // The SQLite import already committed, so cleanup failure must not hide it.
-              devLog('warn', '[history] Failed to remove migrated legacy history', error)
-            }
-          }
-        }
-
         const [initialEntries, nextSummary, rawSolvableStats] = await Promise.all([
           getHistoryPage(HISTORY_PAGE_SIZE, 0),
           getHistorySummary(),
-          getSolvableHistoryStats(),
+          getSolvableDealHistoryStats(),
         ])
         if (cancelled) {
           return
@@ -242,7 +190,7 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
   const refreshMetadata = useCallback(async () => {
     const [nextSummary, rawSolvableStats] = await Promise.all([
       getHistorySummary(),
-      getSolvableHistoryStats(),
+      getSolvableDealHistoryStats(),
     ])
     if (!mountedRef.current) {
       return
@@ -258,7 +206,7 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
     const [persistedEntries, nextSummary, rawSolvableStats] = await Promise.all([
       getHistoryPage(requestedCount, 0),
       getHistorySummary(),
-      getSolvableHistoryStats(),
+      getSolvableDealHistoryStats(),
     ])
     if (!mountedRef.current) {
       return
@@ -360,9 +308,6 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
     setSummary(EMPTY_HISTORY_SUMMARY)
     setSolvableStats(new Map())
     setHasMore(false)
-    AsyncStorage.removeItem(STORAGE_KEY).catch((error) => {
-      devLog('warn', '[history] Failed to clear legacy history entries', error)
-    })
     queueRepositoryTask(clearHistoryEntries)
   }, [queueRepositoryTask])
 
@@ -446,72 +391,21 @@ export const useHistory = (): HistoryContextValue => {
   return context
 }
 
-export const recordGameResultFromState = ({
-  state,
-  lastRecordedShuffleRef,
-  recordResult,
-  preview,
-  displayName,
-  options,
-}: RecordGameResultFromStateParams) => {
-  if (!state.shuffleId) {
-    return
-  }
-
-  if (lastRecordedShuffleRef.current === state.shuffleId) {
-    return
-  }
-
-  const solved = options?.solved ?? state.hasWon
-  if (!solved && state.moveCount === 0) {
-    return
-  }
-
-  const elapsedForRecord = computeElapsedWithReference(
-    state.elapsedMs,
-    state.timerState,
-    state.timerStartedAt,
-    Date.now()
-  )
-
-  recordResult({
-    shuffleId: state.shuffleId,
-    solved,
-    solvable: Boolean(state.solvableId),
-    drawCount: state.drawCount,
-    solvableForDrawCount:
-      state.dealSolvabilityBasis === 'draw1' ? DEFAULT_DRAW_COUNT : null,
-    finishedAt: new Date().toISOString(),
-    moves: state.moveCount,
-    durationMs: elapsedForRecord,
-    preview,
-    displayName,
-  })
-
-  lastRecordedShuffleRef.current = state.shuffleId
-}
-
 export const createStartedHistoryEntryInputFromState = (
   state: GameState,
   options: CreateStartedHistoryEntryInputOptions = {}
-): RecordGameResultInput | null => {
-  if (!state.shuffleId) {
-    return null
-  }
-
+): RecordGameResultInput => {
   return {
-    shuffleId: state.shuffleId,
+    exactId: state.exactId,
+    deckChecksum: state.deckChecksum,
     solved: false,
-    solvable: Boolean(state.solvableId),
     drawCount: state.drawCount,
-    solvableForDrawCount:
-      state.dealSolvabilityBasis === 'draw1' ? DEFAULT_DRAW_COUNT : null,
     startedAt: options.startedAt ?? new Date().toISOString(),
     finishedAt: null,
     moves: 0,
     durationMs: 0,
     preview: options.preview ?? createHistoryPreviewFromState(state),
-    displayName: options.displayName ?? formatShuffleDisplayName(state.shuffleId),
+    displayName: options.displayName ?? formatDealDisplayName(state.exactId),
     status: 'active',
   }
 }
@@ -535,19 +429,20 @@ const createEntry = (input: RecordGameResultInput): HistoryEntry => {
           ? now
           : null
   const preview = sanitizePreview(input.preview)
-  const displayName = input.displayName ?? formatShuffleDisplayName(input.shuffleId)
+  const exactId = input.exactId
+  const displayName = input.displayName ?? formatDealDisplayName(exactId)
   // Task 10-6: derive status from input or solved boolean
   const status: HistoryEntryStatus = input.status ?? (input.solved ? 'solved' : 'active')
   const drawCount = normalizeDrawCount(input.drawCount)
-  const solvableForDrawCount = input.solvable
-    ? normalizeDrawCount(input.solvableForDrawCount)
-    : null
+  const derivedSolvable = isExactDealSolvableForDrawCount(exactId, drawCount)
+  const solvableForDrawCount = derivedSolvable ? drawCount : null
   return {
     id: generateHistoryId(),
-    shuffleId: input.shuffleId,
+    exactId,
+    deckChecksum: input.deckChecksum,
     displayName,
     solved: input.solved,
-    solvable: input.solvable ?? false,
+    solvable: derivedSolvable,
     drawCount,
     solvableForDrawCount,
     startedAt,
@@ -640,61 +535,12 @@ export const mergeHistoryEntries = (
   return merged
 }
 
-const isValidEntry = (entry: unknown): entry is HistoryEntry => {
-  if (!entry || typeof entry !== 'object') {
-    return false
-  }
-
-  const candidate = entry as Partial<HistoryEntry>
-  return (
-    typeof candidate.id === 'string' &&
-    typeof candidate.shuffleId === 'string' &&
-    typeof candidate.displayName === 'string' &&
-    // Task 10-6: finishedAt can be null/undefined for active games, or string for completed/old entries
-    (candidate.finishedAt === null ||
-      candidate.finishedAt === undefined ||
-      typeof candidate.finishedAt === 'string') &&
-    typeof candidate.solved === 'boolean' &&
-    typeof candidate.solvable === 'boolean' &&
-    (candidate.moves === null ||
-      typeof candidate.moves === 'number' ||
-      candidate.moves === undefined) &&
-    (candidate.durationMs === null ||
-      typeof candidate.durationMs === 'number' ||
-      candidate.durationMs === undefined) &&
-    candidate.preview !== undefined
-  )
-}
-
-const readLegacyHistoryEntries = async (): Promise<HistoryEntry[] | null> => {
-  const serialized = await AsyncStorage.getItem(STORAGE_KEY)
-  if (!serialized) {
-    return null
-  }
-
-  try {
-    const parsed = JSON.parse(serialized) as HistoryStoragePayload | null
-    if (!parsed || !Array.isArray(parsed.entries)) {
-      return []
-    }
-
-    const validated = parsed.entries
-      .filter(isValidEntry)
-      .map((entry) => normalizeHistoryEntry(entry))
-    return normalizeActiveEntries(validated)
-  } catch (error) {
-    // Keep unreadable legacy data in place so a future recovery remains possible.
-    devLog('warn', '[history] Failed to parse legacy history entries', error)
-    return null
-  }
-}
-
 const createSolvableStatsMap = (
-  rows: Array<{ shuffleId: string; plays: number; solves: number }>
+  rows: Array<{ exactId: string; plays: number; solves: number }>
 ): ReadonlyMap<string, SolvableHistoryStat> =>
   new Map(
     rows.map((row) => [
-      row.shuffleId,
+      row.exactId,
       {
         plays: row.plays,
         solves: row.solves,
@@ -702,27 +548,26 @@ const createSolvableStatsMap = (
     ])
   )
 
+// Row ID generator only; it is not a deck generator and does not identify a deal.
 const generateHistoryId = () =>
   `hist_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
 
 export const normalizeHistoryEntry = (entry: HistoryEntry): HistoryEntry => {
   const preview = sanitizePreview(entry.preview)
-  const displayName = entry.displayName || formatShuffleDisplayName(entry.shuffleId)
-  // Task 10-6: backward compatibility - derive status from solved if missing
-  const status: HistoryEntryStatus =
-    entry.status ?? (entry.solved ? 'solved' : 'incomplete')
-  // Task 10-6: backward compatibility - use finishedAt as startedAt if missing
-  const startedAt = entry.startedAt ?? entry.finishedAt ?? new Date().toISOString()
-  // For old entries, finishedAt was always set; keep it for solved, null for incomplete
-  const finishedAt = entry.finishedAt ?? (entry.solved ? startedAt : null)
+  const exactId = entry.exactId
+  const displayName = entry.displayName || formatDealDisplayName(exactId)
+  const status = entry.status
+  const startedAt = entry.startedAt
+  const finishedAt = entry.finishedAt
   const drawCount = normalizeDrawCount(entry.drawCount)
-  const solvableForDrawCount = entry.solvable
-    ? normalizeDrawCount(entry.solvableForDrawCount)
-    : null
+  const derivedSolvable = isExactDealSolvableForDrawCount(exactId, drawCount)
+  const solvableForDrawCount = derivedSolvable ? drawCount : null
 
   return {
     ...entry,
+    exactId,
     displayName,
+    solvable: derivedSolvable,
     preview,
     startedAt,
     finishedAt,
@@ -761,36 +606,11 @@ const sanitizePreview = (preview: HistoryPreview | undefined): HistoryPreview =>
 }
 
 const sanitizePreviewColumn = (column: unknown): HistoryPreviewColumn => {
-  const rawColumn = column as Partial<HistoryPreviewColumn & { hiddenCount?: number }>
+  const rawColumn = column as Partial<HistoryPreviewColumn>
   const rawCards = Array.isArray(rawColumn?.cards) ? rawColumn.cards : []
   const sanitizedCards: HistoryPreviewCard[] = rawCards
     .map((card) => (isValidCard(card) ? { ...card, faceUp: Boolean(card.faceUp) } : null))
     .filter((card): card is HistoryPreviewCard => card !== null)
-
-  const inferredHidden = sanitizedCards.filter((card) => !card.faceUp).length
-  const legacyHidden =
-    typeof (rawColumn as { hiddenCount?: unknown })?.hiddenCount === 'number'
-      ? Math.max(
-          0,
-          Math.floor(((rawColumn as { hiddenCount?: number }).hiddenCount as number) ?? 0)
-        )
-      : inferredHidden
-
-  const placeholdersNeeded = Math.max(0, legacyHidden - inferredHidden)
-  if (placeholdersNeeded > 0) {
-    const placeholders = Array.from({ length: placeholdersNeeded }, () =>
-      createPlaceholderCard()
-    )
-    return {
-      cards: [...placeholders, ...sanitizedCards],
-    }
-  }
-
-  if (!sanitizedCards.length && legacyHidden > 0) {
-    return {
-      cards: Array.from({ length: legacyHidden }, () => createPlaceholderCard()),
-    }
-  }
 
   return {
     cards: sanitizedCards,
@@ -841,12 +661,6 @@ const createEmptyPreview = (): HistoryPreview => ({
   stockCount: 0,
 })
 
-const createPlaceholderCard = (): HistoryPreviewCard => ({
-  suit: FOUNDATION_SUIT_ORDER[0],
-  rank: 1,
-  faceUp: false,
-})
-
 // Task 10-7: Preview is derived from a snapshot (start state preferred).
 export const createHistoryPreviewFromState = (state: GameSnapshot): HistoryPreview => {
   const tableau = state.tableau.map((column) => ({
@@ -891,19 +705,12 @@ export const createHistoryPreviewFromState = (state: GameSnapshot): HistoryPrevi
   }
 }
 
-export const formatShuffleDisplayName = (shuffleId: string): string => {
-  if (shuffleId.startsWith('SOLVABLE:')) {
-    const baseId = extractSolvableBaseId(shuffleId)
-    const lookupName = baseId
-      ? (SOLVABLE_SHUFFLE_NAME_LOOKUP.get(baseId) ?? baseId)
-      : null
-    return lookupName ? formatTitleCase(lookupName) : 'Solvable Shuffle'
+export const formatDealDisplayName = (exactId: string): string => {
+  const exactDisplay = formatExactDealDisplayName(exactId)
+  if (exactDisplay) {
+    return exactDisplay
   }
 
-  if (shuffleId.startsWith('LEGACY-')) {
-    return `Legacy ${shuffleId.slice(-4).toUpperCase()}`
-  }
-
-  const compact = shuffleId.slice(-5).toUpperCase()
+  const compact = exactId.slice(-5).toUpperCase()
   return `Game ${compact}`
 }

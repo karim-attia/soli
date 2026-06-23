@@ -44,10 +44,6 @@ export const DrawCountSelector = ({
         appearance={resolveThemeName(colorScheme)}
         style={{ width: '100%' }}
       />
-      <Paragraph color="$color10" fontSize="$3">
-        Deals are generated to be solvable with Draw 1. Higher draw counts use the same
-        deals and may not always be solvable.
-      </Paragraph>
     </YStack>
   )
 }

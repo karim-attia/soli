@@ -28,7 +28,7 @@ type UseDemoGameLauncherOptions = {
   foundationLayoutsRef: MutableRefObject<Partial<Record<Suit, LayoutRectangle>>>
   topRowLayoutRef: MutableRefObject<LayoutRectangle | null>
   winCelebrationsRef: MutableRefObject<number>
-  // Task 10-6: Renamed from lastRecordedShuffleRef to track entry ID
+  // Tracks the current active history row while the demo replaces the live game.
   currentGameEntryIdRef: MutableRefObject<string | null>
   updateBoardLocked: (locked: boolean) => void
   clearGameState: () => Promise<void>
@@ -190,7 +190,7 @@ export const useDemoGameLauncher = ({
       devLog('info', '[Demo] Game loaded (options=' + JSON.stringify(options ?? {}) + ')')
 
       void clearGameState().catch((error) => {
-        console.warn('Failed to clear persisted game before demo shuffle', error)
+        console.warn('Failed to clear persisted game before demo deal', error)
       })
 
       const shouldAutoReveal = options?.autoReveal || options?.autoSolve

@@ -1,16 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-import type {
-  DealSolvabilityBasis,
-  GameSnapshot,
-  GameState,
-  TimerState,
-} from '../solitaire/klondike'
+import type { GameSnapshot, GameState, TimerState } from '../solitaire/klondike'
 import { normalizeDrawCount, type DrawCount } from '../solitaire/drawCount'
 
 // Requirement PBI-13: persist in-progress Klondike sessions locally.
-export const KLONDIKE_STORAGE_KEY = 'soli/klondike/v1'
-export const PERSISTENCE_VERSION = 1
+export const KLONDIKE_STORAGE_KEY = 'soli/klondike/v2'
+export const PERSISTENCE_VERSION = 2
 
 export type PersistedGameErrorReason = 'invalid' | 'unsupported-version'
 
@@ -111,7 +106,8 @@ const isPersistedGamePayload = (value: unknown): value is PersistedGamePayload =
     Array.isArray(candidate.tableau) &&
     Array.isArray(candidate.history ?? []) &&
     Array.isArray(candidate.future ?? []) &&
-    typeof candidate.shuffleId === 'string'
+    typeof candidate.exactId === 'string' &&
+    typeof candidate.deckChecksum === 'string'
   )
 }
 
@@ -160,19 +156,10 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
     )
   }
 
-  const shuffleId =
-    typeof parsed.state.shuffleId === 'string' && parsed.state.shuffleId.length
-      ? parsed.state.shuffleId
-      : createLegacyShuffleId()
-
-  const solvableIdValue =
-    typeof (parsed.state as { solvableId?: unknown }).solvableId === 'string'
-      ? (parsed.state as { solvableId: string }).solvableId
-      : null
-
   const parsedState = parsed.state as Partial<GameState> & {
     drawCount?: unknown
-    dealSolvabilityBasis?: unknown
+    exactId?: unknown
+    deckChecksum?: unknown
     elapsedMs?: unknown
     timerState?: unknown
     timerStartedAt?: unknown
@@ -185,10 +172,8 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
       ? parsedState.elapsedMs
       : 0
   const drawCount = normalizeDrawCount(parsedState.drawCount)
-  const dealSolvabilityBasis = normalizeDealSolvabilityBasis(
-    parsedState.dealSolvabilityBasis,
-    solvableIdValue
-  )
+  const exactId = parsedState.exactId as string
+  const deckChecksum = parsedState.deckChecksum as string
 
   const rawTimerState = isTimerState(parsedState.timerState)
     ? parsedState.timerState
@@ -211,13 +196,15 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
 
   const historySnapshots = normalizeSnapshots(parsed.state.history, {
     drawCount,
-    dealSolvabilityBasis,
+    exactId,
+    deckChecksum,
   })
   const futureSnapshots = normalizeSnapshots(
     (parsed.state as { future?: unknown }).future,
     {
       drawCount,
-      dealSolvabilityBasis,
+      exactId,
+      deckChecksum,
     }
   )
 
@@ -227,12 +214,11 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
     timerState,
     timerStartedAt,
     drawCount,
-    dealSolvabilityBasis,
     selected: null,
     history: historySnapshots,
     future: futureSnapshots,
-    shuffleId,
-    solvableId: solvableIdValue,
+    exactId,
+    deckChecksum,
     autoUpEnabled:
       typeof (parsed.state as { autoUpEnabled?: unknown }).autoUpEnabled === 'boolean'
         ? (parsed.state as { autoUpEnabled: boolean }).autoUpEnabled
@@ -257,25 +243,15 @@ export const clearGameState = async (): Promise<void> => {
   await AsyncStorage.removeItem(KLONDIKE_STORAGE_KEY)
 }
 
-const createLegacyShuffleId = (): string =>
-  `LEGACY-${Date.now().toString(36).toUpperCase()}-${Math.random()
-    .toString(36)
-    .slice(2, 6)
-    .toUpperCase()}`
-
 const isTimerState = (value: unknown): value is TimerState =>
   value === 'idle' || value === 'running' || value === 'paused'
-
-const normalizeDealSolvabilityBasis = (
-  value: unknown,
-  solvableId: string | null
-): DealSolvabilityBasis => (value === 'draw1' || solvableId ? 'draw1' : null)
 
 const normalizeSnapshots = (
   value: unknown,
   fallback: {
     drawCount: DrawCount
-    dealSolvabilityBasis: DealSolvabilityBasis
+    exactId: string
+    deckChecksum: string
   }
 ): GameSnapshot[] => {
   if (!Array.isArray(value)) {
@@ -291,7 +267,8 @@ const normalizeSnapshot = (
   value: unknown,
   fallback: {
     drawCount: DrawCount
-    dealSolvabilityBasis: DealSolvabilityBasis
+    exactId: string
+    deckChecksum: string
   }
 ): GameSnapshot | null => {
   if (!value || typeof value !== 'object') {
@@ -308,14 +285,17 @@ const normalizeSnapshot = (
     return null
   }
 
-  const solvableId = typeof snapshot.solvableId === 'string' ? snapshot.solvableId : null
+  const exactId =
+    typeof snapshot.exactId === 'string' ? snapshot.exactId : fallback.exactId
+  const deckChecksum =
+    typeof snapshot.deckChecksum === 'string'
+      ? snapshot.deckChecksum
+      : fallback.deckChecksum
+
   return {
     ...(snapshot as GameSnapshot),
-    solvableId,
+    exactId,
+    deckChecksum,
     drawCount: normalizeDrawCount(snapshot.drawCount ?? fallback.drawCount),
-    dealSolvabilityBasis: normalizeDealSolvabilityBasis(
-      snapshot.dealSolvabilityBasis ?? fallback.dealSolvabilityBasis,
-      solvableId
-    ),
   }
 }

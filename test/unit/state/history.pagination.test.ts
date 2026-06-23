@@ -22,7 +22,8 @@ const preview: HistoryPreview = {
 
 const createEntry = (index: number): HistoryEntry => ({
   id: `history-${index.toString().padStart(3, '0')}`,
-  shuffleId: `shuffle-${index}`,
+  exactId: `E1_${index.toString(36)}`,
+  deckChecksum: 'D1_TEST',
   displayName: `Game ${index}`,
   startedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
   finishedAt: null,

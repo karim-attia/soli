@@ -43,10 +43,10 @@ const didGameShapeChange = (previous: GameState | null, next: GameState): boolea
     previous.isAutoCompleting !== next.isAutoCompleting ||
     previous.hasWon !== next.hasWon ||
     previous.winCelebrations !== next.winCelebrations ||
-    previous.shuffleId !== next.shuffleId ||
-    previous.solvableId !== next.solvableId ||
-    previous.drawCount !== next.drawCount ||
-    previous.dealSolvabilityBasis !== next.dealSolvabilityBasis
+    // Exact ID is both the history key and replay recipe in phase 1.
+    previous.exactId !== next.exactId ||
+    previous.deckChecksum !== next.deckChecksum ||
+    previous.drawCount !== next.drawCount
   )
 }
 
@@ -93,7 +93,7 @@ export const useKlondikePersistence = ({
         if (persisted.status === 'won') {
           devLog(
             'info',
-            '[Game] Cleared completed session on startup; starting new shuffle.'
+            '[Game] Cleared completed session on startup; starting new deal.'
           )
           try {
             await clearGameState()
@@ -108,7 +108,7 @@ export const useKlondikePersistence = ({
 
         devLog('info', '[Game] Hydrating saved in-progress session.', {
           savedAt: persisted.savedAt,
-          shuffleId: persisted.state.shuffleId,
+          exactId: persisted.state.exactId,
         })
         previousHasWonRef.current = persisted.state.hasWon
         // Task 10-7: Restore history linkage so completion updates the same entry.

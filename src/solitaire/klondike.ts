@@ -1,6 +1,19 @@
-import type { SolvableShuffleConfig } from '../data/solvableShuffles'
-import { createSolvableShuffleId } from '../data/solvableShuffles'
+import type { SolvableDealV2 } from '../data/solvableDealsV2'
+import {
+  computeDeckChecksum,
+  createCanonicalDealCards,
+  createRandomExactDealId,
+  decodeExactDealId,
+  hasDrawCountInMask,
+  type DealCard,
+} from './dealIdentity'
 import { DEFAULT_DRAW_COUNT, normalizeDrawCount, type DrawCount } from './drawCount'
+import {
+  DEMO_DEAL_CONFIG,
+  DEMO_DECK_CHECKSUM,
+  DEMO_EXACT_DEAL_ID,
+  DEMO_STOCK_ORDER,
+} from './demoDeal'
 
 const SUITS = ['clubs', 'diamonds', 'hearts', 'spades'] as const
 const RANKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] as const
@@ -14,14 +27,6 @@ const KING_RANK = 13
 const TOTAL_CARDS_PER_SUIT = 13
 const RED_SUITS = new Set(['hearts', 'diamonds'])
 let deckInstanceCounter = 0
-const SUIT_HASH_VALUES: Record<Suit, number> = {
-  clubs: 1,
-  diamonds: 2,
-  hearts: 3,
-  spades: 4,
-}
-const FNV_OFFSET_BASIS_64 = 0xcbf29ce484222325n
-const FNV_PRIME_64 = 0x100000001b3n
 
 export type Suit = (typeof SUITS)[number]
 export type Rank = (typeof RANKS)[number]
@@ -43,7 +48,6 @@ export type Selection =
   | { source: 'foundation'; suit: Suit }
 
 export type TimerState = 'idle' | 'running' | 'paused'
-export type DealSolvabilityBasis = 'draw1' | null
 
 export type MoveTarget =
   | { type: 'tableau'; columnIndex: number }
@@ -60,12 +64,11 @@ export interface GameSnapshot {
   isAutoCompleting: boolean
   hasWon: boolean
   winCelebrations: number
-  shuffleId: string
-  solvableId: string | null
+  // Canonical 52-card permutation ID for normal deals. The hidden developer demo
+  // also carries an exact-format ID so the live model never needs nullable identity.
+  exactId: string
+  deckChecksum: string
   drawCount: DrawCount
-  // Curated tableau layouts are proven only against the Draw 1 solver even when
-  // a player chooses a higher draw rule for the resulting game.
-  dealSolvabilityBasis: DealSolvabilityBasis
   elapsedMs: number
   timerState: TimerState
   timerStartedAt: number | null
@@ -137,11 +140,22 @@ const revealInitialWaste = (
   }
 }
 
+const createExactDealIdentity = (
+  exactId: string,
+  deck: readonly DealCard[]
+): Pick<GameSnapshot, 'exactId' | 'deckChecksum'> => ({
+  // Exact ID is both the history key and the replay recipe; no separate local
+  // deal identifier is kept in phase 1.
+  exactId,
+  deckChecksum: computeDeckChecksum(deck),
+})
+
 export const createInitialState = (
   drawCount: DrawCount = DEFAULT_DRAW_COUNT
 ): GameState => {
-  const deck = shuffle(createDeck())
-  const shuffleId = computeShuffleId(deck)
+  const exactId = createRandomExactDealId()
+  const deck = createDeckFromExactId(exactId)
+  const dealIdentity = createExactDealIdentity(exactId, deck)
   const { tableau, stock: dealtStock } = dealTableau(deck)
   const { stock, waste } = revealInitialWaste(dealtStock, drawCount)
   const snapshot: GameSnapshot = {
@@ -155,10 +169,8 @@ export const createInitialState = (
     isAutoCompleting: false,
     hasWon: false,
     winCelebrations: 0,
-    shuffleId,
-    solvableId: null,
+    ...dealIdentity,
     drawCount,
-    dealSolvabilityBasis: null,
     elapsedMs: 0,
     timerState: 'idle',
     timerStartedAt: null,
@@ -174,55 +186,19 @@ export const createInitialState = (
 }
 
 export const createSolvableGameState = (
-  shuffleConfig: SolvableShuffleConfig,
+  deal: SolvableDealV2,
   drawCount: DrawCount = DEFAULT_DRAW_COUNT
 ): GameState => {
-  const deck = createDeck()
-  const lookup = new Map<string, Card>()
-  deck.forEach((card) => {
-    lookup.set(`${card.suit}-${card.rank}`, card)
-  })
+  if (!hasDrawCountInMask(deal.drawMask, drawCount)) {
+    throw new Error(
+      `Solvable deal ${deal.exactId} is not cataloged for Draw ${drawCount}.`
+    )
+  }
 
-  const tableau: Tableau = shuffleConfig.tableau.map((columnConfig, columnIndex) => {
-    const column: Card[] = []
-
-    columnConfig.down.forEach((cardConfig, cardIndex) => {
-      column.push(
-        takeCardFromLookup(
-          lookup,
-          cardConfig.suit,
-          cardConfig.rank,
-          false,
-          columnIndex,
-          cardIndex,
-          'down'
-        )
-      )
-    })
-
-    columnConfig.up.forEach((cardConfig, cardIndex) => {
-      column.push(
-        takeCardFromLookup(
-          lookup,
-          cardConfig.suit,
-          cardConfig.rank,
-          true,
-          columnIndex,
-          cardIndex,
-          'up'
-        )
-      )
-    })
-
-    return column
-  })
-
-  const remainingCards = Array.from(lookup.values()).map((card) => ({
-    ...card,
-    faceUp: false,
-  }))
-  const stockShuffled = shuffle(remainingCards)
-  const { stock, waste } = revealInitialWaste(stockShuffled, drawCount)
+  const deck = createDeckFromExactId(deal.exactId)
+  const dealIdentity = createExactDealIdentity(deal.exactId, deck)
+  const { tableau, stock: dealtStock } = dealTableau(deck)
+  const { stock, waste } = revealInitialWaste(dealtStock, drawCount)
 
   const snapshot: GameSnapshot = {
     stock,
@@ -235,10 +211,8 @@ export const createSolvableGameState = (
     isAutoCompleting: false,
     hasWon: false,
     winCelebrations: 0,
-    shuffleId: createSolvableShuffleId(shuffleConfig.id),
-    solvableId: shuffleConfig.id,
+    ...dealIdentity,
     drawCount,
-    dealSolvabilityBasis: 'draw1',
     elapsedMs: 0,
     timerState: 'idle',
     timerStartedAt: null,
@@ -252,99 +226,6 @@ export const createSolvableGameState = (
     autoUpEnabled: true,
   }
 }
-
-const DEMO_SHUFFLE_CONFIG: SolvableShuffleConfig = {
-  id: 'developer-demo-0001',
-  name: 'Developer Demo',
-  addedAt: '2025-11-04',
-  source: 'developer-mode',
-  tableau: [
-    {
-      down: [{ suit: 'hearts', rank: 3 }],
-      up: [
-        { suit: 'hearts', rank: 2 },
-        { suit: 'hearts', rank: 1 },
-      ],
-    },
-    {
-      down: [{ suit: 'diamonds', rank: 3 }],
-      up: [
-        { suit: 'diamonds', rank: 2 },
-        { suit: 'diamonds', rank: 1 },
-      ],
-    },
-    {
-      down: [],
-      up: [
-        { suit: 'clubs', rank: 13 },
-        { suit: 'clubs', rank: 12 },
-        { suit: 'clubs', rank: 11 },
-        { suit: 'clubs', rank: 10 },
-        { suit: 'clubs', rank: 9 },
-        { suit: 'clubs', rank: 8 },
-        { suit: 'clubs', rank: 7 },
-        { suit: 'clubs', rank: 6 },
-        { suit: 'clubs', rank: 5 },
-        { suit: 'clubs', rank: 4 },
-        { suit: 'clubs', rank: 3 },
-        { suit: 'clubs', rank: 2 },
-        { suit: 'clubs', rank: 1 },
-      ],
-    },
-    {
-      down: [],
-      up: [
-        { suit: 'spades', rank: 13 },
-        { suit: 'spades', rank: 12 },
-        { suit: 'spades', rank: 11 },
-        { suit: 'spades', rank: 10 },
-        { suit: 'spades', rank: 9 },
-        { suit: 'spades', rank: 8 },
-        { suit: 'spades', rank: 7 },
-        { suit: 'spades', rank: 6 },
-        { suit: 'spades', rank: 5 },
-        { suit: 'spades', rank: 4 },
-        { suit: 'spades', rank: 3 },
-        { suit: 'spades', rank: 2 },
-        { suit: 'spades', rank: 1 },
-      ],
-    },
-    {
-      down: [],
-      up: [
-        { suit: 'hearts', rank: 8 },
-        { suit: 'hearts', rank: 7 },
-        { suit: 'hearts', rank: 6 },
-        { suit: 'hearts', rank: 5 },
-        { suit: 'hearts', rank: 4 },
-      ],
-    },
-    {
-      down: [],
-      up: [
-        { suit: 'diamonds', rank: 8 },
-        { suit: 'diamonds', rank: 7 },
-        { suit: 'diamonds', rank: 6 },
-        { suit: 'diamonds', rank: 5 },
-        { suit: 'diamonds', rank: 4 },
-      ],
-    },
-    { down: [], up: [] },
-  ],
-}
-
-const DEMO_STOCK_ORDER: Array<{ suit: Suit; rank: Rank }> = [
-  { suit: 'hearts', rank: 9 },
-  { suit: 'hearts', rank: 10 },
-  { suit: 'hearts', rank: 11 },
-  { suit: 'hearts', rank: 12 },
-  { suit: 'hearts', rank: 13 },
-  { suit: 'diamonds', rank: 9 },
-  { suit: 'diamonds', rank: 10 },
-  { suit: 'diamonds', rank: 11 },
-  { suit: 'diamonds', rank: 12 },
-  { suit: 'diamonds', rank: 13 },
-]
 
 export const createDemoGameState = (
   drawCount: DrawCount = DEFAULT_DRAW_COUNT
@@ -368,7 +249,10 @@ export const createDemoGameState = (
     }
   }
 
-  const tableau: Tableau = DEMO_SHUFFLE_CONFIG.tableau.map((columnConfig) => {
+  // The developer demo is a custom internal board, not a standard Klondike deal:
+  // it uses 42 tableau cards so the hidden auto-solve path is short and readable.
+  // Its exact-format ID is for non-null identity/logging, not public catalog replay.
+  const tableau: Tableau = DEMO_DEAL_CONFIG.tableau.map((columnConfig) => {
     const column: Card[] = []
 
     columnConfig.down.forEach((cardConfig) => {
@@ -398,10 +282,9 @@ export const createDemoGameState = (
     isAutoCompleting: false,
     hasWon: false,
     winCelebrations: 0,
-    shuffleId: 'DEMO-GAME-0001',
-    solvableId: DEMO_SHUFFLE_CONFIG.id,
+    exactId: DEMO_EXACT_DEAL_ID,
+    deckChecksum: DEMO_DECK_CHECKSUM,
     drawCount,
-    dealSolvabilityBasis: 'draw1',
     elapsedMs: 0,
     timerState: 'idle',
     timerStartedAt: null,
@@ -413,30 +296,6 @@ export const createDemoGameState = (
     future: [],
     selected: null,
     autoUpEnabled: true,
-  }
-}
-
-const takeCardFromLookup = (
-  lookup: Map<string, Card>,
-  suit: Suit,
-  rank: Rank,
-  faceUp: boolean,
-  columnIndex: number,
-  cardIndex: number,
-  zone: 'down' | 'up'
-): Card => {
-  const key = `${suit}-${rank}`
-  const card = lookup.get(key)
-  if (!card) {
-    throw new Error(
-      `Solvable shuffle is missing card ${key} (${zone} column ${columnIndex} position ${cardIndex}).`
-    )
-  }
-
-  lookup.delete(key)
-  return {
-    ...card,
-    faceUp,
   }
 }
 
@@ -1283,10 +1142,9 @@ const snapshotFromState = (state: GameState): GameSnapshot => ({
   isAutoCompleting: false,
   hasWon: state.hasWon,
   winCelebrations: state.winCelebrations,
-  shuffleId: state.shuffleId,
-  solvableId: state.solvableId ?? null,
+  exactId: state.exactId,
+  deckChecksum: state.deckChecksum,
   drawCount: state.drawCount,
-  dealSolvabilityBasis: state.dealSolvabilityBasis,
   elapsedMs: state.elapsedMs,
   timerState: state.timerState,
   timerStartedAt: state.timerStartedAt,
@@ -1303,11 +1161,9 @@ const cloneSnapshot = (snapshot: GameSnapshot, autoUpEnabled = true): GameState 
   isAutoCompleting: false,
   hasWon: snapshot.hasWon,
   winCelebrations: snapshot.winCelebrations,
-  shuffleId: snapshot.shuffleId,
-  solvableId: snapshot.solvableId,
+  exactId: snapshot.exactId,
+  deckChecksum: snapshot.deckChecksum,
   drawCount: normalizeDrawCount(snapshot.drawCount),
-  dealSolvabilityBasis:
-    snapshot.dealSolvabilityBasis === 'draw1' || snapshot.solvableId ? 'draw1' : null,
   elapsedMs: snapshot.elapsedMs,
   timerState: snapshot.timerState,
   timerStartedAt: snapshot.timerStartedAt,
@@ -1328,49 +1184,23 @@ const cloneFoundations = (foundations: Foundations): Foundations =>
 const cloneTableau = (tableau: Tableau): Tableau =>
   tableau.map((column) => cloneCards(column))
 
-const createDeck = (): Card[] => {
+const createDeckFromDealCards = (dealCards: readonly DealCard[]): Card[] => {
   const deckInstanceId = (deckInstanceCounter += 1).toString(36)
-  const deck: Card[] = []
-  SUITS.forEach((suit) => {
-    for (let rankIndex = 0; rankIndex < TOTAL_CARDS_PER_SUIT; rankIndex += 1) {
-      const rank = (rankIndex + 1) as Rank
-      deck.push({
-        // Card ids must be unique per deal so animated card views do not reuse
-        // face-up or flight state from a previous game.
-        id: `${suit}-${rank}-${deckInstanceId}`,
-        suit,
-        rank,
-        faceUp: false,
-      })
-    }
-  })
-  return deck
+  return dealCards.map((card) => ({
+    // Card ids must be unique per deal so animated card views do not reuse
+    // face-up or flight state from a previous game.
+    id: `${card.suit}-${card.rank}-${deckInstanceId}`,
+    suit: card.suit,
+    rank: card.rank,
+    faceUp: false,
+  }))
 }
 
-const computeShuffleId = (deck: Card[]): string => {
-  let hash = FNV_OFFSET_BASIS_64
+const createDeckFromExactId = (exactId: string): Card[] =>
+  createDeckFromDealCards(decodeExactDealId(exactId))
 
-  deck.forEach((card, index) => {
-    const suitValue = BigInt(SUIT_HASH_VALUES[card.suit])
-    const rankValue = BigInt(card.rank)
-    const position = BigInt(index + 1)
-    const combined = (suitValue << 16n) ^ (rankValue << 4n) ^ position
-    hash ^= combined
-    hash = (hash * FNV_PRIME_64) & 0xffffffffffffffffn
-  })
-
-  const normalized = hash & 0xffffffffffffffffn
-  const base36 = normalized.toString(36).toUpperCase()
-  return base36.padStart(13, '0')
-}
-
-const shuffle = (cards: Card[]): Card[] => {
-  const copy = [...cards]
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1))
-    ;[copy[index], copy[randomIndex]] = [copy[randomIndex], copy[index]]
-  }
-  return copy
+const createDeck = (): Card[] => {
+  return createDeckFromDealCards(createCanonicalDealCards())
 }
 
 const dealTableau = (deck: Card[]): { tableau: Tableau; stock: Card[] } => {

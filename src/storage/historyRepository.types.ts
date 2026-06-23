@@ -9,8 +9,8 @@ export type HistorySummary = {
   activeCount: number
 }
 
-export type SolvableHistoryStats = {
-  shuffleId: string
+export type SolvableDealHistoryStats = {
+  exactId: string
   plays: number
   solves: number
 }
@@ -18,11 +18,10 @@ export type SolvableHistoryStats = {
 export type HistoryRepository = {
   readonly isHistorySupported: boolean
   initializeHistoryRepository: () => Promise<void>
-  importLegacyHistory: (entries: HistoryEntry[]) => Promise<void>
   getHistoryPage: (limit: number, offset: number) => Promise<HistoryEntry[]>
   getHistoryEntryById: (id: string) => Promise<HistoryEntry | null>
   getHistorySummary: () => Promise<HistorySummary>
-  getSolvableHistoryStats: () => Promise<SolvableHistoryStats[]>
+  getSolvableDealHistoryStats: () => Promise<SolvableDealHistoryStats[]>
   insertHistoryEntry: (entry: HistoryEntry) => Promise<void>
   updateHistoryEntry: (entry: HistoryEntry) => Promise<void>
   clearHistoryEntries: () => Promise<void>

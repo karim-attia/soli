@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Soli Deck System V2 Visual Plan</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172026;
+        --muted: #5c6670;
+        --line: #d9dee3;
+        --surface: #f7f8fa;
+        --paper: #ffffff;
+        --green: #1e7a5b;
+        --blue: #2c65b7;
+        --gold: #9b6b00;
+        --red: #ad3e3e;
+        --violet: #6d55a3;
+        --teal-soft: #e7f4ef;
+        --blue-soft: #e9f0fb;
+        --gold-soft: #fff5d8;
+        --red-soft: #fbeaea;
+        --violet-soft: #f0edf8;
+        --shadow: 0 1px 2px rgba(23, 32, 38, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--surface);
+        color: var(--ink);
+        font:
+          15px/1.5 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 24px 0 56px;
+      }
+
+      header {
+        display: grid;
+        gap: 16px;
+        padding: 22px 0 18px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 920px;
+        font-size: clamp(30px, 4vw, 50px);
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 22px;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        font-size: 15px;
+        line-height: 1.25;
+        letter-spacing: 0;
+      }
+
+      .lede {
+        max-width: 860px;
+        color: var(--muted);
+        font-size: 17px;
+      }
+
+      .recommendation {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: center;
+        padding: 16px;
+        border: 1px solid #c8d7ce;
+        background: var(--teal-soft);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+      }
+
+      .recommendation strong {
+        color: var(--green);
+      }
+
+      .badge {
+        display: inline-flex;
+        min-height: 32px;
+        align-items: center;
+        justify-content: center;
+        padding: 0 12px;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        color: var(--green);
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding-top: 4px;
+      }
+
+      nav a {
+        color: var(--ink);
+        text-decoration: none;
+        border: 1px solid var(--line);
+        background: var(--paper);
+        border-radius: 8px;
+        padding: 7px 10px;
+      }
+
+      section {
+        margin-top: 22px;
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+        box-shadow: var(--shadow);
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: end;
+        margin-bottom: 16px;
+      }
+
+      .section-head p {
+        max-width: 650px;
+        color: var(--muted);
+      }
+
+      .system-map {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(148px, 1fr));
+        gap: 10px;
+      }
+
+      .node {
+        min-height: 170px;
+        display: grid;
+        align-content: start;
+        gap: 10px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        position: relative;
+      }
+
+      .node::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        right: -11px;
+        width: 10px;
+        height: 2px;
+        background: var(--muted);
+        z-index: 2;
+      }
+
+      .node:last-child::after {
+        content: "";
+      }
+
+      .node .kicker {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .node ul,
+      .phase ul,
+      .migration ul,
+      .decision ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      .node li,
+      .phase li,
+      .migration li,
+      .decision li {
+        margin-top: 4px;
+      }
+
+      .green {
+        border-color: #9fc8ba;
+        background: var(--teal-soft);
+      }
+
+      .blue {
+        border-color: #b6c9e8;
+        background: var(--blue-soft);
+      }
+
+      .gold {
+        border-color: #e5c978;
+        background: var(--gold-soft);
+      }
+
+      .red {
+        border-color: #e3b9b9;
+        background: var(--red-soft);
+      }
+
+      .violet {
+        border-color: #c9bfe2;
+        background: var(--violet-soft);
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .compare {
+        display: grid;
+        grid-template-columns: 140px repeat(2, minmax(0, 1fr));
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .compare > div {
+        min-height: 48px;
+        padding: 11px 12px;
+        border-bottom: 1px solid var(--line);
+        border-right: 1px solid var(--line);
+      }
+
+      .compare > div:nth-child(3n) {
+        border-right: 0;
+      }
+
+      .compare > div:nth-last-child(-n + 3) {
+        border-bottom: 0;
+      }
+
+      .compare .head {
+        background: #eef1f4;
+        font-weight: 800;
+      }
+
+      .compare .label {
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .lanes {
+        display: grid;
+        grid-template-columns: 120px minmax(0, 1fr);
+        gap: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .lane-label {
+        padding: 12px;
+        background: #eef1f4;
+        border-bottom: 1px solid var(--line);
+        font-weight: 800;
+      }
+
+      .lane-track {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(120px, 1fr));
+        gap: 8px;
+        padding: 10px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .lane-label:last-of-type,
+      .lane-track:last-child {
+        border-bottom: 0;
+      }
+
+      .step {
+        min-height: 84px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .step b {
+        display: block;
+        margin-bottom: 5px;
+      }
+
+      .step span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .migration {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .decision-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .decision,
+      .phase {
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .decision h3 {
+        margin-bottom: 8px;
+      }
+
+      .data-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      pre {
+        min-height: 260px;
+        overflow: auto;
+        margin: 0;
+        padding: 14px;
+        border: 1px solid #ccd3d9;
+        border-radius: 8px;
+        background: #111820;
+        color: #eef6ef;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .phase-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .phase h3 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .num {
+        display: inline-flex;
+        width: 26px;
+        height: 26px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: var(--ink);
+        color: #fff;
+        font-size: 13px;
+      }
+
+      .note {
+        margin-top: 14px;
+        padding: 12px 14px;
+        border-left: 4px solid var(--gold);
+        background: var(--gold-soft);
+        color: #4a3a16;
+      }
+
+      .compact {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @media (max-width: 980px) {
+        .system-map,
+        .split,
+        .migration,
+        .decision-grid,
+        .data-grid,
+        .phase-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .node::after {
+          top: auto;
+          right: 50%;
+          bottom: -11px;
+          width: 2px;
+          height: 10px;
+        }
+
+        .node:last-child::after {
+          content: "";
+        }
+
+        .lanes {
+          grid-template-columns: 1fr;
+        }
+
+        .lane-track {
+          grid-template-columns: 1fr;
+        }
+
+        .compare {
+          grid-template-columns: 1fr;
+        }
+
+        .compare > div,
+        .compare > div:nth-child(3n),
+        .compare > div:nth-last-child(-n + 3) {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .compare > div:last-child {
+          border-bottom: 0;
+        }
+      }
+
+      @media (max-width: 680px) {
+        main {
+          width: min(100% - 18px, 1180px);
+          padding-top: 12px;
+        }
+
+        .recommendation {
+          grid-template-columns: 1fr;
+        }
+
+        section {
+          padding: 14px;
+        }
+
+        .section-head {
+          display: grid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="compact">Soli architecture artifact - deck system v2</div>
+        <h1>Generate decks once, identify them exactly, and select solvable deals by draw mode.</h1>
+        <p class="lede">
+          This plan separates random generation from durable deal identity. Generators can change.
+          Exact permutation IDs keep history, replay, sharing, and solver validation stable.
+        </p>
+        <div class="recommendation">
+          <p>
+            <strong>Recommendation:</strong> use an app-owned generator for random-looking
+            decks, encode every full 52-card permutation as an exact ID, solve batches offline
+            with Lonelybot, and store history against the exact ID plus draw-specific solvability.
+          </p>
+          <span class="badge">v2 target</span>
+        </div>
+        <nav aria-label="Page sections">
+          <a href="#system-map">System Map</a>
+          <a href="#identity">Identity</a>
+          <a href="#harvest">Harvest</a>
+          <a href="#runtime">Runtime</a>
+          <a href="#history">History</a>
+          <a href="#data">Data</a>
+          <a href="#phases">Phases</a>
+        </nav>
+      </header>
+
+      <section id="system-map">
+        <div class="section-head">
+          <div>
+            <h2>System Map</h2>
+            <p>The full lifecycle from a seed to a played game and history record.</p>
+          </div>
+        </div>
+        <div class="system-map">
+          <article class="node blue">
+            <div class="kicker">Create</div>
+            <h3>Generator</h3>
+            <ul>
+              <li>`soli-v1` seed</li>
+              <li>Stable PRNG</li>
+              <li>Fisher-Yates shuffle</li>
+            </ul>
+          </article>
+          <article class="node violet">
+            <div class="kicker">Freeze</div>
+            <h3>Exact Identity</h3>
+            <ul>
+              <li>Full 52-card deck</li>
+              <li>Encode as permutation rank</li>
+              <li>Store `exactId` forever</li>
+            </ul>
+          </article>
+          <article class="node gold">
+            <div class="kicker">Prove</div>
+            <h3>Offline Solver</h3>
+            <ul>
+              <li>Lonelybot batch run</li>
+              <li>Draw 1-5 mask</li>
+              <li>Stats and solution traces</li>
+            </ul>
+          </article>
+          <article class="node green">
+            <div class="kicker">Play</div>
+            <h3>App Runtime</h3>
+            <ul>
+              <li>Select by draw count</li>
+              <li>Decode exact deck</li>
+              <li>Deal tableau and stock</li>
+            </ul>
+          </article>
+          <article class="node red">
+            <div class="kicker">Remember</div>
+            <h3>History</h3>
+            <ul>
+              <li>Save exact ID</li>
+              <li>Save draw count</li>
+              <li>Display solvable deal</li>
+            </ul>
+          </article>
+        </div>
+        <div class="note">
+          The exact ID is the durable deal license plate. The random generator is only how we
+          discover new license plates.
+        </div>
+      </section>
+
+      <section id="identity">
+        <div class="section-head">
+          <div>
+            <h2>Generator vs Exact Identity</h2>
+            <p>
+              A generator produces random-looking decks. An exact ID reconstructs one specific
+              deck in both directions.
+            </p>
+          </div>
+        </div>
+        <div class="compare" role="table" aria-label="Generator and exact identity comparison">
+          <div class="head">Question</div>
+          <div class="head">Generator Seed</div>
+          <div class="head">Exact ID</div>
+
+          <div class="label">Purpose</div>
+          <div>Create candidate decks.</div>
+          <div>Store and reconstruct one exact deck.</div>
+
+          <div class="label">Direction</div>
+          <div>Seed -> random number stream -> deck.</div>
+          <div>Integer <-> deck permutation.</div>
+
+          <div class="label">Good examples</div>
+          <div>`soli-v1` using PCG or xoshiro plus Fisher-Yates.</div>
+          <div>Lonelybot `exact`; Lehmer/factoradic rank.</div>
+
+          <div class="label">Risk</div>
+          <div>Library RNG behavior can change if not frozen.</div>
+          <div>Sequential IDs like 0, 1, 2 are structured, not random.</div>
+
+          <div class="label">How to use</div>
+          <div>Generate broad candidate ranges offline.</div>
+          <div>Save in history, index, share links, and tests.</div>
+        </div>
+      </section>
+
+      <section id="harvest">
+        <div class="section-head">
+          <div>
+            <h2>Solvable Deck Harvest</h2>
+            <p>
+              Solve fixed batches and cache every result. Do not stop early after easy wins,
+              because that biases the dataset toward easy games.
+            </p>
+          </div>
+        </div>
+        <div class="lanes">
+          <div class="lane-label">Tooling</div>
+          <div class="lane-track">
+            <div class="step"><b>Generate seeds</b><span>Pick `soli-v1` seed range.</span></div>
+            <div class="step"><b>Encode exact</b><span>Convert deck to exact ID.</span></div>
+            <div class="step"><b>Solve</b><span>Run Lonelybot for Draw 1-5.</span></div>
+            <div class="step"><b>Cache</b><span>Keep status, stats, trace.</span></div>
+          </div>
+
+          <div class="lane-label">Data</div>
+          <div class="lane-track">
+            <div class="step"><b>Candidate</b><span>`sourceSeed`, full deck checksum.</span></div>
+            <div class="step"><b>Identity</b><span>`exactId` becomes stable key.</span></div>
+            <div class="step"><b>Mask</b><span>`solvableDraws: [1, 2, 3]`.</span></div>
+            <div class="step"><b>Index</b><span>Ship compact solved subset.</span></div>
+          </div>
+
+          <div class="lane-label">Selection</div>
+          <div class="lane-track">
+            <div class="step"><b>Draw setting</b><span>User chooses Draw 1-5.</span></div>
+            <div class="step"><b>Filter</b><span>Keep deals with matching mask.</span></div>
+            <div class="step"><b>Fairness</b><span>Prefer least-played unsolved IDs.</span></div>
+            <div class="step"><b>Deal</b><span>Decode exact deck in app.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="runtime">
+        <div class="section-head">
+          <div>
+            <h2>Runtime Flow</h2>
+            <p>Runtime generation stays simple. The app does not need the solver for v2 deals.</p>
+          </div>
+        </div>
+        <div class="split">
+          <article class="decision green">
+            <h3>Random Game</h3>
+            <ul>
+              <li>Generate a `soli-v1` seed.</li>
+              <li>Create deck and exact ID.</li>
+              <li>Deal normally.</li>
+              <li>History stores exact ID, but solvable flag is false or unknown.</li>
+            </ul>
+          </article>
+          <article class="decision blue">
+            <h3>Solvable Game</h3>
+            <ul>
+              <li>Read current draw count.</li>
+              <li>Pick exact ID from offline index with matching draw mask.</li>
+              <li>Decode exact deck and deal full tableau plus stock.</li>
+              <li>History stores exact ID and `solvableDraws`.</li>
+            </ul>
+          </article>
+        </div>
+        <div class="note">
+          Runtime app code should not call Lonelybot for normal new games. The solver is useful
+          offline first, then later for hints.
+        </div>
+      </section>
+
+      <section id="history">
+        <div class="section-head">
+          <div>
+            <h2>Legacy History And Existing Tableaus</h2>
+            <p>
+              Old entries can get a modern exact identity, but we cannot recover their original
+              missing stock order.
+            </p>
+          </div>
+        </div>
+        <div class="migration">
+          <article class="decision red">
+            <h3>Legacy Raw Entry</h3>
+            <ul>
+              <li>Has 28-card tableau.</li>
+              <li>Missing stock order.</li>
+              <li>Missing original RNG seed.</li>
+            </ul>
+          </article>
+          <article class="decision gold">
+            <h3>Migration Search</h3>
+            <ul>
+              <li>Fill stock from remaining 24 cards.</li>
+              <li>Try deterministic stock candidates.</li>
+              <li>Validate draw masks with Lonelybot.</li>
+            </ul>
+          </article>
+          <article class="decision green">
+            <h3>Migration Map</h3>
+            <ul>
+              <li>`legacyId -> exactId`.</li>
+              <li>Keep legacy display stable.</li>
+              <li>Use v2 identity for future replays.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="data">
+        <div class="section-head">
+          <div>
+            <h2>Data Contracts</h2>
+            <p>Compact records for the app; richer artifacts for solver tooling.</p>
+          </div>
+        </div>
+        <div class="data-grid">
+          <pre><code>type DealIndexEntry = {
+  exactId: string
+  generator: 'soli-v1' | 'legacy-upgrade'
+  sourceSeed?: string
+  deckChecksum: string
+  solvableDraws: number[]
+  solver: {
+    name: 'lonelybot'
+    version: string
+  }
+}</code></pre>
+          <pre><code>type HistoryDeal = {
+  schemaVersion: 2
+  exactId: string
+  drawCount: 1 | 2 | 3 | 4 | 5
+  solvable: boolean
+  solvableDraws?: number[]
+  startedAt: string
+}</code></pre>
+          <pre><code>type LegacyDealMap = {
+  legacyId: string
+  exactId: string
+  stockSource: 'generated'
+  confidence: 'canonical-upgrade'
+  notes: string
+}</code></pre>
+        </div>
+      </section>
+
+      <section id="decisions">
+        <div class="section-head">
+          <div>
+            <h2>Decision Board</h2>
+            <p>Defaults to keep v2 tight and avoid unnecessary migration complexity.</p>
+          </div>
+        </div>
+        <div class="decision-grid">
+          <article class="decision green">
+            <h3>Do Now</h3>
+            <ul>
+              <li>Use full deals for all draw counts.</li>
+              <li>Store exact IDs in history.</li>
+              <li>Ship a compact solvable index.</li>
+              <li>Keep old history readable.</li>
+            </ul>
+          </article>
+          <article class="decision gold">
+            <h3>Decide Once</h3>
+            <ul>
+              <li>PCG vs xoshiro for `soli-v1`.</li>
+              <li>Exact ID string encoding.</li>
+              <li>Minimum solved index size.</li>
+              <li>Legacy upgrade stock policy.</li>
+            </ul>
+          </article>
+          <article class="decision red">
+            <h3>Avoid</h3>
+            <ul>
+              <li>`Math.random` for durable games.</li>
+              <li>Library-default RNG as identity.</li>
+              <li>Tableau-only v2 deals.</li>
+              <li>Claiming draw solvability without proof.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="phases">
+        <div class="section-head">
+          <div>
+            <h2>Implementation Phases</h2>
+            <p>Split the work so the dataset migration does not get tangled with in-app hints.</p>
+          </div>
+        </div>
+        <div class="phase-grid">
+          <article class="phase">
+            <h3><span class="num">1</span> Identity</h3>
+            <ul>
+              <li>Implement exact encode/decode in TypeScript.</li>
+              <li>Fixture against Lonelybot.</li>
+              <li>Pick exact ID string format.</li>
+            </ul>
+          </article>
+          <article class="phase">
+            <h3><span class="num">2</span> Harvest</h3>
+            <ul>
+              <li>Generate large seed batches.</li>
+              <li>Run Lonelybot Draw 1-5.</li>
+              <li>Build compact index.</li>
+            </ul>
+          </article>
+          <article class="phase">
+            <h3><span class="num">3</span> App</h3>
+            <ul>
+              <li>Create games from exact IDs.</li>
+              <li>Select by draw mask.</li>
+              <li>Update history labels.</li>
+            </ul>
+          </article>
+          <article class="phase">
+            <h3><span class="num">4</span> Later</h3>
+            <ul>
+              <li>Rust native solver spike.</li>
+              <li>Current-position hints.</li>
+              <li>Undo to solvable position.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

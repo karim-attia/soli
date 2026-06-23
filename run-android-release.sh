@@ -20,6 +20,13 @@ pick_adb() {
     return 0
   fi
 
+  local path_adb=""
+  path_adb="$(command -v adb || true)"
+  if [[ -n "${path_adb}" && -x "${path_adb}" ]]; then
+    echo "${path_adb}"
+    return 0
+  fi
+
   if [[ -n "${ANDROID_HOME:-}" && -x "${ANDROID_HOME}/platform-tools/adb" ]]; then
     echo "${ANDROID_HOME}/platform-tools/adb"
     return 0
@@ -37,6 +44,66 @@ pick_adb() {
   fi
 
   command -v adb || true
+}
+
+resolve_path() {
+  local path="$1"
+  if command -v realpath >/dev/null 2>&1; then
+    realpath "${path}" 2>/dev/null && return 0
+  fi
+
+  local dir=""
+  dir="$(cd "$(dirname "${path}")" 2>/dev/null && pwd -P)" || {
+    echo "${path}"
+    return 0
+  }
+
+  echo "${dir}/$(basename "${path}")"
+}
+
+get_adb_server_executable() {
+  local adb_bin="$1"
+
+  "${adb_bin}" server-status 2>/dev/null | awk -F'"' '/executable_absolute_path:/ { print $2; exit }'
+}
+
+ensure_adb_server_owner() {
+  local adb_bin="$1"
+  local expected_adb=""
+  local current_server=""
+  local current_server_resolved=""
+
+  # All adb clients share one server on port 5037. Keep release installs on the same
+  # binary we selected above, otherwise another tool can leave a stale/mismatched server
+  # handling Wi-Fi pairing and reconnects.
+  "${adb_bin}" start-server >/dev/null 2>&1 || true
+
+  expected_adb="$(resolve_path "${adb_bin}")"
+  current_server="$(get_adb_server_executable "${adb_bin}" || true)"
+
+  if [[ -z "${current_server}" ]]; then
+    return 0
+  fi
+
+  current_server_resolved="$(resolve_path "${current_server}")"
+  if [[ "${current_server_resolved}" == "${expected_adb}" ]]; then
+    return 0
+  fi
+
+  echo "ADB server is owned by '${current_server}', restarting it with '${adb_bin}'." >&2
+  "${adb_bin}" kill-server >/dev/null 2>&1 || true
+  sleep 1
+  "${adb_bin}" start-server >/dev/null 2>&1
+
+  current_server="$(get_adb_server_executable "${adb_bin}" || true)"
+  if [[ -z "${current_server}" ]]; then
+    return 0
+  fi
+
+  current_server_resolved="$(resolve_path "${current_server}")"
+  if [[ "${current_server_resolved}" != "${expected_adb}" ]]; then
+    echo "Warning: ADB server is still owned by '${current_server}' after restart." >&2
+  fi
 }
 
 add_candidate() {
@@ -184,6 +251,7 @@ EOF
 collect_existing_serial() {
   local adb_bin="$1"
   local line=""
+  local first_device_serial=""
   while IFS= read -r line; do
     [[ -z "${line}" || "${line}" == List* ]] && continue
 
@@ -191,7 +259,16 @@ collect_existing_serial() {
       echo "${BASH_REMATCH[1]}"
       return 0
     fi
+
+    if [[ -z "${first_device_serial}" && "${line}" =~ ^([^[:space:]]+)[[:space:]]+device\b ]]; then
+      first_device_serial="${BASH_REMATCH[1]}"
+    fi
   done < <("${adb_bin}" devices -l 2>/dev/null || true)
+
+  if [[ -n "${first_device_serial}" ]]; then
+    echo "${first_device_serial}"
+    return 0
+  fi
 
   return 1
 }
@@ -311,6 +388,7 @@ main() {
     echo "Error: adb not found" >&2
     exit 1
   fi
+  ensure_adb_server_owner "${adb_bin}"
 
   local stable_serial=""
   CONNECT_CANDIDATES=()
@@ -318,19 +396,22 @@ main() {
   if [[ -z "${requested_target}" ]]; then
     stable_serial="$(collect_existing_serial "${adb_bin}" || true)"
     if [[ -n "${stable_serial}" ]]; then
-      add_candidate "${stable_serial}"
+      export ANDROID_SERIAL="${stable_serial}"
     fi
   fi
 
-  collect_mdns_candidates "${adb_bin}"
-  if [[ "${#CONNECT_CANDIDATES[@]}" -eq 0 ]]; then
+  if [[ -z "${stable_serial}" ]]; then
+    collect_mdns_candidates "${adb_bin}"
+  fi
+
+  if [[ -z "${stable_serial}" && "${#CONNECT_CANDIDATES[@]}" -eq 0 ]]; then
     stable_serial="$(derive_candidate_from_alias_connection "${adb_bin}" || true)"
     if [[ -n "${stable_serial}" ]]; then
       add_candidate "${stable_serial}"
     fi
   fi
 
-  if [[ "${#CONNECT_CANDIDATES[@]}" -gt 0 ]]; then
+  if [[ -z "${stable_serial}" && "${#CONNECT_CANDIDATES[@]}" -gt 0 ]]; then
     local candidate=""
     echo "Reconnecting Android device over Wi-Fi..." >&2
     "${adb_bin}" disconnect >/dev/null 2>&1 || true

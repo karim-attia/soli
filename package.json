@@ -21,8 +21,7 @@
     "build:ios": "npx eas build --platform ios --profile production --non-interactive",
     "web": "pkill -f 'expo.*start.*web' 2>/dev/null || true && BROWSER=none expo start --web --port 8081",
     "test": "jest --watchAll",
-    "harvest": "node scripts/harvest-solvable-new.js",
-    "harvest:trial": "node scripts/harvest-solvable-new.js --trial",
+    "generate:solvable-deals": "node scripts/generate-solvable-deals-v2.js",
     "demo:auto-solve": "node scripts/run-demo-autosolve.js",
     "build:android": "./build-android.sh",
     "prebuild": "npx expo prebuild --platform android --clean"
@@ -40,6 +39,7 @@
     "expo": "^56.0.0",
     "expo-build-properties": "~56.0.19",
     "expo-constants": "~56.0.18",
+    "expo-crypto": "~56.0.4",
     "expo-font": "~56.0.7",
     "expo-linear-gradient": "~56.0.4",
     "expo-linking": "~56.0.14",

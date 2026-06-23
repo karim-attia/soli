@@ -238,6 +238,8 @@ export const useCelebrationController = ({
       return null
     }
 
+    // Visual-only randomization for celebration timing/layering. This is not a
+    // gameplay deck shuffle and cannot affect the exact deal ID.
     const shuffledCards = [...cards].sort(() => Math.random() - 0.5)
     const modeId = Math.floor(Math.random() * CELEBRATION_MODE_COUNT)
 

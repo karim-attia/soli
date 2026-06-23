@@ -2,9 +2,9 @@
 
 Use web search to research a tool, library, pattern, etc. to see how others do something.
 
-Compatibility notice (explicit): This repo makes NO backward-compatibility guarantees. Breaking changes to are allowed and expected.
+Leave small documentation notes inline throughout the app to better understand reasons why we did something in a certain way. For example product decisions, technical decisions. This gives valuable context for future development so that we don't undo such decisions unintentionally (or so that we consciously change these assumptions). Especially leave such a comment if there was an initial implementation that was then corrected in the chat afterwards. E.g. we do this this way instead of that way because we learned if we do it that way, we will run into issue X.
 
-Leave small documentation notes inline throughout the app to better understand reasons why we did something in a certain way. E.g. we do this this way instead of that way because we learned if we do it that way, we will run into issue X.
+Never commit/stage changes except if the user directly asked for it.
 
 # Implementation plan
 
@@ -49,7 +49,7 @@ Update the status of the steps after the implementation of each step. NEVER SKIP
 
 # Testing
 
-Test everything you do in a real environment (when it makes sense!). In order to save context, always use sub-agents to test. Use GPT 5.5 medium reasoning for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
+Test everything you do in a real environment (when it makes sense!). In order to save context, always use sub-agents to test. Use GPT 5.5 medium reasoning for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Give the .md file to the (updated!) sub-agent for context. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
 
 Native: Use agent-device skill
 Web: Use Playwright with skill (but no need to test on web since the app is for native only, but it's an option.)

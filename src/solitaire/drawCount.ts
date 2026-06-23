@@ -9,7 +9,7 @@ export const isDrawCount = (value: unknown): value is DrawCount =>
   Number.isInteger(value) &&
   DRAW_COUNT_OPTIONS.includes(value as DrawCount)
 
-// Persisted settings, games, and history all use the same fallback so legacy
-// payloads cannot disagree about which rules an older game used.
+// Persisted settings, games, and history share one fallback so missing or damaged
+// draw-count values resolve to the same rule everywhere.
 export const normalizeDrawCount = (value: unknown): DrawCount =>
   isDrawCount(value) ? value : DEFAULT_DRAW_COUNT
