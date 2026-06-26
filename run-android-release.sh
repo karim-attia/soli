@@ -7,6 +7,7 @@ ENV_FILE="${ROOT_DIR}/.env"
 BUILD_GRADLE_FILE="${ROOT_DIR}/android/app/build.gradle"
 EXPO_RELEASE_COMMAND=(yarn expo run:android --variant release)
 CONNECT_CANDIDATES=()
+DISCOVERED_STABLE_SERIAL=""
 REQUIRED_SIGNING_KEYS=(
   "SOLI_UPLOAD_STORE_FILE"
   "SOLI_UPLOAD_STORE_PASSWORD"
@@ -277,6 +278,7 @@ collect_mdns_candidates() {
   local adb_bin="$1"
   local preferred_ip="${ADB_WIFI_IP:-}"
   local target="${ADB_WIFI_TARGET:-}"
+  local target_ip=""
   local line=""
   local name=""
   local type=""
@@ -284,6 +286,7 @@ collect_mdns_candidates() {
 
   if [[ -n "${target}" && "${target}" == *:* ]]; then
     add_candidate "${target}"
+    target_ip="${target%%:*}"
   fi
 
   while IFS= read -r line; do
@@ -299,6 +302,9 @@ collect_mdns_candidates() {
     if [[ -n "${target}" ]]; then
       if [[ "${target}" == *:* ]]; then
         add_candidate "${target}"
+        if [[ -n "${target_ip}" && "${address}" == "${target_ip}:"* ]]; then
+          add_candidate "${address}"
+        fi
       elif [[ "${target}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         if [[ "${address}" == "${target}:"* ]]; then
           add_candidate "${address}"
@@ -375,6 +381,67 @@ connect_candidate() {
   return 1
 }
 
+discover_adb_targets() {
+  local adb_bin="$1"
+  local requested_target="$2"
+  local stable_serial=""
+
+  CONNECT_CANDIDATES=()
+  DISCOVERED_STABLE_SERIAL=""
+
+  if [[ -z "${requested_target}" ]]; then
+    stable_serial="$(collect_existing_serial "${adb_bin}" || true)"
+    if [[ -n "${stable_serial}" ]]; then
+      DISCOVERED_STABLE_SERIAL="${stable_serial}"
+      return 0
+    fi
+  fi
+
+  collect_mdns_candidates "${adb_bin}"
+
+  if [[ "${#CONNECT_CANDIDATES[@]}" -eq 0 ]]; then
+    stable_serial="$(derive_candidate_from_alias_connection "${adb_bin}" || true)"
+    if [[ -n "${stable_serial}" ]]; then
+      add_candidate "${stable_serial}"
+    fi
+  fi
+}
+
+restart_adb_for_discovery_retry() {
+  local adb_bin="$1"
+  local reason="$2"
+
+  echo "${reason}; restarting ADB server once before release." >&2
+  "${adb_bin}" kill-server >/dev/null 2>&1 || true
+  sleep 1
+  "${adb_bin}" start-server >/dev/null 2>&1 || true
+  ensure_adb_server_owner "${adb_bin}"
+  sleep 2
+}
+
+connect_candidates() {
+  local adb_bin="$1"
+  local candidate=""
+  local stable_serial=""
+
+  if [[ "${#CONNECT_CANDIDATES[@]}" -eq 0 ]]; then
+    return 1
+  fi
+
+  echo "Reconnecting Android device over Wi-Fi..." >&2
+  "${adb_bin}" disconnect >/dev/null 2>&1 || true
+
+  for candidate in "${CONNECT_CANDIDATES[@]}"; do
+    stable_serial="$(connect_candidate "${adb_bin}" "${candidate}" || true)"
+    if [[ -n "${stable_serial}" ]]; then
+      echo "${stable_serial}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 main() {
   cd "${ROOT_DIR}"
   load_env_file
@@ -391,43 +458,36 @@ main() {
   ensure_adb_server_owner "${adb_bin}"
 
   local stable_serial=""
+  local restarted_discovery=0
   CONNECT_CANDIDATES=()
 
-  if [[ -z "${requested_target}" ]]; then
-    stable_serial="$(collect_existing_serial "${adb_bin}" || true)"
-    if [[ -n "${stable_serial}" ]]; then
-      export ANDROID_SERIAL="${stable_serial}"
-    fi
+  discover_adb_targets "${adb_bin}" "${requested_target}"
+  stable_serial="${DISCOVERED_STABLE_SERIAL}"
+
+  if [[ -z "${stable_serial}" && "${#CONNECT_CANDIDATES[@]}" -eq 0 ]]; then
+    restart_adb_for_discovery_retry "${adb_bin}" "ADB discovery found no connected devices or wireless services"
+    restarted_discovery=1
+    discover_adb_targets "${adb_bin}" "${requested_target}"
+    stable_serial="${DISCOVERED_STABLE_SERIAL}"
   fi
 
   if [[ -z "${stable_serial}" ]]; then
-    collect_mdns_candidates "${adb_bin}"
+    stable_serial="$(connect_candidates "${adb_bin}" || true)"
   fi
 
-  if [[ -z "${stable_serial}" && "${#CONNECT_CANDIDATES[@]}" -eq 0 ]]; then
-    stable_serial="$(derive_candidate_from_alias_connection "${adb_bin}" || true)"
-    if [[ -n "${stable_serial}" ]]; then
-      add_candidate "${stable_serial}"
-    fi
-  fi
-
-  if [[ -z "${stable_serial}" && "${#CONNECT_CANDIDATES[@]}" -gt 0 ]]; then
-    local candidate=""
-    echo "Reconnecting Android device over Wi-Fi..." >&2
-    "${adb_bin}" disconnect >/dev/null 2>&1 || true
-
-    stable_serial=""
-    for candidate in "${CONNECT_CANDIDATES[@]}"; do
-      stable_serial="$(connect_candidate "${adb_bin}" "${candidate}" || true)"
-      if [[ -n "${stable_serial}" ]]; then
-        export ANDROID_SERIAL="${stable_serial}"
-        break
-      fi
-    done
-
+  if [[ -z "${stable_serial}" && "${restarted_discovery}" -eq 0 ]]; then
+    restart_adb_for_discovery_retry "${adb_bin}" "ADB candidates did not connect"
+    discover_adb_targets "${adb_bin}" "${requested_target}"
+    stable_serial="${DISCOVERED_STABLE_SERIAL}"
     if [[ -z "${stable_serial}" ]]; then
-      echo "Warning: could not establish a stable Wi-Fi adb serial; continuing with Expo device detection." >&2
+      stable_serial="$(connect_candidates "${adb_bin}" || true)"
     fi
+  fi
+
+  if [[ -n "${stable_serial}" ]]; then
+    export ANDROID_SERIAL="${stable_serial}"
+  else
+    echo "Warning: could not establish a stable Wi-Fi adb serial; continuing with Expo device detection." >&2
   fi
 
   "${EXPO_RELEASE_COMMAND[@]}"
