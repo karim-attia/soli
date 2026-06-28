@@ -12,11 +12,19 @@ export type StockStackProps = {
   metrics: CardMetrics
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
+  flightOverlayHiddenCardIds: ReadonlySet<string>
+  animationResetKey: number
   // requirement 20-6: Disable CardView layout tracking during scrubbing to reduce churn
   layoutTrackingEnabled?: boolean
-  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  onCardMeasured: (
+    cardId: string,
+    snapshot: CardFlightSnapshot,
+    card?: Card,
+    onFlightSettled?: (cardId: string) => void
+  ) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
   label?: string
+  renderCardsInPlace?: boolean
 }
 
 export const StockStack = ({
@@ -24,12 +32,15 @@ export const StockStack = ({
   metrics,
   invalidWiggle,
   cardFlights,
+  flightOverlayHiddenCardIds,
+  animationResetKey,
   layoutTrackingEnabled = true,
   onCardMeasured,
   cardFlightMemory,
   label,
+  renderCardsInPlace = true,
 }: StockStackProps) => {
-  if (!cards.length) {
+  if (!cards.length || !renderCardsInPlace) {
     return (
       <View
         pointerEvents="none"
@@ -71,6 +82,8 @@ export const StockStack = ({
           metrics={metrics}
           invalidWiggle={invalidWiggle}
           cardFlights={cardFlights}
+          hiddenForFlightOverlay={flightOverlayHiddenCardIds.has(topCard.id)}
+          animationResetKey={animationResetKey}
           layoutTrackingEnabled={layoutTrackingEnabled}
           onCardMeasured={onCardMeasured}
           cardFlightMemory={cardFlightMemory}

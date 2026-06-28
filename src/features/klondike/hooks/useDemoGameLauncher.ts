@@ -35,6 +35,7 @@ type UseDemoGameLauncherOptions = {
   recordCurrentGameResult: (options?: { solved?: boolean }) => void
   setCelebrationState: Dispatch<SetStateAction<any>>
   resetCardFlights: () => void
+  clearAnimatedCardResidency: () => void
   foundationLayoutsRef: MutableRefObject<Partial<Record<Suit, LayoutRectangle>>>
   topRowLayoutRef: MutableRefObject<LayoutRectangle | null>
   winCelebrationsRef: MutableRefObject<number>
@@ -77,6 +78,7 @@ export const useDemoGameLauncher = ({
   recordCurrentGameResult,
   setCelebrationState,
   resetCardFlights,
+  clearAnimatedCardResidency,
   foundationLayoutsRef,
   topRowLayoutRef,
   winCelebrationsRef,
@@ -117,6 +119,7 @@ export const useDemoGameLauncher = ({
     clearCelebrationDialogTimer()
     setCelebrationState(null)
     resetCardFlights()
+    clearAnimatedCardResidency()
     foundationLayoutsRef.current = {}
     topRowLayoutRef.current = null
     winCelebrationsRef.current = 0
@@ -124,6 +127,7 @@ export const useDemoGameLauncher = ({
     updateBoardLocked(false)
   }, [
     clearCelebrationDialogTimer,
+    clearAnimatedCardResidency,
     currentGameEntryIdRef,
     foundationLayoutsRef,
     resetCardFlights,

@@ -7,6 +7,7 @@ import {
   FOUNDATION_SUIT_ORDER,
   TABLEAU_COLUMN_COUNT,
   type GameState,
+  type Card,
   type Selection,
   type Suit,
 } from '../../../../solitaire/klondike'
@@ -14,7 +15,6 @@ import type { CardFlightSnapshot } from '../../../../animation/flightController'
 import type {
   CardFlightRegistry,
   CardMetrics,
-  CelebrationBindings,
   DropHints,
   InvalidWiggleConfig,
 } from '../../types'
@@ -61,7 +61,14 @@ export type TopRowProps = {
   notifyInvalidMove: (options?: { selection?: Selection | null }) => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
-  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  flightOverlayHiddenCardIds: ReadonlySet<string>
+  animationResetKey: number
+  onCardMeasured: (
+    cardId: string,
+    snapshot: CardFlightSnapshot,
+    card?: Card,
+    onFlightSettled?: (cardId: string) => void
+  ) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
   onFoundationArrival?: (cardId: string | null | undefined) => void
   onFoundationCardFlightSettled?: (cardId: string) => void
@@ -71,9 +78,11 @@ export type TopRowProps = {
   hideFoundations?: boolean
   onTopRowLayout?: (layout: LayoutRectangle) => void
   onFoundationLayout?: (suit: Suit, layout: LayoutRectangle) => void
-  celebrationBindings?: CelebrationBindings
+  onStockLayout?: (layout: LayoutRectangle) => void
+  onWasteLayout?: (layout: LayoutRectangle) => void
   celebrationActive?: boolean
   celebrationPending?: boolean
+  renderCardsInPlace?: boolean
 }
 
 export const TopRow = ({
@@ -87,6 +96,8 @@ export const TopRow = ({
   notifyInvalidMove,
   invalidWiggle,
   cardFlights,
+  flightOverlayHiddenCardIds,
+  animationResetKey,
   onCardMeasured,
   cardFlightMemory,
   onFoundationArrival,
@@ -96,9 +107,11 @@ export const TopRow = ({
   hideFoundations,
   onTopRowLayout,
   onFoundationLayout,
-  celebrationBindings,
+  onStockLayout,
+  onWasteLayout,
   celebrationActive = false,
   celebrationPending = false,
+  renderCardsInPlace = true,
 }: TopRowProps) => {
   const handleRowLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -160,8 +173,13 @@ export const TopRow = ({
 
         if (columnIndex < FOUNDATION_SUIT_ORDER.length) {
           const suit = FOUNDATION_SUIT_ORDER[columnIndex] as Suit
+          const handleFoundationSlotLayout = createFoundationLayoutHandler(suit)
           return (
-            <View key={`foundation-${suit}`} style={slotStyle}>
+            <View
+              key={`foundation-${suit}`}
+              style={slotStyle}
+              onLayout={(event) => handleFoundationSlotLayout(event.nativeEvent.layout)}
+            >
               <FoundationPile
                 suit={suit}
                 cards={state.foundations[suit]}
@@ -173,16 +191,18 @@ export const TopRow = ({
                 onPress={() => onFoundationPress(suit)}
                 invalidWiggle={invalidWiggle}
                 cardFlights={cardFlights}
+                flightOverlayHiddenCardIds={flightOverlayHiddenCardIds}
+                animationResetKey={animationResetKey}
                 layoutTrackingEnabled={!scrubbingActive}
                 onCardMeasured={onCardMeasured}
                 cardFlightMemory={cardFlightMemory}
                 onCardArrived={onFoundationArrival}
                 onTopCardFlightSettled={onFoundationCardFlightSettled}
                 disableInteractions={interactionsLocked}
-                hideTopCard={hideFoundations && !celebrationActive}
-                celebrationBindings={celebrationBindings}
+                hideTopCard={hideFoundations || celebrationActive}
                 celebrationActive={celebrationActive}
-                onLayout={createFoundationLayoutHandler(suit)}
+                renderTopCard={renderCardsInPlace}
+                suppressHiddenTopCardOutline={!renderCardsInPlace}
               />
             </View>
           )
@@ -190,7 +210,11 @@ export const TopRow = ({
 
         if (columnIndex === wasteColumnIndex) {
           return (
-            <View key="waste" style={slotStyle}>
+            <View
+              key="waste"
+              style={slotStyle}
+              onLayout={(event) => onWasteLayout?.(event.nativeEvent.layout)}
+            >
               <WinCleanupPile hidden={showWinCleanup}>
                 <PileButton
                   label={`${state.waste.length}`}
@@ -208,10 +232,13 @@ export const TopRow = ({
                         onPress={handleWastePress}
                         invalidWiggle={invalidWiggle}
                         cardFlights={cardFlights}
+                        flightOverlayHiddenCardIds={flightOverlayHiddenCardIds}
+                        animationResetKey={animationResetKey}
                         layoutTrackingEnabled={!scrubbingActive}
                         onCardMeasured={onCardMeasured}
                         cardFlightMemory={cardFlightMemory}
                         disabled={interactionsLocked}
+                        renderCardsInPlace={renderCardsInPlace}
                       />
                     ) : (
                       <EmptySlot highlight={false} metrics={cardMetrics} />
@@ -225,12 +252,20 @@ export const TopRow = ({
 
         if (columnIndex === stockColumnIndex) {
           return (
-            <View key="stock" style={slotStyle}>
+            <View
+              key="stock"
+              style={slotStyle}
+              onLayout={(event) => onStockLayout?.(event.nativeEvent.layout)}
+            >
               <WinCleanupPile hidden={showWinCleanup}>
                 <PileButton
                   label={`${state.stock.length}`}
                   onPress={onDraw}
                   disabled={stockDisabled}
+                  // Absolute-card mode gives the visible stock card its own press target.
+                  // Keep recycle on the structural slot, but avoid a duplicate draw handler
+                  // underneath the absolute stock card during rapid taps.
+                  disablePress={!renderCardsInPlace && drawVariant === 'stock'}
                   width={cardMetrics.width}
                 >
                   {drawVariant === 'stock' ? (
@@ -239,10 +274,13 @@ export const TopRow = ({
                       metrics={cardMetrics}
                       invalidWiggle={invalidWiggle}
                       cardFlights={cardFlights}
+                      flightOverlayHiddenCardIds={flightOverlayHiddenCardIds}
+                      animationResetKey={animationResetKey}
                       layoutTrackingEnabled={!scrubbingActive}
                       onCardMeasured={onCardMeasured}
                       cardFlightMemory={cardFlightMemory}
                       label={state.stock.length ? drawLabel : undefined}
+                      renderCardsInPlace={renderCardsInPlace}
                     />
                   ) : (
                     <CardBack

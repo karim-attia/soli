@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useCallback } from 'react'
 import { View } from 'react-native'
+import type { LayoutChangeEvent, LayoutRectangle } from 'react-native'
 
 import type { Card } from '../../../../solitaire/klondike'
 import type { CardFlightSnapshot } from '../../../../animation/flightController'
@@ -29,12 +30,22 @@ export type TableauSectionProps = {
   onAutoMove: (selection: Selection) => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
-  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  flightOverlayHiddenCardIds: ReadonlySet<string>
+  animationResetKey: number
+  onCardMeasured: (
+    cardId: string,
+    snapshot: CardFlightSnapshot,
+    card?: Card,
+    onFlightSettled?: (cardId: string) => void
+  ) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
   interactionsLocked: boolean
   // requirement 20-6: When scrubbing, reduce board churn to avoid iOS gesture cancellation
   scrubbingActive: boolean
   celebrationPending?: boolean
+  renderCardsInPlace?: boolean
+  onTableauRowLayout?: (layout: LayoutRectangle) => void
+  onTableauColumnLayout?: (columnIndex: number, layout: LayoutRectangle) => void
 }
 
 export const TableauSection = ({
@@ -44,35 +55,53 @@ export const TableauSection = ({
   onAutoMove,
   invalidWiggle,
   cardFlights,
+  flightOverlayHiddenCardIds,
+  animationResetKey,
   onCardMeasured,
   cardFlightMemory,
   interactionsLocked,
   scrubbingActive,
   celebrationPending = false,
-}: TableauSectionProps) => (
-  <View style={styles.tableauRow}>
-    {state.tableau.map((column, columnIndex) => (
-      <TableauColumn
-        key={`col-${columnIndex}`}
-        column={column}
-        columnIndex={columnIndex}
-        state={state}
-        cardMetrics={cardMetrics}
-        isDroppable={dropHints.tableau[columnIndex]}
-        onCardPress={(cardIndex) =>
-          onAutoMove({ source: 'tableau', columnIndex, cardIndex })
-        }
-        invalidWiggle={invalidWiggle}
-        cardFlights={cardFlights}
-        onCardMeasured={onCardMeasured}
-        cardFlightMemory={cardFlightMemory}
-        disableInteractions={interactionsLocked}
-        scrubbingActive={scrubbingActive}
-        celebrationPending={celebrationPending}
-      />
-    ))}
-  </View>
-)
+  renderCardsInPlace = true,
+  onTableauRowLayout,
+  onTableauColumnLayout,
+}: TableauSectionProps) => {
+  const handleRowLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      onTableauRowLayout?.(event.nativeEvent.layout)
+    },
+    [onTableauRowLayout]
+  )
+
+  return (
+    <View style={styles.tableauRow} onLayout={handleRowLayout}>
+      {state.tableau.map((column, columnIndex) => (
+        <TableauColumn
+          key={`col-${columnIndex}`}
+          column={column}
+          columnIndex={columnIndex}
+          state={state}
+          cardMetrics={cardMetrics}
+          isDroppable={dropHints.tableau[columnIndex]}
+          onCardPress={(cardIndex) =>
+            onAutoMove({ source: 'tableau', columnIndex, cardIndex })
+          }
+          invalidWiggle={invalidWiggle}
+          cardFlights={cardFlights}
+          flightOverlayHiddenCardIds={flightOverlayHiddenCardIds}
+          animationResetKey={animationResetKey}
+          onCardMeasured={onCardMeasured}
+          cardFlightMemory={cardFlightMemory}
+          disableInteractions={interactionsLocked}
+          scrubbingActive={scrubbingActive}
+          celebrationPending={celebrationPending}
+          renderCardsInPlace={renderCardsInPlace}
+          onColumnLayout={onTableauColumnLayout}
+        />
+      ))}
+    </View>
+  )
+}
 
 export type TableauColumnProps = {
   column: Card[]
@@ -83,11 +112,20 @@ export type TableauColumnProps = {
   onCardPress: (cardIndex: number) => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
-  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  flightOverlayHiddenCardIds: ReadonlySet<string>
+  animationResetKey: number
+  onCardMeasured: (
+    cardId: string,
+    snapshot: CardFlightSnapshot,
+    card?: Card,
+    onFlightSettled?: (cardId: string) => void
+  ) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
   disableInteractions: boolean
   scrubbingActive: boolean
   celebrationPending?: boolean
+  renderCardsInPlace?: boolean
+  onColumnLayout?: (columnIndex: number, layout: LayoutRectangle) => void
 }
 
 export const TableauColumn = ({
@@ -99,11 +137,15 @@ export const TableauColumn = ({
   onCardPress,
   invalidWiggle,
   cardFlights,
+  flightOverlayHiddenCardIds,
+  animationResetKey,
   onCardMeasured,
   cardFlightMemory,
   disableInteractions,
   scrubbingActive,
   celebrationPending = false,
+  renderCardsInPlace = true,
+  onColumnLayout,
 }: TableauColumnProps) => {
   // Task 1-9: Keep face-up spacing (tap targets), but halve the visible spacing for face-down stacks.
   const faceDownStackOffset = Math.round(
@@ -147,6 +189,7 @@ export const TableauColumn = ({
           marginRight: isLastColumn ? BOARD_COLUMN_GAP : BOARD_COLUMN_MARGIN,
         },
       ]}
+      onLayout={(event) => onColumnLayout?.(columnIndex, event.nativeEvent.layout)}
       pointerEvents={disableInteractions ? 'none' : 'auto'}
     >
       {/* Task 28-2: Fade empty tableau outlines after the visual win handoff, instead of unmounting them in one frame. */}
@@ -157,29 +200,35 @@ export const TableauColumn = ({
           metrics={cardMetrics}
         />
       ) : null}
-      {column.map((card, cardIndex) => (
-        <CardView
-          key={card.id}
-          card={card}
-          metrics={cardMetrics}
-          offsetTop={cardOffsets[cardIndex]}
-          suppressFlightOnFaceUpChange
-          isSelected={
-            columnSelected &&
-            selectedCardIndex !== null &&
-            selectedCardIndex <= cardIndex &&
-            card.faceUp
-          }
-          onPress={
-            disableInteractions || !card.faceUp ? undefined : () => onCardPress(cardIndex)
-          }
-          invalidWiggle={invalidWiggle}
-          cardFlights={cardFlights}
-          layoutTrackingEnabled={!scrubbingActive}
-          onCardMeasured={onCardMeasured}
-          cardFlightMemory={cardFlightMemory}
-        />
-      ))}
+      {renderCardsInPlace
+        ? column.map((card, cardIndex) => (
+            <CardView
+              key={card.id}
+              card={card}
+              metrics={cardMetrics}
+              offsetTop={cardOffsets[cardIndex]}
+              suppressFlightOnFaceUpChange
+              isSelected={
+                columnSelected &&
+                selectedCardIndex !== null &&
+                selectedCardIndex <= cardIndex &&
+                card.faceUp
+              }
+              onPress={
+                disableInteractions || !card.faceUp
+                  ? undefined
+                  : () => onCardPress(cardIndex)
+              }
+              invalidWiggle={invalidWiggle}
+              cardFlights={cardFlights}
+              hiddenForFlightOverlay={flightOverlayHiddenCardIds.has(card.id)}
+              animationResetKey={animationResetKey}
+              layoutTrackingEnabled={!scrubbingActive}
+              onCardMeasured={onCardMeasured}
+              cardFlightMemory={cardFlightMemory}
+            />
+          ))
+        : null}
     </View>
   )
 }

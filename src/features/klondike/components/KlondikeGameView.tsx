@@ -7,6 +7,12 @@ import { StatisticsHud, StatisticsPlaceholder, type StatisticsRow } from './Stat
 import { FeltBackground } from './FeltBackground'
 import { TopRow, type TopRowProps } from './cards/TopRow'
 import { TableauSection, type TableauSectionProps } from './cards/TableauSection'
+import {
+  CardFlightOverlayLayer,
+  type CardFlightOverlayItem,
+} from './cards/CardFlightOverlayLayer'
+import { AbsoluteCardLayer, type AbsoluteCardLayerProps } from './cards/AbsoluteCardLayer'
+import { CelebrationOverlayLayer } from './cards/CelebrationOverlayLayer'
 import { CelebrationTouchBlocker } from './cards'
 import { CelebrationDebugBadge } from './CelebrationDebugBadge'
 import { UndoScrubber, type UndoScrubberProps } from './UndoScrubber'
@@ -28,6 +34,9 @@ export type KlondikeGameViewProps = {
   celebrationBindings: CelebrationBindings
   onCelebrationAbort: () => void
   undoScrubProps: UndoScrubberProps
+  absoluteCardLayerProps: AbsoluteCardLayerProps | null
+  cardFlightOverlayItems: CardFlightOverlayItem[]
+  onCardFlightOverlayComplete: (key: string) => void
 }
 
 export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
@@ -40,9 +49,12 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
   tableauProps,
   celebrationState,
   celebrationLabel,
-  celebrationBindings: _celebrationBindings,
+  celebrationBindings,
   onCelebrationAbort,
   undoScrubProps,
+  absoluteCardLayerProps,
+  cardFlightOverlayItems,
+  onCardFlightOverlayComplete,
 }) => {
   const hasStats = statisticsRows.length > 0
 
@@ -83,6 +95,21 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
         <TopRow {...topRowProps} />
 
         <TableauSection {...tableauProps} />
+
+        {absoluteCardLayerProps ? (
+          <AbsoluteCardLayer {...absoluteCardLayerProps} />
+        ) : null}
+
+        <CardFlightOverlayLayer
+          items={cardFlightOverlayItems}
+          onFlightComplete={onCardFlightOverlayComplete}
+        />
+
+        <CelebrationOverlayLayer
+          celebrationState={celebrationState}
+          celebrationBindings={celebrationBindings}
+          cardMetrics={topRowProps.cardMetrics}
+        />
 
         {celebrationState ? (
           <CelebrationTouchBlocker onAbort={onCelebrationAbort} />

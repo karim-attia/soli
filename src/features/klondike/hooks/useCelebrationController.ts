@@ -401,6 +401,7 @@ export const useCelebrationController = ({
       }
 
       pendingWinningCardSettledRef.current = true
+      clearCelebrationFallbackTimer()
       const settledAt = Date.now()
       const queuedAt = pendingCelebrationQueuedAtRef.current ?? settledAt
       const elapsedSinceQueuedAt = Math.max(0, settledAt - queuedAt)
@@ -420,6 +421,7 @@ export const useCelebrationController = ({
     },
     [
       cardFlightsEnabled,
+      clearCelebrationFallbackTimer,
       foundationGlowEnabled,
       logCelebrationHandoff,
       scheduleCelebrationStart,

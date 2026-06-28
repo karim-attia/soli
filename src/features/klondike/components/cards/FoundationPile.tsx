@@ -4,13 +4,7 @@ import { Text } from 'tamagui'
 
 import type { Card, Suit } from '../../../../solitaire/klondike'
 import type { CardFlightSnapshot } from '../../../../animation/flightController'
-import type {
-  CardFlightRegistry,
-  CardMetrics,
-  CelebrationBindings,
-  InvalidWiggleConfig,
-} from '../../types'
-import { EMPTY_INVALID_WIGGLE } from '../../types'
+import type { CardFlightRegistry, CardMetrics, InvalidWiggleConfig } from '../../types'
 import {
   COLOR_COLUMN_BORDER,
   COLOR_DROP_BORDER,
@@ -36,17 +30,24 @@ export type FoundationPileProps = {
   onPress: () => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
+  flightOverlayHiddenCardIds: ReadonlySet<string>
+  animationResetKey: number
   // requirement 20-6: Disable CardView layout tracking during scrubbing to reduce churn
   layoutTrackingEnabled?: boolean
-  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  onCardMeasured: (
+    cardId: string,
+    snapshot: CardFlightSnapshot,
+    card?: Card,
+    onFlightSettled?: (cardId: string) => void
+  ) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
   onCardArrived?: (cardId: string | null | undefined) => void
   onTopCardFlightSettled?: (cardId: string) => void
   disableInteractions?: boolean
   hideTopCard?: boolean
-  celebrationBindings?: CelebrationBindings
   celebrationActive?: boolean
-  onLayout?: (layout: { x: number; y: number; width: number; height: number }) => void
+  renderTopCard?: boolean
+  suppressHiddenTopCardOutline?: boolean
 }
 
 export const FoundationPile = ({
@@ -58,6 +59,8 @@ export const FoundationPile = ({
   onPress,
   invalidWiggle,
   cardFlights,
+  flightOverlayHiddenCardIds,
+  animationResetKey,
   layoutTrackingEnabled = true,
   onCardMeasured,
   cardFlightMemory,
@@ -65,9 +68,9 @@ export const FoundationPile = ({
   onTopCardFlightSettled,
   disableInteractions = false,
   hideTopCard = false,
-  celebrationBindings,
   celebrationActive = false,
-  onLayout,
+  renderTopCard = true,
+  suppressHiddenTopCardOutline = false,
 }: FoundationPileProps) => {
   const { glowStyle, glowDimensions } = useFoundationGlowAnimation({
     cards,
@@ -78,10 +81,16 @@ export const FoundationPile = ({
 
   const hasCards = cards.length > 0
   const topCard = cards[cards.length - 1]
-  const shouldHideVisibleTopCard = Boolean(topCard) && hideTopCard
+  const shouldHideVisibleTopCard = Boolean(topCard) && (hideTopCard || !renderTopCard)
+  const hideOutlineForHiddenTopCard =
+    shouldHideVisibleTopCard && (celebrationActive || suppressHiddenTopCardOutline)
   // Task 1-8: The dashed empty outline should NOT show behind cards.
   // When the top card is intentionally hidden, treat the pile as "empty" for outline purposes.
-  const showEmptyOutline = !topCard || shouldHideVisibleTopCard
+  // During the 2026-06 celebration overlay fix, the top foundation cards are hidden
+  // only because the board-level overlay owns their visual copy; keep the outline off
+  // so the win animation does not reveal empty slots underneath.
+  const showEmptyOutline =
+    !topCard || (shouldHideVisibleTopCard && !hideOutlineForHiddenTopCard)
   const borderColor = isDroppable
     ? COLOR_DROP_BORDER
     : isSelected
@@ -90,13 +99,10 @@ export const FoundationPile = ({
         ? COLOR_FOUNDATION_BORDER
         : COLOR_COLUMN_BORDER
   const highlightOutlineOnTop = !showEmptyOutline && (isSelected || isDroppable)
-  const renderedCards = celebrationActive ? cards : topCard ? [topCard] : []
-
   return (
     <Pressable
       onPress={disableInteractions ? undefined : onPress}
       disabled={disableInteractions}
-      onLayout={(event) => onLayout?.(event.nativeEvent.layout)}
       style={[
         styles.foundation,
         {
@@ -123,41 +129,32 @@ export const FoundationPile = ({
           glowStyle,
         ]}
       />
-      {topCard ? (
-        renderedCards.map((card, index) => {
-          const actualIndex = celebrationActive ? index : cards.length - 1
-          const isTop = actualIndex === cards.length - 1
-          return (
-            <AnimatedView
-              key={card.id}
-              pointerEvents="none"
-              style={[
-                styles.foundationCard,
-                !isTop && !celebrationActive ? styles.foundationStackedCard : undefined,
-                hideTopCard && isTop ? styles.hiddenCard : undefined,
-                { zIndex: actualIndex + 1 },
-              ]}
-            >
-              <CardView
-                card={card}
-                metrics={cardMetrics}
-                invalidWiggle={isTop ? invalidWiggle : EMPTY_INVALID_WIGGLE}
-                cardFlights={cardFlights}
-                // Celebration remounts the whole foundation stack. Those cards can
-                // carry a remembered flight snapshot, so they need one layout pass
-                // to rehydrate opacity/position instead of staying hidden at 0.
-                layoutTrackingEnabled={
-                  layoutTrackingEnabled && (celebrationActive || isTop)
-                }
-                onCardMeasured={onCardMeasured}
-                onFlightSettled={isTop ? onTopCardFlightSettled : undefined}
-                cardFlightMemory={cardFlightMemory}
-                celebrationBindings={celebrationBindings}
-              />
-            </AnimatedView>
-          )
-        })
-      ) : (
+      {topCard && renderTopCard ? (
+        <AnimatedView
+          key={topCard.id}
+          pointerEvents="none"
+          style={[
+            styles.foundationCard,
+            hideTopCard ? styles.hiddenCard : undefined,
+            { zIndex: cards.length },
+          ]}
+        >
+          <CardView
+            card={topCard}
+            metrics={cardMetrics}
+            invalidWiggle={invalidWiggle}
+            cardFlights={cardFlights}
+            hiddenForFlightOverlay={flightOverlayHiddenCardIds.has(topCard.id)}
+            animationResetKey={animationResetKey}
+            // 2026-06 Android memory fix: the full win celebration now lives in a
+            // bounded board overlay, so foundations keep only their top static card.
+            layoutTrackingEnabled={layoutTrackingEnabled}
+            onCardMeasured={onCardMeasured}
+            onFlightSettled={onTopCardFlightSettled}
+            cardFlightMemory={cardFlightMemory}
+          />
+        </AnimatedView>
+      ) : !topCard ? (
         <Text
           style={[
             styles.foundationSymbol,
@@ -166,7 +163,7 @@ export const FoundationPile = ({
         >
           {SUIT_SYMBOLS[suit]}
         </Text>
-      )}
+      ) : null}
       {highlightOutlineOnTop ? (
         <View
           pointerEvents="none"

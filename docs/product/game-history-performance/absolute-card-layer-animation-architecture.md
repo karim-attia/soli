@@ -1,0 +1,270 @@
+# Game History Performance Absolute Card Layer Animation Architecture
+
+## User prompt
+
+```text
+try option 3
+new md file.
+implement and test and loop directly
+```
+
+```text
+works really well!!
+pls run 10 test games and check memory usage.
+also some minor minor issues:
+when celebration runs, the symbols of the Foundation are still there, see screenshot
+also, when moving card to foundation, sometimes the foundation stack vanishes and is see through
+when running 10 test games, auto-up seems to be deactivated afterwards even though it's on in the settings. toggling it off and on makes it work normally again.
+when moving a card from the stock to the board and then clicking undo, the card flight is behind the column on the board. also sometimes when moving from column to column. one interesting observation: when moving from left to right, it's on top and from right to left, it's below these other columns. I am afraid that we're opening pandora's box with this one. pls analyze and only touch this one if you're super super certain, otherwise report back to me.
+And maybe the biggest issue: when clicking through the stock fast, it sometimes takes it as a clickon the open card. Even though the open card was not clicked. Maybe this registers because the flight is not completed yet. The open card then wiggles because Invalid move or moves around the board even though it was not click.
+```
+
+```text
+[absolute-card-layer-animation-architecture.md](docs/product/game-history-performance/absolute-card-layer-animation-architecture.md)
+[fabric-view-retention-root-fix.md](docs/product/game-history-performance/fabric-view-retention-root-fix.md)
+implemented absolute card layer animation architecture. please have a look. a lot of files changed in staged.
+
+I think the last issue was not fixed, i still sometimes have cards move from the stock even though i am only clicking on the covered cards.
+please have a look. what else could cause this?
+please check the memory now, it feels a bit sluggish, i played some more games.
+did we also move the celebration to this new logic? should we?
+```
+
+```text
+Hey, I have one more optimization. There's usually three open-faced cards from the stock, right? And when I tap there twice, I kind of expect both cards to move, so the first on top. And of course, if that's invalid, it will wiggle and nothing will happen, even if I tap twice. But if both cards are able to move, and I tap twice in like a fast succession in a game, they should both move. Is there a reasonable way to implement this in a quick way? Thank you.
+```
+
+## Description
+
+Try the option 3 animation architecture: render cards from one board-level absolute layer instead of letting each pile own its moving card views. Piles should provide target geometry and non-card UI; the card layer owns card visuals, hit targets, and motion. The first pass should be small enough to test quickly while moving the code toward the final architecture.
+
+## Framing context
+
+The current implementation keeps most cards static and uses a flight overlay clone for moved cards. That reduced long-lived animated residency, but animation ownership is split across pile-local card views, NativeAnimated invalid wiggle, Reanimated hooks, and board overlays. A full absolute layer can reduce parent-to-parent remounts because cards stay in one React subtree and only their target coordinates change.
+
+This is an architecture experiment, not a proven memory fix. Existing A/B runs showed that disabling visible animations did not flatten the native/unknown memory slope, so success here is primarily animation smoothness and simpler visual ownership unless measurement proves a memory benefit too.
+
+## Acceptance Criteria
+
+- Cards render from a board-level absolute layer for normal gameplay.
+- Piles still render empty slots, labels, outlines, drop highlights, and glow/cleanup UI.
+- Tapping stock, waste, foundation top cards, and tableau cards still routes to the existing gameplay handlers.
+- Moving cards animate by changing target coordinates in one absolute layer, not by remounting between pile parents.
+- Invalid wiggle and face-up changes still have visible feedback, at least for touched cards.
+- New game and undo scrubbing reset or stabilize animation state without stale card positions.
+- The implementation can be disabled or reverted cleanly if device tests show regressions.
+
+## Design links
+
+- Existing analysis: `docs/product/game-history-performance/fabric-view-retention-root-fix.md`
+- Reanimated performance guide: https://docs.swmansion.com/react-native-reanimated/docs/guides/performance/
+- React list identity: https://react.dev/learn/rendering-lists
+- React Native Animated native driver: https://reactnative.dev/docs/animated
+- React Native View pointer events: https://reactnative.dev/docs/view#pointerevents
+
+## Possible approaches incl. pros and cons
+
+### Board-level absolute layer with measured pile targets
+
+Pros:
+
+- Closest to the requested option 3.
+- Cards keep stable React parents across stock/waste/tableau/foundation moves.
+- Works with current pile layout if piles emit target rectangles.
+
+Cons:
+
+- Requires carefully preserving tap behavior and z-order.
+- Initial target measurement can briefly be unavailable.
+- More code than polishing the current overlay path.
+
+### Board-level absolute layer with purely computed coordinates
+
+Pros:
+
+- Avoids measuring every card.
+- Potentially fastest after implementation.
+
+Cons:
+
+- More brittle because it must duplicate all layout math from top row/tableau/tamagui spacing.
+- Safe-area and dynamic card metrics make this risky for a first pass.
+
+### Keep current pile rendering and only expand the overlay
+
+Pros:
+
+- Lower risk and smaller change.
+
+Cons:
+
+- Not option 3.
+- Cards still remount between parents and visual ownership stays split.
+
+Recommendation: implement measured pile targets first. It is the quickest credible route to one card layer while preserving the existing board layout.
+
+## Open questions to the user
+
+- Should this ship as an always-on replacement once stable, or remain behind a temporary dev flag until the memory/perf loop is convincing? Recommendation: start always-on in this branch only, because the user asked to try the option directly and the branch is already experimental.
+
+## Dependencies
+
+No new runtime dependencies.
+
+## UX/UI Considerations
+
+The user should not see a visual redesign. The goal is the same solitaire board with smoother, more deterministic card motion. Empty slots, stock labels, waste count, foundation outlines, and win cleanup should remain visually equivalent.
+
+## Components
+
+- Reuse `CardVisual`, `CardBack`, `EmptySlot`, `PileButton`, pile layout components, and existing game handlers.
+- Create a new board-level `AbsoluteCardLayer`.
+- Update pile components so they can render structural UI without local card visuals.
+
+## How to fetch data, how to cache
+
+No data fetching changes. Card target positions are derived from current `GameState`, board/pile layout callbacks, and card metrics.
+
+## Related tasks
+
+- Follow-up memory work in `fabric-view-retention-root-fix.md`.
+- Existing performance harness in `scripts/run-demo-autosolve.js`.
+
+## Simplification ideas
+
+- First pass can keep existing `CardFlightOverlayLayer` available but unused for normal card movement.
+- First pass can use measured pile targets and avoid a second custom layout solver.
+- First pass can defer fancy stacked drag/selection effects; tap-to-auto-move is the current primary interaction.
+
+## Steps to implement
+
+- [completed] Create this implementation plan.
+- [completed] Read current pile/card boundaries and identify minimal props changes.
+- [completed] Add target layout collection for stock, waste, foundations, and tableau columns.
+- [completed] Add `AbsoluteCardLayer` that renders visible cards and animates target changes.
+- [completed] Convert pile components to optionally hide local card visuals while keeping structure.
+- [completed] Wire the layer into `KlondikeGameView` / `useKlondikeGame`.
+- [completed] Run lints/typecheck.
+- [completed] Run native/device smoke test and iterate.
+- [completed] Fix follow-up visual/interaction issues found during manual play.
+- [completed] Run 10-game memory harness after follow-up fixes.
+- [completed] Re-read the staged absolute-layer implementation after the fast-stock issue reproduced.
+- [completed] Sample current Android memory before rebuilding or disturbing the user's sluggish session.
+- [completed] Remove the duplicate structural stock draw press target in absolute-layer stock mode.
+- [completed] Disable absolute-card presses synchronously on the render where a card target changes.
+- [completed] Run focused static checks for the interaction fix.
+- [completed] Run native/device verification through a testing sub-agent.
+- [completed] Update memory and celebration recommendations from the verification results.
+- [completed] Analyze fast double-tap waste behavior after the stock-mis-tap guard.
+- [completed] Add a waste-slot tap target that stays available while waste cards shift.
+- [completed] Add a one-tap waste buffer for taps that arrive before React renders the next waste top card.
+- [completed] Run focused static checks.
+- [completed-via-user] Run Android release/device smoke through a testing sub-agent.
+
+## Plan: Files to modify
+
+- `src/features/klondike/components/KlondikeGameView.tsx`
+- `src/features/klondike/hooks/useKlondikeGame.ts`
+- `src/features/klondike/components/cards/AbsoluteCardLayer.tsx`
+- `src/features/klondike/components/cards/TopRow.tsx`
+- `src/features/klondike/components/cards/TableauSection.tsx`
+- `src/features/klondike/components/cards/StockStack.tsx`
+- `src/features/klondike/components/cards/WasteFan.tsx`
+- `src/features/klondike/components/cards/FoundationPile.tsx`
+- `src/features/klondike/hooks/useDemoGameLauncher.ts`
+- `src/features/klondike/hooks/useCelebrationController.ts`
+- `src/features/klondike/components/cards/TopRow.tsx`
+- `src/features/klondike/components/cards/AbsoluteCardLayer.tsx`
+- `src/features/klondike/hooks/useKlondikeGame.ts`
+
+## Files actually modified
+
+- `docs/product/game-history-performance/absolute-card-layer-animation-architecture.md`
+- `src/features/klondike/components/KlondikeGameView.tsx`
+- `src/features/klondike/hooks/useKlondikeGame.ts`
+- `src/features/klondike/components/cards/AbsoluteCardLayer.tsx`
+- `src/features/klondike/components/cards/TopRow.tsx`
+- `src/features/klondike/components/cards/TableauSection.tsx`
+- `src/features/klondike/components/cards/StockStack.tsx`
+- `src/features/klondike/components/cards/WasteFan.tsx`
+- `src/features/klondike/components/cards/FoundationPile.tsx`
+- `src/features/klondike/components/cards/TopRow.tsx`
+
+## Intermediary learnings
+
+- The existing top row and tableau layout can publish enough target geometry for a first measured-layer implementation. The layer combines top-row/row layout plus slot/column layout rather than measuring each card.
+- In absolute-layer mode, `dispatchWithFlight` now bypasses the old card-flight snapshot gate. Movement is produced by stable card components receiving new coordinates after reducer updates.
+- The first pass renders the currently visible card set: stock top, last three waste cards, foundation top cards, and all tableau cards. Fully hidden stock/waste cards are still not mounted as card visuals.
+- `yarn lint` passed.
+- `yarn typecheck` initially caught a strict-null foundation layout lookup, then passed after the lookup was normalized.
+- Android release smoke test passed overall: app launched, board rendered without duplicate/missing cards, stock draw worked, tableau auto-move worked, undo worked, and New Game reset without stale card positions.
+- The first tester pass could not clearly see invalid wiggle in sampled frames, so the absolute layer wiggle offset was made slightly stronger. User then confirmed the J card visibly wiggled and the invalid wiggle works well.
+- Follow-up z-order analysis found a deterministic cause: moving cards used their destination column z-index during the whole flight, so right-to-left flights could pass under higher-index source columns. The fix boosts z-index only while a card is settling.
+- Follow-up fast-stock-click analysis found moving cards remained pressable during native-driver transforms. The fix disables pointer events only while a card is settling.
+- Foundation symbol visibility came from `FoundationPile` falling back to the suit symbol whenever local top-card rendering was suppressed. The fix renders the symbol only when the foundation is actually empty.
+- Foundation see-through handoff came from rendering only the new top foundation card while it was still flying. The fix keeps the previous foundation top as a noninteractive underlay.
+- Demo playlist hydrates fixture games with runtime auto-up disabled. The fix restores runtime auto-up from settings when the playlist completes or fails.
+- Final 10-game run verified the new absolute-layer settle callback: `winning_card_settled` logged for all 10 wins. A redundant fallback timer still fired in 5/10 before cleanup; the fallback is now cleared on winning-card settle.
+- Current sluggish-session memory sample before any rebuild on 2026-06-26: `agent-device perf memory sample` reported Total PSS `530.7 MB`, Total RSS `479.0 MB`, Native Heap PSS `144.1 MB`, Unknown PSS `95.1 MB`, and Dalvik Heap PSS `47.2 MB`. A follow-up `perf metrics` sample reported Total PSS `500.8 MB`, CPU `15%`, and no frame data in the short idle window.
+- React Native View pointer-event docs confirm `View.pointerEvents="none"` removes a view from touch targeting and `box-none` lets subviews receive touches. That supports keeping the absolute-layer root `box-none` while explicitly removing duplicate/stale card press targets.
+- Root cause candidate for the remaining fast-stock symptom: after a draw, the same card id moves from stock to waste, but before the animation effect marks it as settling, the card can render once with its new waste `onPress` while still at the old/native stock position. The fix disables pressability during that first target-change render.
+- Secondary root cause candidate: the structural stock `PileButton` still owned `onDraw` under the absolute stock card. In absolute-card mode, that violates the single-owner hit-target model and can draw from an underlay rather than the visible card layer.
+- Fast double-tapping waste can be dropped by the same pressability guard that prevents stock mis-taps: after one waste card moves, the next waste card may shift into the top-waste target, so its card component is temporarily non-pressable while the animation target changes.
+- A waste-slot tap target is safer than re-enabling moving-card presses because it is anchored only over the waste area and does not reintroduce a stock/waste overlap hit target.
+- Implemented a max-one buffered waste tap. A second tap on the same waste top before React renders the next state is replayed once after the first moved card leaves the waste top; invalid first taps do not buffer.
+- `yarn lint` passed after the waste double-tap optimization.
+- `yarn typecheck` passed after the waste double-tap optimization.
+- User manually tested the waste double-tap optimization and reported it looks good. The planned follow-up testing sub-agent did not return a report, and a fallback `yarn release` was interrupted by the user before completion, so this pass uses the user's manual device verification rather than a fresh automated release-build smoke.
+- Android release/device tester result after the fix: `yarn release` completed successfully and installed `/Users/karim/kDrive/Code/soli/android/app/build/outputs/apk/release/app-release.apk` on device `A065`.
+- Focused stock-only tap smoke after install passed: ten coordinate taps on the stock/draw card changed moves `18 -> 28`, stock `15 -> 5`, and waste `9 -> 19`, with no observed unintended waste-card auto-move or invalid wiggle. Caveat: `agent-device press` taps are serialized and slower than a human ultra-fast burst.
+- Post-smoke tester memory sample: Total PSS `360.3 MB`, RSS `476.6 MB`, Native Heap PSS `211.4 MB`, Unknown PSS `50.0 MB`, Dalvik Heap PSS `25.8 MB`. Follow-up perf metrics showed Total PSS `348.3 MB`, Native Heap PSS `210.6 MB`, Unknown PSS `50.0 MB`, CPU `0%` in the sampled idle window.
+- Tester frame sample reported 170/324 janky frames (`52.5%`) in a window that included coordinate automation and artifact capture, so this is not a clean gameplay FPS benchmark.
+- Celebration is already on the right kind of board-level bounded overlay: `CelebrationOverlayLayer` keeps a fixed `52` slot pool, `KlondikeGameView` renders it above the absolute gameplay layer, and the gameplay layer returns no cards while `celebrationActive`. Moving celebration into `AbsoluteCardLayer` would consolidate ownership but is not an obvious memory or correctness win right now.
+- After the user's 40-game manual run on 2026-06-26, memory stayed broadly flat versus the 10-game absolute-layer run: Total PSS `486.1-528.2 MB`, Native Heap PSS `300.7-312.8 MB`, Unknown PSS `81.9-88.4 MB`, Java/Dalvik Heap PSS `17.9-45.1 MB`. This is nowhere near the previous `1.2-2.0 GB` runaway state.
+- The same 40-game sample still showed runtime pressure: CPU `180%` on the first foreground sample, then `88%` after a 5s idle wait. Top threads included `mqt_v_js` around `30.7%`, process main thread around `26.9%`, `RenderThread` around `7.6%`, and Hermes `hades` around `11.5%`.
+- The 40-game frame windows missed deadlines (`29.7%` then `22.1%`), with the caveat that foregrounding and diagnostic collection were in the sample window. This points more at CPU/render pressure than total process memory.
+- Detailed 40-game `dumpsys meminfo` reported `968` Android `Views`, `1` `ViewRootImpl`, `1` `Activity`, and `0` `WebViews`. Screenshot `/Users/karim/kDrive/Code/soli/tmp/android-smoke/after-40-games-memory-check.png` showed normal gameplay rather than an active celebration, so the elevated view count is worth tracking separately.
+
+## Identified issues
+
+- [verified] Absolute card hit targets did not block stock draw, tableau auto-move, undo, or New Game in Android smoke testing.
+- [verified] Initial measured targets were available after layout settled; the board rendered cleanly without missing or duplicate cards.
+- [pending] Need to verify whether foundation glow arrival callbacks still fire at the right time.
+- [fixed] Invalid wiggle was hard to see in the first sampled recording; absolute-layer wiggle now uses a stronger offset and user confirmed it is visible.
+- [known-limitation] Recycle animation is not fully solved in this first pass because hidden older waste cards are not mounted; the next visible stock top can appear without a continuous card component.
+- [fixed] Absolute-layer winning-card settlement now feeds the existing celebration handoff controller.
+- [fixed] Foundation suit symbols were visible during celebration.
+- [fixed] Foundation stack could look see-through while a new card was flying to the foundation.
+- [fixed-in-code] 10-game demo playlist can leave runtime auto-up disabled even when the setting is on. The runtime state is now restored from settings when the playlist completes or fails. Manual post-playlist auto-up was not separately UI-smoke-tested.
+- [fixed] Some right-to-left/undo flights could appear behind tableau columns. Moving cards now get a temporary high z-index only while settling.
+- [fixed] Fast stock clicks could hit the newly opened/flying waste card before its flight settled. Moving cards now ignore pointer events while settling.
+- [fixed-in-code] The first render after a card target change could still be pressable before the settling effect ran. Absolute-layer cards now disable pressability synchronously while their target differs from the previous target.
+- [fixed-in-code] The structural stock pile was still pressable when a visible absolute stock card existed. The structural slot now keeps recycle behavior but no longer duplicates the draw handler under stock cards.
+- [observed] Current memory after additional play is around `500-531 MB` PSS, not the previous runaway `1.2-2.0 GB` class. The sluggish feel still needs interaction/frame verification because the sampled memory is not alarming by itself.
+- [verified] Android release stock-only repeated-tap smoke passed after the duplicate-target and first-render pressability fixes.
+- [recommendation] Keep celebration in `CelebrationOverlayLayer` rather than moving it into `AbsoluteCardLayer` unless a concrete celebration-specific bug appears.
+- [observed] After 40 manual games, memory still looks flat enough, but CPU/frame pressure and Android view count are now the suspicious signals.
+- [verified-by-user] Fast waste double-tap behavior looks good in manual testing.
+- `yarn lint` passed after the duplicate-stock-target and first-render pressability fixes.
+- `yarn typecheck` passed after the duplicate-stock-target and first-render pressability fixes.
+
+## Testing
+
+- `yarn lint` passed.
+- `yarn typecheck` passed.
+- `git diff --check` passed after removing prompt-trailing spaces in this plan doc.
+- User manual device test passed for the waste double-tap optimization. No new automated Android release smoke was completed after this optimization because the testing sub-agent did not return a report and the fallback `yarn release` was interrupted by the user.
+- `yarn release` passed in the Android smoke-test subagent and installed the release APK on physical Android `A065`.
+- Post-fix Android smoke artifacts from the testing sub-agent:
+  - `/Users/karim/kDrive/Code/soli/tmp/test-artifacts/absolute-card-layer/01-initial.png`
+  - `/Users/karim/kDrive/Code/soli/tmp/test-artifacts/absolute-card-layer/03-after-fast-stock-taps-physical.png`
+  - `/Users/karim/kDrive/Code/soli/tmp/test-artifacts/absolute-card-layer/stock-fast-tap-physical-coords.mp4`
+- 40-game manual memory check artifact: `/Users/karim/kDrive/Code/soli/tmp/android-smoke/after-40-games-memory-check.png`
+- Native smoke test passed: launch, initial board render, two stock draws, tableau auto-move, undo, and New Game reset.
+- Invalid wiggle is confirmed visible by user observation after the stronger absolute-layer wiggle change.
+- Final 10-game harness variant `absolute-layer-final` completed 10/10 games on Android A065.
+- Final memory result, Game 1 -> Game 10: Total PSS `450.3 MB -> 501.9 MB` (`+51.6 MB`), Native Heap PSS `273.0 MB -> 288.9 MB` (`+15.9 MB`), Unknown PSS `80.0 MB -> 97.3 MB` (`+17.3 MB`), Java Heap PSS `30.8 MB -> 41.9 MB` (`+11.1 MB`), Views `397 -> 530`.
+- Memory assessment: flat/not-runaway and dramatically better than the old `+650-760 MB` class; slightly worse than the earlier clean overlay baseline (`-26 MB`) and just over the `+50 MB` total-PSS target band.
+- Final artifacts: `/Users/karim/kDrive/Code/soli/tmp/perf-samples/absolute-layer-final-per-game/`.
+- Celebration handoff in final run: `winning_card_settled` logged for 10/10 games. A redundant fallback logged in 5/10 before the timer cleanup; code now clears fallback on settle.
+- Still not manually verified after the final code changes: post-playlist auto-up UI behavior without toggling settings.

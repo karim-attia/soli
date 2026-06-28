@@ -17,11 +17,19 @@ export type WasteFanProps = {
   onPress: () => void
   invalidWiggle: InvalidWiggleConfig
   cardFlights: CardFlightRegistry
+  flightOverlayHiddenCardIds: ReadonlySet<string>
+  animationResetKey: number
   // requirement 20-6: Disable CardView layout tracking during scrubbing to reduce churn
   layoutTrackingEnabled?: boolean
-  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  onCardMeasured: (
+    cardId: string,
+    snapshot: CardFlightSnapshot,
+    card?: Card,
+    onFlightSettled?: (cardId: string) => void
+  ) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
   disabled?: boolean
+  renderCardsInPlace?: boolean
 }
 
 export const WasteFan = ({
@@ -31,16 +39,23 @@ export const WasteFan = ({
   onPress,
   invalidWiggle,
   cardFlights,
+  flightOverlayHiddenCardIds,
+  animationResetKey,
   layoutTrackingEnabled = true,
   onCardMeasured,
   cardFlightMemory,
   disabled = false,
+  renderCardsInPlace = true,
 }: WasteFanProps) => {
   // Keep the fan inside its fixed board column. Draw 4/5 still moves every card,
   // but only the top three are shown so the waste cannot overlap the stock.
   const visibleCards = cards.slice(-3)
   const overlap = Math.min(metrics.width * WASTE_FAN_OVERLAP_RATIO, WASTE_FAN_MAX_OFFSET)
   const width = metrics.width + overlap * (visibleCards.length - 1)
+
+  if (!renderCardsInPlace) {
+    return <View style={{ width: metrics.width, height: metrics.height }} />
+  }
 
   return (
     <View style={{ width, height: metrics.height, position: 'relative' }}>
@@ -58,6 +73,8 @@ export const WasteFan = ({
             invalidWiggle={invalidWiggle}
             zIndex={index}
             cardFlights={cardFlights}
+            hiddenForFlightOverlay={flightOverlayHiddenCardIds.has(card.id)}
+            animationResetKey={animationResetKey}
             layoutTrackingEnabled={layoutTrackingEnabled}
             onCardMeasured={onCardMeasured}
             cardFlightMemory={cardFlightMemory}
@@ -77,8 +94,15 @@ export type WasteFanCardProps = {
   invalidWiggle: InvalidWiggleConfig
   zIndex: number
   cardFlights: CardFlightRegistry
+  hiddenForFlightOverlay: boolean
+  animationResetKey: number
   layoutTrackingEnabled: boolean
-  onCardMeasured: (cardId: string, snapshot: CardFlightSnapshot) => void
+  onCardMeasured: (
+    cardId: string,
+    snapshot: CardFlightSnapshot,
+    card?: Card,
+    onFlightSettled?: (cardId: string) => void
+  ) => void
   cardFlightMemory: Record<string, CardFlightSnapshot>
 }
 
@@ -91,6 +115,8 @@ export const WasteFanCard = ({
   invalidWiggle,
   zIndex,
   cardFlights,
+  hiddenForFlightOverlay,
+  animationResetKey,
   layoutTrackingEnabled,
   onCardMeasured,
   cardFlightMemory,
@@ -117,6 +143,8 @@ export const WasteFanCard = ({
         onPress={onPress}
         invalidWiggle={invalidWiggle}
         cardFlights={cardFlights}
+        hiddenForFlightOverlay={hiddenForFlightOverlay}
+        animationResetKey={animationResetKey}
         layoutTrackingEnabled={layoutTrackingEnabled}
         onCardMeasured={onCardMeasured}
         cardFlightMemory={cardFlightMemory}
