@@ -1,13 +1,17 @@
-import { useLayoutEffect } from 'react'
+import { useCallback, useLayoutEffect, useState } from 'react'
 import { Platform } from 'react-native'
 import { HeaderButton } from 'expo-router/react-navigation'
 import { useNavigation } from 'expo-router'
-import { Button, Text, XStack } from 'tamagui'
+import { Button, Text, XStack, YStack } from 'tamagui'
 import { Menu } from '@tamagui/lucide-icons-2'
 
-import { KlondikeGameView } from '../../src/features/klondike/components/KlondikeGameView'
-import { useKlondikeGame } from '../../src/features/klondike/hooks/useKlondikeGame'
+import {
+  KlondikeGameSession,
+  type KlondikeGameSessionControls,
+} from '../../src/features/klondike/components/KlondikeGameSession'
+import type { LaunchDemoGameOptions } from '../../src/features/klondike/hooks/useKlondikeGame'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
+import { AppSheet } from '../../components/AppSheet'
 
 const IOS_HEADER_CONTROL_SIZE = 44
 const IOS_HEADER_ICON_SIZE = 26
@@ -24,13 +28,37 @@ const ANDROID_HEADER_ICON_SIZE = 32
 export default function TabOneScreen() {
   const navigation = useNavigation()
   const openDrawer = useDrawerOpener()
-  const { developerModeEnabled, requestNewGame, handleLaunchDemoGame, viewProps } =
-    useKlondikeGame()
+  const [sessionControls, setSessionControls] =
+    useState<KlondikeGameSessionControls | null>(null)
+  const [demoChoiceVisible, setDemoChoiceVisible] = useState(false)
   const isIOS = Platform.OS === 'ios'
 
+  const handleSessionControlsChange = useCallback(
+    (controls: KlondikeGameSessionControls | null) => {
+      setSessionControls(controls)
+    },
+    []
+  )
+
+  const openDemoChoice = useCallback(() => {
+    setDemoChoiceVisible(true)
+  }, [])
+
+  const handleDemoChoice = useCallback(
+    (options: LaunchDemoGameOptions) => {
+      setDemoChoiceVisible(false)
+      sessionControls?.handleLaunchDemoGame(options)
+    },
+    [sessionControls]
+  )
+
+  const closeDemoChoice = useCallback(() => {
+    setDemoChoiceVisible(false)
+  }, [])
+
   useLayoutEffect(() => {
-    const onNewGame = () => requestNewGame({ reason: 'manual' })
-    const onDemoGame = developerModeEnabled ? () => handleLaunchDemoGame() : undefined
+    const onNewGame = () => sessionControls?.requestNewGame({ reason: 'manual' })
+    const onDemoGame = sessionControls?.developerModeEnabled ? openDemoChoice : undefined
 
     if (isIOS) {
       // PBI-32: Use standard leading/trailing iOS bar slots so the visible New Game
@@ -68,16 +96,52 @@ export default function TabOneScreen() {
         />
       ),
     })
-  }, [
-    developerModeEnabled,
-    handleLaunchDemoGame,
-    isIOS,
-    navigation,
-    openDrawer,
-    requestNewGame,
-  ])
+  }, [isIOS, navigation, openDemoChoice, openDrawer, sessionControls])
 
-  return <KlondikeGameView {...viewProps} />
+  return (
+    <>
+      <KlondikeGameSession onControlsChange={handleSessionControlsChange} />
+      <DemoChoiceSheet
+        isPresented={demoChoiceVisible}
+        onDismiss={closeDemoChoice}
+        onSelect={handleDemoChoice}
+      />
+    </>
+  )
+}
+
+type DemoChoiceSheetProps = {
+  isPresented: boolean
+  onDismiss: () => void
+  onSelect: (options: LaunchDemoGameOptions) => void
+}
+
+const DemoChoiceSheet = ({ isPresented, onDismiss, onSelect }: DemoChoiceSheetProps) => {
+  return (
+    <AppSheet isPresented={isPresented} onDismiss={onDismiss}>
+      <YStack gap="$3" p="$4">
+        <Text fontSize={18} fontWeight="700">
+          Run Demo
+        </Text>
+        <Button onPress={() => onSelect({ demoMode: 'old' })}>Old demo game</Button>
+        <Button onPress={() => onSelect({ demoMode: 'single' })}>
+          One generated game
+        </Button>
+        <Button onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 5 })}>
+          5 generated games
+        </Button>
+        <Button onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 10 })}>
+          10 generated games
+        </Button>
+        <Button onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 20 })}>
+          20 generated games
+        </Button>
+        <Button chromeless onPress={onDismiss}>
+          Cancel
+        </Button>
+      </YStack>
+    </AppSheet>
+  )
 }
 
 type HeaderControlsProps = {

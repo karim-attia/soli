@@ -1,28 +1,37 @@
 #!/usr/bin/env node
 
 /**
- * Installs the release build on a connected Android device and triggers the demo game
- * (with auto-solve) to exercise the foundations-complete logging path.
+ * Installs the release build on a connected Android device and triggers the
+ * generated demo playlist to exercise real solver-path playback.
  */
 
 const { spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 
-const DEMO_URI = 'soli:///?demo=autosolve'
+const DEMO_GAME_LIMIT = Number(process.env.DEMO_GAME_LIMIT ?? '')
+const DEMO_PLAYLIST_MAX_GAMES = 20
+const DEMO_GAME_COUNT =
+  Number.isInteger(DEMO_GAME_LIMIT) && DEMO_GAME_LIMIT > 0
+    ? Math.min(DEMO_GAME_LIMIT, DEMO_PLAYLIST_MAX_GAMES)
+    : DEMO_PLAYLIST_MAX_GAMES
+const DEMO_URI = buildDemoUri()
 const BASE_APP_URI = 'soli:///'
 const GAME_LOADED_TOKEN = '[Demo] Game loaded'
 const AUTO_SEQUENCE_QUEUED_TOKEN = '[Demo] Auto sequence queued'
 const AUTO_SEQUENCE_COMPLETED_QUEUE_TOKEN =
   '[Demo] Auto sequence completed dispatch queue.'
+const PLAYLIST_GAME_LOADED_TOKEN = '[DemoPlaylist] Game '
+const PLAYLIST_UNDO_TOKEN = '[DemoPlaylist] Undo probe'
+const PLAYLIST_COMPLETED_TOKEN = '[DemoPlaylist] Playlist completed'
+const PLAYLIST_FAILED_TOKEN = '[DemoPlaylist] Playlist failed'
 const GAME_COMPLETED_TOKEN = '[Game] Foundations complete, player won the game.'
 const CELEBRATION_HANDOFF_START_TOKEN = '[CelebrationHandoff] start'
 const CELEBRATION_START_TOKEN = '[Celebration] start'
 const COMPLETION_TOKEN = 'Foundations complete'
 const APP_LOG_PREFIX = '[SoliDev]'
 const DEMO_LOAD_RETRIGGER_TIMEOUT_MS = 15000
-const POST_COMPLETION_CELEBRATION_TIMEOUT_MS = 5000
-const TOTAL_TIMEOUT_MS = 60000
+const TOTAL_TIMEOUT_MS = DEMO_GAME_COUNT * 60 * 1000
 const PACKAGE_NAME = 'ch.karimattia.soli'
 const MS_PER_SECOND = 1000
 const SECONDS_PER_MINUTE = 60
@@ -36,7 +45,7 @@ const PROGRESS_BAR_EMPTY_CHAR = '.'
 const PROGRESS_BAR_PREFIX = '['
 const PROGRESS_BAR_SUFFIX = ']'
 const PROGRESS_EXPECTATION_MULTIPLIER = 1.25
-const DEFAULT_EXPECTED_BUILD_TIME_MS = TOTAL_TIMEOUT_MS
+const DEFAULT_EXPECTED_BUILD_TIME_MS = 60000
 const CRASH_PREFIX = '[CRASH]'
 const CRASH_KEYWORDS = [
   'FATAL',
@@ -88,6 +97,14 @@ const log = (message) => {
 
 const logError = (message) => {
   console.error(`\x1b[31m[demo]\x1b[0m ${message}`)
+}
+
+function buildDemoUri() {
+  const params = new URLSearchParams({
+    demo: 'playlist',
+    games: String(DEMO_GAME_COUNT),
+  })
+  return `soli:///?${params.toString()}`
 }
 
 const extractAppLogMessage = (line) => {
@@ -252,6 +269,8 @@ const ensureValidMode = (mode) => {
 
 const isDemoMode = (mode) => mode === MODES.DEMO
 
+const quoteAndroidShellArg = (value) => `'${String(value).replace(/'/g, "'\\''")}'`
+
 const getUriForMode = (mode, launchCount = 0) => {
   const baseUri = isDemoMode(mode) ? DEMO_URI : BASE_APP_URI
   if (launchCount <= 0) {
@@ -276,7 +295,7 @@ const createLauncherForMode = ({ deviceSerial, mode }) =>
         '-a',
         'android.intent.action.VIEW',
         '-d',
-        targetUri,
+        quoteAndroidShellArg(targetUri),
         `${PACKAGE_NAME}/.MainActivity`,
       ])
     }
@@ -623,7 +642,7 @@ const createLogMonitor = ({ mode, logcat, launchApp }) => {
   }
 
   const processLine = (line) => {
-    if (!line) {
+    if (!line || terminated) {
       return
     }
 
@@ -660,29 +679,36 @@ const createLogMonitor = ({ mode, logcat, launchApp }) => {
     if (line.includes(AUTO_SEQUENCE_COMPLETED_QUEUE_TOKEN)) {
       log('Detected demo dispatch-queue completion signal.')
     }
+    if (line.includes(PLAYLIST_GAME_LOADED_TOKEN)) {
+      gameLoadedDetected = true
+      clearTimer(demoLoadTimer)
+      log('Detected demo playlist game progress.')
+    }
+    if (line.includes(PLAYLIST_UNDO_TOKEN)) {
+      log('Detected demo playlist undo probe.')
+    }
+    if (line.includes(PLAYLIST_FAILED_TOKEN)) {
+      rejectFailure('Demo playlist reported failure in app logs.')
+      return
+    }
+    if (line.includes(PLAYLIST_COMPLETED_TOKEN)) {
+      log('Detected demo playlist completion.')
+      resolveSuccess()
+      return
+    }
     if (
       line.includes(CELEBRATION_HANDOFF_START_TOKEN) ||
       line.includes(CELEBRATION_START_TOKEN)
     ) {
-      log('Celebration start detected via logcat.')
-      resolveSuccess()
+      log(
+        'Celebration start detected via logcat; continuing to wait for playlist completion.'
+      )
       return
     }
     if (line.includes(COMPLETION_TOKEN) || line.includes(GAME_COMPLETED_TOKEN)) {
-      if (!isDemoMode(mode)) {
-        log('Game completion detected via logcat.')
-        resolveSuccess()
-        return
-      }
-
-      log('Game completion detected via logcat; waiting briefly for celebration start.')
-      clearTimer(postCompletionTimer)
-      postCompletionTimer = setTimeout(() => {
-        log(
-          'Celebration start was not observed after win completion; treating the completed game as success.'
-        )
-        resolveSuccess()
-      }, POST_COMPLETION_CELEBRATION_TIMEOUT_MS)
+      log(
+        'Game completion detected via logcat; continuing to wait for playlist completion.'
+      )
     }
   }
 
@@ -710,7 +736,7 @@ const createLogMonitor = ({ mode, logcat, launchApp }) => {
   if (isDemoMode(mode)) {
     scheduleDemoLoadRetrigger()
     totalTimer = setTimeout(() => {
-      rejectFailure('Total timeout reached while waiting for demo completion.')
+      rejectFailure('Total timeout reached while waiting for demo playlist completion.')
     }, TOTAL_TIMEOUT_MS)
   }
 

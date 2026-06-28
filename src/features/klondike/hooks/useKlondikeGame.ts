@@ -47,7 +47,11 @@ import { useKlondikePersistence } from './useKlondikePersistence'
 import { useSolvableDealSelector } from './useSolvableDealSelector'
 import { useCelebrationController } from './useCelebrationController'
 import { useUndoScrubber } from './useUndoScrubber'
-import { useDemoGameLauncher, DEMO_AUTO_STEP_INTERVAL_MS } from './useDemoGameLauncher'
+import {
+  useDemoGameLauncher,
+  DEMO_AUTO_STEP_INTERVAL_MS,
+  type LaunchDemoGameOptions,
+} from './useDemoGameLauncher'
 import { useAutoQueueRunner } from './useAutoQueueRunner'
 import type { KlondikeGameViewProps } from '../components/KlondikeGameView'
 import { buildStatisticsRows, type StatisticsRow } from '../components/StatisticsHud'
@@ -56,7 +60,9 @@ import type { TopRowProps } from '../components/cards/TopRow'
 import type { TableauSectionProps } from '../components/cards/TableauSection'
 import { loadBoardMetrics, saveBoardMetrics } from '../../../storage/uiPreferences'
 
-type RequestNewGameFn = (options?: { reason?: 'manual' | 'celebration' }) => void
+export type { LaunchDemoGameOptions } from './useDemoGameLauncher'
+
+export type RequestNewGameFn = (options?: { reason?: 'manual' | 'celebration' }) => void
 
 // PBI-28: Run auto-up (auto-complete) much faster than manual play cadence.
 const AUTO_QUEUE_INTERVAL_MS = 25
@@ -67,6 +73,21 @@ const WIGGLE_SEQUENCE_SEGMENT_COUNT = 3
 const WIGGLE_RESET_BUFFER_MS = 40
 const INVALID_WIGGLE_RESET_DELAY_MS =
   WIGGLE_SEGMENT_DURATION_MS * WIGGLE_SEQUENCE_SEGMENT_COUNT + WIGGLE_RESET_BUFFER_MS
+
+const parseOptionalBooleanParam = (value: string | null): boolean | null => {
+  if (value === null) {
+    return null
+  }
+
+  const normalized = value.trim().toLowerCase()
+  if (['1', 'true', 'yes', 'on', 'enabled'].includes(normalized)) {
+    return true
+  }
+  if (['0', 'false', 'no', 'off', 'disabled'].includes(normalized)) {
+    return false
+  }
+  return null
+}
 
 const createEmptyInvalidWiggle = (): InvalidWiggleConfig => ({
   ...EMPTY_INVALID_WIGGLE,
@@ -238,11 +259,7 @@ const getPendingActionKey = (action: GameAction, cardIds: string[]): string => {
 type UseKlondikeGameResult = {
   developerModeEnabled: boolean
   requestNewGame: RequestNewGameFn
-  handleLaunchDemoGame: (options?: {
-    autoReveal?: boolean
-    autoSolve?: boolean
-    force?: boolean
-  }) => void
+  handleLaunchDemoGame: (options?: LaunchDemoGameOptions) => void
   viewProps: KlondikeGameViewProps
 }
 
@@ -362,6 +379,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const foundationLayoutsRef = useRef<Partial<Record<Suit, LayoutRectangle>>>({})
   const boardLockedRef = useRef(false)
   const lastDemoLinkRef = useRef<string | null>(null)
+  const demoPlaybackActiveRef = useRef(false)
   const pendingSolvedResultRef = useRef(false)
   const pendingSolvedResultTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [boardLocked, setBoardLocked] = useState(false)
@@ -448,6 +466,9 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Task 10-7: After hydration, ensure the current game has one active history row.
   useEffect(() => {
     if (!historyHydrated || !storageHydrated) {
+      return
+    }
+    if (demoPlaybackActiveRef.current) {
       return
     }
     if (currentHasWon) {
@@ -560,6 +581,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Task 10-6: Updates or records game result in history
   const recordCurrentGameResult = useCallback(
     (options?: { solved?: boolean }) => {
+      if (demoPlaybackActiveRef.current) {
+        return
+      }
+
       const currentState = stateRef.current
       const solved = options?.solved ?? currentState.hasWon
       const status = solved ? 'solved' : 'incomplete'
@@ -763,9 +788,11 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     topRowLayoutRef,
     winCelebrationsRef,
     currentGameEntryIdRef,
+    demoPlaybackActiveRef,
     updateBoardLocked,
     clearGameState,
     preferredDrawCount,
+    autoUpEnabled,
   })
 
   // Triggers the invalid-move wiggle animation for the provided selection.
@@ -836,12 +863,21 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       const demoParam =
         parsed.searchParams.get('demo') ?? parsed.searchParams.get('demoGame')
       const normalizedDemoParam = demoParam?.toLowerCase()
+      const demoRequestsPlaylist =
+        normalizedDemoParam === 'playlist' ||
+        normalizedDemoParam === 'autosolve-playlist' ||
+        normalizedDemoParam === 'autosolveplaylist'
       const demoRequestsAutoSolve =
-        normalizedDemoParam === 'autosolve' || normalizedDemoParam === 'solve'
+        demoRequestsPlaylist ||
+        normalizedDemoParam === 'autosolve' ||
+        normalizedDemoParam === 'solve'
       const demoRequestsAutoReveal =
         demoRequestsAutoSolve ||
         normalizedDemoParam === 'autoreveal' ||
         normalizedDemoParam === 'auto'
+      const recordHistoryParam =
+        parsed.searchParams.get('recordHistory') ?? parsed.searchParams.get('history')
+      const nextRecordHistoryEnabled = parseOptionalBooleanParam(recordHistoryParam)
 
       if (
         host === 'demo-game' ||
@@ -856,6 +892,15 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
           parsed.searchParams.get('auto') ?? parsed.searchParams.get('autoreveal')
         const solveParam =
           parsed.searchParams.get('solve') ?? parsed.searchParams.get('autosolve')
+        const gameLimitParam =
+          parsed.searchParams.get('games') ??
+          parsed.searchParams.get('gameLimit') ??
+          parsed.searchParams.get('count')
+        const parsedGameLimit = Number(gameLimitParam ?? '')
+        const gameLimit =
+          Number.isInteger(parsedGameLimit) && parsedGameLimit > 0
+            ? parsedGameLimit
+            : undefined
         const autoSolve =
           demoRequestsAutoSolve ||
           solveParam === '1' ||
@@ -871,7 +916,13 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         }
 
         setTimeout(() => {
-          handleLaunchDemoGame({ autoReveal, autoSolve, force: true })
+          handleLaunchDemoGame({
+            autoReveal,
+            autoSolve,
+            force: true,
+            gameLimit,
+            recordHistory: nextRecordHistoryEnabled ?? undefined,
+          })
         }, DEMO_AUTO_STEP_INTERVAL_MS)
       }
     },
@@ -915,7 +966,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         'info',
         `[Game] hasWon set true (moves=${state.moveCount}, winCelebrations=${state.winCelebrations}).`
       )
-      if (delaySolvedResultRecording) {
+      if (demoPlaybackActiveRef.current) {
+        pendingSolvedResultRef.current = false
+        clearPendingSolvedResultTimer()
+      } else if (delaySolvedResultRecording) {
         pendingSolvedResultRef.current = true
       } else {
         pendingSolvedResultRef.current = false

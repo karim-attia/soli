@@ -31,6 +31,9 @@ let deckInstanceCounter = 0
 export type Suit = (typeof SUITS)[number]
 export type Rank = (typeof RANKS)[number]
 
+export const getCardStableId = (card: { suit: Suit; rank: Rank }): string =>
+  `${card.suit}-${card.rank}`
+
 export interface Card {
   id: string
   suit: Suit
@@ -83,7 +86,7 @@ export interface GameState extends GameSnapshot {
 
 export type GameAction =
   | { type: 'NEW_GAME'; drawCount?: DrawCount }
-  | { type: 'DRAW_OR_RECYCLE' }
+  | { type: 'DRAW_OR_RECYCLE'; recordHistory?: boolean }
   | { type: 'UNDO' }
   | { type: 'SCRUB_TO_INDEX'; index: number }
   | { type: 'HYDRATE_STATE'; state: GameState; autoUpEnabled?: boolean }
@@ -150,14 +153,25 @@ const createExactDealIdentity = (
   deckChecksum: computeDeckChecksum(deck),
 })
 
-export const createInitialState = (
-  drawCount: DrawCount = DEFAULT_DRAW_COUNT
+type CreateGameStateFromExactIdOptions = {
+  revealInitialWaste?: boolean
+  autoUpEnabled?: boolean
+}
+
+export const createGameStateFromExactId = (
+  exactId: string,
+  drawCount: DrawCount = DEFAULT_DRAW_COUNT,
+  options: CreateGameStateFromExactIdOptions = {}
 ): GameState => {
-  const exactId = createRandomExactDealId()
+  const normalizedDrawCount = normalizeDrawCount(drawCount)
   const deck = createDeckFromExactId(exactId)
   const dealIdentity = createExactDealIdentity(exactId, deck)
   const { tableau, stock: dealtStock } = dealTableau(deck)
-  const { stock, waste } = revealInitialWaste(dealtStock, drawCount)
+  const { stock, waste } =
+    options.revealInitialWaste === false
+      ? { stock: dealtStock, waste: [] }
+      : revealInitialWaste(dealtStock, normalizedDrawCount)
+
   const snapshot: GameSnapshot = {
     stock,
     waste,
@@ -170,7 +184,7 @@ export const createInitialState = (
     hasWon: false,
     winCelebrations: 0,
     ...dealIdentity,
-    drawCount,
+    drawCount: normalizedDrawCount,
     elapsedMs: 0,
     timerState: 'idle',
     timerStartedAt: null,
@@ -181,8 +195,15 @@ export const createInitialState = (
     history: [],
     future: [],
     selected: null,
-    autoUpEnabled: true,
+    autoUpEnabled: options.autoUpEnabled ?? true,
   }
+}
+
+export const createInitialState = (
+  drawCount: DrawCount = DEFAULT_DRAW_COUNT
+): GameState => {
+  const exactId = createRandomExactDealId()
+  return createGameStateFromExactId(exactId, drawCount)
 }
 
 export const createSolvableGameState = (
@@ -195,36 +216,7 @@ export const createSolvableGameState = (
     )
   }
 
-  const deck = createDeckFromExactId(deal.exactId)
-  const dealIdentity = createExactDealIdentity(deal.exactId, deck)
-  const { tableau, stock: dealtStock } = dealTableau(deck)
-  const { stock, waste } = revealInitialWaste(dealtStock, drawCount)
-
-  const snapshot: GameSnapshot = {
-    stock,
-    waste,
-    foundations: createEmptyFoundations(),
-    tableau,
-    moveCount: 0,
-    autoCompleteRuns: 0,
-    autoQueue: [],
-    isAutoCompleting: false,
-    hasWon: false,
-    winCelebrations: 0,
-    ...dealIdentity,
-    drawCount,
-    elapsedMs: 0,
-    timerState: 'idle',
-    timerStartedAt: null,
-  }
-
-  return {
-    ...snapshot,
-    history: [],
-    future: [],
-    selected: null,
-    autoUpEnabled: true,
-  }
+  return createGameStateFromExactId(deal.exactId, drawCount)
 }
 
 export const createDemoGameState = (
@@ -307,7 +299,9 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
         autoUpEnabled: state.autoUpEnabled,
       }
     case 'DRAW_OR_RECYCLE':
-      return finalizeState(drawFromStock(haltAutoQueue(state)))
+      return finalizeState(
+        drawFromStock(haltAutoQueue(state), { recordHistory: action.recordHistory })
+      )
     case 'UNDO':
       return finalizeState(handleUndo(haltAutoQueue(state)))
     case 'SCRUB_TO_INDEX': {
