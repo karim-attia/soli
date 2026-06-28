@@ -13,7 +13,6 @@ import type { DrawCount } from '../../../solitaire/drawCount'
 type UseKlondikePersistenceParams = {
   state: GameState
   dispatch: React.Dispatch<GameAction>
-  resetCardFlights: () => void
   previousHasWonRef: React.MutableRefObject<boolean>
   // Task 10-7: Persist linkage to the active history entry across restarts.
   currentGameEntryIdRef: React.MutableRefObject<string | null>
@@ -53,7 +52,6 @@ const didGameShapeChange = (previous: GameState | null, next: GameState): boolea
 export const useKlondikePersistence = ({
   state,
   dispatch,
-  resetCardFlights,
   previousHasWonRef,
   currentGameEntryIdRef,
   settingsHydrated,
@@ -85,7 +83,6 @@ export const useKlondikePersistence = ({
         if (!persisted) {
           // The reducer starts before settings hydration. Replace that placeholder
           // only when there is no active game, so returning users get their saved rule.
-          resetCardFlights()
           dispatch({ type: 'NEW_GAME', drawCount: preferredDrawCountRef.current })
           return
         }
@@ -100,7 +97,6 @@ export const useKlondikePersistence = ({
           } catch (clearError) {
             devLog('warn', 'Failed clearing completed saved game state', clearError)
           }
-          resetCardFlights()
           previousHasWonRef.current = false
           dispatch({ type: 'NEW_GAME', drawCount: preferredDrawCountRef.current })
           return
@@ -113,7 +109,6 @@ export const useKlondikePersistence = ({
         previousHasWonRef.current = persisted.state.hasWon
         // Task 10-7: Restore history linkage so completion updates the same entry.
         currentGameEntryIdRef.current = persisted.historyEntryId
-        resetCardFlights()
         dispatch({
           type: 'HYDRATE_STATE',
           state: persisted.state,
@@ -138,7 +133,6 @@ export const useKlondikePersistence = ({
           devLog('warn', 'Failed clearing invalid saved game state', clearError)
         }
 
-        resetCardFlights()
         previousHasWonRef.current = false
         dispatch({ type: 'NEW_GAME', drawCount: preferredDrawCountRef.current })
         devLog('warn', '[Toast suppressed] Game reset', { message })
@@ -152,13 +146,7 @@ export const useKlondikePersistence = ({
     return () => {
       isCancelled = true
     }
-  }, [
-    currentGameEntryIdRef,
-    dispatch,
-    previousHasWonRef,
-    resetCardFlights,
-    settingsHydrated,
-  ])
+  }, [currentGameEntryIdRef, dispatch, previousHasWonRef, settingsHydrated])
 
   useEffect(() => {
     if (!storageHydrationComplete) {

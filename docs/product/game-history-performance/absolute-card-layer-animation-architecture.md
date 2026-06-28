@@ -34,15 +34,19 @@ did we also move the celebration to this new logic? should we?
 Hey, I have one more optimization. There's usually three open-faced cards from the stock, right? And when I tap there twice, I kind of expect both cards to move, so the first on top. And of course, if that's invalid, it will wiggle and nothing will happen, even if I tap twice. But if both cards are able to move, and I tap twice in like a fast succession in a game, they should both move. Is there a reasonable way to implement this in a quick way? Thank you.
 ```
 
+```text
+absolute layer is accepted as permanent. fully clean up.
+```
+
 ## Description
 
 Try the option 3 animation architecture: render cards from one board-level absolute layer instead of letting each pile own its moving card views. Piles should provide target geometry and non-card UI; the card layer owns card visuals, hit targets, and motion. The first pass should be small enough to test quickly while moving the code toward the final architecture.
 
 ## Framing context
 
-The current implementation keeps most cards static and uses a flight overlay clone for moved cards. That reduced long-lived animated residency, but animation ownership is split across pile-local card views, NativeAnimated invalid wiggle, Reanimated hooks, and board overlays. A full absolute layer can reduce parent-to-parent remounts because cards stay in one React subtree and only their target coordinates change.
+The current implementation keeps card visuals in a board-level absolute layer. The cleanup pass makes that permanent: structural piles keep only layout, empty-slot, outline, label, and glow responsibilities, while card visuals, card hit targets, movement, flip, and invalid wiggle live in `AbsoluteCardLayer`.
 
-This is an architecture experiment, not a proven memory fix. Existing A/B runs showed that disabling visible animations did not flatten the native/unknown memory slope, so success here is primarily animation smoothness and simpler visual ownership unless measurement proves a memory benefit too.
+This started as an architecture experiment. After repeated manual/demo-game runs, the absolute layer is accepted as the production architecture because it keeps the flat memory profile and resolves the large long-run lag class. Keeping the old pile-local card-flight path now makes the mental model harder without protecting a path we plan to ship.
 
 ## Acceptance Criteria
 
@@ -52,7 +56,9 @@ This is an architecture experiment, not a proven memory fix. Existing A/B runs s
 - Moving cards animate by changing target coordinates in one absolute layer, not by remounting between pile parents.
 - Invalid wiggle and face-up changes still have visible feedback, at least for touched cards.
 - New game and undo scrubbing reset or stabilize animation state without stale card positions.
-- The implementation can be disabled or reverted cleanly if device tests show regressions.
+- The old `CardFlightOverlayLayer` and `useFlightController` fallback path are removed.
+- Pile components no longer accept card-flight snapshot props they never use in permanent absolute-layer mode.
+- The implementation is simpler because there is one normal-gameplay card owner.
 
 ## Design links
 
@@ -101,11 +107,23 @@ Cons:
 - Not option 3.
 - Cards still remount between parents and visual ownership stays split.
 
-Recommendation: implement measured pile targets first. It is the quickest credible route to one card layer while preserving the existing board layout.
+### Delete the legacy overlay/fallback after accepting absolute layer
+
+Pros:
+
+- Removes the unused `CardFlightOverlayLayer` slot pool and the dispatch-delay snapshot controller.
+- Makes card ownership direct: piles publish geometry, `AbsoluteCardLayer` renders cards.
+- Reduces per-render prop plumbing through `TopRow`, `TableauSection`, `StockStack`, `WasteFan`, and `FoundationPile`.
+
+Cons:
+
+- Removes the old fallback path, so regressions must be fixed in the absolute layer instead of toggling back.
+
+Recommendation: delete the fallback now. The user accepted the absolute layer as permanent, and keeping two systems makes future fixes riskier.
 
 ## Open questions to the user
 
-- Should this ship as an always-on replacement once stable, or remain behind a temporary dev flag until the memory/perf loop is convincing? Recommendation: start always-on in this branch only, because the user asked to try the option directly and the branch is already experimental.
+- Resolved: ship as the always-on architecture. Do not keep a hidden old flight-overlay fallback.
 
 ## Dependencies
 
@@ -118,8 +136,9 @@ The user should not see a visual redesign. The goal is the same solitaire board 
 ## Components
 
 - Reuse `CardVisual`, `CardBack`, `EmptySlot`, `PileButton`, pile layout components, and existing game handlers.
-- Create a new board-level `AbsoluteCardLayer`.
-- Update pile components so they can render structural UI without local card visuals.
+- Keep the board-level `AbsoluteCardLayer` as the only normal-gameplay card renderer.
+- Update pile components so they render structural UI without local card visuals.
+- Keep `CelebrationOverlayLayer` separate because it is already bounded and conceptually a win effect, not normal gameplay card ownership.
 
 ## How to fetch data, how to cache
 
@@ -132,9 +151,10 @@ No data fetching changes. Card target positions are derived from current `GameSt
 
 ## Simplification ideas
 
-- First pass can keep existing `CardFlightOverlayLayer` available but unused for normal card movement.
+- Remove the first-pass `CardFlightOverlayLayer` fallback now that absolute mode is permanent.
 - First pass can use measured pile targets and avoid a second custom layout solver.
 - First pass can defer fancy stacked drag/selection effects; tap-to-auto-move is the current primary interaction.
+- Remove old `CardView` flight-measure props from pile boundaries. If local card rendering is ever needed for screenshots/tests, reintroduce it deliberately as static visuals, not as a second animation owner.
 
 ## Steps to implement
 
@@ -160,6 +180,10 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - [completed] Add a one-tap waste buffer for taps that arrive before React renders the next waste top card.
 - [completed] Run focused static checks.
 - [completed-via-user] Run Android release/device smoke through a testing sub-agent.
+- [completed] Remove the old `CardFlightOverlayLayer` / `useFlightController` fallback now that absolute layer is permanent.
+- [completed] Remove legacy card-flight props from pile component boundaries.
+- [completed] Delete unused flight overlay/controller files.
+- [completed] Run focused static checks after cleanup.
 
 ## Plan: Files to modify
 
@@ -176,6 +200,10 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - `src/features/klondike/components/cards/TopRow.tsx`
 - `src/features/klondike/components/cards/AbsoluteCardLayer.tsx`
 - `src/features/klondike/hooks/useKlondikeGame.ts`
+- `src/features/klondike/components/cards/CardView.tsx`
+- `src/features/klondike/components/cards/animations.ts`
+- `src/features/klondike/components/cards/CardFlightOverlayLayer.tsx`
+- `src/animation/flightController.ts`
 
 ## Files actually modified
 
@@ -189,11 +217,20 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - `src/features/klondike/components/cards/WasteFan.tsx`
 - `src/features/klondike/components/cards/FoundationPile.tsx`
 - `src/features/klondike/components/cards/TopRow.tsx`
+- `src/features/klondike/components/cards/CardView.tsx`
+- `src/features/klondike/components/cards/animations.ts`
+- `src/features/klondike/hooks/useAutoQueueRunner.ts`
+- `src/features/klondike/hooks/useCelebrationController.ts`
+- `src/features/klondike/hooks/useDemoGameLauncher.ts`
+- `src/features/klondike/hooks/useKlondikePersistence.ts`
+- `src/features/klondike/types.ts`
+- `src/features/klondike/components/cards/CardFlightOverlayLayer.tsx` deleted
+- `src/animation/flightController.ts` deleted
 
 ## Intermediary learnings
 
 - The existing top row and tableau layout can publish enough target geometry for a first measured-layer implementation. The layer combines top-row/row layout plus slot/column layout rather than measuring each card.
-- In absolute-layer mode, `dispatchWithFlight` now bypasses the old card-flight snapshot gate. Movement is produced by stable card components receiving new coordinates after reducer updates.
+- In absolute-layer mode, game actions now dispatch directly. Movement is produced by stable absolute-layer card components receiving new coordinates after reducer updates.
 - The first pass renders the currently visible card set: stock top, last three waste cards, foundation top cards, and all tableau cards. Fully hidden stock/waste cards are still not mounted as card visuals.
 - `yarn lint` passed.
 - `yarn typecheck` initially caught a strict-null foundation layout lookup, then passed after the lookup was normalized.
@@ -224,6 +261,8 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - The same 40-game sample still showed runtime pressure: CPU `180%` on the first foreground sample, then `88%` after a 5s idle wait. Top threads included `mqt_v_js` around `30.7%`, process main thread around `26.9%`, `RenderThread` around `7.6%`, and Hermes `hades` around `11.5%`.
 - The 40-game frame windows missed deadlines (`29.7%` then `22.1%`), with the caveat that foregrounding and diagnostic collection were in the sample window. This points more at CPU/render pressure than total process memory.
 - Detailed 40-game `dumpsys meminfo` reported `968` Android `Views`, `1` `ViewRootImpl`, `1` `Activity`, and `0` `WebViews`. Screenshot `/Users/karim/kDrive/Code/soli/tmp/android-smoke/after-40-games-memory-check.png` showed normal gameplay rather than an active celebration, so the elevated view count is worth tracking separately.
+- Once the absolute layer was accepted as permanent, the old `CardFlightOverlayLayer`, `useFlightController`, `StockStack`, `WasteFan`, pile-local `CardView`, and card-flight snapshot props became dead architecture. Removing them simplified normal gameplay to one card owner: structural piles publish geometry and `AbsoluteCardLayer` renders/taps/animates cards.
+- The cleanup removed about 2,270 lines from the production diff while preserving the reducer/state APIs used by demo replay, auto-queue, timer, and persistence.
 
 ## Identified issues
 
@@ -247,6 +286,7 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - [verified-by-user] Fast waste double-tap behavior looks good in manual testing.
 - `yarn lint` passed after the duplicate-stock-target and first-render pressability fixes.
 - `yarn typecheck` passed after the duplicate-stock-target and first-render pressability fixes.
+- [fixed] Permanent absolute-layer cleanup removed the old fallback card-flight overlay and dispatch snapshot gate.
 
 ## Testing
 
@@ -268,3 +308,7 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - Final artifacts: `/Users/karim/kDrive/Code/soli/tmp/perf-samples/absolute-layer-final-per-game/`.
 - Celebration handoff in final run: `winning_card_settled` logged for 10/10 games. A redundant fallback logged in 5/10 before the timer cleanup; code now clears fallback on settle.
 - Still not manually verified after the final code changes: post-playlist auto-up UI behavior without toggling settings.
+- Cleanup validation on 2026-06-28: `yarn format:check`, `yarn typecheck`, `yarn lint`, and `yarn jest --runInBand` passed.
+- Cleanup-path whitespace validation passed: `git diff --check -- docs/product/game-history-performance/absolute-card-layer-animation-architecture.md src/animation src/features/klondike`.
+- Full `git diff --check` is blocked by unrelated trailing whitespace in modified `AGENTS.md`.
+- Android release validation attempted with `yarn release`, but Expo timed out waiting for `Pixel_9_API_36`; `adb devices -l` showed `emulator-5554 offline`, and `agent-device devices --platform android` found no usable Android target. The stuck emulator process was stopped.

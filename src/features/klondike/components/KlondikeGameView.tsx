@@ -7,10 +7,6 @@ import { StatisticsHud, StatisticsPlaceholder, type StatisticsRow } from './Stat
 import { FeltBackground } from './FeltBackground'
 import { TopRow, type TopRowProps } from './cards/TopRow'
 import { TableauSection, type TableauSectionProps } from './cards/TableauSection'
-import {
-  CardFlightOverlayLayer,
-  type CardFlightOverlayItem,
-} from './cards/CardFlightOverlayLayer'
 import { AbsoluteCardLayer, type AbsoluteCardLayerProps } from './cards/AbsoluteCardLayer'
 import { CelebrationOverlayLayer } from './cards/CelebrationOverlayLayer'
 import { CelebrationTouchBlocker } from './cards'
@@ -35,8 +31,6 @@ export type KlondikeGameViewProps = {
   onCelebrationAbort: () => void
   undoScrubProps: UndoScrubberProps
   absoluteCardLayerProps: AbsoluteCardLayerProps | null
-  cardFlightOverlayItems: CardFlightOverlayItem[]
-  onCardFlightOverlayComplete: (key: string) => void
 }
 
 export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
@@ -53,8 +47,6 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
   onCelebrationAbort,
   undoScrubProps,
   absoluteCardLayerProps,
-  cardFlightOverlayItems,
-  onCardFlightOverlayComplete,
 }) => {
   const hasStats = statisticsRows.length > 0
 
@@ -99,11 +91,6 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
         {absoluteCardLayerProps ? (
           <AbsoluteCardLayer {...absoluteCardLayerProps} />
         ) : null}
-
-        <CardFlightOverlayLayer
-          items={cardFlightOverlayItems}
-          onFlightComplete={onCardFlightOverlayComplete}
-        />
 
         <CelebrationOverlayLayer
           celebrationState={celebrationState}

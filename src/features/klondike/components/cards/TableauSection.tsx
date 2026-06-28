@@ -3,14 +3,8 @@ import { View } from 'react-native'
 import type { LayoutChangeEvent, LayoutRectangle } from 'react-native'
 
 import type { Card } from '../../../../solitaire/klondike'
-import type { CardFlightSnapshot } from '../../../../animation/flightController'
-import type {
-  CardFlightRegistry,
-  CardMetrics,
-  DropHints,
-  InvalidWiggleConfig,
-} from '../../types'
-import type { GameState, Selection } from '../../../../solitaire/klondike'
+import type { CardMetrics, DropHints } from '../../types'
+import type { GameState } from '../../../../solitaire/klondike'
 import {
   BOARD_COLUMN_GAP,
   BOARD_COLUMN_MARGIN,
@@ -18,7 +12,7 @@ import {
   COLOR_COLUMN_SELECTED,
   COLOR_DROP_BORDER,
 } from '../../constants'
-import { CardView, EmptySlot } from './CardView'
+import { EmptySlot } from './CardView'
 import { styles } from './styles'
 
 const FACE_DOWN_STACK_OFFSET_DIVISOR = 2
@@ -27,23 +21,8 @@ export type TableauSectionProps = {
   state: GameState
   cardMetrics: CardMetrics
   dropHints: DropHints
-  onAutoMove: (selection: Selection) => void
-  invalidWiggle: InvalidWiggleConfig
-  cardFlights: CardFlightRegistry
-  flightOverlayHiddenCardIds: ReadonlySet<string>
-  animationResetKey: number
-  onCardMeasured: (
-    cardId: string,
-    snapshot: CardFlightSnapshot,
-    card?: Card,
-    onFlightSettled?: (cardId: string) => void
-  ) => void
-  cardFlightMemory: Record<string, CardFlightSnapshot>
   interactionsLocked: boolean
-  // requirement 20-6: When scrubbing, reduce board churn to avoid iOS gesture cancellation
-  scrubbingActive: boolean
   celebrationPending?: boolean
-  renderCardsInPlace?: boolean
   onTableauRowLayout?: (layout: LayoutRectangle) => void
   onTableauColumnLayout?: (columnIndex: number, layout: LayoutRectangle) => void
 }
@@ -52,17 +31,8 @@ export const TableauSection = ({
   state,
   cardMetrics,
   dropHints,
-  onAutoMove,
-  invalidWiggle,
-  cardFlights,
-  flightOverlayHiddenCardIds,
-  animationResetKey,
-  onCardMeasured,
-  cardFlightMemory,
   interactionsLocked,
-  scrubbingActive,
   celebrationPending = false,
-  renderCardsInPlace = true,
   onTableauRowLayout,
   onTableauColumnLayout,
 }: TableauSectionProps) => {
@@ -83,19 +53,8 @@ export const TableauSection = ({
           state={state}
           cardMetrics={cardMetrics}
           isDroppable={dropHints.tableau[columnIndex]}
-          onCardPress={(cardIndex) =>
-            onAutoMove({ source: 'tableau', columnIndex, cardIndex })
-          }
-          invalidWiggle={invalidWiggle}
-          cardFlights={cardFlights}
-          flightOverlayHiddenCardIds={flightOverlayHiddenCardIds}
-          animationResetKey={animationResetKey}
-          onCardMeasured={onCardMeasured}
-          cardFlightMemory={cardFlightMemory}
           disableInteractions={interactionsLocked}
-          scrubbingActive={scrubbingActive}
           celebrationPending={celebrationPending}
-          renderCardsInPlace={renderCardsInPlace}
           onColumnLayout={onTableauColumnLayout}
         />
       ))}
@@ -109,22 +68,8 @@ export type TableauColumnProps = {
   state: GameState
   cardMetrics: CardMetrics
   isDroppable: boolean
-  onCardPress: (cardIndex: number) => void
-  invalidWiggle: InvalidWiggleConfig
-  cardFlights: CardFlightRegistry
-  flightOverlayHiddenCardIds: ReadonlySet<string>
-  animationResetKey: number
-  onCardMeasured: (
-    cardId: string,
-    snapshot: CardFlightSnapshot,
-    card?: Card,
-    onFlightSettled?: (cardId: string) => void
-  ) => void
-  cardFlightMemory: Record<string, CardFlightSnapshot>
   disableInteractions: boolean
-  scrubbingActive: boolean
   celebrationPending?: boolean
-  renderCardsInPlace?: boolean
   onColumnLayout?: (columnIndex: number, layout: LayoutRectangle) => void
 }
 
@@ -134,17 +79,8 @@ export const TableauColumn = ({
   state,
   cardMetrics,
   isDroppable,
-  onCardPress,
-  invalidWiggle,
-  cardFlights,
-  flightOverlayHiddenCardIds,
-  animationResetKey,
-  onCardMeasured,
-  cardFlightMemory,
   disableInteractions,
-  scrubbingActive,
   celebrationPending = false,
-  renderCardsInPlace = true,
   onColumnLayout,
 }: TableauColumnProps) => {
   // Task 1-9: Keep face-up spacing (tap targets), but halve the visible spacing for face-down stacks.
@@ -165,7 +101,6 @@ export const TableauColumn = ({
       ? state.selected
       : null
   const columnSelected = Boolean(tableauSelection)
-  const selectedCardIndex = tableauSelection ? tableauSelection.cardIndex : null
   const isFirstColumn = columnIndex === 0
   const isLastColumn = columnIndex === state.tableau.length - 1
   const showWinCleanup = state.hasWon && !celebrationPending
@@ -200,35 +135,6 @@ export const TableauColumn = ({
           metrics={cardMetrics}
         />
       ) : null}
-      {renderCardsInPlace
-        ? column.map((card, cardIndex) => (
-            <CardView
-              key={card.id}
-              card={card}
-              metrics={cardMetrics}
-              offsetTop={cardOffsets[cardIndex]}
-              suppressFlightOnFaceUpChange
-              isSelected={
-                columnSelected &&
-                selectedCardIndex !== null &&
-                selectedCardIndex <= cardIndex &&
-                card.faceUp
-              }
-              onPress={
-                disableInteractions || !card.faceUp
-                  ? undefined
-                  : () => onCardPress(cardIndex)
-              }
-              invalidWiggle={invalidWiggle}
-              cardFlights={cardFlights}
-              hiddenForFlightOverlay={flightOverlayHiddenCardIds.has(card.id)}
-              animationResetKey={animationResetKey}
-              layoutTrackingEnabled={!scrubbingActive}
-              onCardMeasured={onCardMeasured}
-              cardFlightMemory={cardFlightMemory}
-            />
-          ))
-        : null}
     </View>
   )
 }

@@ -21,21 +21,19 @@ import {
 } from '../../../data/demoAutoSolvePlaylist'
 import { devLog } from '../../../utils/devLogger'
 
-type DispatchWithFlightFn = (action: GameAction, selection?: Selection | null) => void
+type DispatchGameActionFn = (action: GameAction, selection?: Selection | null) => void
 export type DemoLaunchMode = 'old' | 'single' | 'playlist'
 
 type UseDemoGameLauncherOptions = {
   stateRef: MutableRefObject<GameState>
   dispatch: Dispatch<GameAction>
-  dispatchWithFlight: DispatchWithFlightFn
+  dispatchGameAction: DispatchGameActionFn
   developerModeEnabled: boolean
   setDeveloperMode: (enabled: boolean) => void
   boardLockedRef: MutableRefObject<boolean>
   clearCelebrationDialogTimer: () => void
   recordCurrentGameResult: (options?: { solved?: boolean }) => void
   setCelebrationState: Dispatch<SetStateAction<any>>
-  resetCardFlights: () => void
-  clearAnimatedCardResidency: () => void
   foundationLayoutsRef: MutableRefObject<Partial<Record<Suit, LayoutRectangle>>>
   topRowLayoutRef: MutableRefObject<LayoutRectangle | null>
   winCelebrationsRef: MutableRefObject<number>
@@ -70,15 +68,13 @@ const DEMO_PLAYLIST_BETWEEN_GAMES_MS = 600
 export const useDemoGameLauncher = ({
   stateRef,
   dispatch,
-  dispatchWithFlight,
+  dispatchGameAction,
   developerModeEnabled,
   setDeveloperMode,
   boardLockedRef,
   clearCelebrationDialogTimer,
   recordCurrentGameResult,
   setCelebrationState,
-  resetCardFlights,
-  clearAnimatedCardResidency,
   foundationLayoutsRef,
   topRowLayoutRef,
   winCelebrationsRef,
@@ -118,8 +114,6 @@ export const useDemoGameLauncher = ({
   const resetDemoRuntimeState = useCallback(() => {
     clearCelebrationDialogTimer()
     setCelebrationState(null)
-    resetCardFlights()
-    clearAnimatedCardResidency()
     foundationLayoutsRef.current = {}
     topRowLayoutRef.current = null
     winCelebrationsRef.current = 0
@@ -127,10 +121,8 @@ export const useDemoGameLauncher = ({
     updateBoardLocked(false)
   }, [
     clearCelebrationDialogTimer,
-    clearAnimatedCardResidency,
     currentGameEntryIdRef,
     foundationLayoutsRef,
-    resetCardFlights,
     setCelebrationState,
     topRowLayoutRef,
     updateBoardLocked,
@@ -301,7 +293,7 @@ export const useDemoGameLauncher = ({
           return
         }
 
-        dispatchWithFlight(applyHistoryPreference(resolved.action), resolved.selection)
+        dispatchGameAction(applyHistoryPreference(resolved.action), resolved.selection)
         waitForPlaylistState({
           runId,
           description: `Game ${gameIndex + 1} step ${moveIndex + 1}`,
@@ -317,7 +309,7 @@ export const useDemoGameLauncher = ({
               'info',
               `[DemoPlaylist] Undo probe at game ${gameIndex + 1}, step ${moveIndex + 1}.`
             )
-            dispatchWithFlight({ type: 'UNDO' })
+            dispatchGameAction({ type: 'UNDO' })
             waitForPlaylistState({
               runId,
               description: `Game ${gameIndex + 1} undo probe ${moveIndex + 1}`,
@@ -332,7 +324,7 @@ export const useDemoGameLauncher = ({
                   )
                   return
                 }
-                dispatchWithFlight(
+                dispatchGameAction(
                   applyHistoryPreference(replayResolved.action),
                   replayResolved.selection
                 )
@@ -357,7 +349,7 @@ export const useDemoGameLauncher = ({
       autoUpEnabled,
       demoPlaybackActiveRef,
       dispatch,
-      dispatchWithFlight,
+      dispatchGameAction,
       failPlaylist,
       resetDemoRuntimeState,
       schedulePlaylistTimer,
@@ -387,7 +379,7 @@ export const useDemoGameLauncher = ({
               columnIndex,
               cardIndex: topCardIndex,
             }
-            dispatchWithFlight(
+            dispatchGameAction(
               {
                 type: 'APPLY_MOVE',
                 selection,
@@ -419,10 +411,10 @@ export const useDemoGameLauncher = ({
           for (let index = 0; index < drawCount; index += 1) {
             steps.push(() => {
               // PBI-14-4: Route draws through the flight controller so stock→waste origins are snapshot-gated.
-              dispatchWithFlight({ type: 'DRAW_OR_RECYCLE' })
+              dispatchGameAction({ type: 'DRAW_OR_RECYCLE' })
             })
             steps.push(() => {
-              dispatchWithFlight(
+              dispatchGameAction(
                 {
                   type: 'APPLY_MOVE',
                   selection: { source: 'waste' },
@@ -459,7 +451,7 @@ export const useDemoGameLauncher = ({
         )
       }
     },
-    [dispatchWithFlight, stateRef]
+    [dispatchGameAction, stateRef]
   )
 
   const handleLaunchDemoGame = useCallback(

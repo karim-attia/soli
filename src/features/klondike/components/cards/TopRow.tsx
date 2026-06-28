@@ -7,22 +7,14 @@ import {
   FOUNDATION_SUIT_ORDER,
   TABLEAU_COLUMN_COUNT,
   type GameState,
-  type Card,
   type Selection,
   type Suit,
 } from '../../../../solitaire/klondike'
-import type { CardFlightSnapshot } from '../../../../animation/flightController'
-import type {
-  CardFlightRegistry,
-  CardMetrics,
-  DropHints,
-  InvalidWiggleConfig,
-} from '../../types'
+import type { CardMetrics, DropHints } from '../../types'
 import { EmptySlot, CardBack } from './CardView'
 import { PileButton } from './PileButton'
-import { StockStack } from './StockStack'
-import { WasteFan } from './WasteFan'
 import { FoundationPile } from './FoundationPile'
+import { styles as cardStyles } from './styles'
 import {
   BOARD_COLUMN_GAP,
   BOARD_COLUMN_MARGIN,
@@ -59,30 +51,14 @@ export type TopRowProps = {
   cardMetrics: CardMetrics
   dropHints: DropHints
   notifyInvalidMove: (options?: { selection?: Selection | null }) => void
-  invalidWiggle: InvalidWiggleConfig
-  cardFlights: CardFlightRegistry
-  flightOverlayHiddenCardIds: ReadonlySet<string>
-  animationResetKey: number
-  onCardMeasured: (
-    cardId: string,
-    snapshot: CardFlightSnapshot,
-    card?: Card,
-    onFlightSettled?: (cardId: string) => void
-  ) => void
-  cardFlightMemory: Record<string, CardFlightSnapshot>
   onFoundationArrival?: (cardId: string | null | undefined) => void
-  onFoundationCardFlightSettled?: (cardId: string) => void
   interactionsLocked: boolean
-  // requirement 20-6: When scrubbing, reduce board churn to avoid iOS gesture cancellation
-  scrubbingActive: boolean
-  hideFoundations?: boolean
   onTopRowLayout?: (layout: LayoutRectangle) => void
   onFoundationLayout?: (suit: Suit, layout: LayoutRectangle) => void
   onStockLayout?: (layout: LayoutRectangle) => void
   onWasteLayout?: (layout: LayoutRectangle) => void
   celebrationActive?: boolean
   celebrationPending?: boolean
-  renderCardsInPlace?: boolean
 }
 
 export const TopRow = ({
@@ -94,24 +70,14 @@ export const TopRow = ({
   cardMetrics,
   dropHints,
   notifyInvalidMove,
-  invalidWiggle,
-  cardFlights,
-  flightOverlayHiddenCardIds,
-  animationResetKey,
-  onCardMeasured,
-  cardFlightMemory,
   onFoundationArrival,
-  onFoundationCardFlightSettled,
   interactionsLocked,
-  scrubbingActive,
-  hideFoundations,
   onTopRowLayout,
   onFoundationLayout,
   onStockLayout,
   onWasteLayout,
   celebrationActive = false,
   celebrationPending = false,
-  renderCardsInPlace = true,
 }: TopRowProps) => {
   const handleRowLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -128,7 +94,6 @@ export const TopRow = ({
   )
 
   const stockDisabled = (!state.stock.length && !state.waste.length) || interactionsLocked
-  const wasteSelected = state.selected?.source === 'waste'
   const showRecycle = !state.stock.length && state.waste.length > 0
   const drawVariant: 'stock' | 'recycle' | 'empty' = showRecycle
     ? 'recycle'
@@ -189,20 +154,9 @@ export const TopRow = ({
                   state.selected?.source === 'foundation' && state.selected.suit === suit
                 }
                 onPress={() => onFoundationPress(suit)}
-                invalidWiggle={invalidWiggle}
-                cardFlights={cardFlights}
-                flightOverlayHiddenCardIds={flightOverlayHiddenCardIds}
-                animationResetKey={animationResetKey}
-                layoutTrackingEnabled={!scrubbingActive}
-                onCardMeasured={onCardMeasured}
-                cardFlightMemory={cardFlightMemory}
                 onCardArrived={onFoundationArrival}
-                onTopCardFlightSettled={onFoundationCardFlightSettled}
                 disableInteractions={interactionsLocked}
-                hideTopCard={hideFoundations || celebrationActive}
                 celebrationActive={celebrationActive}
-                renderTopCard={renderCardsInPlace}
-                suppressHiddenTopCardOutline={!renderCardsInPlace}
               />
             </View>
           )
@@ -225,20 +179,8 @@ export const TopRow = ({
                 >
                   <View width={cardMetrics.width} items="flex-end" overflow="visible">
                     {state.waste.length ? (
-                      <WasteFan
-                        cards={state.waste}
-                        metrics={cardMetrics}
-                        isSelected={wasteSelected}
-                        onPress={handleWastePress}
-                        invalidWiggle={invalidWiggle}
-                        cardFlights={cardFlights}
-                        flightOverlayHiddenCardIds={flightOverlayHiddenCardIds}
-                        animationResetKey={animationResetKey}
-                        layoutTrackingEnabled={!scrubbingActive}
-                        onCardMeasured={onCardMeasured}
-                        cardFlightMemory={cardFlightMemory}
-                        disabled={interactionsLocked}
-                        renderCardsInPlace={renderCardsInPlace}
+                      <View
+                        style={{ width: cardMetrics.width, height: cardMetrics.height }}
                       />
                     ) : (
                       <EmptySlot highlight={false} metrics={cardMetrics} />
@@ -263,24 +205,22 @@ export const TopRow = ({
                   onPress={onDraw}
                   disabled={stockDisabled}
                   // Absolute-card mode gives the visible stock card its own press target.
-                  // Keep recycle on the structural slot, but avoid a duplicate draw handler
+                  // Keep recycle on this structural slot, but never duplicate stock draw
                   // underneath the absolute stock card during rapid taps.
-                  disablePress={!renderCardsInPlace && drawVariant === 'stock'}
+                  disablePress={drawVariant === 'stock'}
                   width={cardMetrics.width}
                 >
                   {drawVariant === 'stock' ? (
-                    <StockStack
-                      cards={state.stock}
-                      metrics={cardMetrics}
-                      invalidWiggle={invalidWiggle}
-                      cardFlights={cardFlights}
-                      flightOverlayHiddenCardIds={flightOverlayHiddenCardIds}
-                      animationResetKey={animationResetKey}
-                      layoutTrackingEnabled={!scrubbingActive}
-                      onCardMeasured={onCardMeasured}
-                      cardFlightMemory={cardFlightMemory}
-                      label={state.stock.length ? drawLabel : undefined}
-                      renderCardsInPlace={renderCardsInPlace}
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        cardStyles.stockContainer,
+                        {
+                          width: cardMetrics.width,
+                          height: cardMetrics.height,
+                          borderRadius: cardMetrics.radius,
+                        },
+                      ]}
                     />
                   ) : (
                     <CardBack

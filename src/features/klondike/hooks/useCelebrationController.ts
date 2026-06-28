@@ -54,7 +54,6 @@ type UseCelebrationControllerParams = {
   cardMetrics: CardMetrics
   foundationLayoutsRef: React.MutableRefObject<Partial<Record<Suit, LayoutRectangle>>>
   topRowLayoutRef: React.MutableRefObject<LayoutRectangle | null>
-  ensureCardFlightsReady: () => void
   updateBoardLocked: (locked: boolean) => void
   winCelebrationsRef: React.MutableRefObject<number>
   onWinVisualHandoffStart?: (options: { reason: CelebrationStartReason }) => void
@@ -101,7 +100,6 @@ export const useCelebrationController = ({
   cardMetrics,
   foundationLayoutsRef,
   topRowLayoutRef,
-  ensureCardFlightsReady,
   updateBoardLocked,
   winCelebrationsRef,
   onWinVisualHandoffStart,
@@ -274,7 +272,6 @@ export const useCelebrationController = ({
       setCelebrationPending(false)
       clearCelebrationStartTimer()
       clearCelebrationFallbackTimer()
-      ensureCardFlightsReady()
       onWinVisualHandoffStart?.({ reason })
       // Task 28-2: Build the celebration payload only once the visual handoff is actually
       // starting so the exact win frame stays as light as possible.
@@ -299,7 +296,6 @@ export const useCelebrationController = ({
       buildCelebrationState,
       clearCelebrationFallbackTimer,
       clearCelebrationStartTimer,
-      ensureCardFlightsReady,
       logCelebrationHandoff,
       onWinVisualHandoffStart,
       updateBoardLocked,

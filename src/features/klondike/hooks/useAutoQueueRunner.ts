@@ -4,7 +4,7 @@ import type { GameAction, GameState, Selection } from '../../../solitaire/klondi
 
 export type AutoQueueRunnerParams = {
   state: GameState
-  dispatchWithFlight: (action: GameAction, selection?: Selection | null) => void
+  dispatchGameAction: (action: GameAction, selection?: Selection | null) => void
   moveDelayMs: number
   intervalMs: number
 }
@@ -12,7 +12,7 @@ export type AutoQueueRunnerParams = {
 // Runs the auto-complete queue, dispatching queued actions after the configured delays.
 export const useAutoQueueRunner = ({
   state,
-  dispatchWithFlight,
+  dispatchGameAction,
   moveDelayMs,
   intervalMs,
 }: AutoQueueRunnerParams) => {
@@ -30,14 +30,14 @@ export const useAutoQueueRunner = ({
     const selection = nextAction.type === 'move' ? (nextAction.selection ?? null) : null
 
     const timeoutId = setTimeout(() => {
-      dispatchWithFlight({ type: 'ADVANCE_AUTO_QUEUE' }, selection)
+      dispatchGameAction({ type: 'ADVANCE_AUTO_QUEUE' }, selection)
     }, delay)
 
     return () => {
       clearTimeout(timeoutId)
     }
   }, [
-    dispatchWithFlight,
+    dispatchGameAction,
     intervalMs,
     moveDelayMs,
     state.autoQueue,

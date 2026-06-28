@@ -6,7 +6,6 @@ import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated'
 import { RefreshCcw } from '@tamagui/lucide-icons-2'
 
 import type { Card } from '../../../../solitaire/klondike'
-import type { CardFlightSnapshot } from '../../../../animation/flightController'
 import {
   CARD_REFERENCE_HEIGHT,
   CARD_REFERENCE_WIDTH,
@@ -17,14 +16,7 @@ import {
   SUIT_SYMBOLS,
   WIN_CLEANUP_OUTLINE_FADE_TIMING,
 } from '../../constants'
-import type {
-  CardFlightRegistry,
-  CardMetrics,
-  CelebrationBindings,
-  InvalidWiggleConfig,
-} from '../../types'
-import { useCardAnimations } from './animations'
-import { AnimatedView } from './common'
+import type { CardMetrics } from '../../types'
 import {
   CARD_CENTER_SUIT_FONT_WEIGHT,
   CARD_RANK_FONT_FAMILY,
@@ -152,109 +144,6 @@ export const CardVisual = ({ card, metrics, onPress, disabled }: CardVisualProps
   }
 
   return <View style={baseStyle}>{body}</View>
-}
-
-export type CardViewProps = {
-  card: Card
-  metrics: CardMetrics
-  offsetTop?: number
-  offsetLeft?: number
-  isSelected?: boolean
-  suppressFlightOnFaceUpChange?: boolean
-  onPress?: () => void
-  invalidWiggle: InvalidWiggleConfig
-  cardFlights: CardFlightRegistry
-  hiddenForFlightOverlay?: boolean
-  animationResetKey: number
-  // requirement 20-6: During undo scrubbing, disable layout tracking to reduce native churn.
-  // Card onLayout → measure() → shared value updates can be extremely noisy during rapid SCRUB_TO_INDEX commits.
-  layoutTrackingEnabled?: boolean
-  onCardMeasured?: (
-    cardId: string,
-    snapshot: CardFlightSnapshot,
-    card?: Card,
-    onFlightSettled?: (cardId: string) => void
-  ) => void
-  onFlightSettled?: (cardId: string) => void
-  cardFlightMemory?: Record<string, CardFlightSnapshot>
-  celebrationBindings?: CelebrationBindings
-}
-
-export const CardView = ({
-  card,
-  metrics,
-  offsetTop,
-  offsetLeft,
-  isSelected,
-  suppressFlightOnFaceUpChange,
-  onPress,
-  invalidWiggle,
-  cardFlights,
-  hiddenForFlightOverlay = false,
-  layoutTrackingEnabled = true,
-  onCardMeasured,
-  onFlightSettled,
-  cardFlightMemory,
-  celebrationBindings,
-}: CardViewProps) => {
-  const {
-    cardRef,
-    renderFaceUp,
-    motionStyle,
-    flipStyle,
-    positionStyle,
-    containerStyle,
-    handleCardLayout,
-  } = useCardAnimations({
-    card,
-    metrics,
-    offsetTop,
-    offsetLeft,
-    isSelected,
-    suppressFlightOnFaceUpChange,
-    layoutTrackingEnabled,
-    invalidWiggle,
-    cardFlights,
-    cardFlightMemory,
-    onCardMeasured,
-    onFlightSettled,
-    celebrationBindings,
-  })
-
-  const frontContent = (
-    <CardVisual card={card} metrics={metrics} onPress={onPress} disabled={!onPress} />
-  )
-
-  const backContent = (
-    <View
-      style={[
-        styles.cardBase,
-        styles.faceDown,
-        {
-          width: '100%',
-          height: '100%',
-          borderRadius: metrics.radius,
-        },
-      ]}
-    />
-  )
-
-  return (
-    <AnimatedView
-      ref={cardRef}
-      onLayout={layoutTrackingEnabled ? handleCardLayout : undefined}
-      style={[
-        positionStyle,
-        motionStyle,
-        containerStyle,
-        hiddenForFlightOverlay ? styles.hiddenCard : undefined,
-      ]}
-    >
-      <Animated.View style={[styles.cardFlipWrapper, flipStyle]}>
-        {renderFaceUp ? frontContent : backContent}
-      </Animated.View>
-    </AnimatedView>
-  )
 }
 
 export type CardBackProps = {

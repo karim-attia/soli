@@ -4,31 +4,21 @@ import {
   LayoutChangeEvent,
   LayoutRectangle,
   Linking,
-  Platform,
   useColorScheme,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
-  FOUNDATION_SUIT_ORDER,
   createInitialState,
   createSolvableGameState,
   findAutoMoveTargetWithTableauAdjacentFallback,
   getDropHints,
   klondikeReducer,
   type GameAction,
-  type GameSnapshot,
   type GameState,
-  type Card,
   type Selection,
   type Suit,
 } from '../../../solitaire/klondike'
-import {
-  areCardFlightSnapshotsEquivalent,
-  isValidCardFlightSnapshot,
-  type CardFlightSnapshot,
-  useFlightController,
-} from '../../../animation/flightController'
 import { devLog } from '../../../utils/devLogger'
 import { computeElapsedWithReference } from '../../../utils/time'
 import { clearGameState } from '../../../storage/gamePersistence'
@@ -40,8 +30,6 @@ import {
 } from '../../../state/history'
 import { useAnimationToggles, useSettings } from '../../../state/settings'
 import {
-  CARD_ANIMATION_DURATION_MS,
-  CARD_FLIP_HALF_DURATION_MS,
   COLUMN_MARGIN,
   EDGE_GUTTER,
   COLOR_FELT_LIGHT,
@@ -67,10 +55,6 @@ import type { UndoScrubberProps } from '../components/UndoScrubber'
 import type { TopRowProps } from '../components/cards/TopRow'
 import type { TableauSectionProps } from '../components/cards/TableauSection'
 import {
-  CARD_FLIGHT_OVERLAY_SLOT_COUNT,
-  type CardFlightOverlayItem,
-} from '../components/cards/CardFlightOverlayLayer'
-import {
   createEmptyAbsoluteCardLayerLayouts,
   type AbsoluteCardLayerLayouts,
 } from '../components/cards/AbsoluteCardLayer'
@@ -89,10 +73,6 @@ const WIGGLE_SEQUENCE_SEGMENT_COUNT = 3
 const WIGGLE_RESET_BUFFER_MS = 40
 const INVALID_WIGGLE_RESET_DELAY_MS =
   WIGGLE_SEGMENT_DURATION_MS * WIGGLE_SEQUENCE_SEGMENT_COUNT + WIGGLE_RESET_BUFFER_MS
-const TRANSIENT_CARD_ANIMATION_WINDOW_MS =
-  CARD_ANIMATION_DURATION_MS + CARD_FLIP_HALF_DURATION_MS * 2 + 120
-// Option 3 experiment: one board-level card layer owns card visuals and movement.
-const ABSOLUTE_CARD_LAYER_ENABLED = true
 const MAX_BUFFERED_WASTE_TAPS = 1
 
 const parseOptionalBooleanParam = (value: string | null): boolean | null => {
@@ -115,36 +95,7 @@ const createEmptyInvalidWiggle = (): InvalidWiggleConfig => ({
   lookup: new Set<string>(),
 })
 
-const findCardById = (state: GameState, cardId: string): Card | null => {
-  const stockCard = state.stock.find((card) => card.id === cardId)
-  if (stockCard) {
-    return stockCard
-  }
-
-  const wasteCard = state.waste.find((card) => card.id === cardId)
-  if (wasteCard) {
-    return wasteCard
-  }
-
-  for (const suit of FOUNDATION_SUIT_ORDER) {
-    const foundationCard = state.foundations[suit].find((card) => card.id === cardId)
-    if (foundationCard) {
-      return foundationCard
-    }
-  }
-
-  for (const column of state.tableau) {
-    const tableauCard = column.find((card) => card.id === cardId)
-    if (tableauCard) {
-      return tableauCard
-    }
-  }
-
-  return null
-}
-
-// Maps a selection descriptor to the card IDs required for animation-flight tracking.
-// The flight controller waits for these IDs to have layout snapshots before animating moves.
+// Maps a selection descriptor to the card IDs that should receive invalid-move feedback.
 // Auto-move, waste taps, and auto-complete still raise selections even after manual selection removal.
 function collectSelectionCardIds(
   state: GameState,
@@ -173,183 +124,6 @@ function collectSelectionCardIds(
   return []
 }
 
-type CardSignatureSnapshot = Pick<
-  GameSnapshot,
-  'stock' | 'waste' | 'foundations' | 'tableau'
->
-
-type PendingActionValidationSnapshot = Pick<
-  GameState,
-  | 'stock'
-  | 'waste'
-  | 'foundations'
-  | 'tableau'
-  | 'selected'
-  | 'history'
-  | 'autoQueue'
-  | 'isAutoCompleting'
->
-
-const buildCardSignatureMap = (snapshot: CardSignatureSnapshot): Map<string, string> => {
-  const map = new Map<string, string>()
-
-  snapshot.stock.forEach((card, index) => {
-    map.set(card.id, `stock:${index}:${card.faceUp ? 1 : 0}`)
-  })
-
-  snapshot.waste.forEach((card, index) => {
-    map.set(card.id, `waste:${index}:${card.faceUp ? 1 : 0}`)
-  })
-
-  Object.entries(snapshot.foundations).forEach(([suit, cards]) => {
-    cards.forEach((card, index) => {
-      map.set(card.id, `foundation:${suit}:${index}:${card.faceUp ? 1 : 0}`)
-    })
-  })
-
-  snapshot.tableau.forEach((column, columnIndex) => {
-    column.forEach((card, cardIndex) => {
-      map.set(card.id, `tableau:${columnIndex}:${cardIndex}:${card.faceUp ? 1 : 0}`)
-    })
-  })
-
-  return map
-}
-
-const collectChangedCardIds = (current: GameState, target: GameSnapshot): string[] => {
-  const currentMap = buildCardSignatureMap(current)
-  const targetMap = buildCardSignatureMap(target)
-  const changed: string[] = []
-
-  for (const [cardId, currentSignature] of currentMap.entries()) {
-    const targetSignature = targetMap.get(cardId)
-    if (targetSignature !== currentSignature) {
-      changed.push(cardId)
-    }
-  }
-
-  for (const cardId of targetMap.keys()) {
-    if (!currentMap.has(cardId)) {
-      changed.push(cardId)
-    }
-  }
-
-  return changed
-}
-
-const collectTableauRevealCardIds = (
-  state: GameState,
-  selection?: Selection | null
-): string[] => {
-  if (selection?.source !== 'tableau' || selection.cardIndex <= 0) {
-    return []
-  }
-
-  const exposedCard = state.tableau[selection.columnIndex]?.[selection.cardIndex - 1]
-  return exposedCard && !exposedCard.faceUp ? [exposedCard.id] : []
-}
-
-const collectTransientAnimationCardIds = (
-  state: GameState,
-  action: GameAction,
-  selection: Selection | null | undefined,
-  trackedCardIds: string[]
-): string[] => {
-  const cardIds = new Set(trackedCardIds)
-
-  if (action.type === 'APPLY_MOVE') {
-    collectTableauRevealCardIds(state, action.selection).forEach((cardId) => {
-      cardIds.add(cardId)
-    })
-  }
-
-  if (action.type === 'ADVANCE_AUTO_QUEUE') {
-    const queued = state.autoQueue[0]
-    if (queued?.type === 'move') {
-      collectSelectionCardIds(state, queued.selection).forEach((cardId) => {
-        cardIds.add(cardId)
-      })
-      collectTableauRevealCardIds(state, queued.selection).forEach((cardId) => {
-        cardIds.add(cardId)
-      })
-    }
-  }
-
-  collectTableauRevealCardIds(state, selection).forEach((cardId) => {
-    cardIds.add(cardId)
-  })
-
-  return [...cardIds]
-}
-
-const serializeCardsForPendingValidation = (
-  cards: Array<{ id: string; faceUp: boolean }>
-): string => cards.map((card) => `${card.id}:${card.faceUp ? 1 : 0}`).join(',')
-
-const getBoardTokenForPendingValidation = (snapshot: CardSignatureSnapshot): string => {
-  const foundationToken = FOUNDATION_SUIT_ORDER.map(
-    (suit) => `${suit}[${serializeCardsForPendingValidation(snapshot.foundations[suit])}]`
-  ).join('|')
-  const tableauToken = snapshot.tableau
-    .map(
-      (column, columnIndex) =>
-        `${columnIndex}[${serializeCardsForPendingValidation(column)}]`
-    )
-    .join('|')
-
-  return [
-    `stock[${serializeCardsForPendingValidation(snapshot.stock)}]`,
-    `waste[${serializeCardsForPendingValidation(snapshot.waste)}]`,
-    `foundations[${foundationToken}]`,
-    `tableau[${tableauToken}]`,
-  ].join('||')
-}
-
-const getPendingActionValidationToken = (
-  snapshot: PendingActionValidationSnapshot
-): string => {
-  const topHistorySnapshot = snapshot.history[snapshot.history.length - 1]
-  const topHistoryToken = topHistorySnapshot
-    ? getBoardTokenForPendingValidation(topHistorySnapshot)
-    : 'none'
-  const nextQueuedAction = snapshot.autoQueue[0]
-
-  // Bind queued animation dispatches to the exact board-selection/history state
-  // they were created from. If any gameplay action sneaks in before the queued
-  // dispatch flushes, dropping the stale work is safer than replaying it late.
-  return [
-    getBoardTokenForPendingValidation(snapshot),
-    `selected:${JSON.stringify(snapshot.selected)}`,
-    `history:${snapshot.history.length}:${topHistoryToken}`,
-    `auto:${snapshot.isAutoCompleting ? 1 : 0}:${snapshot.autoQueue.length}:${JSON.stringify(nextQueuedAction ?? null)}`,
-  ].join('||')
-}
-
-const getPendingActionKey = (action: GameAction, cardIds: string[]): string => {
-  const cardKey = cardIds.join(',') || 'none'
-
-  switch (action.type) {
-    case 'DRAW_OR_RECYCLE':
-    case 'UNDO':
-    case 'ADVANCE_AUTO_QUEUE':
-      return `${action.type}:${cardKey}`
-    case 'APPLY_MOVE':
-      return [
-        action.type,
-        JSON.stringify(action.selection),
-        JSON.stringify(action.target),
-        action.recordHistory === false ? 'history:off' : 'history:on',
-        cardKey,
-      ].join(':')
-    case 'PLACE_ON_FOUNDATION':
-      return `${action.type}:${action.suit}:${cardKey}`
-    case 'PLACE_ON_TABLEAU':
-      return `${action.type}:${action.columnIndex}:${cardKey}`
-    default:
-      return `${action.type}:${cardKey}`
-  }
-}
-
 export type UseKlondikeGameResult = {
   developerModeEnabled: boolean
   requestNewGame: RequestNewGameFn
@@ -357,20 +131,10 @@ export type UseKlondikeGameResult = {
   viewProps: KlondikeGameViewProps
 }
 
-type PendingCardFlightOverlay = {
-  card: Card
-  from: CardFlightSnapshot
-  requestId: number
-  timeoutId: ReturnType<typeof setTimeout>
-}
-
 type WasteAutoMoveMarker = {
   cardId: string
   moveCount: number
 }
-
-const createOverlaySlotQueue = (): number[] =>
-  Array.from({ length: CARD_FLIGHT_OVERLAY_SLOT_COUNT }, (_, slot) => slot)
 
 const areLayoutsEquivalent = (
   previous: LayoutRectangle | null | undefined,
@@ -454,7 +218,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   } = useHistory()
   const {
     master: animationsEnabled,
-    cardFlights: cardFlightsEnabled,
     invalidMoveWiggle: invalidWiggleEnabled,
     celebrations: celebrationAnimationsEnabled,
   } = animationToggles
@@ -504,76 +267,11 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const demoPlaybackActiveRef = useRef(false)
   const pendingSolvedResultRef = useRef(false)
   const pendingSolvedResultTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const flightRequestIdRef = useRef(0)
-  const cardFlightsEnabledRef = useRef(cardFlightsEnabled)
   const bufferedWasteTapCountRef = useRef(0)
   const lastWasteAutoMoveRef = useRef<WasteAutoMoveMarker | null>(null)
   const [boardLocked, setBoardLocked] = useState(false)
   const [dealResetKey, setDealResetKey] = useState(0)
   const [wasteTapQueueVersion, setWasteTapQueueVersion] = useState(0)
-  const [flightOverlayHiddenCardIds, setFlightOverlayHiddenCardIds] = useState<
-    ReadonlySet<string>
-  >(() => new Set())
-  const [cardFlightOverlayItems, setCardFlightOverlayItems] = useState<
-    CardFlightOverlayItem[]
-  >([])
-  const dealResetKeyRef = useRef(0)
-  const flightOverlayHiddenCardIdsRef = useRef<Set<string>>(new Set())
-  const cardFlightOverlayItemsRef = useRef<Map<string, CardFlightOverlayItem>>(new Map())
-  const cardFlightOverlayCallbacksRef = useRef<
-    Map<string, ((cardId: string) => void) | undefined>
-  >(new Map())
-  const cardFlightOverlayKeyByCardIdRef = useRef<Map<string, string>>(new Map())
-  const pendingCardFlightOverlaysRef = useRef<Map<string, PendingCardFlightOverlay>>(
-    new Map()
-  )
-  const availableCardFlightOverlaySlotsRef = useRef<number[]>(createOverlaySlotQueue())
-  const cardFlightOverlaySequenceRef = useRef(0)
-
-  useEffect(() => {
-    dealResetKeyRef.current = dealResetKey
-  }, [dealResetKey])
-
-  useEffect(() => {
-    cardFlightsEnabledRef.current = cardFlightsEnabled
-  }, [cardFlightsEnabled])
-
-  const publishCardFlightOverlayState = useCallback(() => {
-    setFlightOverlayHiddenCardIds(new Set(flightOverlayHiddenCardIdsRef.current))
-    setCardFlightOverlayItems([...cardFlightOverlayItemsRef.current.values()])
-  }, [])
-
-  const clearAnimatedCardResidency = useCallback(() => {
-    pendingCardFlightOverlaysRef.current.forEach((pending) => {
-      clearTimeout(pending.timeoutId)
-    })
-    pendingCardFlightOverlaysRef.current.clear()
-    cardFlightOverlayItemsRef.current.clear()
-    cardFlightOverlayCallbacksRef.current.clear()
-    cardFlightOverlayKeyByCardIdRef.current.clear()
-    flightOverlayHiddenCardIdsRef.current.clear()
-    availableCardFlightOverlaySlotsRef.current = createOverlaySlotQueue()
-    publishCardFlightOverlayState()
-  }, [publishCardFlightOverlayState])
-
-  useEffect(() => {
-    const pendingCardFlightOverlays = pendingCardFlightOverlaysRef.current
-    const overlayItems = cardFlightOverlayItemsRef.current
-    const cardFlightOverlayCallbacks = cardFlightOverlayCallbacksRef.current
-    const cardFlightOverlayKeyByCardId = cardFlightOverlayKeyByCardIdRef.current
-    const overlayHiddenCardIds = flightOverlayHiddenCardIdsRef.current
-
-    return () => {
-      pendingCardFlightOverlays.forEach((pending) => {
-        clearTimeout(pending.timeoutId)
-      })
-      pendingCardFlightOverlays.clear()
-      overlayItems.clear()
-      cardFlightOverlayCallbacks.clear()
-      cardFlightOverlayKeyByCardId.clear()
-      overlayHiddenCardIds.clear()
-    }
-  }, [])
 
   // Synchronizes the board-locked flag between refs and React state.
   const updateBoardLocked = useCallback((locked: boolean) => {
@@ -663,180 +361,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     []
   )
 
-  // Provides the flight controller with a stable resolver for fetching selection card IDs.
-  const resolveSelectionCardIds = useCallback(
-    (selection?: Selection | null) =>
-      collectSelectionCardIds(stateRef.current, selection),
-    []
-  )
-
-  // Manages layout snapshot tracking for card-flight animations.
-  const {
-    cardFlights,
-    cardFlightMemoryRef,
-    registerSnapshot,
-    ensureReady: ensureCardFlightsReady,
-    reset: resetCardFlights,
-    dispatchWithFlight: dispatchWithFlightInternal,
-  } = useFlightController({
-    enabled: cardFlightsEnabled,
-    waitTimeoutMs: 160,
-    getSelectionCardIds: resolveSelectionCardIds,
-  })
-
-  const completeCardFlightOverlay = useCallback(
-    (key: string, options: { notifySettled?: boolean } = {}) => {
-      const item = cardFlightOverlayItemsRef.current.get(key)
-      if (!item) {
-        return
-      }
-
-      const notifySettled = options.notifySettled !== false
-      const currentKeyForCard = cardFlightOverlayKeyByCardIdRef.current.get(item.card.id)
-      if (currentKeyForCard === key) {
-        cardFlightOverlayKeyByCardIdRef.current.delete(item.card.id)
-        flightOverlayHiddenCardIdsRef.current.delete(item.card.id)
-      }
-
-      cardFlightOverlayItemsRef.current.delete(key)
-      const settledCallback = cardFlightOverlayCallbacksRef.current.get(key)
-      cardFlightOverlayCallbacksRef.current.delete(key)
-      if (!availableCardFlightOverlaySlotsRef.current.includes(item.slot)) {
-        availableCardFlightOverlaySlotsRef.current.push(item.slot)
-      }
-      publishCardFlightOverlayState()
-
-      if (notifySettled) {
-        settledCallback?.(item.card.id)
-      }
-    },
-    [publishCardFlightOverlayState]
-  )
-
-  const startCardFlightOverlay = useCallback(
-    ({
-      card,
-      from,
-      to,
-      onFlightSettled,
-    }: {
-      card: Card
-      from: CardFlightSnapshot
-      to: CardFlightSnapshot
-      onFlightSettled?: (cardId: string) => void
-    }) => {
-      const previousKey = cardFlightOverlayKeyByCardIdRef.current.get(card.id)
-      if (previousKey) {
-        completeCardFlightOverlay(previousKey, {
-          notifySettled: false,
-        })
-      }
-
-      const slot = availableCardFlightOverlaySlotsRef.current.shift()
-      if (slot === undefined) {
-        onFlightSettled?.(card.id)
-        return
-      }
-
-      cardFlightOverlaySequenceRef.current += 1
-      const key = `${card.id}:${cardFlightOverlaySequenceRef.current}`
-      const item: CardFlightOverlayItem = {
-        key,
-        slot,
-        card,
-        from,
-        to,
-        metrics: {
-          ...cardMetrics,
-          width: to.width,
-          height: to.height,
-        },
-      }
-
-      cardFlightOverlayItemsRef.current.set(key, item)
-      cardFlightOverlayCallbacksRef.current.set(key, onFlightSettled)
-      cardFlightOverlayKeyByCardIdRef.current.set(card.id, key)
-      flightOverlayHiddenCardIdsRef.current.add(card.id)
-      publishCardFlightOverlayState()
-    },
-    [cardMetrics, completeCardFlightOverlay, publishCardFlightOverlayState]
-  )
-
-  const queueCardFlightOverlays = useCallback(
-    (current: GameState, cardIds: string[], requestId: number) => {
-      if (!cardFlightsEnabledRef.current) {
-        return
-      }
-
-      ;[...new Set(cardIds.filter(Boolean))].forEach((cardId) => {
-        const from = cardFlightMemoryRef.current[cardId]
-        const card = findCardById(current, cardId)
-        if (!card || !isValidCardFlightSnapshot(from)) {
-          return
-        }
-
-        const existing = pendingCardFlightOverlaysRef.current.get(cardId)
-        if (existing) {
-          clearTimeout(existing.timeoutId)
-        }
-
-        const timeoutId = setTimeout(() => {
-          const pending = pendingCardFlightOverlaysRef.current.get(cardId)
-          if (!pending || pending.requestId !== requestId) {
-            return
-          }
-          pendingCardFlightOverlaysRef.current.delete(cardId)
-        }, TRANSIENT_CARD_ANIMATION_WINDOW_MS)
-
-        pendingCardFlightOverlaysRef.current.set(cardId, {
-          card,
-          from,
-          requestId,
-          timeoutId,
-        })
-      })
-    },
-    [cardFlightMemoryRef]
-  )
-
-  const handleCardMeasured = useCallback(
-    (
-      cardId: string,
-      snapshot: CardFlightSnapshot,
-      measuredCard?: Card,
-      onFlightSettled?: (cardId: string) => void
-    ) => {
-      registerSnapshot(cardId, snapshot)
-
-      const pending = pendingCardFlightOverlaysRef.current.get(cardId)
-      if (!pending) {
-        onFlightSettled?.(cardId)
-        return
-      }
-
-      pendingCardFlightOverlaysRef.current.delete(cardId)
-      clearTimeout(pending.timeoutId)
-
-      if (
-        !cardFlightsEnabledRef.current ||
-        !isValidCardFlightSnapshot(snapshot) ||
-        areCardFlightSnapshotsEquivalent(pending.from, snapshot)
-      ) {
-        onFlightSettled?.(cardId)
-        return
-      }
-
-      const card = measuredCard ?? findCardById(stateRef.current, cardId) ?? pending.card
-      startCardFlightOverlay({
-        card,
-        from: pending.from,
-        to: snapshot,
-        onFlightSettled,
-      })
-    },
-    [registerSnapshot, startCardFlightOverlay]
-  )
-
   // Hook: drive the Klondike timer lifecycle (start/pause/tick) away from the main component.
   useKlondikeTimer({ state, dispatch, stateRef })
 
@@ -855,7 +379,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const storageHydrated = useKlondikePersistence({
     state,
     dispatch,
-    resetCardFlights,
     previousHasWonRef,
     currentGameEntryIdRef,
     settingsHydrated,
@@ -943,11 +466,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const dealNewGame = useCallback(() => {
     const finishDeal = (nextState: GameState) => {
       dispatch({ type: 'HYDRATE_STATE', state: nextState })
-      setDealResetKey((current) => {
-        const next = current + 1
-        dealResetKeyRef.current = next
-        return next
-      })
+      setDealResetKey((current) => current + 1)
     }
 
     if (settingsHydrated && solvableGamesOnly) {
@@ -1115,7 +634,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     cardMetrics,
     foundationLayoutsRef,
     topRowLayoutRef,
-    ensureCardFlightsReady,
     updateBoardLocked,
     winCelebrationsRef,
     onWinVisualHandoffStart: flushPendingSolvedResultAfterHandoff,
@@ -1136,88 +654,28 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     }
   }, [])
 
-  // Dispatches game actions via the flight controller while respecting board locks.
-  const dispatchWithFlight = useCallback(
-    (action: GameAction, selection?: Selection | null) => {
+  // Absolute-card mode owns movement after reducer commits; dispatch no longer waits
+  // for pile-local card measurements or a fallback flight overlay.
+  const dispatchGameAction = useCallback(
+    (action: GameAction, _selection?: Selection | null) => {
       if (boardLockedRef.current) {
         return
       }
-      // PBI-14-4: Some actions (draw/undo) have no `Selection`; infer the affected card IDs for snapshot gating.
-      const current = stateRef.current
-      const inferredCardIds =
-        action.type === 'DRAW_OR_RECYCLE' && !selection
-          ? current.stock.length
-            ? [current.stock[current.stock.length - 1].id]
-            : []
-          : action.type === 'UNDO' && !selection
-            ? current.history.length
-              ? collectChangedCardIds(
-                  current,
-                  current.history[current.history.length - 1]
-                )
-              : []
-            : action.type === 'ADVANCE_AUTO_QUEUE' && !selection
-              ? (() => {
-                  const queued = current.autoQueue[0]
-                  if (!queued) {
-                    return []
-                  }
-                  if (queued.type === 'draw') {
-                    return current.stock.length
-                      ? [current.stock[current.stock.length - 1].id]
-                      : []
-                  }
-                  if (queued.type === 'recycle') {
-                    const topWaste = current.waste[current.waste.length - 1]
-                    return topWaste ? [topWaste.id] : []
-                  }
-                  return []
-                })()
-              : undefined
-
-      const trackedCardIds =
-        inferredCardIds ?? collectSelectionCardIds(current, selection)
-      flightRequestIdRef.current += 1
-      const flightRequestId = flightRequestIdRef.current
-      if (cardFlightsEnabledRef.current && !ABSOLUTE_CARD_LAYER_ENABLED) {
-        queueCardFlightOverlays(
-          current,
-          collectTransientAnimationCardIds(current, action, selection, trackedCardIds),
-          flightRequestId
-        )
-      }
-      const pendingValidationToken = getPendingActionValidationToken(current)
-      const pendingKey = getPendingActionKey(action, trackedCardIds)
-
-      if (ABSOLUTE_CARD_LAYER_ENABLED) {
-        dispatch(action)
-        return
-      }
-      dispatchWithFlightInternal({
-        action,
-        selection,
-        cardIds: trackedCardIds,
-        pendingKey,
-        canDispatch: () =>
-          getPendingActionValidationToken(stateRef.current) === pendingValidationToken,
-        dispatch,
-      })
+      dispatch(action)
     },
-    [dispatch, dispatchWithFlightInternal, queueCardFlightOverlays]
+    [dispatch]
   )
 
   const { handleLaunchDemoGame } = useDemoGameLauncher({
     stateRef,
     dispatch,
-    dispatchWithFlight,
+    dispatchGameAction,
     developerModeEnabled,
     setDeveloperMode,
     boardLockedRef,
     clearCelebrationDialogTimer,
     recordCurrentGameResult,
     setCelebrationState,
-    resetCardFlights,
-    clearAnimatedCardResidency,
     foundationLayoutsRef,
     topRowLayoutRef,
     winCelebrationsRef,
@@ -1449,8 +907,8 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       notifyInvalidMove()
       return
     }
-    dispatchWithFlight({ type: 'DRAW_OR_RECYCLE' })
-  }, [dispatchWithFlight, notifyInvalidMove])
+    dispatchGameAction({ type: 'DRAW_OR_RECYCLE' })
+  }, [dispatchGameAction, notifyInvalidMove])
 
   // Initiates an undo action when the board is unlocked and history exists.
   const handleUndo = useCallback(() => {
@@ -1459,8 +917,8 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       notifyInvalidMove()
       return
     }
-    dispatchWithFlight({ type: 'UNDO' })
-  }, [dispatchWithFlight, notifyInvalidMove])
+    dispatchGameAction({ type: 'UNDO' })
+  }, [dispatchGameAction, notifyInvalidMove])
 
   // Presents a confirmation dialog and seeds state for a newly dealt game.
   const requestNewGame = useCallback<RequestNewGameFn>(
@@ -1489,8 +947,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
             recordCurrentGameResult()
           }
           setCelebrationState(null)
-          resetCardFlights()
-          clearAnimatedCardResidency()
           foundationLayoutsRef.current = {}
           topRowLayoutRef.current = null
           winCelebrationsRef.current = 0
@@ -1512,10 +968,8 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     },
     [
       clearCelebrationDialogTimer,
-      clearAnimatedCardResidency,
       dealNewGame,
       recordCurrentGameResult,
-      resetCardFlights,
       setCelebrationState,
       updateBoardLocked,
     ]
@@ -1543,13 +997,13 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         return false
       }
 
-      dispatchWithFlight(
+      dispatchGameAction(
         { type: 'APPLY_MOVE', selection: resolved.selection, target: resolved.target },
         resolved.selection
       )
       return true
     },
-    [dispatchWithFlight, notifyInvalidMove]
+    [dispatchGameAction, notifyInvalidMove]
   )
 
   // Attempts to auto-move a selection and falls back to invalid feedback on failure.
@@ -1648,7 +1102,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         return
       }
       if (dropHints.foundations[suit]) {
-        dispatchWithFlight(
+        dispatchGameAction(
           {
             type: 'APPLY_MOVE',
             selection: state.selected,
@@ -1662,7 +1116,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     },
     [
       attemptAutoMove,
-      dispatchWithFlight,
+      dispatchGameAction,
       dropHints.foundations,
       notifyInvalidMove,
       state.foundations,
@@ -1687,14 +1141,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     handleUndo,
   })
 
-  // requirement 20-6: Scrubbing disables CardView layout tracking to prevent iOS cancels.
-  // That means card-flight snapshots can become stale; reset them when scrubbing begins to avoid wrong flights.
-  useEffect(() => {
-    if (Platform.OS === 'ios' && isScrubbing) {
-      resetCardFlights()
-    }
-  }, [isScrubbing, resetCardFlights])
-
   // Requirement PBI-13: persist state changes after hydration.
   useEffect(() => {
     if (state.autoCompleteRuns > autoCompleteRunsRef.current) {
@@ -1709,7 +1155,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Runs the auto-queue orchestrator so auto-complete advances at the configured cadence.
   useAutoQueueRunner({
     state,
-    dispatchWithFlight,
+    dispatchGameAction,
     moveDelayMs: AUTO_QUEUE_MOVE_DELAY_MS,
     intervalMs: AUTO_QUEUE_INTERVAL_MS,
   })
@@ -1723,42 +1169,21 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     cardMetrics,
     dropHints,
     notifyInvalidMove,
-    invalidWiggle: invalidWiggleEnabled ? invalidWiggle : EMPTY_INVALID_WIGGLE,
-    cardFlights,
-    flightOverlayHiddenCardIds,
-    animationResetKey: dealResetKey,
-    onCardMeasured: handleCardMeasured,
-    cardFlightMemory: cardFlightMemoryRef.current,
-    onFoundationCardFlightSettled: handleWinningCardFlightSettled,
     interactionsLocked: boardLocked,
-    // requirement 20-6: Reduce board churn during undo scrubbing (iOS gesture stability)
-    scrubbingActive: Platform.OS === 'ios' && isScrubbing,
-    hideFoundations: false,
     onTopRowLayout: handleTopRowLayout,
     onFoundationLayout: handleFoundationLayout,
     onStockLayout: handleStockLayout,
     onWasteLayout: handleWasteLayout,
     celebrationActive: Boolean(celebrationState),
     celebrationPending,
-    renderCardsInPlace: !ABSOLUTE_CARD_LAYER_ENABLED,
   }
 
   const tableauProps: TableauSectionProps = {
     state,
     cardMetrics,
     dropHints,
-    onAutoMove: attemptAutoMove,
-    invalidWiggle: invalidWiggleEnabled ? invalidWiggle : EMPTY_INVALID_WIGGLE,
-    cardFlights,
-    flightOverlayHiddenCardIds,
-    animationResetKey: dealResetKey,
-    onCardMeasured: handleCardMeasured,
-    cardFlightMemory: cardFlightMemoryRef.current,
     interactionsLocked: boardLocked,
-    // requirement 20-6: Reduce board churn during undo scrubbing (iOS gesture stability)
-    scrubbingActive: Platform.OS === 'ios' && isScrubbing,
     celebrationPending,
-    renderCardsInPlace: !ABSOLUTE_CARD_LAYER_ENABLED,
     onTableauRowLayout: handleTableauRowLayout,
     onTableauColumnLayout: handleTableauColumnLayout,
   }
@@ -1788,26 +1213,22 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     celebrationBindings,
     onCelebrationAbort: handleCelebrationAbort,
     undoScrubProps,
-    absoluteCardLayerProps: ABSOLUTE_CARD_LAYER_ENABLED
-      ? {
-          state,
-          cardMetrics,
-          layouts: absoluteCardLayerLayouts,
-          drawLabel,
-          invalidWiggle: invalidWiggleEnabled ? invalidWiggle : EMPTY_INVALID_WIGGLE,
-          animationResetKey: dealResetKey,
-          interactionsLocked: boardLocked,
-          celebrationActive: Boolean(celebrationState),
-          onDraw: handleDraw,
-          onWasteTap: handleWasteTap,
-          onFoundationPress: handleFoundationPress,
-          onTableauCardPress: (columnIndex, cardIndex) =>
-            attemptAutoMove({ source: 'tableau', columnIndex, cardIndex }),
-          onCardSettled: handleWinningCardFlightSettled,
-        }
-      : null,
-    cardFlightOverlayItems,
-    onCardFlightOverlayComplete: completeCardFlightOverlay,
+    absoluteCardLayerProps: {
+      state,
+      cardMetrics,
+      layouts: absoluteCardLayerLayouts,
+      drawLabel,
+      invalidWiggle: invalidWiggleEnabled ? invalidWiggle : EMPTY_INVALID_WIGGLE,
+      animationResetKey: dealResetKey,
+      interactionsLocked: boardLocked,
+      celebrationActive: Boolean(celebrationState),
+      onDraw: handleDraw,
+      onWasteTap: handleWasteTap,
+      onFoundationPress: handleFoundationPress,
+      onTableauCardPress: (columnIndex, cardIndex) =>
+        attemptAutoMove({ source: 'tableau', columnIndex, cardIndex }),
+      onCardSettled: handleWinningCardFlightSettled,
+    },
   }
 
   return {

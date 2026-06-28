@@ -1,6 +1,5 @@
 import type { SharedValue } from 'react-native-reanimated'
 
-import type { CardFlightSnapshot } from '../../animation/flightController'
 import type { CelebrationAssignment } from '../../animation/celebrationModes'
 import type { getDropHints } from '../../solitaire/klondike'
 
@@ -20,8 +19,6 @@ export const EMPTY_INVALID_WIGGLE: InvalidWiggleConfig = {
   key: 0,
   lookup: new Set<string>(),
 }
-
-export type CardFlightRegistry = SharedValue<Record<string, CardFlightSnapshot>>
 
 export type CelebrationBindings = {
   active: SharedValue<number>
