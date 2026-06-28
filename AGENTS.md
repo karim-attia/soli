@@ -56,6 +56,8 @@ Fill in the following sections:
 
 # Testing
 
+Context: I am Karim and I code this app. I regularly run AI agents (you) to get a change done. Since you often run for 30min+, I do something else meantime, either on the laptop or away from the computer. The goal of this is that you can run independently for as long as possible without needing to be present. If you can test/verify things yourself and interate/fix without needing my input, this drastically speeds up the process compared to when I quickly test something and then start a prompt again. However, there's also the trade-off: Getting lost in testing loops wastes both time and tokens. Please decide sensibly how to approach this. For example, in the past, you have tested animations via recording a video and analyzing it frame by frame. This was a bit overkill. It took an hour and burned through my usage limits. Quickly asking me if the animation looks good would have made sense here. However, quickly running a build and doing a smoke test makes sense in most (not all!) cases.
+
 Test everything you do in a real environment (when it makes sense!). In order to save context, always use sub-agents to test. Use GPT 5.5 medium reasoning for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Give the .md file (updated!) to the sub-agent for context. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
 
 Native: Use agent-device skill
