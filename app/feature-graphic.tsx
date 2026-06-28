@@ -6,7 +6,7 @@ import { purple } from '@tamagui/colors/legacy'
 
 import type { Card, Rank, Suit } from '../src/solitaire/klondike'
 import type { CardMetrics } from '../src/features/klondike/types'
-import { CardVisual } from '../src/features/klondike/components/cards/CardView'
+import { CardVisual } from '../src/features/klondike/components/cards/CardVisual'
 import { FeltBackground } from '../src/features/klondike/components/FeltBackground'
 import {
   BASE_STACK_OFFSET,

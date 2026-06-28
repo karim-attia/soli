@@ -21,7 +21,7 @@ import {
 } from '../../../data/demoAutoSolvePlaylist'
 import { devLog } from '../../../utils/devLogger'
 
-type DispatchGameActionFn = (action: GameAction, selection?: Selection | null) => void
+type DispatchGameActionFn = (action: GameAction) => void
 export type DemoLaunchMode = 'old' | 'single' | 'playlist'
 
 type UseDemoGameLauncherOptions = {
@@ -293,7 +293,7 @@ export const useDemoGameLauncher = ({
           return
         }
 
-        dispatchGameAction(applyHistoryPreference(resolved.action), resolved.selection)
+        dispatchGameAction(applyHistoryPreference(resolved.action))
         waitForPlaylistState({
           runId,
           description: `Game ${gameIndex + 1} step ${moveIndex + 1}`,
@@ -324,10 +324,7 @@ export const useDemoGameLauncher = ({
                   )
                   return
                 }
-                dispatchGameAction(
-                  applyHistoryPreference(replayResolved.action),
-                  replayResolved.selection
-                )
+                dispatchGameAction(applyHistoryPreference(replayResolved.action))
                 waitForPlaylistState({
                   runId,
                   description: `Game ${gameIndex + 1} replay after undo ${moveIndex + 1}`,
@@ -379,15 +376,12 @@ export const useDemoGameLauncher = ({
               columnIndex,
               cardIndex: topCardIndex,
             }
-            dispatchGameAction(
-              {
-                type: 'APPLY_MOVE',
-                selection,
-                target: { type: 'foundation', suit },
-                recordHistory: false,
-              },
-              selection
-            )
+            dispatchGameAction({
+              type: 'APPLY_MOVE',
+              selection,
+              target: { type: 'foundation', suit },
+              recordHistory: false,
+            })
           })
         }
       }
@@ -414,15 +408,12 @@ export const useDemoGameLauncher = ({
               dispatchGameAction({ type: 'DRAW_OR_RECYCLE' })
             })
             steps.push(() => {
-              dispatchGameAction(
-                {
-                  type: 'APPLY_MOVE',
-                  selection: { source: 'waste' },
-                  target: { type: 'foundation', suit },
-                  recordHistory: false,
-                },
-                { source: 'waste' }
-              )
+              dispatchGameAction({
+                type: 'APPLY_MOVE',
+                selection: { source: 'waste' },
+                target: { type: 'foundation', suit },
+                recordHistory: false,
+              })
             })
           }
         }

@@ -12,7 +12,6 @@ import {
 import {
   CELEBRATION_DURATION_MS,
   CELEBRATION_MODE_COUNT,
-  type CelebrationAssignment,
   getCelebrationModeMetadata,
 } from '../../../animation/celebrationModes'
 import { FOUNDATION_SUIT_ORDER } from '../../../solitaire/klondike'
@@ -107,7 +106,6 @@ export const useCelebrationController = ({
 }: UseCelebrationControllerParams) => {
   const [celebrationState, setCelebrationState] = useState<CelebrationState | null>(null)
   const [celebrationPending, setCelebrationPending] = useState(false)
-  const celebrationAssignments = useSharedValue<Record<string, CelebrationAssignment>>({})
   const celebrationProgress = useSharedValue(0)
   const celebrationActive = useSharedValue(0)
   const celebrationMode = useSharedValue(0)
@@ -136,14 +134,12 @@ export const useCelebrationController = ({
     () => ({
       active: celebrationActive,
       progress: celebrationProgress,
-      assignments: celebrationAssignments,
       mode: celebrationMode,
       board: celebrationBoard,
       total: celebrationTotal,
     }),
     [
       celebrationActive,
-      celebrationAssignments,
       celebrationBoard,
       celebrationMode,
       celebrationProgress,
@@ -310,7 +306,6 @@ export const useCelebrationController = ({
     pendingWinningCardIdRef.current = null
     pendingWinningCardSettledRef.current = false
     setCelebrationPending(false)
-    celebrationAssignments.value = {}
     celebrationTotal.value = 0
     celebrationMode.value = 0
     celebrationBoard.value = { width: 0, height: 0 }
@@ -324,7 +319,6 @@ export const useCelebrationController = ({
     clearCelebrationDialogTimer()
   }, [
     celebrationActive,
-    celebrationAssignments,
     celebrationBoard,
     celebrationMode,
     celebrationProgress,
@@ -434,19 +428,6 @@ export const useCelebrationController = ({
     celebrationDialogShownRef.current = false
     clearCelebrationDialogTimer()
 
-    const assignmentMap: Record<string, CelebrationAssignment> = {}
-    celebrationState.cards.forEach((config, index) => {
-      assignmentMap[config.card.id] = {
-        baseX: config.baseX,
-        baseY: config.baseY,
-        stackIndex: config.stackIndex,
-        suitIndex: config.suitIndex,
-        randomSeed: config.randomSeed,
-        index,
-      }
-    })
-
-    celebrationAssignments.value = assignmentMap
     celebrationTotal.value = celebrationState.cards.length
     celebrationMode.value = celebrationState.modeId
     celebrationBoard.value = {
@@ -490,7 +471,6 @@ export const useCelebrationController = ({
     }
   }, [
     celebrationActive,
-    celebrationAssignments,
     celebrationBoard,
     celebrationMode,
     celebrationProgress,

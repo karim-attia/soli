@@ -1,6 +1,5 @@
 import type { SharedValue } from 'react-native-reanimated'
 
-import type { CelebrationAssignment } from '../../animation/celebrationModes'
 import type { getDropHints } from '../../solitaire/klondike'
 
 export type CardMetrics = {
@@ -23,7 +22,6 @@ export const EMPTY_INVALID_WIGGLE: InvalidWiggleConfig = {
 export type CelebrationBindings = {
   active: SharedValue<number>
   progress: SharedValue<number>
-  assignments: SharedValue<Record<string, CelebrationAssignment>>
   mode: SharedValue<number>
   board: SharedValue<{ width: number; height: number }>
   total: SharedValue<number>

@@ -1,10 +1,10 @@
 import { useEffect } from 'react'
 
-import type { GameAction, GameState, Selection } from '../../../solitaire/klondike'
+import type { GameAction, GameState } from '../../../solitaire/klondike'
 
 export type AutoQueueRunnerParams = {
   state: GameState
-  dispatchGameAction: (action: GameAction, selection?: Selection | null) => void
+  dispatchGameAction: (action: GameAction) => void
   moveDelayMs: number
   intervalMs: number
 }
@@ -27,10 +27,9 @@ export const useAutoQueueRunner = ({
     }
 
     const delay = nextAction.type === 'move' ? moveDelayMs : intervalMs
-    const selection = nextAction.type === 'move' ? (nextAction.selection ?? null) : null
 
     const timeoutId = setTimeout(() => {
-      dispatchGameAction({ type: 'ADVANCE_AUTO_QUEUE' }, selection)
+      dispatchGameAction({ type: 'ADVANCE_AUTO_QUEUE' })
     }, delay)
 
     return () => {

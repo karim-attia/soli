@@ -12,7 +12,7 @@ import {
   COLOR_COLUMN_SELECTED,
   COLOR_DROP_BORDER,
 } from '../../constants'
-import { EmptySlot } from './CardView'
+import { EmptySlot } from './CardVisual'
 import { styles } from './styles'
 
 const FACE_DOWN_STACK_OFFSET_DIVISOR = 2

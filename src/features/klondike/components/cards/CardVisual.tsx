@@ -1,8 +1,12 @@
-import React from 'react'
-import { Pressable, View } from 'react-native'
+import React, { useEffect, useRef } from 'react'
+import {
+  Animated as NativeAnimated,
+  Easing as NativeEasing,
+  Pressable,
+  View,
+} from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
 import { Text } from 'tamagui'
-import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated'
 import { RefreshCcw } from '@tamagui/lucide-icons-2'
 
 import type { Card } from '../../../../solitaire/klondike'
@@ -14,7 +18,7 @@ import {
   COLOR_DROP_BORDER,
   SUIT_COLORS,
   SUIT_SYMBOLS,
-  WIN_CLEANUP_OUTLINE_FADE_TIMING,
+  WIN_CLEANUP_OUTLINE_FADE_DURATION_MS,
 } from '../../constants'
 import type { CardMetrics } from '../../types'
 import {
@@ -190,24 +194,35 @@ export const EmptySlot = ({
   hidden?: boolean
   metrics: CardMetrics
 }) => {
-  const animatedStyle = useAnimatedStyle(
-    () => ({
-      opacity: withTiming(hidden ? 0 : 1, WIN_CLEANUP_OUTLINE_FADE_TIMING),
-      transform: [
-        {
-          scale: withTiming(hidden ? 0.985 : 1, WIN_CLEANUP_OUTLINE_FADE_TIMING),
-        },
-      ],
-    }),
-    [hidden]
-  )
+  const opacity = useRef(new NativeAnimated.Value(hidden ? 0 : 1)).current
+  const scale = useRef(new NativeAnimated.Value(hidden ? 0.985 : 1)).current
+
+  useEffect(() => {
+    NativeAnimated.parallel([
+      NativeAnimated.timing(opacity, {
+        toValue: hidden ? 0 : 1,
+        duration: WIN_CLEANUP_OUTLINE_FADE_DURATION_MS,
+        easing: NativeEasing.bezier(0.2, 0, 0.2, 1),
+        useNativeDriver: true,
+      }),
+      NativeAnimated.timing(scale, {
+        toValue: hidden ? 0.985 : 1,
+        duration: WIN_CLEANUP_OUTLINE_FADE_DURATION_MS,
+        easing: NativeEasing.bezier(0.2, 0, 0.2, 1),
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }, [hidden, opacity, scale])
 
   return (
-    <Animated.View
+    <NativeAnimated.View
       pointerEvents="none"
       style={[
         styles.emptySlot,
-        animatedStyle,
+        {
+          opacity,
+          transform: [{ scale }],
+        },
         {
           width: metrics.width,
           height: metrics.height,
@@ -217,6 +232,6 @@ export const EmptySlot = ({
       ]}
     >
       {!!label && <Text style={styles.emptyLabel}>{label}</Text>}
-    </Animated.View>
+    </NativeAnimated.View>
   )
 }

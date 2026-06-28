@@ -19,7 +19,7 @@ import {
   WIGGLE_SEGMENT_DURATION_MS,
 } from '../../constants'
 import type { CardMetrics, InvalidWiggleConfig } from '../../types'
-import { CardBack, CardVisual } from './CardView'
+import { CardBack, CardVisual } from './CardVisual'
 import { styles as cardStyles } from './styles'
 
 const FACE_DOWN_STACK_OFFSET_DIVISOR = 2

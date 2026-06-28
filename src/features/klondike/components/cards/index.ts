@@ -1,5 +1,5 @@
 export { TopRow } from './TopRow'
 export { TableauSection } from './TableauSection'
 export { CelebrationTouchBlocker } from './CelebrationTouchBlocker'
-export { CardVisual } from './CardView'
+export { CardVisual } from './CardVisual'
 export { rankToLabel } from './utils'

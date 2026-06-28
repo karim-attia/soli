@@ -11,7 +11,7 @@ import {
 import type { Card } from '../../../../solitaire/klondike'
 import type { CelebrationState } from '../../hooks/useCelebrationController'
 import type { CardMetrics, CelebrationBindings } from '../../types'
-import { CardVisual } from './CardView'
+import { CardVisual } from './CardVisual'
 
 export const CELEBRATION_OVERLAY_SLOT_COUNT = 52
 

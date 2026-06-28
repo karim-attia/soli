@@ -7,7 +7,7 @@ import { styles } from './styles'
 
 export type PileButtonProps = PropsWithChildren<{
   label: string
-  onPress: () => void
+  onPress?: () => void
   disabled?: boolean
   disablePress?: boolean
   width?: number

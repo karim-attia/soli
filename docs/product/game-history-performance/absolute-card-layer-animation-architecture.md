@@ -38,6 +38,10 @@ Hey, I have one more optimization. There's usually three open-faced cards from t
 absolute layer is accepted as permanent. fully clean up.
 ```
 
+```text
+Implement top row with plumbing. Implement dispatch game action recommendation. Implement card view naming. The simple reanimated fade. The, like the fade, opacity scale, I think that's good that this happens. Please explain this in a few sentences what this does, but also please implement your recommendation after that. Like I kind of think I understand, but I don't fully, so please give me a few sentences so that I can read up on it afterwards. I agree with keeping, with doing the other stuff later. Also do the celebration cleanup, please. I agree with that one. And for the UI thread animations, please give me more details. I don't fully understand what's going on here. Please explain first in simple terms and kind of in which part of the code we would do what. Yes, please. Thank you.
+```
+
 ## Description
 
 Try the option 3 animation architecture: render cards from one board-level absolute layer instead of letting each pile own its moving card views. Piles should provide target geometry and non-card UI; the card layer owns card visuals, hit targets, and motion. The first pass should be small enough to test quickly while moving the code toward the final architecture.
@@ -184,6 +188,8 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - [completed] Remove legacy card-flight props from pile component boundaries.
 - [completed] Delete unused flight overlay/controller files.
 - [completed] Run focused static checks after cleanup.
+- [completed] Remove remaining post-absolute-layer cleanup residue: unused top-row waste press plumbing, unused dispatch selection arg, stale `CardView` naming, Reanimated-only simple fades, and unused celebration assignment shared value.
+- [completed] Run focused static checks after cleanup-residue removal.
 
 ## Plan: Files to modify
 
@@ -200,7 +206,7 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - `src/features/klondike/components/cards/TopRow.tsx`
 - `src/features/klondike/components/cards/AbsoluteCardLayer.tsx`
 - `src/features/klondike/hooks/useKlondikeGame.ts`
-- `src/features/klondike/components/cards/CardView.tsx`
+- `src/features/klondike/components/cards/CardVisual.tsx`
 - `src/features/klondike/components/cards/animations.ts`
 - `src/features/klondike/components/cards/CardFlightOverlayLayer.tsx`
 - `src/animation/flightController.ts`
@@ -217,7 +223,7 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - `src/features/klondike/components/cards/WasteFan.tsx`
 - `src/features/klondike/components/cards/FoundationPile.tsx`
 - `src/features/klondike/components/cards/TopRow.tsx`
-- `src/features/klondike/components/cards/CardView.tsx`
+- `src/features/klondike/components/cards/CardVisual.tsx`
 - `src/features/klondike/components/cards/animations.ts`
 - `src/features/klondike/hooks/useAutoQueueRunner.ts`
 - `src/features/klondike/hooks/useCelebrationController.ts`
@@ -226,6 +232,7 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - `src/features/klondike/types.ts`
 - `src/features/klondike/components/cards/CardFlightOverlayLayer.tsx` deleted
 - `src/animation/flightController.ts` deleted
+- `src/features/klondike/components/cards/CardVisual.tsx`
 
 ## Intermediary learnings
 
@@ -263,6 +270,9 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - Detailed 40-game `dumpsys meminfo` reported `968` Android `Views`, `1` `ViewRootImpl`, `1` `Activity`, and `0` `WebViews`. Screenshot `/Users/karim/kDrive/Code/soli/tmp/android-smoke/after-40-games-memory-check.png` showed normal gameplay rather than an active celebration, so the elevated view count is worth tracking separately.
 - Once the absolute layer was accepted as permanent, the old `CardFlightOverlayLayer`, `useFlightController`, `StockStack`, `WasteFan`, pile-local `CardView`, and card-flight snapshot props became dead architecture. Removing them simplified normal gameplay to one card owner: structural piles publish geometry and `AbsoluteCardLayer` renders/taps/animates cards.
 - The cleanup removed about 2,270 lines from the production diff while preserving the reducer/state APIs used by demo replay, auto-queue, timer, and persistence.
+- Post-acceptance cleanup found two stale concepts from earlier architecture attempts: `dispatchGameAction` still accepted an ignored selection snapshot, and celebration bindings still carried an assignments shared value even though overlay slots now receive assignments as React props.
+- Simple empty-slot/win-cleanup fades are still useful because they prevent structural outlines from snapping away during the win handoff, but they do not need Reanimated worklets; React Native `Animated` with the native driver can handle opacity/scale without adding Reanimated residency.
+- Renaming `CardView.tsx` to `CardVisual.tsx` aligns the file with the permanent architecture: card visuals are primitives now, while animation ownership lives in the absolute gameplay layer and celebration overlay.
 
 ## Identified issues
 
@@ -287,6 +297,7 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - `yarn lint` passed after the duplicate-stock-target and first-render pressability fixes.
 - `yarn typecheck` passed after the duplicate-stock-target and first-render pressability fixes.
 - [fixed] Permanent absolute-layer cleanup removed the old fallback card-flight overlay and dispatch snapshot gate.
+- [fixed] Removed cleanup residue left after accepting the absolute card layer.
 
 ## Testing
 
@@ -312,3 +323,5 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - Cleanup-path whitespace validation passed: `git diff --check -- docs/product/game-history-performance/absolute-card-layer-animation-architecture.md src/animation src/features/klondike`.
 - Full `git diff --check` is blocked by unrelated trailing whitespace in modified `AGENTS.md`.
 - Android release validation attempted with `yarn release`, but Expo timed out waiting for `Pixel_9_API_36`; `adb devices -l` showed `emulator-5554 offline`, and `agent-device devices --platform android` found no usable Android target. The stuck emulator process was stopped.
+- Cleanup-residue validation on 2026-06-29: `yarn format:check`, `yarn typecheck`, `yarn lint`, `yarn jest --runInBand`, and focused `git diff --check -- app/feature-graphic.tsx docs/product/game-history-performance/absolute-card-layer-animation-architecture.md src/features/klondike src/animation` passed.
+- Android release/device smoke was not run on 2026-06-29 because `adb devices -l` and `agent-device devices --platform android` listed no connected Android target.

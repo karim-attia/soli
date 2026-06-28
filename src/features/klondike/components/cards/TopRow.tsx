@@ -1,24 +1,23 @@
-import React, { useCallback, type PropsWithChildren } from 'react'
+import React, { useCallback, useEffect, useRef, type PropsWithChildren } from 'react'
+import { Animated as NativeAnimated, Easing as NativeEasing } from 'react-native'
 import type { LayoutChangeEvent, LayoutRectangle } from 'react-native'
-import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated'
 import { View, XStack } from 'tamagui'
 
 import {
   FOUNDATION_SUIT_ORDER,
   TABLEAU_COLUMN_COUNT,
   type GameState,
-  type Selection,
   type Suit,
 } from '../../../../solitaire/klondike'
 import type { CardMetrics, DropHints } from '../../types'
-import { EmptySlot, CardBack } from './CardView'
+import { EmptySlot, CardBack } from './CardVisual'
 import { PileButton } from './PileButton'
 import { FoundationPile } from './FoundationPile'
 import { styles as cardStyles } from './styles'
 import {
   BOARD_COLUMN_GAP,
   BOARD_COLUMN_MARGIN,
-  WIN_CLEANUP_OUTLINE_FADE_TIMING,
+  WIN_CLEANUP_OUTLINE_FADE_DURATION_MS,
 } from '../../constants'
 
 const WinCleanupPile = ({
@@ -27,18 +26,22 @@ const WinCleanupPile = ({
 }: PropsWithChildren<{
   hidden: boolean
 }>) => {
-  const animatedStyle = useAnimatedStyle(
-    () => ({
-      opacity: withTiming(hidden ? 0 : 1, WIN_CLEANUP_OUTLINE_FADE_TIMING),
-    }),
-    [hidden]
-  )
+  const opacity = useRef(new NativeAnimated.Value(hidden ? 0 : 1)).current
+
+  useEffect(() => {
+    NativeAnimated.timing(opacity, {
+      toValue: hidden ? 0 : 1,
+      duration: WIN_CLEANUP_OUTLINE_FADE_DURATION_MS,
+      easing: NativeEasing.bezier(0.2, 0, 0.2, 1),
+      useNativeDriver: true,
+    }).start()
+  }, [hidden, opacity])
 
   // Opacity keeps the pile and slot mounted so win cleanup cannot disturb board geometry or measurements.
   return (
-    <Animated.View style={[animatedStyle, { pointerEvents: hidden ? 'none' : 'auto' }]}>
+    <NativeAnimated.View pointerEvents={hidden ? 'none' : 'auto'} style={{ opacity }}>
       {children}
-    </Animated.View>
+    </NativeAnimated.View>
   )
 }
 
@@ -46,11 +49,9 @@ export type TopRowProps = {
   state: GameState
   drawLabel: string
   onDraw: () => void
-  onWasteTap: () => void
   onFoundationPress: (suit: Suit) => void
   cardMetrics: CardMetrics
   dropHints: DropHints
-  notifyInvalidMove: (options?: { selection?: Selection | null }) => void
   onFoundationArrival?: (cardId: string | null | undefined) => void
   interactionsLocked: boolean
   onTopRowLayout?: (layout: LayoutRectangle) => void
@@ -65,11 +66,9 @@ export const TopRow = ({
   state,
   drawLabel,
   onDraw,
-  onWasteTap,
   onFoundationPress,
   cardMetrics,
   dropHints,
-  notifyInvalidMove,
   onFoundationArrival,
   interactionsLocked,
   onTopRowLayout,
@@ -102,17 +101,6 @@ export const TopRow = ({
       : 'empty'
   // Task 28-2: Keep the board stable until the final winning card finishes settling.
   const showWinCleanup = state.hasWon && !celebrationPending
-
-  const handleWastePress = useCallback(() => {
-    if (interactionsLocked) {
-      return
-    }
-    if (!state.waste.length) {
-      notifyInvalidMove()
-      return
-    }
-    onWasteTap()
-  }, [interactionsLocked, notifyInvalidMove, onWasteTap, state.waste.length])
 
   const wasteColumnIndex = TABLEAU_COLUMN_COUNT - 2
   const stockColumnIndex = TABLEAU_COLUMN_COUNT - 1
@@ -172,7 +160,6 @@ export const TopRow = ({
               <WinCleanupPile hidden={showWinCleanup}>
                 <PileButton
                   label={`${state.waste.length}`}
-                  onPress={handleWastePress}
                   disabled={!state.waste.length || interactionsLocked}
                   disablePress
                   width={cardMetrics.width}

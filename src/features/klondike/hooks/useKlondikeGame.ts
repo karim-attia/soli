@@ -657,7 +657,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Absolute-card mode owns movement after reducer commits; dispatch no longer waits
   // for pile-local card measurements or a fallback flight overlay.
   const dispatchGameAction = useCallback(
-    (action: GameAction, _selection?: Selection | null) => {
+    (action: GameAction) => {
       if (boardLockedRef.current) {
         return
       }
@@ -997,10 +997,11 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         return false
       }
 
-      dispatchGameAction(
-        { type: 'APPLY_MOVE', selection: resolved.selection, target: resolved.target },
-        resolved.selection
-      )
+      dispatchGameAction({
+        type: 'APPLY_MOVE',
+        selection: resolved.selection,
+        target: resolved.target,
+      })
       return true
     },
     [dispatchGameAction, notifyInvalidMove]
@@ -1102,14 +1103,11 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         return
       }
       if (dropHints.foundations[suit]) {
-        dispatchGameAction(
-          {
-            type: 'APPLY_MOVE',
-            selection: state.selected,
-            target: { type: 'foundation', suit },
-          },
-          state.selected
-        )
+        dispatchGameAction({
+          type: 'APPLY_MOVE',
+          selection: state.selected,
+          target: { type: 'foundation', suit },
+        })
       } else {
         notifyInvalidMove({ selection: state.selected })
       }
@@ -1164,11 +1162,9 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     state,
     drawLabel,
     onDraw: handleDraw,
-    onWasteTap: handleWasteTap,
     onFoundationPress: handleFoundationPress,
     cardMetrics,
     dropHints,
-    notifyInvalidMove,
     interactionsLocked: boardLocked,
     onTopRowLayout: handleTopRowLayout,
     onFoundationLayout: handleFoundationLayout,
