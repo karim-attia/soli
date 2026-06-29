@@ -249,20 +249,32 @@ EOF
   fi
 }
 
-collect_existing_serial() {
+collect_existing_physical_serial() {
   local adb_bin="$1"
   local line=""
+  local serial=""
   local first_device_serial=""
   while IFS= read -r line; do
     [[ -z "${line}" || "${line}" == List* ]] && continue
 
-    if [[ "${line}" =~ ^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+)[[:space:]]+device\b ]]; then
-      echo "${BASH_REMATCH[1]}"
+    if [[ ! "${line}" =~ ^([^[:space:]]+)[[:space:]]+device([[:space:]]|$) ]]; then
+      continue
+    fi
+
+    serial="${BASH_REMATCH[1]}"
+    # Release QA is physical-device-only. Ignoring emulator transports here prevents
+    # Expo from making an emulator install look like successful phone validation.
+    if [[ "${serial}" == emulator-* ]]; then
+      continue
+    fi
+
+    if [[ "${serial}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]]; then
+      echo "${serial}"
       return 0
     fi
 
-    if [[ -z "${first_device_serial}" && "${line}" =~ ^([^[:space:]]+)[[:space:]]+device\b ]]; then
-      first_device_serial="${BASH_REMATCH[1]}"
+    if [[ -z "${first_device_serial}" ]]; then
+      first_device_serial="${serial}"
     fi
   done < <("${adb_bin}" devices -l 2>/dev/null || true)
 
@@ -390,7 +402,7 @@ discover_adb_targets() {
   DISCOVERED_STABLE_SERIAL=""
 
   if [[ -z "${requested_target}" ]]; then
-    stable_serial="$(collect_existing_serial "${adb_bin}" || true)"
+    stable_serial="$(collect_existing_physical_serial "${adb_bin}" || true)"
     if [[ -n "${stable_serial}" ]]; then
       DISCOVERED_STABLE_SERIAL="${stable_serial}"
       return 0
@@ -442,6 +454,22 @@ connect_candidates() {
   return 1
 }
 
+warn_if_short_screen_timeout() {
+  local adb_bin="$1"
+  local serial="$2"
+  local timeout_ms=""
+
+  timeout_ms="$("${adb_bin}" -s "${serial}" shell settings get system screen_off_timeout 2>/dev/null | tr -d '\r\n' || true)"
+  if [[ ! "${timeout_ms}" =~ ^[0-9]+$ || "${timeout_ms}" -gt 30000 ]]; then
+    return 0
+  fi
+
+  # Keep this guidance contextual: agents only need it when a short timeout can interrupt
+  # physical-device testing, rather than in the repository-wide AGENTS.md instructions.
+  echo "Testing agent warning: the physical device screen timeout is ${timeout_ms} ms (30 seconds or less)." >&2
+  printf "Testing agent: before testing, run: %q -s %q shell settings put system screen_off_timeout 150000\n" "${adb_bin}" "${serial}" >&2
+}
+
 main() {
   cd "${ROOT_DIR}"
   load_env_file
@@ -487,9 +515,13 @@ main() {
   if [[ -n "${stable_serial}" ]]; then
     export ANDROID_SERIAL="${stable_serial}"
   else
-    echo "Warning: could not establish a stable Wi-Fi adb serial; continuing with Expo device detection." >&2
+    echo "Error: no physical Android device is connected." >&2
+    echo "The release script will not fall back to an emulator." >&2
+    echo "Testing agent: ask Karim to enable Wireless debugging, wait for his response, then rerun yarn release and continue the original task." >&2
+    exit 1
   fi
 
+  warn_if_short_screen_timeout "${adb_bin}" "${stable_serial}"
   "${EXPO_RELEASE_COMMAND[@]}"
 }
 
