@@ -12,11 +12,11 @@ import {
 import { useAnimationToggles } from '../../../../state/settings'
 import {
   CARD_FLIGHT_TIMING,
-  CARD_FLIP_HALF_DURATION_MS,
+  CARD_FLIP_HALF_TIMING,
   WASTE_FAN_MAX_OFFSET,
   WASTE_FAN_OVERLAP_RATIO,
   WIGGLE_OFFSET_PX,
-  WIGGLE_SEGMENT_DURATION_MS,
+  WIGGLE_TIMING_CONFIG,
 } from '../../constants'
 import type { CardMetrics, InvalidWiggleConfig } from '../../types'
 import { CardBack, CardVisual } from './CardVisual'
@@ -404,12 +404,12 @@ const AbsoluteLayerCard = React.memo(
       NativeAnimated.parallel([
         NativeAnimated.timing(translateX, {
           toValue: item.x,
-          duration: CARD_FLIGHT_TIMING.duration,
+          ...CARD_FLIGHT_TIMING,
           useNativeDriver: true,
         }),
         NativeAnimated.timing(translateY, {
           toValue: item.y,
-          duration: CARD_FLIGHT_TIMING.duration,
+          ...CARD_FLIGHT_TIMING,
           useNativeDriver: true,
         }),
       ]).start(({ finished }) => {
@@ -446,7 +446,7 @@ const AbsoluteLayerCard = React.memo(
       flipScale.stopAnimation()
       NativeAnimated.timing(flipScale, {
         toValue: 0,
-        duration: CARD_FLIP_HALF_DURATION_MS,
+        ...CARD_FLIP_HALF_TIMING,
         useNativeDriver: true,
       }).start(({ finished }) => {
         if (!finished) {
@@ -456,7 +456,7 @@ const AbsoluteLayerCard = React.memo(
         setRenderFaceUp(item.card.faceUp)
         NativeAnimated.timing(flipScale, {
           toValue: 1,
-          duration: CARD_FLIP_HALF_DURATION_MS,
+          ...CARD_FLIP_HALF_TIMING,
           useNativeDriver: true,
         }).start()
       })
@@ -476,17 +476,17 @@ const AbsoluteLayerCard = React.memo(
       NativeAnimated.sequence([
         NativeAnimated.timing(wiggle, {
           toValue: -ABSOLUTE_LAYER_WIGGLE_OFFSET_PX,
-          duration: WIGGLE_SEGMENT_DURATION_MS,
+          ...WIGGLE_TIMING_CONFIG,
           useNativeDriver: true,
         }),
         NativeAnimated.timing(wiggle, {
           toValue: ABSOLUTE_LAYER_WIGGLE_OFFSET_PX,
-          duration: WIGGLE_SEGMENT_DURATION_MS,
+          ...WIGGLE_TIMING_CONFIG,
           useNativeDriver: true,
         }),
         NativeAnimated.timing(wiggle, {
           toValue: 0,
-          duration: WIGGLE_SEGMENT_DURATION_MS,
+          ...WIGGLE_TIMING_CONFIG,
           useNativeDriver: true,
         }),
       ]).start()

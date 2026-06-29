@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, type PropsWithChildren } from 'react'
-import { Animated as NativeAnimated, Easing as NativeEasing } from 'react-native'
+import { Animated as NativeAnimated } from 'react-native'
 import type { LayoutChangeEvent, LayoutRectangle } from 'react-native'
 import { View, XStack } from 'tamagui'
 
@@ -17,7 +17,7 @@ import { styles as cardStyles } from './styles'
 import {
   BOARD_COLUMN_GAP,
   BOARD_COLUMN_MARGIN,
-  WIN_CLEANUP_OUTLINE_FADE_DURATION_MS,
+  WIN_CLEANUP_OUTLINE_FADE_TIMING,
 } from '../../constants'
 
 const WinCleanupPile = ({
@@ -31,8 +31,7 @@ const WinCleanupPile = ({
   useEffect(() => {
     NativeAnimated.timing(opacity, {
       toValue: hidden ? 0 : 1,
-      duration: WIN_CLEANUP_OUTLINE_FADE_DURATION_MS,
-      easing: NativeEasing.bezier(0.2, 0, 0.2, 1),
+      ...WIN_CLEANUP_OUTLINE_FADE_TIMING,
       useNativeDriver: true,
     }).start()
   }, [hidden, opacity])

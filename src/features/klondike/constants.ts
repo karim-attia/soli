@@ -1,4 +1,4 @@
-import { Easing } from 'react-native-reanimated'
+import { Easing } from 'react-native'
 
 import type { Rank, Suit } from '../../solitaire/klondike'
 
@@ -46,13 +46,6 @@ export const CARD_FLIP_HALF_DURATION_MS = 40
 export const CARD_FLIP_HALF_TIMING = {
   duration: CARD_FLIP_HALF_DURATION_MS,
   easing: Easing.bezier(0.45, 0, 0.55, 1),
-} as const
-
-export const WASTE_SLIDE_DURATION_MS = 70
-export const WASTE_SLIDE_EASING = Easing.bezier(0.15, 0.9, 0.2, 1)
-export const WASTE_TIMING_CONFIG = {
-  duration: WASTE_SLIDE_DURATION_MS,
-  easing: WASTE_SLIDE_EASING,
 } as const
 
 export const WIGGLE_OFFSET_PX = 5

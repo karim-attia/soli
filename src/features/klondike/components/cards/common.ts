@@ -1,1 +1,0 @@
-export { AnimatedView } from './animations'

@@ -78,6 +78,8 @@ type CelebrationOverlaySlotProps = {
 
 const CelebrationOverlaySlot = React.memo(
   ({ assignment, bindings, metrics }: CelebrationOverlaySlotProps) => {
+    // Unlike finite card/glow timings, celebration paths are recalculated from shared
+    // progress every frame; keeping this worklet prevents JS from driving 52 slots.
     const animatedStyle = useAnimatedStyle(() => {
       const inactiveStyle = {
         opacity: 0,

@@ -1,10 +1,5 @@
 import React, { useEffect, useRef } from 'react'
-import {
-  Animated as NativeAnimated,
-  Easing as NativeEasing,
-  Pressable,
-  View,
-} from 'react-native'
+import { Animated as NativeAnimated, Pressable, View } from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
 import { Text } from 'tamagui'
 import { RefreshCcw } from '@tamagui/lucide-icons-2'
@@ -18,7 +13,7 @@ import {
   COLOR_DROP_BORDER,
   SUIT_COLORS,
   SUIT_SYMBOLS,
-  WIN_CLEANUP_OUTLINE_FADE_DURATION_MS,
+  WIN_CLEANUP_OUTLINE_FADE_TIMING,
 } from '../../constants'
 import type { CardMetrics } from '../../types'
 import {
@@ -201,14 +196,12 @@ export const EmptySlot = ({
     NativeAnimated.parallel([
       NativeAnimated.timing(opacity, {
         toValue: hidden ? 0 : 1,
-        duration: WIN_CLEANUP_OUTLINE_FADE_DURATION_MS,
-        easing: NativeEasing.bezier(0.2, 0, 0.2, 1),
+        ...WIN_CLEANUP_OUTLINE_FADE_TIMING,
         useNativeDriver: true,
       }),
       NativeAnimated.timing(scale, {
         toValue: hidden ? 0.985 : 1,
-        duration: WIN_CLEANUP_OUTLINE_FADE_DURATION_MS,
-        easing: NativeEasing.bezier(0.2, 0, 0.2, 1),
+        ...WIN_CLEANUP_OUTLINE_FADE_TIMING,
         useNativeDriver: true,
       }),
     ]).start()
