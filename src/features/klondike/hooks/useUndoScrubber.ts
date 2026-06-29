@@ -200,10 +200,6 @@ export const useUndoScrubber = ({
   }, [safeArea.left, safeArea.right, safeAreaLeftShared, safeAreaRightShared])
 
   useEffect(() => {
-    isScrubbingShared.value = isScrubbing ? 1 : 0
-  }, [isScrubbing, isScrubbingShared])
-
-  useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
       windowWidthShared.value = window.width || 1
     })
@@ -336,8 +332,8 @@ export const useUndoScrubber = ({
         .minDistance(5)
         .failOffsetY([-100, 100])
         .shouldCancelWhenOutside(false)
-        .simultaneousWithExternalGesture()
-        .requireExternalGestureToFail()
+        // Moving this to the attached Animated.View did not expand the target in our iOS
+        // simulator test. Keep the proven Android expansion; iOS has a visible 48pt target.
         .hitSlop({ bottom: 50, top: 50, left: 20, right: 20 })
         .cancelsTouchesInView(false)
         .onStart((event) => {
@@ -435,7 +431,7 @@ export const useUndoScrubber = ({
   return {
     shouldShowUndo,
     canUndo,
-    isScrubbing,
+    scrubActive: isScrubbingShared,
     scrubAnimatedIndex,
     scrubSliderMax,
     undoScrubGesture,

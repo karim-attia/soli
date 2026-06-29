@@ -1125,7 +1125,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const {
     shouldShowUndo,
     canUndo,
-    isScrubbing,
+    scrubActive,
     scrubAnimatedIndex,
     scrubSliderMax,
     undoScrubGesture,
@@ -1187,11 +1187,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // requirement 20-6: onUndoPress removed - tap is handled by composed gesture
   const undoScrubProps: UndoScrubberProps = {
     visible: shouldShowUndo,
-    isScrubbing,
+    scrubActive,
     scrubIndex: scrubAnimatedIndex,
     sliderMax: scrubSliderMax,
     gesture: undoScrubGesture,
-    boardLocked,
     canUndo,
     onTrackMetrics: handleTrackMetrics,
   }

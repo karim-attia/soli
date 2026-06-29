@@ -4,6 +4,7 @@ import Animated, {
   createAnimatedComponent,
   useAnimatedStyle,
   useSharedValue,
+  withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
 import { GestureDetector, type GestureType } from 'react-native-gesture-handler'
@@ -19,11 +20,10 @@ import {
 
 export type UndoScrubberProps = {
   visible: boolean
-  isScrubbing: boolean
+  scrubActive: SharedValue<number>
   scrubIndex: SharedValue<number>
   sliderMax: number
   gesture: GestureType
-  boardLocked: boolean
   canUndo: boolean
   onTrackMetrics: (metrics: { left: number; right: number }) => void
 }
@@ -31,134 +31,164 @@ export type UndoScrubberProps = {
 const AnimatedView = createAnimatedComponent(View)
 const SCRUBBER_THUMB_SIZE = 20
 const SCRUBBER_THUMB_RADIUS = SCRUBBER_THUMB_SIZE / 2
+const SCRUBBER_HIDDEN_SCALE = 0.985
+const SCRUBBER_TRANSITION = { duration: 140 } as const
 
-// requirement 20-6: Approach A - Isolate gesture component to prevent re-renders during scrubbing
-// This wrapper NEVER re-renders, preventing iOS gesture cancellation from React updates
+// Keep the native gesture target isolated from board-preview commits. Only stable gesture,
+// shared-value, and undo-availability changes should update this subtree.
 const GestureWrapper = React.memo(
-  ({ gesture, opacity }: { gesture: GestureType; opacity: number }) => {
+  ({
+    gesture,
+    scrubActive,
+    canUndo,
+  }: {
+    gesture: GestureType
+    scrubActive: SharedValue<number>
+    canUndo: boolean
+  }) => {
+    const buttonStyle = useAnimatedStyle(() => {
+      const opacity =
+        scrubActive.value > 0
+          ? UNDO_SCRUB_BUTTON_DIM_OPACITY
+          : canUndo
+            ? 1
+            : UNDO_BUTTON_DISABLED_OPACITY
+
+      return { opacity: withTiming(opacity, SCRUBBER_TRANSITION) }
+    }, [canUndo, scrubActive])
+
     return (
       <GestureDetector gesture={gesture}>
-        <Animated.View style={[styles.undoButton, { opacity }]} collapsable={false}>
+        <Animated.View style={[styles.undoButton, buttonStyle]} collapsable={false}>
           <Undo2 size={20} color="#000" />
           <Text style={styles.undoButtonText}>Undo</Text>
         </Animated.View>
       </GestureDetector>
     )
-  },
-  // Custom comparison: avoid churn, but still update opacity when scrubbing starts/ends.
-  (prev, next) => prev.gesture === next.gesture && prev.opacity === next.opacity
+  }
 )
 
-export const UndoScrubber: React.FC<UndoScrubberProps> = ({
-  visible,
-  isScrubbing,
-  scrubIndex,
-  sliderMax,
-  gesture,
-  boardLocked: _boardLocked,
-  canUndo,
-  onTrackMetrics,
-}) => {
-  const trackRef = useRef<View>(null)
-  const trackWidth = useSharedValue(0)
-  const safeArea = useSafeAreaInsets()
-  const bottomDockOffset = safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING
+GestureWrapper.displayName = 'GestureWrapper'
 
-  const measureTrack = useCallback(() => {
-    const track = trackRef.current
-    if (!track) {
-      return
-    }
-    track.measureInWindow((x, _y, width) => {
-      if (width <= 0) {
+export const UndoScrubber = React.memo(
+  ({
+    visible,
+    scrubActive,
+    scrubIndex,
+    sliderMax,
+    gesture,
+    canUndo,
+    onTrackMetrics,
+  }: UndoScrubberProps) => {
+    const trackRef = useRef<View>(null)
+    const trackWidth = useSharedValue(0)
+    const safeArea = useSafeAreaInsets()
+    const bottomDockOffset = safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING
+
+    const measureTrack = useCallback(() => {
+      const track = trackRef.current
+      if (!track) {
         return
       }
-      onTrackMetrics({ left: x, right: x + width })
-    })
-  }, [onTrackMetrics])
+      track.measureInWindow((x, _y, width) => {
+        if (width <= 0) {
+          return
+        }
+        onTrackMetrics({ left: x, right: x + width })
+      })
+    }, [onTrackMetrics])
 
-  const handleTrackLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      trackWidth.value = event.nativeEvent.layout.width
+    const handleTrackLayout = useCallback(
+      (event: LayoutChangeEvent) => {
+        trackWidth.value = event.nativeEvent.layout.width
+        measureTrack()
+      },
+      [measureTrack, trackWidth]
+    )
+
+    useEffect(() => {
+      if (!visible) {
+        return
+      }
       measureTrack()
-    },
-    [measureTrack, trackWidth]
-  )
+    }, [measureTrack, sliderMax, visible])
 
-  useEffect(() => {
-    if (!visible) {
-      return
-    }
-    measureTrack()
-  }, [measureTrack, sliderMax, visible])
+    const activeTrackStyle = useAnimatedStyle(() => {
+      const clampedIndex = Math.max(0, Math.min(scrubIndex.value, sliderMax))
+      const normalized = sliderMax <= 0 ? 0 : clampedIndex / sliderMax
+      const travelWidth = Math.max(trackWidth.value - SCRUBBER_THUMB_SIZE, 0)
+      const thumbCenter = normalized * travelWidth + SCRUBBER_THUMB_RADIUS
+      return {
+        width: Math.min(trackWidth.value, Math.max(SCRUBBER_THUMB_RADIUS, thumbCenter)),
+      }
+    }, [scrubIndex, sliderMax, trackWidth])
 
-  const activeTrackStyle = useAnimatedStyle(() => {
-    const clampedIndex = Math.max(0, Math.min(scrubIndex.value, sliderMax))
-    const normalized = sliderMax <= 0 ? 0 : clampedIndex / sliderMax
-    const travelWidth = Math.max(trackWidth.value - SCRUBBER_THUMB_SIZE, 0)
-    const thumbCenter = normalized * travelWidth + SCRUBBER_THUMB_RADIUS
-    return {
-      width: Math.min(trackWidth.value, Math.max(SCRUBBER_THUMB_RADIUS, thumbCenter)),
-    }
-  }, [scrubIndex, sliderMax, trackWidth])
+    const thumbStyle = useAnimatedStyle(() => {
+      const clampedIndex = Math.max(0, Math.min(scrubIndex.value, sliderMax))
+      const normalized = sliderMax <= 0 ? 0 : clampedIndex / sliderMax
+      const travelWidth = Math.max(trackWidth.value - SCRUBBER_THUMB_SIZE, 0)
+      return {
+        transform: [{ translateX: normalized * travelWidth }],
+      }
+    }, [scrubIndex, sliderMax, trackWidth])
 
-  const thumbStyle = useAnimatedStyle(() => {
-    const clampedIndex = Math.max(0, Math.min(scrubIndex.value, sliderMax))
-    const normalized = sliderMax <= 0 ? 0 : clampedIndex / sliderMax
-    const travelWidth = Math.max(trackWidth.value - SCRUBBER_THUMB_SIZE, 0)
-    return {
-      transform: [{ translateX: normalized * travelWidth }],
-    }
-  }, [scrubIndex, sliderMax, trackWidth])
-
-  if (!visible) {
-    return null
-  }
-
-  const buttonOpacity = isScrubbing
-    ? UNDO_SCRUB_BUTTON_DIM_OPACITY
-    : canUndo
-      ? 1
-      : UNDO_BUTTON_DISABLED_OPACITY
-
-  return (
-    <View
-      style={[
-        styles.container,
-        // Task 20-6: Keep the pre-wrapper geometry here: the scrubber's bottom dock
-        // height should be the Android/iOS inset plus our explicit extra breathing room.
-        // That matches the older layout more faithfully than the SafeAreaView wrapper
-        // experiments, including the perceived right-side placement.
-        { paddingBottom: safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING },
-      ]}
-    >
-      <AnimatedView
-        pointerEvents="none"
-        style={[
-          styles.overlay,
+    const overlayStyle = useAnimatedStyle(() => {
+      const active = scrubActive.value > 0
+      return {
+        opacity: withTiming(active ? 1 : 0, SCRUBBER_TRANSITION),
+        transform: [
           {
-            opacity: isScrubbing ? 1 : 0,
-            // Task 20-6: The button can safely use container padding, but the scrubber
-            // overlay is absolutely positioned and will otherwise keep stretching into
-            // the Android system-bar area. Mirror the same dock offset here so the
-            // active scrubber panel stays above the nav/home indicator zone too.
-            bottom: bottomDockOffset,
+            scale: withTiming(active ? 1 : SCRUBBER_HIDDEN_SCALE, SCRUBBER_TRANSITION),
           },
+        ],
+      }
+    }, [scrubActive])
+
+    if (!visible) {
+      return null
+    }
+
+    return (
+      <View
+        style={[
+          styles.container,
+          // Task 20-6: Keep the pre-wrapper geometry here: the scrubber's bottom dock
+          // height should be the Android/iOS inset plus our explicit extra breathing room.
+          // That matches the older layout more faithfully than the SafeAreaView wrapper
+          // experiments, including the perceived right-side placement.
+          { paddingBottom: safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING },
         ]}
       >
-        {/* Keep the visual scrub overlay on shared values instead of Slider props:
+        <AnimatedView
+          pointerEvents="none"
+          style={[
+            styles.overlay,
+            overlayStyle,
+            {
+              // Task 20-6: The button can safely use container padding, but the scrubber
+              // overlay is absolutely positioned and will otherwise keep stretching into
+              // the Android system-bar area. Mirror the same dock offset here so the
+              // active scrubber panel stays above the nav/home indicator zone too.
+              bottom: bottomDockOffset,
+            },
+          ]}
+        >
+          {/* Keep the visual scrub overlay on shared values instead of Slider props:
             we learned that React-driven per-step updates add avoidable churn during long scrubs. */}
-        <View style={styles.slider}>
-          <View ref={trackRef} onLayout={handleTrackLayout} style={styles.track}>
-            <AnimatedView style={[styles.trackActive, activeTrackStyle]} />
-            <AnimatedView style={[styles.thumb, thumbStyle]} />
+          <View style={styles.slider}>
+            <View ref={trackRef} onLayout={handleTrackLayout} style={styles.track}>
+              <AnimatedView style={[styles.trackActive, activeTrackStyle]} />
+              <AnimatedView style={[styles.thumb, thumbStyle]} />
+            </View>
           </View>
-        </View>
-      </AnimatedView>
-      <GestureWrapper gesture={gesture} opacity={buttonOpacity} />
-    </View>
-  )
-}
+        </AnimatedView>
+        <GestureWrapper gesture={gesture} scrubActive={scrubActive} canUndo={canUndo} />
+      </View>
+    )
+  }
+)
+
+UndoScrubber.displayName = 'UndoScrubber'
 
 const styles = StyleSheet.create({
   container: {
@@ -179,7 +209,10 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 24,
     backgroundColor: 'rgba(15, 23, 42, 0.55)',
-    zIndex: 1,
+    // The old pile-local card measurements made an updating overlay above the gesture target
+    // unstable on iOS. The absolute card layer removed that churn, and pointerEvents="none"
+    // keeps this shared visual treatment from competing for the gesture on either platform.
+    zIndex: 3,
     shadowColor: 'rgba(0, 0, 0, 0.35)',
     shadowOpacity: 0.35,
     shadowRadius: 10,
@@ -220,6 +253,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
   },
   undoButton: {
+    position: 'relative',
     width: '50%',
     alignSelf: 'flex-end',
     zIndex: 2,
