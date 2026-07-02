@@ -46,6 +46,22 @@ Implement top row with plumbing. Implement dispatch game action recommendation. 
 Committed. Implement animation recommendations.
 ```
 
+```text
+What's your recommendation? To go back to the 1b commit, and from there, we kind of have, I mean, the yarn release commit afterwards is tiny. That can be easily added again. And from there, kind of, like, restart again and rebuild whatever's needed and be super clean, or are you confident that you can now, with all this analysis, restore the behavior from before to make it as amazing as before? Yeah, please, please comment on this and let me know, and also comment on the later commits on how, like, on how you would review them, how useful they are, do they really make sense to simplify the code, or based on this learning, would it maybe make sense to do this differently? Thank you.
+```
+
+```text
+Thank you. Please implement this now.
+```
+
+```text
+anything else we should do to clean up?
+what's stashed?
+is there still an agents.md change stashed?
+workspace?
+what needed so that i can commit?
+```
+
 ## Description
 
 Try the option 3 animation architecture: render cards from one board-level absolute layer instead of letting each pile own its moving card views. Piles should provide target geometry and non-card UI; the card layer owns card visuals, hit targets, and motion. The first pass should be small enough to test quickly while moving the code toward the final architecture.
@@ -55,6 +71,12 @@ Try the option 3 animation architecture: render cards from one board-level absol
 The current implementation keeps card visuals in a board-level absolute layer. The cleanup pass makes that permanent: structural piles keep only layout, empty-slot, outline, label, and glow responsibilities, while card visuals, card hit targets, movement, flip, and invalid wiggle live in `AbsoluteCardLayer`.
 
 This started as an architecture experiment. After repeated manual/demo-game runs, the absolute layer is accepted as the production architecture because it keeps the flat memory profile and resolves the large long-run lag class. Keeping the old pile-local card-flight path now makes the mental model harder without protecting a path we plan to ship.
+
+The June 29 animation-library pass is now treated as a failed behavior experiment rather than
+architecture cleanup. Device A/B testing isolated stock-draw flicker and a stuck foundation glow
+to commit `e647d1c`; the known-good `2722938` and `1b487d6` card-animation sources are identical.
+The corrective pass restores that complete card-animation surface instead of patching either
+symptom, while retaining the independent Android release and undo-scrubber commits.
 
 ## Acceptance Criteria
 
@@ -67,11 +89,14 @@ This started as an architecture experiment. After repeated manual/demo-game runs
 - The old `CardFlightOverlayLayer` and `useFlightController` fallback path are removed.
 - Pile components no longer accept card-flight snapshot props they never use in permanent absolute-layer mode.
 - The implementation is simpler because there is one normal-gameplay card owner.
-- Ordinary finite animations (card movement, flip, invalid wiggle, cleanup fades, and
-  foundation glow) use React Native `Animated` with the native driver.
+- Card movement, flip, invalid wiggle, and cleanup fades use React Native `Animated` with the
+  native driver and retain the known-good default timing curves from `1b487d6`.
+- Foundation glow retains its proven Reanimated shared-value sequence; moving four finite glow
+  instances to React Native `Animated` has no measured performance benefit and regressed behavior.
 - Reanimated remains limited to animation paths that need live UI-thread calculations:
   the gesture-driven undo scrubber and procedural celebration overlay.
-- Existing animation durations and easing curves remain intact.
+- Existing durations remain intact. Card movement, flip, and wiggle intentionally omit custom
+  easing so React Native's established default easing remains part of the shipped behavior.
 
 ## Design links
 
@@ -231,11 +256,23 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - [completed] Remove remaining post-absolute-layer cleanup residue: unused top-row waste press plumbing, unused dispatch selection arg, stale `CardView` naming, Reanimated-only simple fades, and unused celebration assignment shared value.
 - [completed] Run focused static checks after cleanup-residue removal.
 - [completed] Audit the remaining live animation paths against the native-driver/worklet boundary.
-- [completed] Convert foundation glow to React Native `Animated`, reuse the defined easing
-  configurations in the absolute card layer and cleanup fades, and remove obsolete wrapper code.
+- [completed, later reverted] Convert foundation glow to React Native `Animated`, reuse the
+  defined easing configurations in the absolute card layer and cleanup fades, and remove obsolete
+  wrapper code. Device A/B testing later disproved this experiment.
 - [completed] Run formatting, typecheck, lint, and tests for the animation pass.
 - [completed] Build and smoke-test a fresh Android release on a connected device, including card
   movement, flip/wiggle, foundation glow, undo scrubber, and celebration when automation permits.
+- [completed] Isolate the stock-draw flicker and stuck foundation glow through commit-by-commit
+  physical-device A/B testing.
+- [completed] Confirm `2722938` and `1b487d6` have identical card-animation source and that later
+  release/scrubber commits do not overlap the corrective file set.
+- [completed] Restore the complete `e647d1c` card-animation source surface to the known-good
+  behavior while retaining the release and scrubber commits.
+- [completed] Remove only timing constants made dead by the restored default-easing behavior and
+  document why the front-loaded curve must not be reintroduced casually.
+- [completed] Run formatting, typecheck, lint, tests, and focused diff validation.
+- [completed] Run a fresh Android release build and physical-device smoke test through a testing
+  sub-agent, then record the result here.
 
 ## Plan: Files to modify
 
@@ -258,6 +295,7 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - `src/features/klondike/constants.ts`
 - `src/features/klondike/components/cards/CardFlightOverlayLayer.tsx`
 - `src/animation/flightController.ts`
+- `docs/product/game-history-performance/absolute-card-layer-animation-architecture.md`
 
 ## Files actually modified
 
@@ -322,9 +360,9 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - Post-acceptance cleanup found two stale concepts from earlier architecture attempts: `dispatchGameAction` still accepted an ignored selection snapshot, and celebration bindings still carried an assignments shared value even though overlay slots now receive assignments as React props.
 - Simple empty-slot/win-cleanup fades are still useful because they prevent structural outlines from snapping away during the win handoff, but they do not need Reanimated worklets; React Native `Animated` with the native driver can handle opacity/scale without adding Reanimated residency.
 - Renaming `CardView.tsx` to `CardVisual.tsx` aligns the file with the permanent architecture: card visuals are primitives now, while animation ownership lives in the absolute gameplay layer and celebration overlay.
-- The remaining foundation glow is a finite opacity sequence. It does not need a worklet;
-  React Native `Animated` can serialize it to the native driver just like card movement and the
-  cleanup fades.
+- Superseded experiment: foundation glow was moved to React Native `Animated` because it is a
+  finite opacity sequence. Device testing later found that interrupted native-driver sequences
+  could leave the glow visible, so the proven Reanimated implementation was restored.
 - The undo scrubber and celebration are different: their displayed values are recalculated from
   live gesture/progress shared values on the UI thread, so retaining Reanimated there keeps JS
   out of the per-frame path.
@@ -332,11 +370,26 @@ No data fetching changes. Card target positions are derived from current `GameSt
   frame updates can continue without JS. Reanimated worklets are still the better fit when each
   frame must run application calculations, as the celebration does, or react directly to a pan
   gesture, as the undo scrubber does.
-- The absolute layer had retained the intended easing constants but was only passing their
-  durations to React Native `Animated`. Reusing the complete timing configurations restores the
-  tuned move, flip, and wiggle curves instead of relying on `Animated.timing`'s default easing.
+- Superseded experiment: the absolute layer had unused custom easing constants, which were assumed
+  to represent intended tuning. Applying them changed the proven animation behavior and introduced
+  stock-draw flicker; the constants are now removed and the default easing is intentional.
 - The old waste-slide timing configuration was only used by the deleted pile-local animation
   architecture and could be removed.
+- Follow-up device A/B testing disproved the assumption that the unused custom timing objects
+  represented the desired animation behavior. Before `e647d1c`, React Native received only the
+  durations and therefore used its default symmetric ease-in-out curve.
+- The custom card-flight bezier added by `e647d1c` is extremely front-loaded: after 40 ms of the
+  90 ms flight it is roughly 95% complete, while the known-good default is roughly 41% complete.
+  The card face still changes after the first 40 ms flip half, making the reveal appear late and
+  producing the reproducible stock-draw flicker.
+- Migrating foundation glow from Reanimated to an imperative React Native `Animated.sequence`
+  did not materially reduce source or runtime complexity and introduced the reproducible stuck
+  foundation glow. Four glow instances are not a credible performance reason to retain the swap.
+- The Android release improvement is shell-only and independent. The undo-scrubber commit touches
+  separate files and keeps live gesture presentation on Reanimated shared values, so both can be
+  retained while restoring the card-animation surface.
+- Reanimated already exposes `Animated.View`; using it directly in `FoundationPile` removes both
+  the old one-line `common.ts` re-export and the replacement custom animated-view alias.
 
 ## Identified issues
 
@@ -364,12 +417,16 @@ No data fetching changes. Card target positions are derived from current `GameSt
 - `yarn typecheck` passed after the duplicate-stock-target and first-render pressability fixes.
 - [fixed] Permanent absolute-layer cleanup removed the old fallback card-flight overlay and dispatch snapshot gate.
 - [fixed] Removed cleanup residue left after accepting the absolute card layer.
-- [verified] Ordinary finite card animations no longer import Reanimated. Card movement, flip,
-  wiggle, cleanup fades, and foundation glow all use React Native `Animated` with
-  `useNativeDriver: true`; Reanimated remains in celebration and undo scrubber paths.
-- [testing-gap] The fresh release automation could not reliably capture the very brief face flip
-  or invalid wiggle on the physical device's sparse accessibility tree. Their code paths passed
-  static checks and use the same native-driver sequence as before, now with the intended easing.
+- [reverted] A pass moved every finite card animation, including foundation glow, to React Native
+  `Animated`. Card movement, flip, wiggle, and cleanup fades remain there, but foundation glow is
+  back on its proven Reanimated shared-value sequence after the Native Animated regression.
+- [superseded-testing-gap] The earlier release automation could not reliably capture the very
+  brief face flip or invalid wiggle. Its claim about "intended easing" was later disproved by
+  device A/B testing; the final implementation restores the known-good default easing.
+- [fixed-in-code] `e647d1c` changed proven movement/flip/wiggle curves and migrated foundation glow;
+  restore the whole experiment rather than layering symptom-specific fixes on top.
+- [separate] The vertically shifted Android card font reproduces on both sides of the animation
+  regression boundary and is not part of this corrective pass.
 
 ## Testing
 
@@ -415,3 +472,22 @@ No data fetching changes. Card target positions are derived from current `GameSt
   stable app state and is recorded as an automation capture-timing anomaly, not a reproduced UI bug.
 - The physical device's original `15000` ms screen timeout was restored and verified, the
   `agent-device` session was closed, and no build/test process was left running.
+- Corrective-pass testing plan: compare the resulting source against `1b487d6`, run all static
+  checks, build with `yarn release`, confirm installation on physical Android, smoke stock draw,
+  invalid wiggle, foundation arrival/glow, normal Undo, and the undo scrubber without attempting
+  frame-by-frame visual grading that is better handled by the user's final feel test.
+- Corrective-pass static validation passed: `yarn format`, `yarn format:check`, `yarn typecheck`,
+  `yarn lint`, and `yarn jest --runInBand` (11 suites / 56 tests).
+- Corrective-pass Android release validation passed on physical device `A065`: 642 Gradle tasks,
+  `BUILD SUCCESSFUL in 5m 10s`, APK SHA-256
+  `f6a9bf4ebf4006aea8c6ae71a6faa572f9a1839b71586a89a1ca28c1a35d6b83`, and package update time
+  `2026-07-02 18:12:50` confirmed that version `0.8.0` (code 13) was installed and launched.
+- Physical-device smoke passed for complete initial rendering, four stock draws (`23 -> 19`),
+  normal Undo (`19 -> 20`), and an undo-scrubber rewind (`20 -> 22`). App-log scans found no
+  fatal/error/exception/crash signal.
+- An invalid waste press produced no crash, but sparse screenshots cannot verify the brief wiggle.
+  No reliable foundation move was available without extending the test, so final glow appearance
+  and subjective flicker/smoothness remain for the user's manual feel test.
+- Testing artifacts: `tmp/test-artifacts/corrective-animation-final/` and
+  `/Users/karim/.agent-device/sessions/corrective-animation-final/app.log`. The tester closed its
+  agent-device session and left no Expo, Metro, or build process running.

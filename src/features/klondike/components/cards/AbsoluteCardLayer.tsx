@@ -11,12 +11,12 @@ import {
 } from '../../../../solitaire/klondike'
 import { useAnimationToggles } from '../../../../state/settings'
 import {
-  CARD_FLIGHT_TIMING,
-  CARD_FLIP_HALF_TIMING,
+  CARD_ANIMATION_DURATION_MS,
+  CARD_FLIP_HALF_DURATION_MS,
   WASTE_FAN_MAX_OFFSET,
   WASTE_FAN_OVERLAP_RATIO,
   WIGGLE_OFFSET_PX,
-  WIGGLE_TIMING_CONFIG,
+  WIGGLE_SEGMENT_DURATION_MS,
 } from '../../constants'
 import type { CardMetrics, InvalidWiggleConfig } from '../../types'
 import { CardBack, CardVisual } from './CardVisual'
@@ -401,15 +401,17 @@ const AbsoluteLayerCard = React.memo(
       }
 
       setIsSettling(true)
+      // Keep React Native's default symmetric easing here. A front-loaded curve moved stock
+      // cards almost completely before the 40 ms face swap, which caused visible draw flicker.
       NativeAnimated.parallel([
         NativeAnimated.timing(translateX, {
           toValue: item.x,
-          ...CARD_FLIGHT_TIMING,
+          duration: CARD_ANIMATION_DURATION_MS,
           useNativeDriver: true,
         }),
         NativeAnimated.timing(translateY, {
           toValue: item.y,
-          ...CARD_FLIGHT_TIMING,
+          duration: CARD_ANIMATION_DURATION_MS,
           useNativeDriver: true,
         }),
       ]).start(({ finished }) => {
@@ -446,7 +448,7 @@ const AbsoluteLayerCard = React.memo(
       flipScale.stopAnimation()
       NativeAnimated.timing(flipScale, {
         toValue: 0,
-        ...CARD_FLIP_HALF_TIMING,
+        duration: CARD_FLIP_HALF_DURATION_MS,
         useNativeDriver: true,
       }).start(({ finished }) => {
         if (!finished) {
@@ -456,7 +458,7 @@ const AbsoluteLayerCard = React.memo(
         setRenderFaceUp(item.card.faceUp)
         NativeAnimated.timing(flipScale, {
           toValue: 1,
-          ...CARD_FLIP_HALF_TIMING,
+          duration: CARD_FLIP_HALF_DURATION_MS,
           useNativeDriver: true,
         }).start()
       })
@@ -476,17 +478,17 @@ const AbsoluteLayerCard = React.memo(
       NativeAnimated.sequence([
         NativeAnimated.timing(wiggle, {
           toValue: -ABSOLUTE_LAYER_WIGGLE_OFFSET_PX,
-          ...WIGGLE_TIMING_CONFIG,
+          duration: WIGGLE_SEGMENT_DURATION_MS,
           useNativeDriver: true,
         }),
         NativeAnimated.timing(wiggle, {
           toValue: ABSOLUTE_LAYER_WIGGLE_OFFSET_PX,
-          ...WIGGLE_TIMING_CONFIG,
+          duration: WIGGLE_SEGMENT_DURATION_MS,
           useNativeDriver: true,
         }),
         NativeAnimated.timing(wiggle, {
           toValue: 0,
-          ...WIGGLE_TIMING_CONFIG,
+          duration: WIGGLE_SEGMENT_DURATION_MS,
           useNativeDriver: true,
         }),
       ]).start()

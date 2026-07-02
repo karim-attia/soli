@@ -1,5 +1,11 @@
 import { useEffect, useRef } from 'react'
-import { Animated as NativeAnimated } from 'react-native'
+import {
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated'
 
 import type { Card } from '../../../../solitaire/klondike'
 import { useAnimationToggles } from '../../../../state/settings'
@@ -25,7 +31,10 @@ export const useFoundationGlowAnimation = ({
   onCardArrived,
 }: UseFoundationGlowAnimationParams) => {
   const { foundationGlow: foundationGlowEnabled } = useAnimationToggles()
-  const glowOpacity = useRef(new NativeAnimated.Value(0)).current
+  const glowOpacity = useSharedValue(0)
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+  }))
 
   const lastGlowCardRef = useRef<string | null>(null)
   const previousCountRef = useRef(cards.length)
@@ -41,8 +50,7 @@ export const useFoundationGlowAnimation = ({
     const currentId = topCard?.id ?? null
 
     if (!foundationGlowEnabled) {
-      glowOpacity.stopAnimation()
-      glowOpacity.setValue(0)
+      glowOpacity.value = 0
       if (!removedCard && currentId && currentId !== previousId) {
         onCardArrived?.(currentId)
       }
@@ -54,22 +62,19 @@ export const useFoundationGlowAnimation = ({
       // Absolute celebration cards take over the visual stack; keep the structural
       // foundation glow quiet so it does not animate underneath the win overlay.
       lastGlowCardRef.current = currentId
-      glowOpacity.stopAnimation()
-      glowOpacity.setValue(0)
+      glowOpacity.value = 0
       return
     }
 
     if (!currentId) {
       lastGlowCardRef.current = null
-      glowOpacity.stopAnimation()
-      glowOpacity.setValue(0)
+      glowOpacity.value = 0
       return
     }
 
     if (removedCard) {
       lastGlowCardRef.current = currentId
-      glowOpacity.stopAnimation()
-      glowOpacity.setValue(0)
+      glowOpacity.value = 0
       return
     }
 
@@ -79,32 +84,24 @@ export const useFoundationGlowAnimation = ({
 
     lastGlowCardRef.current = currentId
     onCardArrived?.(currentId)
-    glowOpacity.stopAnimation()
-    glowOpacity.setValue(0)
-    // A foundation arrival is a finite opacity pulse. The native driver keeps its
-    // frames off the JS thread without retaining a Reanimated worklet per pile.
-    NativeAnimated.sequence([
-      NativeAnimated.timing(glowOpacity, {
-        toValue: FOUNDATION_GLOW_MAX_OPACITY,
-        ...FOUNDATION_GLOW_IN_TIMING,
-        useNativeDriver: true,
-      }),
-      NativeAnimated.timing(glowOpacity, {
-        toValue: 0,
-        ...FOUNDATION_GLOW_OUT_TIMING,
-        useNativeDriver: true,
-      }),
-    ]).start()
+    cancelAnimation(glowOpacity)
+    glowOpacity.value = 0
+    // Keep the proven shared-value sequence: the four foundation pulses are tiny, and the
+    // imperative Native Animated replacement could remain visibly stuck when interrupted.
+    glowOpacity.value = withSequence(
+      withTiming(FOUNDATION_GLOW_MAX_OPACITY, FOUNDATION_GLOW_IN_TIMING),
+      withTiming(0, FOUNDATION_GLOW_OUT_TIMING)
+    )
   }, [cards, celebrationActive, foundationGlowEnabled, glowOpacity, onCardArrived])
 
   useEffect(() => {
     return () => {
-      glowOpacity.stopAnimation()
+      cancelAnimation(glowOpacity)
     }
   }, [glowOpacity])
 
   return {
-    glowStyle: { opacity: glowOpacity },
+    glowStyle,
     glowDimensions: {
       width: glowWidth,
       height: glowHeight,

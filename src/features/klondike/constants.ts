@@ -1,4 +1,4 @@
-import { Easing } from 'react-native'
+import { Easing } from 'react-native-reanimated'
 
 import type { Rank, Suit } from '../../solitaire/klondike'
 
@@ -36,25 +36,9 @@ export const WASTE_FAN_MAX_OFFSET = 28
 
 // Animation timings
 export const CARD_ANIMATION_DURATION_MS = 90
-export const CARD_MOVE_EASING = Easing.bezier(0.15, 0.9, 0.2, 1)
-export const CARD_FLIGHT_TIMING = {
-  duration: CARD_ANIMATION_DURATION_MS,
-  easing: CARD_MOVE_EASING,
-} as const
-
 export const CARD_FLIP_HALF_DURATION_MS = 40
-export const CARD_FLIP_HALF_TIMING = {
-  duration: CARD_FLIP_HALF_DURATION_MS,
-  easing: Easing.bezier(0.45, 0, 0.55, 1),
-} as const
-
 export const WIGGLE_OFFSET_PX = 5
 export const WIGGLE_SEGMENT_DURATION_MS = 70
-export const WIGGLE_EASING = Easing.bezier(0.4, 0, 0.2, 1)
-export const WIGGLE_TIMING_CONFIG = {
-  duration: WIGGLE_SEGMENT_DURATION_MS,
-  easing: WIGGLE_EASING,
-} as const
 
 export const FOUNDATION_GLOW_MAX_OPACITY = 1
 export const FOUNDATION_GLOW_IN_DURATION_MS = 90
@@ -82,10 +66,6 @@ export const WIN_CELEBRATION_GLOW_TAIL_DELAY_MS = Math.max(
   FOUNDATION_GLOW_TOTAL_DURATION_MS - CARD_ANIMATION_DURATION_MS
 )
 export const WIN_CLEANUP_OUTLINE_FADE_DURATION_MS = 180
-export const WIN_CLEANUP_OUTLINE_FADE_TIMING = {
-  duration: WIN_CLEANUP_OUTLINE_FADE_DURATION_MS,
-  easing: Easing.bezier(0.2, 0, 0.2, 1),
-} as const
 export const FOUNDATION_FALLBACK_GAP = 16
 
 // Colour palette

@@ -1,5 +1,6 @@
 import React from 'react'
-import { Animated as NativeAnimated, Pressable, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import Animated from 'react-native-reanimated'
 import { Text } from 'tamagui'
 
 import type { Card, Suit } from '../../../../solitaire/klondike'
@@ -77,7 +78,7 @@ export const FoundationPile = ({
         },
       ]}
     >
-      <NativeAnimated.View
+      <Animated.View
         pointerEvents="none"
         style={[
           styles.foundationGlow,
