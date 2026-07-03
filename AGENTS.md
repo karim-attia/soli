@@ -100,7 +100,7 @@ Context: I am Karim and I code this app. I regularly run AI agents (you) to get 
 
 Cheap tests first: yarn typecheck && yarn lint && yarn jest
 
-However, also test everything you do in a real environment (when it makes sense!). In order to save context, always use sub-agents to test. Use GPT 5.5 medium reasoning for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Give the .md file (updated!) to the sub-agent for context. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
+However, also test everything you do in a real environment (when it makes sense!). In order to save context, always use sub-agents to build and test. Use a timer while building to save some context so that you don't check up on the build every few seconds. Use GPT 5.5 medium reasoning for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Give the .md file (updated!) to the sub-agent for context. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
 
 Native: Use agent-device skill
 Web: Use Playwright with skill (but no need to test on web since the app is for native only, but it's an option.)
