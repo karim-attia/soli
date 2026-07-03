@@ -48,6 +48,7 @@ Fill in the following sections:
   - Link to all package guides that are used
   - (Only if applicable)
 - ## UX/UI Considerations
+  - (Only if applicable)
 - ## Components
   - Which components to reuse, which components to create?
   - (Only if applicable)
@@ -55,6 +56,7 @@ Fill in the following sections:
   - (Only if applicable)
 - ## Related tasks
 - ## Simplification ideas
+  - See: Prefer simplicity. Use defaults.
 - ## Steps to implement
   - List every step
   - Update if you discover new steps
@@ -62,7 +64,8 @@ Fill in the following sections:
 - ## Plan: Files to modify
 - ## Files actually modified
 - ## Intermediary learnings
-  - add intermediary learnings here especially if something didn't work or we discovered a new piece of information
+  - Intermediary learnings discovered during implementation
+  - Especially if something didn't work or we discovered a new piece of information
 - ## Identified issues
   - and status of these issues
 - ## Testing
