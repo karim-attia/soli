@@ -19,7 +19,7 @@
 - Every feature should have a detailed implementation plan
 - Exception: Very small updates. But if the update gets bigger create one, also if it only gets bigger after already having started working on it. Reason: To preserve the context of what we're doing through sessions or after compacting context. 
 - First check if there is an existing implementation plan in `docs/product/` for what we are doing and continue using it if it makes sense. Otherwise, create a new one with <feature-name>.md.
-- Use a subagent with the latest model on highest thinking param (GPT 5.5 xhigh as of June 2026) to create the initial implementation plan. Smaller updates can be done directly or also by the subagent depending on the size of the update.
+- Use a subagent with the strongest AI model to create the initial implementation plan. Smaller updates can be done directly or also by the subagent depending on the size of the update.
 - The implementation plan should have enough details so that a sub-agent can implement the changes based on it.
 - If we're in the same chat, it usually makes sense to use the same file except if we're doing something quite different. Apply common sense here to not overdo it.
 - Implementation sub-agents shouldn't create new implementation plans, but rather update the one they got from the orchestrator and give a status update to the orchestrator.
@@ -74,7 +74,7 @@ Fill in the following sections:
 
 - **Directly start implementing** except if the user asks for a different approach. But always create a detailed implementation plan before starting to implement. Proceed with recommended options in open questions, flag them in the final summary.
 
-- **Sub-agents**: Use a subagent with the latest model on highest thinking param (GPT 5.5 xhigh as of June 2026) to implement code changes except if they're very small. Reason: Save context and tokens on the main thread. Decide whether to reuse a sub-agent or choose a new one depending on how similar the code changes are to the previous ones. The sub-agent should directly update the implementation plan.
+- **Sub-agents**: Use a subagent with strongest AI model to implement code changes except if they're very small. Reason: Save context and tokens on the main thread. Decide whether to reuse a sub-agent or choose a new one depending on how similar the code changes are to the previous ones. The sub-agent should directly update the implementation plan.
 
 - **Leave small documentation comment notes inline** throughout the app to better understand reasons why we did something in a certain way. For example product decisions, technical decisions. This gives valuable context for future development so that we don't undo such decisions unintentionally (or so that we consciously change these assumptions). Especially leave such a comment if there was an initial implementation that was then corrected in the chat afterwards. E.g. we do this this way instead of that way because we learned if we do it that way, we will run into issue X.
 
@@ -100,7 +100,7 @@ Context: I am Karim and I code this app. I regularly run AI agents (you) to get 
 
 Cheap tests first: yarn typecheck && yarn lint && yarn jest
 
-However, also test everything you do in a real environment (when it makes sense!). In order to save context, always use sub-agents to build and test. Use a timer while building to save some context so that you don't check up on the build every few seconds. Use GPT 5.5 medium reasoning for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Give the .md file (updated!) to the sub-agent for context. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
+However, also test everything you do in a real environment (when it makes sense!). In order to save context, always use sub-agents to build and test. Use a timer while building to save some context so that you don't check up on the build every few seconds. Use medium AI model for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Give the .md file (updated!) to the sub-agent for context. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
 
 Native: Use agent-device skill
 Web: Use Playwright with skill (but no need to test on web since the app is for native only, but it's an option.)
@@ -121,3 +121,8 @@ Check if the build was actually installed on the device or the device/emulator.
 # External packages
 
 **External Package Research and Documentation**: For any proposed tasks that involve external packages, to avoid hallucinations, use the web to research the documentation first to ensure it's 100% clear how to use the API of the package. Then for each package, create or update a document in `docs/external-package-guides/` named `<package>.md` that contains a fresh cache of the information needed to use the API. It should be date-stamped and link to the original docs provided. This documents foundational assumptions about how to use the package, with example snippets.
+
+# AI models
+
+- Strongest: Anthropic Fable, GPT 5.5 xhigh
+- Medium: GPT 5.5 medium
