@@ -317,9 +317,9 @@ Recommendation: useful only for demos/tutorials, not the main curated dataset.
 ## Plan: Files to modify
 
 - `docs/product/solvable-harvest-strategy/rethink-solvable-harvesting.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-solvitaire-guide.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-lonelybot-guide.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-rust-mobile-guide.md`
+- `docs/external-package-guides/solvitaire.md`
+- `docs/external-package-guides/lonelybot.md`
+- `docs/external-package-guides/rust-mobile.md`
 - Future implementation:
   - `src/data/solvableShuffles.ts`
   - `src/data/solvable-shuffles.raw.ts`
@@ -334,9 +334,9 @@ Recommendation: useful only for demos/tutorials, not the main curated dataset.
 ## Files actually modified
 
 - `docs/product/solvable-harvest-strategy/rethink-solvable-harvesting.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-solvitaire-guide.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-lonelybot-guide.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-rust-mobile-guide.md`
+- `docs/external-package-guides/solvitaire.md`
+- `docs/external-package-guides/lonelybot.md`
+- `docs/external-package-guides/rust-mobile.md`
 
 ## Identified issues and status of these issues
 

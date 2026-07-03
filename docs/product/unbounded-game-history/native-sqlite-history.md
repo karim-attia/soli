@@ -168,7 +168,7 @@ Cons:
 ## Files actually modified
 
 - `docs/product/unbounded-game-history/native-sqlite-history.md`
-- `docs/product/unbounded-game-history/unbounded-game-history-expo-sqlite-guide.md`
+- `docs/external-package-guides/expo-sqlite.md`
 - `package.json`
 - `yarn.lock`
 - `app.json`

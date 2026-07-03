@@ -209,11 +209,11 @@ Primary sources researched on 2026-06-14:
 
 Local package research notes:
 
-- `expo-rn-sdk-56-expo-guide.md`
-- `expo-rn-sdk-56-react-native-guide.md`
-- `expo-rn-sdk-56-react-native-jest-preset-guide.md`
-- `expo-rn-sdk-56-react-guide.md`
-- `expo-rn-sdk-56-expo-router-guide.md`
+- `docs/external-package-guides/expo.md`
+- `docs/external-package-guides/react-native.md`
+- `docs/external-package-guides/react-native-jest-preset.md`
+- `docs/external-package-guides/react.md`
+- `docs/external-package-guides/expo-router.md`
 
 No product design links are required because this upgrade should not intentionally
 change UI design.
@@ -456,11 +456,11 @@ Possible files:
 Plan/research files created before implementation:
 
 - `docs/product/expo-rn-sdk-56-upgrade/upgrade-to-expo-sdk-56-and-react-native-0-85.md`
-- `docs/product/expo-rn-sdk-56-upgrade/expo-rn-sdk-56-expo-guide.md`
-- `docs/product/expo-rn-sdk-56-upgrade/expo-rn-sdk-56-react-native-guide.md`
-- `docs/product/expo-rn-sdk-56-upgrade/expo-rn-sdk-56-react-native-jest-preset-guide.md`
-- `docs/product/expo-rn-sdk-56-upgrade/expo-rn-sdk-56-react-guide.md`
-- `docs/product/expo-rn-sdk-56-upgrade/expo-rn-sdk-56-expo-router-guide.md`
+- `docs/external-package-guides/expo.md`
+- `docs/external-package-guides/react-native.md`
+- `docs/external-package-guides/react-native-jest-preset.md`
+- `docs/external-package-guides/react.md`
+- `docs/external-package-guides/expo-router.md`
 
 ## Files actually modified
 
@@ -477,11 +477,11 @@ Modified in this planning pass and implementation:
 - `src/state/settings.tsx`
 - `yarn.lock`
 - `docs/product/expo-rn-sdk-56-upgrade/upgrade-to-expo-sdk-56-and-react-native-0-85.md`
-- `docs/product/expo-rn-sdk-56-upgrade/expo-rn-sdk-56-expo-guide.md`
-- `docs/product/expo-rn-sdk-56-upgrade/expo-rn-sdk-56-react-native-guide.md`
-- `docs/product/expo-rn-sdk-56-upgrade/expo-rn-sdk-56-react-native-jest-preset-guide.md`
-- `docs/product/expo-rn-sdk-56-upgrade/expo-rn-sdk-56-react-guide.md`
-- `docs/product/expo-rn-sdk-56-upgrade/expo-rn-sdk-56-expo-router-guide.md`
+- `docs/external-package-guides/expo.md`
+- `docs/external-package-guides/react-native.md`
+- `docs/external-package-guides/react-native-jest-preset.md`
+- `docs/external-package-guides/react.md`
+- `docs/external-package-guides/expo-router.md`
 
 Implementation notes:
 

@@ -239,7 +239,7 @@ No new data fetching. Persistence still uses AsyncStorage for the active game an
 - `tmp/android-smoke/timer-isolation-installed.png`
 - `tmp/android-smoke/timer-isolation-tick-check.png`
 - `docs/product/game-history-performance/fabric-view-retention-root-fix.md`
-- `docs/product/game-history-performance/reanimated-worklets-upgrade-guide.md`
+- `docs/external-package-guides/react-native-reanimated.md`
 
 ## Intermediary learnings
 

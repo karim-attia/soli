@@ -115,7 +115,7 @@ Cons:
 ## New dependencies
 
 - None.
-- Existing package guidance refreshed in [`undo-scrubber-safe-area-react-native-safe-area-context-guide.md`](/Users/karim/kDrive/Code/soli/docs/product/undo-scrubber-safe-area/undo-scrubber-safe-area-react-native-safe-area-context-guide.md).
+- Existing package guidance refreshed in [`docs/external-package-guides/react-native-safe-area-context.md`](/Users/karim/kDrive/Code/soli/docs/external-package-guides/react-native-safe-area-context.md).
 
 ## UX/UI Considerations
 
@@ -157,13 +157,13 @@ Cons:
 ## Plan: Files to modify
 
 - [`docs/product/undo-scrubber-safe-area/android-undo-scrubber-regression.md`](/Users/karim/kDrive/Code/soli/docs/product/undo-scrubber-safe-area/android-undo-scrubber-regression.md)
-- [`docs/product/undo-scrubber-safe-area/undo-scrubber-safe-area-react-native-safe-area-context-guide.md`](/Users/karim/kDrive/Code/soli/docs/product/undo-scrubber-safe-area/undo-scrubber-safe-area-react-native-safe-area-context-guide.md)
+- [`docs/external-package-guides/react-native-safe-area-context.md`](/Users/karim/kDrive/Code/soli/docs/external-package-guides/react-native-safe-area-context.md)
 - [`src/features/klondike/components/UndoScrubber.tsx`](/Users/karim/kDrive/Code/soli/src/features/klondike/components/UndoScrubber.tsx)
 
 ## Files actually modified
 
 - [`docs/product/undo-scrubber-safe-area/android-undo-scrubber-regression.md`](/Users/karim/kDrive/Code/soli/docs/product/undo-scrubber-safe-area/android-undo-scrubber-regression.md)
-- [`docs/product/undo-scrubber-safe-area/undo-scrubber-safe-area-react-native-safe-area-context-guide.md`](/Users/karim/kDrive/Code/soli/docs/product/undo-scrubber-safe-area/undo-scrubber-safe-area-react-native-safe-area-context-guide.md)
+- [`docs/external-package-guides/react-native-safe-area-context.md`](/Users/karim/kDrive/Code/soli/docs/external-package-guides/react-native-safe-area-context.md)
 - [`src/features/klondike/components/UndoScrubber.tsx`](/Users/karim/kDrive/Code/soli/src/features/klondike/components/UndoScrubber.tsx)
 
 ## Identified issues and status of these issues

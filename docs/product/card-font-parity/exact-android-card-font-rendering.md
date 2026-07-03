@@ -124,7 +124,7 @@ Recommended for the current pass:
 - Reuse [fonts.ts](/Users/karim/kDrive/Code/soli/src/features/klondike/components/cards/fonts.ts)
 - Reuse [app.json](/Users/karim/kDrive/Code/soli/app.json) for native font embedding
 - Reuse [build-card-fonts.py](/Users/karim/kDrive/Code/soli/scripts/build-card-fonts.py) for reproducible font preparation
-- Reuse [card-font-parity-fonttools-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-fonttools-guide.md) for the merged-font mechanics
+- Reuse [fonttools.md](/Users/karim/kDrive/Code/soli/docs/external-package-guides/fonttools.md) for the merged-font mechanics
 
 ## How to fetch data, how to cache
 
@@ -168,9 +168,9 @@ Recommended for the current pass:
 - [fonts.ts](/Users/karim/kDrive/Code/soli/src/features/klondike/components/cards/fonts.ts)
 - [CardView.tsx](/Users/karim/kDrive/Code/soli/src/features/klondike/components/cards/CardView.tsx)
 - [measure-card-corners.py](/Users/karim/kDrive/Code/soli/scripts/measure-card-corners.py)
-- [card-font-parity-imagemagick-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-imagemagick-guide.md)
-- [card-font-parity-fonttools-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-fonttools-guide.md)
-- [card-font-parity-nanoemoji-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-nanoemoji-guide.md)
+- [imagemagick.md](/Users/karim/kDrive/Code/soli/docs/external-package-guides/imagemagick.md)
+- [fonttools.md](/Users/karim/kDrive/Code/soli/docs/external-package-guides/fonttools.md)
+- [nanoemoji.md](/Users/karim/kDrive/Code/soli/docs/external-package-guides/nanoemoji.md)
 - [33-1.md](/Users/karim/kDrive/Code/soli/docs/delivery/33/33-1.md)
 - [33-2.md](/Users/karim/kDrive/Code/soli/docs/delivery/33/33-2.md)
 - [tasks.md](/Users/karim/kDrive/Code/soli/docs/delivery/33/tasks.md)
@@ -187,9 +187,9 @@ Recommended for the current pass:
 - [CardTextAndroid-SemiBold.ttf](/Users/karim/kDrive/Code/soli/assets/fonts/CardTextAndroid-SemiBold.ttf)
 - [CardTextAndroid-Bold.ttf](/Users/karim/kDrive/Code/soli/assets/fonts/CardTextAndroid-Bold.ttf)
 - [measure-card-corners.py](/Users/karim/kDrive/Code/soli/scripts/measure-card-corners.py)
-- [card-font-parity-imagemagick-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-imagemagick-guide.md)
-- [card-font-parity-fonttools-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-fonttools-guide.md)
-- [card-font-parity-nanoemoji-guide.md](/Users/karim/kDrive/Code/soli/docs/product/card-font-parity/card-font-parity-nanoemoji-guide.md)
+- [imagemagick.md](/Users/karim/kDrive/Code/soli/docs/external-package-guides/imagemagick.md)
+- [fonttools.md](/Users/karim/kDrive/Code/soli/docs/external-package-guides/fonttools.md)
+- [nanoemoji.md](/Users/karim/kDrive/Code/soli/docs/external-package-guides/nanoemoji.md)
 
 ## Identified issues and status of these issues
 

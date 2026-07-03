@@ -170,14 +170,14 @@ adoption through the shared `AppSheet`.
 
 - `@expo/ui`
   - Install with `npx expo install @expo/ui`.
-  - Guide: `docs/product/expo-ui-history-preview-sheet/expo-ui-history-preview-sheet-expo-ui-guide.md`.
+  - Guide: `docs/external-package-guides/expo-ui.md`.
   - Note: `external-packages.mdc` was referenced by repo instructions but is not present
     in this workspace; this guide follows the documented external-package requirement.
 - Global test tool: `agent-device@0.17.5`
   - Install with `npm install -g agent-device@0.17.5`.
   - This is a developer-machine CLI, not an application dependency.
   - Guide:
-    `docs/product/expo-ui-history-preview-sheet/expo-ui-history-preview-sheet-agent-device-guide.md`.
+    `docs/external-package-guides/agent-device.md`.
 
 ## UX/UI Considerations
 
@@ -273,18 +273,18 @@ and local state.
 - `app/history.tsx`
 - `components/AppSheet.tsx`
 - `docs/product/expo-ui-history-preview-sheet/prototype-expo-ui-bottom-sheet.md`
-- `docs/product/expo-ui-history-preview-sheet/expo-ui-history-preview-sheet-expo-ui-guide.md`
-- `docs/product/expo-ui-history-preview-sheet/expo-ui-history-preview-sheet-agent-device-guide.md`
+- `docs/external-package-guides/expo-ui.md`
+- `docs/external-package-guides/agent-device.md`
 
 ## Files actually modified
 
 - `docs/product/expo-ui-history-preview-sheet/prototype-expo-ui-bottom-sheet.md`
-- `docs/product/expo-ui-history-preview-sheet/expo-ui-history-preview-sheet-expo-ui-guide.md`
+- `docs/external-package-guides/expo-ui.md`
 - `package.json`
 - `yarn.lock`
 - `app/history.tsx`
 - `components/AppSheet.tsx`
-- `docs/product/expo-ui-history-preview-sheet/expo-ui-history-preview-sheet-agent-device-guide.md`
+- `docs/external-package-guides/agent-device.md`
 
 ## Identified issues and status of these issues
 

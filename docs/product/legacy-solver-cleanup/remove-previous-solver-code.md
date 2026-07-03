@@ -71,7 +71,7 @@ No data-fetching changes. New solvable deals continue to come from the bundled v
 ## Related tasks
 
 - `docs/product/solvable-harvest-strategy/best-practice-deal-identity-proposal.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-lonelybot-guide.md`
+- `docs/external-package-guides/lonelybot.md`
 
 ## Steps to implement and status of these steps
 

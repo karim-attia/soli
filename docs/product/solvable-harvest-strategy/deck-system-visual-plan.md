@@ -64,7 +64,7 @@ Recommendation: use standalone HTML because the request is specifically for a vi
 
 - `docs/product/solvable-harvest-strategy/rethink-solvable-harvesting.md`
 - `docs/product/solvable-harvest-strategy/seed-recovery-and-generator-selection.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-lonelybot-guide.md`
+- `docs/external-package-guides/lonelybot.md`
 
 ## Steps to implement and status of these steps
 

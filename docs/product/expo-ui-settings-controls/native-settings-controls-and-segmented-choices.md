@@ -30,7 +30,7 @@ Repo process requirements:
 - Create a detailed implementation plan before code changes at:
   `docs/product/expo-ui-settings-controls/native-settings-controls-and-segmented-choices.md`
 - Create a dated package/API guide at:
-  `docs/product/expo-ui-settings-controls/expo-ui-settings-controls-expo-ui-guide.md`
+  `docs/external-package-guides/expo-ui.md`
   Date: 2026-06-15.
 - Include the complete user prompt from this task 1:1 in the plan doc.
 - Include all required AGENTS sections:
@@ -194,9 +194,9 @@ Android runtime override does not reliably refresh Expo UI Hosts without restart
 - Expo UI SegmentedControl drop-in:
   https://docs.expo.dev/versions/latest/sdk/ui/drop-in-replacements/segmentedcontrol/
 - Existing Expo UI guide:
-  `docs/product/expo-ui-history-preview-sheet/expo-ui-history-preview-sheet-expo-ui-guide.md`
+  `docs/external-package-guides/expo-ui.md`
 - Scoped API guide:
-  `docs/product/expo-ui-settings-controls/expo-ui-settings-controls-expo-ui-guide.md`
+  `docs/external-package-guides/expo-ui.md`
 
 ## Possible approaches incl. pros and cons
 
@@ -378,7 +378,7 @@ No fetching or caching changes for retained settings.
 - `src/state/settings.tsx`
 - `src/theme/index.ts`
 - `docs/product/expo-ui-settings-controls/native-settings-controls-and-segmented-choices.md`
-- `docs/product/expo-ui-settings-controls/expo-ui-settings-controls-expo-ui-guide.md`
+- `docs/external-package-guides/expo-ui.md`
 
 ## Files actually modified
 
@@ -391,7 +391,7 @@ No fetching or caching changes for retained settings.
 - `src/state/settings.tsx`
 - `src/theme/index.ts`
 - `docs/product/expo-ui-settings-controls/native-settings-controls-and-segmented-choices.md`
-- `docs/product/expo-ui-settings-controls/expo-ui-settings-controls-expo-ui-guide.md`
+- `docs/external-package-guides/expo-ui.md`
 
 ## Identified issues and status of these issues
 

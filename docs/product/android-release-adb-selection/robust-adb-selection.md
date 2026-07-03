@@ -199,7 +199,7 @@ specific requirement: warn at 30 seconds (`30000` milliseconds) or less.
 
 ## Related tasks
 
-- `docs/delivery/30/30-2-agent-device-guide.md`
+- `docs/external-package-guides/agent-device.md`
 - `docs/product/tamagui-2-upgrade/tamagui-2-migration-plan.md`
 
 ## Simplification ideas

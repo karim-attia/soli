@@ -136,8 +136,8 @@ Recommendation: use this for v2.
 ## Related tasks
 
 - `docs/product/solvable-harvest-strategy/rethink-solvable-harvesting.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-lonelybot-guide.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-rust-mobile-guide.md`
+- `docs/external-package-guides/lonelybot.md`
+- `docs/external-package-guides/rust-mobile.md`
 
 ## Generator research summary
 

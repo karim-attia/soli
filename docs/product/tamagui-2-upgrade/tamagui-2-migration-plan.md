@@ -298,14 +298,14 @@ duplicate or incompatible copies are actually present. Candidate resolutions are
 
 Companion package guides:
 
-- `tamagui-2-tamagui-guide.md`
-- `tamagui-2-expo-sdk-55-guide.md`
-- `tamagui-2-react-native-reanimated-guide.md`
-- `tamagui-2-react-native-teleport-guide.md`
-- `tamagui-2-tamagui-native-guide.md`
-- `tamagui-2-lucide-icons-2-guide.md`
-- `tamagui-2-colors-guide.md`
-- `tamagui-2-font-inter-guide.md`
+- `docs/external-package-guides/tamagui.md`
+- `docs/external-package-guides/expo.md`
+- `docs/external-package-guides/react-native-reanimated.md`
+- `docs/external-package-guides/react-native-teleport.md`
+- `docs/external-package-guides/tamagui-native.md`
+- `docs/external-package-guides/tamagui-lucide-icons-2.md`
+- `docs/external-package-guides/tamagui-colors.md`
+- `docs/external-package-guides/tamagui-font-inter.md`
 
 `external-packages.mdc` is referenced by the repository instructions but is not
 present in the repository or the searched parent/Codex instruction paths. Until its
@@ -698,14 +698,14 @@ limited to Tamagui 2 compatibility and directly required visual regressions.
 - `components/Provider.tsx`
 - `components/settings/DrawCountSelector.tsx`
 - `docs/product/tamagui-2-upgrade/tamagui-2-migration-plan.md`
-- `docs/product/tamagui-2-upgrade/tamagui-2-tamagui-guide.md`
-- `docs/product/tamagui-2-upgrade/tamagui-2-expo-sdk-55-guide.md`
-- `docs/product/tamagui-2-upgrade/tamagui-2-react-native-reanimated-guide.md`
-- `docs/product/tamagui-2-upgrade/tamagui-2-react-native-teleport-guide.md`
-- `docs/product/tamagui-2-upgrade/tamagui-2-tamagui-native-guide.md`
-- `docs/product/tamagui-2-upgrade/tamagui-2-lucide-icons-2-guide.md`
-- `docs/product/tamagui-2-upgrade/tamagui-2-colors-guide.md`
-- `docs/product/tamagui-2-upgrade/tamagui-2-font-inter-guide.md`
+- `docs/external-package-guides/tamagui.md`
+- `docs/external-package-guides/expo.md`
+- `docs/external-package-guides/react-native-reanimated.md`
+- `docs/external-package-guides/react-native-teleport.md`
+- `docs/external-package-guides/tamagui-native.md`
+- `docs/external-package-guides/tamagui-lucide-icons-2.md`
+- `docs/external-package-guides/tamagui-colors.md`
+- `docs/external-package-guides/tamagui-font-inter.md`
 - `docs/product/tamagui-2-upgrade/tamagui-2-validation-report.md`
 - `metro.config.js`
 - `package.json`

@@ -150,7 +150,7 @@ Simplicity update: this proposal now favors a clean v2 path over heavy legacy co
 - PCG reference: https://www.pcg-random.org/index.html
 - Lehmer code / permutation numbering: https://en.wikipedia.org/wiki/Lehmer_code
 - Local Lonelybot exact implementation: `/Users/karim/kDrive/Code/Lonelybot/lonelybot/src/shuffler.rs`
-- Expo Crypto guide for this feature: `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-expo-crypto-guide.md`
+- Expo Crypto guide for this feature: `docs/external-package-guides/expo-crypto.md`
 
 ## Proposed decision in one sentence
 
@@ -748,7 +748,7 @@ Only product decision still worth making:
 
 - Proposed app dependency: `expo-crypto`.
 - Dev/tool dependency: Lonelybot checkout or vendored tooling path for catalog generation.
-- Fresh package guide: `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-expo-crypto-guide.md`
+- Fresh package guide: `docs/external-package-guides/expo-crypto.md`
 
 ## UX/UI Considerations
 
@@ -772,9 +772,9 @@ No new UI components. No component or layout changes.
 
 - `docs/product/solvable-harvest-strategy/rethink-solvable-harvesting.md`
 - `docs/product/solvable-harvest-strategy/seed-recovery-and-generator-selection.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-expo-crypto-guide.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-lonelybot-guide.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-rust-mobile-guide.md`
+- `docs/external-package-guides/expo-crypto.md`
+- `docs/external-package-guides/lonelybot.md`
+- `docs/external-package-guides/rust-mobile.md`
 
 ## Steps to implement and status of these steps
 
@@ -797,7 +797,7 @@ No new UI components. No component or layout changes.
 ## Plan: Files to modify
 
 - `docs/product/solvable-harvest-strategy/best-practice-deal-identity-proposal.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-expo-crypto-guide.md`
+- `docs/external-package-guides/expo-crypto.md`
 - Future implementation:
   - `src/solitaire/dealIdentity.ts`
   - `src/solitaire/klondike.ts`
@@ -817,7 +817,7 @@ No new UI components. No component or layout changes.
 ## Files actually modified
 
 - `docs/product/solvable-harvest-strategy/best-practice-deal-identity-proposal.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-expo-crypto-guide.md`
+- `docs/external-package-guides/expo-crypto.md`
 - `src/solitaire/klondike.ts`
 - `src/solitaire/dealIdentity.ts`
 - `src/data/solvableDealsV2.ts`
@@ -832,7 +832,7 @@ No new UI components. No component or layout changes.
 - `components/settings/DrawCountSelector.tsx`
 - `scripts/generate-solvable-deals-v2.js`
 - `run-android-release.sh`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-lonelybot-guide.md`
+- `docs/external-package-guides/lonelybot.md`
 - `/Users/karim/kDrive/Code/Lonelybot/lonelybot/lonecli/src/main.rs`
 - `/Users/karim/kDrive/Code/Lonelybot/lonelybot/lonecli/src/solver.rs`
 - `scripts/klondike-solver-new.js`

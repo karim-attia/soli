@@ -83,8 +83,8 @@ smoke tests pass, because `react-native-teleport` contains native code.
 
 Package research is cached in the committed Tamagui 2 upgrade docs:
 
-- `docs/product/tamagui-2-upgrade/tamagui-2-tamagui-native-guide.md`
-- `docs/product/tamagui-2-upgrade/tamagui-2-react-native-teleport-guide.md`
+- `docs/external-package-guides/tamagui-native.md`
+- `docs/external-package-guides/react-native-teleport.md`
 
 ## UX/UI Considerations
 
@@ -134,15 +134,15 @@ existing providers and remain visible inside Sheet content.
 - `docs/product/tamagui-native-teleport/native-teleport-follow-up.md`
 - `docs/product/tamagui-2-upgrade/tamagui-2-migration-plan.md`
 - `docs/product/tamagui-2-upgrade/tamagui-2-validation-report.md`
-- `docs/product/tamagui-2-upgrade/tamagui-2-react-native-teleport-guide.md`
-- `docs/product/tamagui-2-upgrade/tamagui-2-tamagui-native-guide.md`
+- `docs/external-package-guides/react-native-teleport.md`
+- `docs/external-package-guides/tamagui-native.md`
 
 ## Files actually modified
 
 - `docs/product/tamagui-native-teleport/native-teleport-follow-up.md`
 - `docs/product/tamagui-2-upgrade/tamagui-2-migration-plan.md`
-- `docs/product/tamagui-2-upgrade/tamagui-2-react-native-teleport-guide.md`
-- `docs/product/tamagui-2-upgrade/tamagui-2-tamagui-native-guide.md`
+- `docs/external-package-guides/react-native-teleport.md`
+- `docs/external-package-guides/tamagui-native.md`
 - `docs/product/tamagui-2-upgrade/tamagui-2-validation-report.md`
 - `index.js`
 - `package.json`

@@ -108,7 +108,7 @@ No new dependency is expected.
 package's dependency graph.
 
 The package/API research required for this feature is cached in
-`config-v5-tamagui-guide.md`.
+`docs/external-package-guides/tamagui-config.md`.
 
 ## UX/UI Considerations
 
@@ -165,14 +165,14 @@ must remain available after the theme/config replacement and inside Teleport con
 - `tamagui-web.css`
 - Config v5-sensitive app/component files only if validation proves a regression
 - `docs/product/tamagui-config-v5/config-v5-migration.md`
-- `docs/product/tamagui-config-v5/config-v5-tamagui-guide.md`
+- `docs/external-package-guides/tamagui-config.md`
 - `docs/product/tamagui-2-upgrade/tamagui-2-migration-plan.md`
 - `docs/product/tamagui-2-upgrade/tamagui-2-validation-report.md`
 
 ## Files actually modified
 
 - `docs/product/tamagui-config-v5/config-v5-migration.md`
-- `docs/product/tamagui-config-v5/config-v5-tamagui-guide.md`
+- `docs/external-package-guides/tamagui-config.md`
 - `docs/product/tamagui-2-upgrade/tamagui-2-migration-plan.md`
 - `docs/product/tamagui-2-upgrade/tamagui-2-validation-report.md`
 - `app/feature-graphic.tsx`

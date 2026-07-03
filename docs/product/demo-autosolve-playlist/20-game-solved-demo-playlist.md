@@ -189,8 +189,8 @@ Recommendation: retire it as the main auto-solve scenario after the playlist wor
 - No new runtime app dependency is expected.
 - Dev/tool dependency: local Lonelybot checkout at
   `/Users/karim/kDrive/Code/Lonelybot/lonelybot`.
-- Feature guide: `docs/product/demo-autosolve-playlist/demo-autosolve-playlist-lonelybot-guide.md`.
-- Existing guide: `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-lonelybot-guide.md`.
+- Feature guide: `docs/external-package-guides/lonelybot.md`.
+- Existing guide: `docs/external-package-guides/lonelybot.md`.
 - Upstream docs/source: https://github.com/vuonghy2442/lonelybot.
 
 ## UX/UI Considerations
@@ -250,7 +250,7 @@ Recommendation: retire it as the main auto-solve scenario after the playlist wor
 ## Related tasks
 
 - `docs/product/solvable-harvest-strategy/rethink-solvable-harvesting.md`
-- `docs/product/solvable-harvest-strategy/solvable-harvest-strategy-lonelybot-guide.md`
+- `docs/external-package-guides/lonelybot.md`
 - `docs/product/draw-count-setting/solitaire-stock-draw-count.md`
 - `docs/product/auto-up-win-handoff/28-2-end-of-auto-up-jitter.md`
 
@@ -303,7 +303,7 @@ Recommendation: retire it as the main auto-solve scenario after the playlist wor
 ## Plan: Files to modify
 
 - `docs/product/demo-autosolve-playlist/20-game-solved-demo-playlist.md`
-- `docs/product/demo-autosolve-playlist/demo-autosolve-playlist-lonelybot-guide.md`
+- `docs/external-package-guides/lonelybot.md`
 - `scripts/generate-demo-autosolve-playlist.js`
 - `src/data/demoAutoSolvePlaylist.generated.ts`
 - `src/data/demoAutoSolvePlaylist.ts`
@@ -319,7 +319,7 @@ Recommendation: retire it as the main auto-solve scenario after the playlist wor
 ## Files actually modified
 
 - `docs/product/demo-autosolve-playlist/20-game-solved-demo-playlist.md`
-- `docs/product/demo-autosolve-playlist/demo-autosolve-playlist-lonelybot-guide.md`
+- `docs/external-package-guides/lonelybot.md`
 - `scripts/generate-demo-autosolve-playlist.js`
 - `scripts/run-demo-autosolve.js`
 - `src/data/demoAutoSolvePlaylist.generated.ts`
