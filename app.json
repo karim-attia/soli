@@ -13,6 +13,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "ch.karimattia.soli",
       "buildNumber": "13",
+      "deploymentTarget": "16.4",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -77,14 +78,6 @@
           "image": "./assets/images/icon.png",
           "imageWidth": 368,
           "resizeMode": "contain"
-        }
-      ],
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "deploymentTarget": "16.4"
-          }
         }
       ],
       "expo-status-bar",

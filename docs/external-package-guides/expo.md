@@ -1,6 +1,6 @@
 # Expo Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-07-04
 
 ## Scope
 
@@ -10,11 +10,78 @@ Last refreshed: 2026-07-03
 
 ## Current guidance
 
-Use this as the definitive Expo SDK reference for Soli. The repo is on SDK 56; keep SDK 55 notes only as migration background, and create a separate implementation plan before moving to SDK 57 or later.
+Use this as the definitive Expo SDK reference for Soli. The repo entered the SDK
+57 upgrade from SDK 56 on 2026-07-04; keep SDK 55/56 notes as migration background
+and use the SDK 57 section for current upgrade decisions.
 
 ## Detailed guidance
 
 The sections below are the definitive combined notes for this package or tool. Keep version-specific context when it affects compatibility, but update this single file instead of adding task- or feature-prefixed guides.
+
+### SDK 57 Upgrade Notes
+
+- Package family: `expo` and Expo SDK packages
+- Retrieved: 2026-07-04
+- Primary docs:
+  - https://expo.dev/changelog/sdk-57
+  - https://docs.expo.dev/versions/latest/
+  - https://docs.expo.dev/workflow/upgrading-expo-sdk-walkthrough/
+  - https://docs.expo.dev/versions/latest/config/app/
+  - https://docs.expo.dev/versions/latest/sdk/build-properties/
+
+## Target facts
+
+- Expo SDK 57 is the latest stable SDK line on 2026-07-04.
+- npm metadata reports `expo@57.0.2` as `latest`.
+- Expo's latest SDK reference maps SDK `57.0.0` to:
+  - React Native `0.86`
+  - React `19.2.3`
+  - React Native Web `0.21.0`
+  - Minimum Node.js `22.13.x`
+- Current local Node `25.9.0` satisfies the SDK 57 minimum.
+- Current local Xcode `26.6` satisfies the SDK 56+ `26.4+` baseline carried into this
+  upgrade.
+
+## Official upgrade flow
+
+For the Soli Yarn/CNG workflow, use:
+
+```sh
+npx expo install expo@^57.0.0 --fix
+npx expo install --check
+npx expo-doctor@latest
+```
+
+Expo's upgrade walkthrough says to upgrade one SDK at a time, align dependencies with
+`expo install --fix`, run Expo Doctor, and regenerate native projects for CNG apps.
+Soli is moving from SDK 56 to SDK 57, so this is an incremental upgrade.
+
+## SDK 57 notes relevant to Soli
+
+- SDK 57 is a focused SDK 56 -> 57 upgrade that primarily brings React Native 0.86.
+- Expo says the upgrade from SDK 56 / RN 0.85 should be straightforward because RN
+  0.86 has no user-facing breaking changes, but Soli still needs fresh native builds.
+- `expo prebuild` now clears and regenerates native `android` and `ios` directories
+  by default. This matches Soli's generated/ignored native folder workflow; do not add
+  tracked native project files.
+- Expo Go for SDK 57 may not be available in all app stores immediately. Use dev or
+  release builds for production-app validation.
+- SDK 57 bundles newer animation/gesture packages: Reanimated 4.5, Worklets 0.10, and
+  Gesture Handler 2.32.
+- Known regression: Android Hermes V1 plus Reanimated can increase memory usage by
+  25-30%. Worklets bundle mode is the documented workaround, but do not enable it
+  without evidence in Soli.
+- For SDK 56 and greater, `expo-build-properties` documents its iOS
+  `deploymentTarget` plugin option as deprecated in favor of built-in
+  `ios.deploymentTarget` app config. Prefer the built-in property if native checks pass.
+
+## Repo usage notes
+
+- Continue to prefer Expo/CNG tooling for native output.
+- Keep `babel.config.js` and `metro.config.js` because Tamagui needs custom Babel and
+  Metro integration.
+- Do not opt into React Compiler, new Android edge-to-edge behavior, or Worklets bundle
+  mode as part of the baseline SDK 57 upgrade unless validation exposes a concrete need.
 
 ### SDK 55 Upgrade Notes
 

@@ -1,6 +1,6 @@
 # React Native Reanimated Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-07-04
 
 ## Scope
 
@@ -10,11 +10,118 @@ Last refreshed: 2026-07-03
 
 ## Current guidance
 
-Use this for Reanimated and Worklets compatibility, feature flags, and animation-risk notes. Keep Reanimated and Worklets aligned with Expo bundled versions.
+Use this for Reanimated and Worklets compatibility, feature flags, and animation-risk
+notes. Keep Reanimated and Worklets aligned with Expo bundled versions unless a captured
+upstream defect justifies a narrowly tested patch release override.
 
 ## Detailed guidance
 
 The sections below are the definitive combined notes for this package or tool. Keep version-specific context when it affects compatibility, but update this single file instead of adding task- or feature-prefixed guides.
+
+### Expo SDK 57 Reanimated / Worklets Notes
+
+- Package: `react-native-reanimated` and `react-native-worklets`
+- Retrieved: 2026-07-04
+- Primary docs:
+  - https://expo.dev/changelog/sdk-57
+  - https://docs.expo.dev/versions/latest/sdk/reanimated/
+  - https://docs.swmansion.com/react-native-reanimated/docs/guides/compatibility/
+
+## Target facts
+
+- Soli enters the SDK 57 upgrade on Reanimated `4.3.1` and Worklets `0.8.3`.
+- Expo SDK 57 bundles Reanimated `4.5` and Worklets `0.10`.
+- Expo's latest Reanimated reference recommends `react-native-reanimated` `4.5.0` and
+  installing it together with `react-native-worklets` through Expo tooling.
+- `babel-preset-expo` automatically configures the Reanimated/Worklets Babel plugin when
+  the libraries are installed.
+
+## SDK 57 risk notes for Soli
+
+- Soli should continue to let Expo align Reanimated and Worklets. Do not manually chase
+  npm latest if it diverges from Expo's bundled versions.
+- Android Hermes V1 plus Reanimated has a known memory regression that can increase
+  memory usage even when Reanimated is only imported. Expo says this also affects SDK 56.
+- Worklets bundle mode is the documented workaround, but enabling it is a native runtime
+  behavior change. For this upgrade, monitor logs and smoke-test repeated gameplay first;
+  enable bundle mode only if evidence justifies a follow-up.
+- Because Soli is animation-heavy, native validation should include stock draw, drag/tap
+  moves, undo, auto-up, settings/history sheets, and a quick repeated-game sanity pass.
+
+### Worklets 0.10.0 iOS remote-callback crash
+
+- Retrieved: 2026-07-04
+- Current Soli pair: Reanimated `4.5.0` and Worklets `0.10.1`; Worklets is an
+  intentional patch override from Expo SDK 57's bundled exact `0.10.0`.
+- Sources:
+  - https://docs.expo.dev/versions/latest/config/package-json/#installexclude
+  - https://github.com/software-mansion/react-native-reanimated/issues/9797
+  - https://github.com/software-mansion/react-native-reanimated/releases/tag/worklets-0.10.1
+  - https://www.npmjs.com/package/react-native-worklets?activeTab=versions
+  - https://developer.apple.com/documentation/xcode/analyzing-a-crash-report
+
+Soli captured a symbolicated iOS simulator crash after a 20-game demo playlist. It was
+an `EXC_CRASH` / `SIGABRT` on the React JavaScript thread, not a memory-pressure
+termination. Worklets `0.10.0` asserted in `JSIWorkletsModuleProxy.cpp:455` while
+reconstructing a remote callback scheduled onto the React Native runtime.
+
+Worklets `0.10.1` is a narrow patch release, not a feature adoption. It includes three
+cherry-picked fixes from the `0.10` stable line:
+
+- normalize Windows paths in bundle-mode module IDs;
+- tie React Native Runtime remote-function lifetime to TurboModule invalidation;
+- make destructor access safe across a time-of-check / time-of-use race.
+
+The latter two fixes are directly relevant to Soli's captured remote-callback crash.
+
+Compatibility metadata supports the narrow patch: Worklets `0.10.1` supports React Native
+`0.83-0.86`, and Reanimated `4.5.0` accepts Worklets `0.10.x`.
+
+Soli now applies exact Worklets `0.10.1` and excludes `react-native-worklets` through
+`expo.install.exclude`. This is only an Expo install/version-check exclusion; native
+autolinking remains enabled. The drawbacks and maintenance requirements are explicit:
+
+- `0.10.1` intentionally diverges from Expo SDK 57's bundled exact `0.10.0`.
+- Expo install checks, Expo Doctor, and other Expo version validation will not check this
+  package while it is excluded, so compatibility must be maintained manually.
+- A clean native rebuild is mandatory after changing Worklets because its JavaScript and
+  native parts must stay aligned; a JavaScript-only reload is not sufficient.
+- Remove the exclusion once Expo recommends Worklets `0.10.1` or newer, then return to
+  Expo-managed version validation.
+
+The regression test should rerun the same 20-game iOS playlist with crash logs captured;
+normal gameplay/celebration smoke should also run on both platforms. Do not add Worklets
+bundle mode or weaken Soli's celebration behavior unless `0.10.1` fails the focused
+regression test.
+
+Android native-cache failure mode after changing Worklets:
+
+- Retrieved: 2026-07-04
+- Sources:
+  - https://docs.swmansion.com/react-native-reanimated/docs/guides/building-on-windows/#remove-or-invalidate-caches
+  - https://github.com/expo/expo/issues/42893
+
+If Android release builds fail with Ninja/CMake looking for a missing
+`libworklets.so` under an old generated hash, first treat it as stale ignored native
+build output. Reanimated's Android build troubleshooting calls out stale Android and
+package-level CMake/build artifacts as valid cleanup targets. For Soli's generated
+native-output workflow, the scoped cleanup targets are:
+
+- `android/.gradle`
+- `android/build`
+- `android/app/.cxx`
+- `android/app/build`
+- `node_modules/react-native-worklets/android/.cxx`
+- `node_modules/react-native-worklets/android/build`
+- `node_modules/react-native-reanimated/android/.cxx`
+- `node_modules/react-native-reanimated/android/build`
+- `node_modules/expo-modules-core/android/.cxx`
+- `node_modules/expo-modules-core/android/build`
+
+Do not respond to this failure by downgrading Reanimated/Worklets, changing Android
+Gradle Plugin, or disabling the New Architecture; the Reanimated guide explicitly warns
+against those detours. Clean generated artifacts, then rebuild the Android release and
+confirm the fresh install on the device.
 
 ### Reanimated 4.2 Feature Flags
 

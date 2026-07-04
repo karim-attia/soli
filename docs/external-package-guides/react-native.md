@@ -1,6 +1,6 @@
 # React Native Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-07-04
 
 ## Scope
 
@@ -10,11 +10,53 @@ Last refreshed: 2026-07-03
 
 ## Current guidance
 
-Use this for React Native version compatibility and upgrade notes. The app is on RN 0.85.3 through Expo SDK 56; native validation remains required for upgrade work.
+Use this for React Native version compatibility and upgrade notes. The app entered the
+Expo SDK 57 upgrade from RN 0.85.3 to RN 0.86 on 2026-07-04; native validation remains
+required for upgrade work.
 
 ## Detailed guidance
 
 The sections below are the definitive combined notes for this package or tool. Keep version-specific context when it affects compatibility, but update this single file instead of adding task- or feature-prefixed guides.
+
+### SDK 57 React Native Notes
+
+- Package: `react-native`
+- Retrieved: 2026-07-04
+- Primary docs:
+  - https://reactnative.dev/blog/2026/06/11/react-native-0.86
+  - https://reactnative.dev/versions
+  - https://reactnative.dev/docs/upgrading
+  - https://docs.expo.dev/versions/latest/
+  - https://expo.dev/changelog/sdk-57
+
+## Target facts
+
+- Soli enters the SDK 57 upgrade on `react-native@0.85.3`.
+- Expo SDK 57 maps to React Native `0.86`.
+- npm metadata reports `react-native@0.86.0` as the latest stable release.
+- React remains `19.2.3` across Expo SDK 56 and SDK 57.
+- Expo's latest SDK matrix keeps the minimum Node.js version at `22.13.x`.
+
+## React Native 0.86 notes relevant to Soli
+
+- React Native 0.86 has no user-facing breaking changes from 0.85.
+- The release focuses on Android 15+ edge-to-edge fixes, React Native DevTools
+  improvements, rendering/layout/animation fixes, accessibility fixes, and Android
+  input/navigation/image fixes.
+- Deprecations to watch for in app or dependencies:
+  - `ViewUtil.getUIManagerType`
+  - the second argument of `AppRegistry.setComponentProviderInstrumentationHook`
+- Android BackHandler behavior changed only by adding an event object argument and fixing
+  callback re-registration on API 36+. Existing callbacks that ignore the argument should
+  continue to work.
+- Safe areas, status/navigation bars, modals, keyboard behavior, Android back behavior,
+  and animation-heavy gameplay should be smoke-tested on fresh native builds.
+
+## Expo-specific upgrade rule
+
+For Soli, do not independently pin React Native outside the Expo SDK 57 matrix. Let
+`npx expo install expo@^57.0.0 --fix` align the supported RN version and then validate
+with Expo Doctor plus native builds.
 
 ### SDK 55 React Native Notes
 

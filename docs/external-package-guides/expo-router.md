@@ -1,6 +1,6 @@
 # Expo Router Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-07-04
 
 ## Scope
 
@@ -10,11 +10,47 @@ Last refreshed: 2026-07-03
 
 ## Current guidance
 
-Use this for Expo Router package alignment and route API migration notes. Prefer Expo SDK bundled versions and avoid direct React Navigation imports unless Expo Router documents them.
+Use this for Expo Router package alignment and route API migration notes. Prefer Expo
+SDK bundled versions and avoid direct React Navigation imports unless Expo Router
+documents them.
 
 ## Detailed guidance
 
 The sections below are the definitive combined notes for this package or tool. Keep version-specific context when it affects compatibility, but update this single file instead of adding task- or feature-prefixed guides.
+
+### SDK 57 Router Notes
+
+- Package: `expo-router`
+- Retrieved: 2026-07-04
+- Primary docs:
+  - https://docs.expo.dev/versions/latest/sdk/router/
+  - https://expo.dev/changelog/sdk-57
+
+## Target facts
+
+- Expo SDK 57 recommends `expo-router` `~57.0.3`.
+- SDK 56 and later still require application code to import React Navigation APIs from
+  Expo Router entry points rather than external `@react-navigation/*` packages.
+- Soli's current source scan has no direct `@react-navigation/*` imports.
+- SDK 57 adds Android support for `Stack.Toolbar.Badge` in header placements and on
+  toolbar menu icons. `Stack.Toolbar` itself predates SDK 57, remains an alpha API,
+  and does not render on web.
+- This is not currently applicable to Soli's main screens. Their headers are owned by
+  the nested Expo Router `Drawer`, while `Stack.Toolbar` configures a native Stack
+  screen. Soli also has no header badge count or status to display.
+- Do not restructure the Drawer navigation or replace the existing `headerLeft` /
+  `headerRight` controls only to adopt `Stack.Toolbar`. Revisit it if Expo stabilizes
+  the API and Soli later moves these screens under a Stack-owned header or gains a
+  concrete badge/menu requirement.
+
+## Repo usage notes
+
+- Let `npx expo install expo@^57.0.0 --fix` select the Router version.
+- After upgrade, re-run `rg "@react-navigation"` across app/source code and
+  `npx expo-doctor@latest`.
+- Keep the existing options-based header configuration for the Drawer routes. The
+  composition APIs (`Stack.Toolbar`, `Stack.Title`, and `Stack.Header`) do not provide
+  a useful drop-in simplification for the current navigator structure.
 
 ### SDK 55 Router Notes
 

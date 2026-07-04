@@ -1,6 +1,6 @@
 # Expo UI Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-07-04
 
 ## Scope
 
@@ -15,6 +15,146 @@ Use this for native Expo UI controls. Prefer small app-owned wrappers in `compon
 ## Detailed guidance
 
 The sections below are the definitive combined notes for this package or tool. Keep version-specific context when it affects compatibility, but update this single file instead of adding task- or feature-prefixed guides.
+
+### SDK 57 Deferred Adoption Opportunities
+
+- Package: `@expo/ui@57.0.3`
+- Retrieved: 2026-07-04
+- Primary docs:
+  - https://docs.expo.dev/versions/v57.0.0/sdk/ui/
+  - https://docs.expo.dev/versions/v57.0.0/sdk/ui/universal/host/
+  - https://docs.expo.dev/versions/v57.0.0/sdk/ui/universal/bottomsheet/
+  - https://docs.expo.dev/versions/v57.0.0/sdk/ui/universal/fieldgroup/
+  - https://docs.expo.dev/versions/v57.0.0/sdk/ui/universal/listitem/
+  - https://docs.expo.dev/versions/v57.0.0/sdk/ui/universal/picker/
+
+These are possible follow-up product changes, not required SDK 57 migration work.
+The current Settings controls and content-sized sheets passed native validation.
+
+#### Small opportunity: theme native controls with `Host.seedColor`
+
+- SDK 57 adds `seedColor` to the universal `Host`.
+- Android derives a Material 3 palette from the seed, iOS applies it as the SwiftUI
+  tint, and web exposes a generated primary color scale to the subtree.
+- Soli could pass its resolved green accent to each Settings `Host` so switches use a
+  deliberate Soli tint instead of the platform-default accent.
+- This is a small visual change, not a correctness fix. Verify enabled, disabled,
+  light, and dark states on both native platforms before keeping it.
+- A future full-screen Expo UI Settings form would use one seeded `Host`, making this
+  cleaner than threading the value into every current inline switch host.
+
+#### Medium opportunity: detented History preview sheet
+
+Current behavior remains valid: `AppSheet` omits `snapPoints`, uses
+`RNHostView matchContents`, and lets each universal sheet fit its intrinsic content.
+This is simple and appropriate for the compact Demo chooser.
+
+The History preview could instead become an explicitly expandable sheet:
+
+- Extend the app-owned `AppSheet` API with an optional layout mode or optional
+  `snapPoints` rather than making all sheets detented.
+- Keep Demo chooser in content-fit mode.
+- Give History preview native half/full detents, allowing the user to expand a tall
+  tableau preview while preserving a smaller initial sheet.
+- Universal snap points are `'half'`, `'full'`, `{ fraction }`, or `{ height }`.
+  Fractional/fixed values are exact on iOS and web; Android maps them to its native
+  half/full states. Prefer `['half', 'full']` for predictable cross-platform behavior.
+- A detented sheet cannot rely on the current intrinsic-size contract alone. Its
+  content should gain an explicit bounded/fill layout and, if it can exceed the active
+  detent, a React Native `ScrollView` or list inside `RNHostView`. Set
+  `nestedScrollEnabled` on Android so content scrolling and sheet dragging cooperate.
+- Preserve `RNHostView`; the History preview is still React Native/Tamagui content
+  hosted inside the native Compose/SwiftUI sheet.
+- Validate short and tall deals, large text, small phones, rotation/tablet widths,
+  Android Back, scrim dismissal, and repeated open/dismiss cycles.
+
+The `@expo/ui@57.0.2` scrolling fix is specifically for
+`@expo/ui/community/bottom-sheet` with fixed snap points. Soli uses the universal
+`BottomSheet`, so that patch is not by itself a reason to change implementations. A
+move to detents should be justified by History preview usability.
+
+#### Larger opportunity: native Settings form with `FieldGroup`
+
+SDK 57's universal `FieldGroup` is a scrollable grouped-settings container backed by
+SwiftUI on iOS, Jetpack Compose on Android, and a web implementation. It can replace
+most of the current Settings screen's React Native `ScrollView`, Tamagui section
+stacks, separators, manual row layout, and one-Host-per-switch pattern.
+
+Possible target structure:
+
+```tsx
+<Host style={{ flex: 1 }} seedColor={accentColor}>
+  <FieldGroup>
+    <FieldGroup.Section title="Gameplay">
+      {/* Draw-count Picker/ListItem and gameplay switch rows */}
+    </FieldGroup.Section>
+    <FieldGroup.Section title="Statistics">
+      {/* Statistics switch rows */}
+    </FieldGroup.Section>
+    <FieldGroup.Section title="Advanced">
+      {/* Developer mode and conditional animation controls */}
+    </FieldGroup.Section>
+  </FieldGroup>
+</Host>
+```
+
+Recommended row mapping:
+
+- Use `ListItem` when a setting needs both a title and supporting description, with
+  the controlled universal `Switch` in its trailing slot. The `Switch.label` prop is
+  only a string and does not replace Soli's richer title-plus-description rows.
+- Use a universal `Picker` for draw count if a native menu is acceptable. Keeping the
+  current always-visible segmented control would require a deliberate mixed/native
+  composition or retaining that row outside the pure `FieldGroup` conversion.
+- Apply `disabled` at the section or control level while settings hydrate. Use native
+  disabled treatment instead of manually reducing opacity where possible.
+- Keep the Advanced/Animations section conditional on developer mode. Confirm that
+  inserting/removing native rows preserves scroll position and accessibility focus.
+
+Benefits:
+
+- One native Host and one coherent native form instead of many small Compose/SwiftUI
+  islands embedded in a Tamagui layout.
+- Platform-native grouped rows, scrolling, spacing, switch alignment, press targets,
+  disabled states, Dynamic Type behavior, and accessibility semantics.
+- Less app-owned layout code: the current `ToggleRow`, repeated section headings,
+  separators, manual bottom safe-area padding, and surrounding `ScrollView` become
+  candidates for removal.
+- `Host.seedColor` can theme the entire form consistently from one place.
+- The Settings state model and callbacks remain unchanged; this is primarily a view
+  migration rather than a state rewrite.
+
+Costs and risks:
+
+- This is a visible Settings redesign. Native iOS and Android forms will not exactly
+  match each other or the surrounding Tamagui screens, which is partly the point but
+  needs a product decision.
+- Universal Expo UI styling is intentionally narrower than Tamagui styling. Exact
+  spacing, typography, separator, and row-background control may be unavailable or
+  require platform modifiers, which should be avoided unless a real UX issue remains.
+- Draw count is the awkward row. Replacing the segmented control with `Picker` changes
+  interaction; embedding the existing control preserves behavior but weakens the
+  simplicity benefit.
+- The native accessibility tree and automation selectors will change. Re-test the
+  drawer/header controls, every setting, screen-reader labels/descriptions, large
+  text, focus order, and screen re-entry after navigating away.
+- Web must be reviewed independently. The universal implementation supports web, but
+  the resulting form will not be pixel-identical to the current Tamagui screen.
+- FieldGroup should own scrolling. Do not nest it in the current React Native
+  `ScrollView`; use a full-height `Host` and verify safe-area behavior before removing
+  the existing manual bottom inset.
+
+Suggested implementation sequence:
+
+1. Prototype the form behind a local branch or temporary route with the existing
+   settings state and no persistence changes.
+2. Convert Gameplay first, deciding explicitly between native `Picker` and the current
+   segmented control.
+3. Add Statistics and the conditional Advanced/Animations sections.
+4. Remove `ToggleRow`, Tamagui section layout, and manual safe-area padding only after
+   native and web comparison passes.
+5. Run focused accessibility and navigation lifecycle tests on physical Android and
+   iOS devices before replacing the current screen.
 
 ### History Preview Sheet Notes
 
