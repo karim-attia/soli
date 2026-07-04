@@ -16,7 +16,7 @@
 
 # Implementation plan
 
-- Every feature should have a detailed implementation plan
+- Every implementation work should have a detailed implementation plan
 - Exception: Very small updates. But if the update gets bigger create one, also if it only gets bigger after already having started working on it. Reason: To preserve the context of what we're doing through sessions or after compacting context.
 - First check if there is an existing implementation plan in `docs/product/` for what we are doing and continue using it if it makes sense. Otherwise, create a new one with <feature-name>.md.
 - Use a subagent with the flagship AI model to create the initial implementation plan. Smaller updates can be done directly or also by the subagent depending on the size of the update.
