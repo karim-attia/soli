@@ -60,6 +60,9 @@ npx expo-doctor
 ## Usage Notes
 - Prefer `expo install` over manual semver guessing for Expo-managed dependencies.
 - After dependency alignment, run TypeScript + tests + Expo export/doctor before considering task review-ready.
+- For CNG-style native files, prefer clean regeneration plus config plugins over relying on
+  ignored local `android/` or `ios/` drift. Soli's native folders are intended to stay
+  untracked; tracked Expo config and assets are the source of truth.
 
 ## Refresh check (2026-07-03)
 
@@ -72,10 +75,28 @@ npx expo-doctor
   installed line.
 - Current guidance in this file covers SDK 56 repo work; use
   Expo's SDK 57 changelog for the next upgrade.
+- SDK 57 changes the default `expo prebuild` behavior: native `android` and `ios`
+  directories are cleared and regenerated unless `--no-clean` is passed. Soli already uses
+  explicit `prebuild --clean` scripts so generated native folders come from tracked config
+  and assets.
 - Sources:
   - https://docs.expo.dev/versions/latest/
   - https://docs.expo.dev/versions/v56.0.0/
+  - https://docs.expo.dev/workflow/continuous-native-generation/
   - https://expo.dev/changelog/sdk-57
+
+### CNG / ignored native folder note (2026-07-03)
+
+- Source refresh:
+  - https://docs.expo.dev/workflow/continuous-native-generation/
+  - https://expo.dev/changelog/sdk-57
+- Expo's CNG docs say `prebuild --clean` deletes existing native folders before generating
+  them from app config and package metadata. Running prebuild without a clean layer can be
+  faster, but may not produce the same result in some cases.
+- For Soli, card-font determinism now lives in tracked source: `app.json` registers the
+  patched `CardTextAndroid` family on Android and embeds the same files on iOS, while CNG
+  regenerates the native folders from that state. The old release-time guard that rejected
+  Android registration was removed because registration is now the desired contract.
 
 ### SDK 56 Current Notes
 
@@ -152,11 +173,11 @@ npx expo-doctor@latest
 ## Repo usage notes
 
 - Current `package.json` and `yarn.lock` are on SDK 56 patch-aligned versions.
-- The workspace has generated `android/` and `ios/` directories locally, and Git tracks
-  `android/app/build.gradle` plus `android/gradle.properties`. Do not assume a purely
-  generated native shell when diagnosing build drift.
-- Continue to prefer Expo/CNG upgrade tooling for native diffs, and only edit tracked
-  native files deliberately.
+- The workspace may have generated `android/` and `ios/` directories locally, but Soli's
+  desired workflow is fully untracked native folders regenerated from tracked Expo config
+  and assets.
+- Continue to prefer Expo/CNG upgrade tooling for native output and avoid hand-editing
+  generated native folders.
 - Keep `babel.config.js` and `metro.config.js` because Tamagui needs custom Babel and
   Metro integration.
 

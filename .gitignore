@@ -57,9 +57,6 @@ modules/**/ios/build
 modules/**/ios/Pods
 modules/**/ios/.symlinks
 modules/**/ios/DerivedData
-!android/app/build.gradle
-!android/app/proguard-rules.pro
-!android/gradle.properties
 # Never commit keystore files
 *.keystore
 *.jks

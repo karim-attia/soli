@@ -24,7 +24,9 @@
     "generate:solvable-deals": "node scripts/generate-solvable-deals-v2.js",
     "demo:auto-solve": "node scripts/run-demo-autosolve.js",
     "build:android": "./build-android.sh",
-    "prebuild": "npx expo prebuild --platform android --clean"
+    "prebuild": "yarn prebuild:android",
+    "prebuild:android": "npx expo prebuild --platform android --clean",
+    "prebuild:ios": "npx expo prebuild --platform ios --clean"
   },
   "dependencies": {
     "@expo/ui": "~56.0.18",

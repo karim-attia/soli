@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import argparse
 import math
-import re
 import shutil
 import subprocess
 import tempfile
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from xml.etree import ElementTree as ET
-
 from fontTools import subset
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.scaleUpem import scale_upem
@@ -20,7 +17,11 @@ DEFAULT_SOURCE_DIR = Path('/tmp/soli-font-check')
 DEFAULT_OUTPUT_DIR = Path('assets/fonts')
 RANK_SOURCE_FILE = 'Roboto-Regular.ttf'
 SUIT_SOURCE_FILE = 'NotoColorEmoji.ttf'
-SUIT_METRICS_SOURCE_FILE = 'NotoSansSymbols-Regular-Subsetted2.ttf'
+# 2026-07-04: suit hmtx must come from NotoColorEmoji (uniform 1275 advance @ upem 1024),
+# the font the approved Android fallback actually used. The earlier NotoSansSymbols
+# source gave per-suit advances that left the centered center-suit ink up to ~5.5px
+# off-center (worst for ♦). Keep in sync with scripts/patch-card-font-metrics.py.
+SUIT_METRICS_SOURCE_FILE = 'NotoColorEmoji.ttf'
 REGULAR_OUTPUT_FILE = 'CardTextAndroid.ttf'
 SEMIBOLD_OUTPUT_FILE = 'CardTextAndroid-SemiBold.ttf'
 BOLD_OUTPUT_FILE = 'CardTextAndroid-Bold.ttf'
@@ -31,9 +32,7 @@ MERGED_FAMILY_NAME = 'CardTextAndroid'
 REGULAR_STYLE_NAME = 'Regular'
 SEMIBOLD_STYLE_NAME = 'SemiBold'
 BOLD_STYLE_NAME = 'Bold'
-SUIT_RIGHT_PADDING = 72
-SVG_PATH_NUMBER_PATTERN = re.compile(r'[-+]?(?:\d*\.\d+|\d+)')
-SVG_PATH_CHUNK_PATTERN = re.compile(r'([A-Za-z])([^A-Za-z]*)')
+USE_TYPO_METRICS_BIT = 1 << 7
 
 
 @dataclass(frozen=True)
@@ -41,6 +40,21 @@ class FontVariant:
   file_name: str
   style_name: str
   weight_class: int
+
+
+@dataclass(frozen=True)
+class VerticalMetrics:
+  upem: int
+  hhea: tuple[int, int, int]
+  os2_typo: tuple[int, int, int]
+  os2_win: tuple[int, int]
+  fs_selection: int
+  # (yMax, yMin): the font bounding box drives Android includeFontPadding placement.
+  head_bbox_y: tuple[int, int]
+
+  @property
+  def uses_typo_metrics(self) -> bool:
+    return bool(self.fs_selection & USE_TYPO_METRICS_BIT)
 
 
 FONT_VARIANTS = (
@@ -88,6 +102,75 @@ def build_subsetter() -> subset.Subsetter:
   options.name_legacy = True
   options.name_languages = ['*']
   return subset.Subsetter(options=options)
+
+
+def rounded_scaled(value: int, scale: float) -> int:
+  return int(math.copysign(math.floor(abs(value) * scale + 0.5), value))
+
+
+def read_vertical_metrics(font: TTFont) -> VerticalMetrics:
+  head = font['head']
+  hhea = font['hhea']
+  os2 = font['OS/2']
+  return VerticalMetrics(
+    upem=head.unitsPerEm,
+    hhea=(hhea.ascent, hhea.descent, hhea.lineGap),
+    os2_typo=(os2.sTypoAscender, os2.sTypoDescender, os2.sTypoLineGap),
+    os2_win=(os2.usWinAscent, os2.usWinDescent),
+    fs_selection=os2.fsSelection,
+    head_bbox_y=(head.yMax, head.yMin),
+  )
+
+
+def scaled_vertical_metrics(reference_font: TTFont, target_upem: int) -> VerticalMetrics:
+  reference = read_vertical_metrics(reference_font)
+  scale = target_upem / reference.upem
+  return VerticalMetrics(
+    upem=target_upem,
+    hhea=tuple(rounded_scaled(value, scale) for value in reference.hhea),
+    os2_typo=tuple(rounded_scaled(value, scale) for value in reference.os2_typo),
+    os2_win=tuple(rounded_scaled(value, scale) for value in reference.os2_win),
+    fs_selection=reference.fs_selection,
+    head_bbox_y=tuple(rounded_scaled(value, scale) for value in reference.head_bbox_y),
+  )
+
+
+def normalize_os2_metrics_from_reference(font: TTFont, reference_font: TTFont) -> None:
+  target = scaled_vertical_metrics(reference_font, font['head'].unitsPerEm)
+
+  os2 = font['OS/2']
+  os2.sTypoAscender, os2.sTypoDescender, os2.sTypoLineGap = target.os2_typo
+  os2.usWinAscent, os2.usWinDescent = target.os2_win
+
+  # Keep this in sync with scripts/patch-card-font-metrics.py: Android registration
+  # must retain the approved phone-Roboto fallback padding instead of device fallback.
+  if target.uses_typo_metrics:
+    os2.fsSelection |= USE_TYPO_METRICS_BIT
+  else:
+    os2.fsSelection &= ~USE_TYPO_METRICS_BIT
+
+  # head bbox is the metric RN Android actually uses for first-line placement
+  # (includeFontPadding -> Skia fTop/fBottom from the font bounding box). The merged
+  # emoji-derived bbox (0.9014em) made card text sit ~0.155em higher than the approved
+  # Roboto fallback (1.0562em). Only valid when saved with recalcBBoxes=False.
+  head = font['head']
+  head.yMax, head.yMin = target.head_bbox_y
+
+  # iOS/CoreText places the first line from hhea ascender while Android uses the bbox,
+  # so hhea must carry the same bbox-derived values or iOS renders ~0.129em higher.
+  # Keep in sync with scripts/patch-card-font-metrics.py.
+  hhea = font['hhea']
+  hhea.ascent, hhea.descent = target.head_bbox_y
+  hhea.lineGap = 0
+
+
+def drop_vertical_layout_tables(font: TTFont) -> None:
+  # nanoemoji emits vhea/vmtx; after merging extra glyphs the vmtx no longer matches the
+  # glyph count and is unparseable. Vertical-layout tables are unused for our horizontal
+  # text, so drop them instead of shipping a corrupt table.
+  for tag in ('vhea', 'vmtx'):
+    if tag in font:
+      del font[tag]
 
 
 def require_tool(name: str) -> str:
@@ -183,55 +266,10 @@ def normalize_suit_metrics_from_symbol_font(suit_font: TTFont, symbol_font: TTFo
     )
 
 
-def iter_suit_svg_x_bounds(font: TTFont) -> list[tuple[str, float, float]]:
-  svg_table = font.get('SVG ')
-  if svg_table is None:
-    return []
-
-  glyph_order = font.getGlyphOrder()
-  glyph_names = set(SUIT_TEXT)
-  bounds: list[tuple[str, float, float]] = []
-
-  for doc in svg_table.docList:
-    if doc.startGlyphID != doc.endGlyphID:
-      continue
-    glyph_name = glyph_order[doc.startGlyphID]
-    codepoints = {
-      codepoint
-      for cmap_table in font['cmap'].tables
-      if cmap_table.isUnicode()
-      for codepoint, mapped_glyph_name in cmap_table.cmap.items()
-      if mapped_glyph_name == glyph_name
-    }
-    if not codepoints or not any(chr(codepoint) in glyph_names for codepoint in codepoints):
-      continue
-
-    root = ET.fromstring(doc.data)
-    x_values: list[float] = []
-    for path in root.iter('{http://www.w3.org/2000/svg}path'):
-      for command, values in SVG_PATH_CHUNK_PATTERN.findall(path.attrib['d']):
-        numbers = [float(number) for number in SVG_PATH_NUMBER_PATTERN.findall(values)]
-        if command.upper() in {'M', 'L', 'Q', 'C', 'S', 'T'}:
-          x_values.extend(numbers[::2])
-        elif command.upper() == 'H':
-          x_values.extend(numbers)
-    if x_values:
-      bounds.append((glyph_name, min(x_values), max(x_values)))
-
-  return bounds
-
-
-def expand_suit_advance_widths_to_fit_svg_artwork(
-  font: TTFont,
-  *,
-  right_padding: int = SUIT_RIGHT_PADDING,
-) -> None:
-  for glyph_name, _x_min, x_max in iter_suit_svg_x_bounds(font):
-    advance_width, left_side_bearing = font['hmtx'].metrics[glyph_name]
-    minimum_advance_width = math.ceil(x_max + right_padding)
-    if minimum_advance_width > advance_width:
-      font['hmtx'].metrics[glyph_name] = (minimum_advance_width, left_side_bearing)
-
+# 2026-07-04: the former expand_suit_advance_widths_to_fit_svg_artwork step (SVG xMax +
+# right padding) was removed. Advances must stay exactly the NotoColorEmoji values or
+# the centered/right-aligned suit text boxes shift the visible ink; ink wider than the
+# advance is fine because RN does not clip glyph overflow horizontally.
 def merge_rank_glyphs_into_suit_font(rank_font: TTFont, suit_font: TTFont) -> TTFont:
   target_upem = suit_font['head'].unitsPerEm
   scale_upem(rank_font, target_upem)
@@ -273,7 +311,6 @@ def build_merged_card_font_variants(
     if suit_metrics_font is not None:
       normalize_suit_metrics_from_symbol_font(suit_font, deepcopy(suit_metrics_font))
     merged_font = merge_rank_glyphs_into_suit_font(rank_font, suit_font)
-    expand_suit_advance_widths_to_fit_svg_artwork(merged_font)
     full_name = (
       MERGED_FAMILY_NAME
       if variant.style_name == REGULAR_STYLE_NAME
@@ -292,7 +329,15 @@ def build_merged_card_font_variants(
       postscript_name=postscript_name,
       weight_class=variant.weight_class,
     )
-    merged_font.save(output_dir / variant.file_name)
+    # Two-phase save: the first save lets fontTools recalculate glyph/head bboxes for
+    # the merged glyphs; the reopened font is saved with recalcBBoxes=False so the
+    # Roboto-derived head bbox from the normalization survives.
+    output_path = output_dir / variant.file_name
+    merged_font.save(output_path)
+    saved_font = TTFont(output_path, recalcBBoxes=False, recalcTimestamp=False)
+    normalize_os2_metrics_from_reference(saved_font, rank_font)
+    drop_vertical_layout_tables(saved_font)
+    saved_font.save(output_path)
 
 
 def parse_args() -> argparse.Namespace:
