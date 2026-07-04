@@ -4,7 +4,10 @@
 - Use web search to research a tool, library, pattern, etc. to see best practices on how to do something.
 - Concept: The main thread orchestrates changes and hands off planning (with implementation plan), implementation and testing to a sub-agent. Reason: Save context and tokens on the main thread.
 - If it makes sense, please reply in a list or table, so I can easily reference to your statements in my reply.
-- If a rule in this file turned out to be wrong or caused friction during a run, propose an edit to AGENTS.md in the final summary.
+- Self-improvement: Introspect on runs. Propose an edit to AGENTS.md if 
+  - a rule in this file turned out to be wrong or caused friction during a run  
+  - spotted inefficiencies, errors, redundant tool calls, etc.
+  - anything else based on your judgement
 
 ## About the codebase
 
