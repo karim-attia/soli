@@ -1,9 +1,11 @@
 import { useLayoutEffect } from 'react'
-import { Pressable } from 'react-native'
 import { useNavigation } from 'expo-router'
 import { Anchor, Paragraph, View, XStack, YStack } from 'tamagui'
-import { Menu } from '@tamagui/lucide-icons-2'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
+import {
+  HeaderMenuButton,
+  HEADER_MENU_LEADING_PADDING,
+} from '../../components/navigation/HeaderMenuButton'
 
 export default function HelloScreen() {
   const navigation = useNavigation()
@@ -12,15 +14,11 @@ export default function HelloScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTitle: 'Hello',
-      headerRight: () => (
-        <Pressable
-          onPress={openDrawer}
-          accessibilityLabel="Open navigation menu"
-          style={{ padding: 8 }}
-        >
-          <Menu size={32} color="$color" />
-        </Pressable>
-      ),
+      headerLeft: () => <HeaderMenuButton onPress={openDrawer} />,
+      headerLeftContainerStyle: {
+        paddingLeft: HEADER_MENU_LEADING_PADDING,
+      },
+      headerRight: () => null,
     })
   }, [navigation, openDrawer])
 

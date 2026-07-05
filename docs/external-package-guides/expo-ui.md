@@ -1,6 +1,6 @@
 # Expo UI Guide
 
-Last refreshed: 2026-07-04
+Last refreshed: 2026-07-05
 
 ## Scope
 
@@ -10,7 +10,9 @@ Last refreshed: 2026-07-04
 
 ## Current guidance
 
-Use this for native Expo UI controls. Prefer small app-owned wrappers in `components/` rather than using raw package components directly in screens.
+Use this for native Expo UI controls. Prefer app-owned wrappers in `components/` for
+reused controls or meaningful behavior boundaries; keep screen-specific, one-use Expo UI
+composition in its route.
 
 ## Detailed guidance
 
@@ -19,96 +21,100 @@ The sections below are the definitive combined notes for this package or tool. K
 ### SDK 57 Deferred Adoption Opportunities
 
 - Package: `@expo/ui@57.0.3`
-- Retrieved: 2026-07-04
+- Retrieved: 2026-07-05
 - Primary docs:
   - https://docs.expo.dev/versions/v57.0.0/sdk/ui/
   - https://docs.expo.dev/versions/v57.0.0/sdk/ui/universal/host/
   - https://docs.expo.dev/versions/v57.0.0/sdk/ui/universal/bottomsheet/
   - https://docs.expo.dev/versions/v57.0.0/sdk/ui/universal/fieldgroup/
+  - https://docs.expo.dev/versions/v57.0.0/sdk/ui/universal/icon/
   - https://docs.expo.dev/versions/v57.0.0/sdk/ui/universal/listitem/
   - https://docs.expo.dev/versions/v57.0.0/sdk/ui/universal/picker/
+  - https://docs.expo.dev/versions/v57.0.0/sdk/ui/universal/bottomsheet/
 
-These are possible follow-up product changes, not required SDK 57 migration work.
-The current Settings controls and content-sized sheets passed native validation.
+These are product changes, not required SDK 57 migration work. The content-sized
+History sheet remains valid. Settings now uses a stricter native-default `FieldGroup`
+form.
 
-#### Small opportunity: theme native controls with `Host.seedColor`
+#### Deferred opportunity: theme native controls with `Host.seedColor`
 
 - SDK 57 adds `seedColor` to the universal `Host`.
 - Android derives a Material 3 palette from the seed, iOS applies it as the SwiftUI
   tint, and web exposes a generated primary color scale to the subtree.
-- Soli could pass its resolved green accent to each Settings `Host` so switches use a
+- Soli can pass its resolved green accent to a Settings `Host` so switches use a
   deliberate Soli tint instead of the platform-default accent.
 - This is a small visual change, not a correctness fix. Verify enabled, disabled,
   light, and dark states on both native platforms before keeping it.
-- A future full-screen Expo UI Settings form would use one seeded `Host`, making this
-  cleaner than threading the value into every current inline switch host.
+- Do not start with this in Settings. On Android, the seed affects the whole Material 3
+  palette rather than only the switches, so the most native-looking baseline is an
+  unseeded `Host`.
 
-#### Medium opportunity: detented History preview sheet
+#### Decision: retain the content-fit History preview sheet
 
-Current behavior remains valid: `AppSheet` omits `snapPoints`, uses
-`RNHostView matchContents`, and lets each universal sheet fit its intrinsic content.
-This is simple and appropriate for the compact Demo chooser.
+The current requirement is to display the existing History preview and size the sheet
+to that content. `AppSheet` already does this by omitting `snapPoints` and using
+`RNHostView matchContents` inside the universal `BottomSheet`.
 
-The History preview could instead become an explicitly expandable sheet:
+Do not add half/full detents, nested scrolling, or a separate History sheet mode now.
+Those controls would introduce an interaction model without a product requirement and
+would complicate an area that is intentionally still small. Revisit only if future
+History content no longer fits comfortably or receives a deliberate redesign.
 
-- Extend the app-owned `AppSheet` API with an optional layout mode or optional
-  `snapPoints` rather than making all sheets detented.
-- Keep Demo chooser in content-fit mode.
-- Give History preview native half/full detents, allowing the user to expand a tall
-  tableau preview while preserving a smaller initial sheet.
-- Universal snap points are `'half'`, `'full'`, `{ fraction }`, or `{ height }`.
-  Fractional/fixed values are exact on iOS and web; Android maps them to its native
-  half/full states. Prefer `['half', 'full']` for predictable cross-platform behavior.
-- A detented sheet cannot rely on the current intrinsic-size contract alone. Its
-  content should gain an explicit bounded/fill layout and, if it can exceed the active
-  detent, a React Native `ScrollView` or list inside `RNHostView`. Set
-  `nestedScrollEnabled` on Android so content scrolling and sheet dragging cooperate.
-- Preserve `RNHostView`; the History preview is still React Native/Tamagui content
-  hosted inside the native Compose/SwiftUI sheet.
-- Validate short and tall deals, large text, small phones, rotation/tablet widths,
-  Android Back, scrim dismissal, and repeated open/dismiss cycles.
-
-The `@expo/ui@57.0.2` scrolling fix is specifically for
-`@expo/ui/community/bottom-sheet` with fixed snap points. Soli uses the universal
-`BottomSheet`, so that patch is not by itself a reason to change implementations. A
-move to detents should be justified by History preview usability.
-
-#### Larger opportunity: native Settings form with `FieldGroup`
+#### Adopted follow-up: native-default Settings form with `FieldGroup`
 
 SDK 57's universal `FieldGroup` is a scrollable grouped-settings container backed by
 SwiftUI on iOS, Jetpack Compose on Android, and a web implementation. It can replace
 most of the current Settings screen's React Native `ScrollView`, Tamagui section
 stacks, separators, manual row layout, and one-Host-per-switch pattern.
 
-Possible target structure:
+Adopted target structure:
 
 ```tsx
-<Host style={{ flex: 1 }} seedColor={accentColor}>
+<Host style={{ flex: 1 }}>
   <FieldGroup>
+    <FieldGroup.Section title="New Games">
+      {/* draw-count Picker and solvable-deal switch */}
+    </FieldGroup.Section>
     <FieldGroup.Section title="Gameplay">
-      {/* Draw-count Picker/ListItem and gameplay switch rows */}
+      {/* Auto Up switch */}
     </FieldGroup.Section>
     <FieldGroup.Section title="Statistics">
       {/* Statistics switch rows */}
     </FieldGroup.Section>
-    <FieldGroup.Section title="Advanced">
+    <FieldGroup.Section title="Developer">
       {/* Developer mode and conditional animation controls */}
     </FieldGroup.Section>
   </FieldGroup>
 </Host>
 ```
 
-Recommended row mapping:
+Adopted row mapping:
 
-- Use `ListItem` when a setting needs both a title and supporting description, with
-  the controlled universal `Switch` in its trailing slot. The `Switch.label` prop is
-  only a string and does not replace Soli's richer title-plus-description rows.
-- Use a universal `Picker` for draw count if a native menu is acceptable. Keeping the
-  current always-visible segmented control would require a deliberate mixed/native
-  composition or retaining that row outside the pure `FieldGroup` conversion.
+- Use compact, directly labeled universal `Switch` rows for boolean preferences.
+  `FieldGroup` already supplies strong native row surfaces; repeating supporting text
+  beneath every switch makes the form unnecessarily tall and visually noisy.
+- Prefer `FieldGroup.Section title` over custom `SectionHeader` text. This preserves the
+  package's native typography and color treatment.
+- Avoid helper footers for the current settings. `New Games`, `Gameplay`, and
+  `Developer` are clear enough, and the extra footer height hurts Android bottom spacing.
+- Do not nest universal `ListItem` inside `FieldGroup.Section` on SDK 57. Android's
+  implementation already wraps every direct row child in a Material `ListItem`, so a
+  second `ListItem` creates nested row layout and excess padding.
+- Use universal `Picker` for draw count on iOS and Android. Android renders a Material 3
+  exposed-dropdown TextField, which is visually heavier than ideal, but it is currently
+  the reliable native Expo UI selector inside `FieldGroup`.
+- As of `@expo/ui@57.0.3`, universal `Picker` does not expose a supported style/modifier
+  prop for shrinking or right-aligning the Android exposed TextField anchor. Avoid
+  reaching into lower-level Android implementations unless a future Expo UI API makes a
+  compact settings-row picker reliable.
+- Do not replace Android draw count with a nested row/menu/bottom-sheet/segmented/slider
+  workaround yet. Those alternatives rendered inside Android `FieldGroup`, but taps or
+  drags did not update reliably in the nested row.
 - Apply `disabled` at the section or control level while settings hydrate. Use native
   disabled treatment instead of manually reducing opacity where possible.
-- Keep the Advanced/Animations section conditional on developer mode. Confirm that
+- Disable child animation switches while `All animations` is off. This follows the
+  native pattern for dependent settings.
+- Keep the Developer/Animations section conditional on developer mode. Confirm that
   inserting/removing native rows preserves scroll position and accessibility focus.
 
 Benefits:
@@ -120,7 +126,8 @@ Benefits:
 - Less app-owned layout code: the current `ToggleRow`, repeated section headings,
   separators, manual bottom safe-area padding, and surrounding `ScrollView` become
   candidates for removal.
-- `Host.seedColor` can theme the entire form consistently from one place.
+- No custom section typography, section colors, RNHostView settings bridge, helper
+  footer copy, or settings-only segmented selector is needed.
 - The Settings state model and callbacks remain unchanged; this is primarily a view
   migration rather than a state rewrite.
 
@@ -132,9 +139,10 @@ Costs and risks:
 - Universal Expo UI styling is intentionally narrower than Tamagui styling. Exact
   spacing, typography, separator, and row-background control may be unavailable or
   require platform modifiers, which should be avoided unless a real UX issue remains.
-- Draw count is the awkward row. Replacing the segmented control with `Picker` changes
-  interaction; embedding the existing control preserves behavior but weakens the
-  simplicity benefit.
+- Draw count is the awkward row. iOS `Picker` reads well, but Android's exposed-dropdown
+  TextField shape does not feel like a compact settings row. Keep the universal `Picker`
+  until Expo UI has a first-class compact settings-row selector or `FieldGroup` exposes a
+  reliable tappable-row pattern.
 - The native accessibility tree and automation selectors will change. Re-test the
   drawer/header controls, every setting, screen-reader labels/descriptions, large
   text, focus order, and screen re-entry after navigating away.
@@ -144,17 +152,58 @@ Costs and risks:
   `ScrollView`; use a full-height `Host` and verify safe-area behavior before removing
   the existing manual bottom inset.
 
-Suggested implementation sequence:
+Implementation sequence:
 
-1. Prototype the form behind a local branch or temporary route with the existing
-   settings state and no persistence changes.
-2. Convert Gameplay first, deciding explicitly between native `Picker` and the current
-   segmented control.
-3. Add Statistics and the conditional Advanced/Animations sections.
-4. Remove `ToggleRow`, Tamagui section layout, and manual safe-area padding only after
-   native and web comparison passes.
-5. Run focused accessibility and navigation lifecycle tests on physical Android and
-   iOS devices before replacing the current screen.
+1. Use one `Host` and one `FieldGroup`.
+2. Keep the one-use form in `app/settings.tsx`; separating the entire screen into a
+   `NativeSettingsForm` adds indirection without reuse.
+3. Use `FieldGroup.Section title` for sections.
+4. Use direct `Switch label` rows.
+5. Keep `DrawCountPreference` as a focused wrapper around the `Row`, `Text`, `Spacer`,
+   normalization, and universal `Picker` trade-off.
+6. Remove the previous `DrawCountSelector`, `RNHostView`, and `seedColor` settings
+   experiment.
+7. Do not add helper footers for the current settings; the section titles are sufficient.
+8. Run static checks and focused native validation before deciding whether to re-add any
+   customization.
+
+#### Adopted Settings implementation notes
+
+- `FieldGroup` and `FieldGroup.Section` inspect their direct React child element types
+  to discover explicit sections and `SectionHeader` / `SectionFooter` slots. Keep those
+  compound markers inline if custom slots are ever needed. Hiding `FieldGroup.Section`
+  behind an app-owned wrapper made Android treat every whole section as one row in an
+  implicit synthetic section, producing oversized nested cards and incorrect spacing.
+- Prefer the `title` prop to custom `SectionHeader` / `SectionFooter` slots. The custom
+  title/note prototype required explicit neutral colors for Android dark mode and still
+  looked less native.
+- If a future section truly needs helper text, prefer one direct
+  `FieldGroup.SectionFooter` at the end of the section. Avoid row subtitles until Expo UI
+  has a first-class native row API for that pattern in this app.
+- Do not use `RNHostView` inside Settings unless we deliberately bring back the
+  segmented draw-count selector. `RNHostView matchContents` measures its React Native
+  child independently and reintroduces layout width decisions that a pure Expo UI form
+  does not need.
+- Do not seed the Settings host by default. `Host.seedColor` intentionally gives
+  Android's complete Material 3 palette a subtle green cast, not only the switches. This
+  is native SchemeTonalSpot behavior and differs from iOS, where the seed acts as a
+  control tint.
+- Use universal `Icon` for native header/menu symbols when possible. It renders SF
+  Symbols on iOS and Material Symbol XML drawables on Android. Wrap it in `Host
+  matchContents` when placing it inside a React Native header button.
+- Expo UI `Icon.size` is optional. As inspected on 2026-07-05, omitting it lets the
+  Android XML use its 24dp intrinsic dimensions, while the SwiftUI Image bridge defaults
+  to 24pt. Soli omits the header menu icon size for that native/intrinsic behavior.
+- When `Icon` is mounted inside an isolated `Host` in a React Navigation header, pass the
+  current header/theme color explicitly rather than relying on native content-color
+  inheritance across the React Native / Expo UI boundary.
+- For Android draw count, keep the universal `Picker` in Settings until Expo UI exposes
+  a less text-field-like settings picker or a reliable compact row trigger inside
+  `FieldGroup`. The current `Picker` look is imperfect, but the tested menu,
+  bottom-sheet, segmented, and slider alternatives did not receive nested gestures
+  reliably.
+- Keep draw count in Settings. It is a durable player preference that is reused across
+  games, not a transient choice for one New Game action.
 
 ### History Preview Sheet Notes
 

@@ -29,6 +29,7 @@
     "prebuild:ios": "npx expo prebuild --platform ios --clean"
   },
   "dependencies": {
+    "@expo/material-symbols": "^0.1.1",
     "@expo/ui": "~57.0.3",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@tamagui/colors": "2.2.0",

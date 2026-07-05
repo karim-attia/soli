@@ -1917,6 +1917,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@expo/material-symbols@npm:^0.1.1":
+  version: 0.1.1
+  resolution: "@expo/material-symbols@npm:0.1.1"
+  bin:
+    add-material-symbols: bin/add-material-symbols.mjs
+  checksum: 10/c96b292d36260671aa148bb9b188607b1e455054fe76776242af488c4132834635db0e8c24bb1e06a9d0cf5e1c32dc6b546e264c5b721f42ecb386bbefe0dfaf
+  languageName: node
+  linkType: hard
+
 "@expo/metro-config@npm:~57.0.3":
   version: 57.0.3
   resolution: "@expo/metro-config@npm:57.0.3"
@@ -12524,6 +12533,7 @@ __metadata:
   resolution: "soli@workspace:."
   dependencies:
     "@babel/core": "npm:^7.29.0"
+    "@expo/material-symbols": "npm:^0.1.1"
     "@expo/metro-runtime": "npm:~57.0.3"
     "@expo/ui": "npm:~57.0.3"
     "@react-native-async-storage/async-storage": "npm:^2.2.0"

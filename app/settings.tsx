@@ -1,38 +1,23 @@
 import { useLayoutEffect } from 'react'
-import { Pressable, ScrollView } from 'react-native'
-import { Host, Switch } from '@expo/ui'
+import { FieldGroup, Host, Switch, Text } from '@expo/ui'
 import { useNavigation } from 'expo-router'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { H2, Paragraph, Separator, Text, XStack, YStack } from 'tamagui'
-import { Menu } from '@tamagui/lucide-icons-2'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { DrawCountSelector } from '../components/settings/DrawCountSelector'
+import {
+  HeaderMenuButton,
+  HEADER_MENU_LEADING_PADDING,
+} from '../components/navigation/HeaderMenuButton'
+import { DrawCountPreference } from '../components/settings/DrawCountPreference'
+import { useDrawerOpener } from '../src/navigation/useDrawerOpener'
 import {
   animationPreferenceDescriptors,
-  useSettings,
   statisticsPreferenceDescriptors,
+  useSettings,
 } from '../src/state/settings'
-import { useDrawerOpener } from '../src/navigation/useDrawerOpener'
 
 export default function SettingsScreen() {
   const navigation = useNavigation()
   const openDrawer = useDrawerOpener()
-  const safeArea = useSafeAreaInsets()
-
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <Pressable
-          onPress={openDrawer}
-          accessibilityLabel="Open navigation menu"
-          style={{ padding: 8 }}
-        >
-          <Menu size={32} color="$color" />
-        </Pressable>
-      ),
-    })
-  }, [navigation, openDrawer])
-
   const {
     state,
     hydrated,
@@ -44,142 +29,97 @@ export default function SettingsScreen() {
     setDeveloperMode,
     setStatisticsPreference,
   } = useSettings()
-  // Android edge-to-edge can place scroll content behind the system dock, so keep
-  // the existing visual breathing room and add the device bottom inset.
-  const settingsContentPaddingBottom = 48 + safeArea.bottom
+
+  const controlsDisabled = !hydrated
+  const animationDetailsDisabled = controlsDisabled || !state.animations.master
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerBackButtonDisplayMode: 'minimal',
+      headerBackVisible: false,
+      headerLeft: () => <HeaderMenuButton onPress={openDrawer} />,
+      headerLeftContainerStyle: {
+        paddingLeft: HEADER_MENU_LEADING_PADDING,
+      },
+      headerRight: () => null,
+    })
+  }, [navigation, openDrawer])
 
   return (
-    <ScrollView
-      contentContainerStyle={{ padding: 24, paddingBottom: settingsContentPaddingBottom }}
-    >
-      <YStack gap="$5">
-        <YStack gap="$2">
-          <H2>Settings</H2>
-          {!hydrated && (
-            <Paragraph color="$color9">Loading your saved preferences…</Paragraph>
-          )}
-        </YStack>
-
-        <YStack gap="$3">
-          <Text fontSize={16} fontWeight="700">
-            Gameplay
-          </Text>
-          <DrawCountSelector
-            value={state.drawCount}
-            onValueChange={setDrawCount}
-            disabled={!hydrated}
-          />
-          <ToggleRow
-            label="Only deal solvable games"
-            description="Use curated solvable layouts when starting a new game."
-            value={state.solvableGamesOnly}
-            onValueChange={setSolvableGamesOnly}
-            disabled={!hydrated}
-          />
-          <ToggleRow
-            label="Auto Up"
-            description="Automatically move remaining cards to foundations once every card is uncovered."
-            value={state.autoUpEnabled}
-            onValueChange={setAutoUpEnabled}
-            disabled={!hydrated}
-          />
-        </YStack>
-
-        <YStack gap="$3">
-          <Text fontSize={16} fontWeight="700">
-            Statistics
-          </Text>
-          {statisticsPreferenceDescriptors.map(({ key, label, description }) => (
-            <ToggleRow
-              key={key}
-              label={label}
-              description={description}
-              value={state.statistics[key]}
-              onValueChange={(enabled) => setStatisticsPreference(key, enabled)}
-              disabled={!hydrated}
-            />
-          ))}
-        </YStack>
-
-        <YStack gap="$3">
-          <Text fontSize={16} fontWeight="700">
-            Advanced
-          </Text>
-          <ToggleRow
-            label="Developer mode"
-            description="Expose internal tools such as demo games and motion tuning."
-            value={state.developerMode}
-            onValueChange={setDeveloperMode}
-            disabled={!hydrated}
-          />
-
-          {/* Developer mode keeps motion tuning out of the everyday settings flow while
-              still making it easy to reach. */}
-          {state.developerMode ? (
-            <>
-              <Separator my="$2" />
-              <YStack gap="$3">
-                <Text fontWeight="600">Animations</Text>
-                <ToggleRow
-                  label="All animations"
-                  description="Turn this off to disable motion effects across the game."
-                  value={state.animations.master}
-                  onValueChange={setGlobalAnimationsEnabled}
-                  disabled={!hydrated}
-                />
-
-                <Separator />
-
-                <YStack gap="$3" opacity={state.animations.master ? 1 : 0.6}>
-                  {animationPreferenceDescriptors.map(({ key, label, description }) => (
-                    <ToggleRow
-                      key={key}
-                      label={label}
-                      description={description}
-                      value={state.animations[key]}
-                      onValueChange={(enabled) => setAnimationPreference(key, enabled)}
-                      disabled={!hydrated}
-                      inactive={!state.animations.master}
-                    />
-                  ))}
-                </YStack>
-              </YStack>
-            </>
+    <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
+      <Host style={{ flex: 1 }}>
+        <FieldGroup>
+          {!hydrated ? (
+            <FieldGroup.Section>
+              <Text>Loading preferences...</Text>
+            </FieldGroup.Section>
           ) : null}
-        </YStack>
-      </YStack>
-    </ScrollView>
+
+          <FieldGroup.Section title="New Games">
+            <DrawCountPreference
+              value={state.drawCount}
+              onValueChange={setDrawCount}
+              disabled={controlsDisabled}
+            />
+            <Switch
+              label="Solvable deals"
+              value={state.solvableGamesOnly}
+              onValueChange={setSolvableGamesOnly}
+              disabled={controlsDisabled}
+            />
+          </FieldGroup.Section>
+
+          <FieldGroup.Section title="Gameplay">
+            <Switch
+              label="Auto Up"
+              value={state.autoUpEnabled}
+              onValueChange={setAutoUpEnabled}
+              disabled={controlsDisabled}
+            />
+          </FieldGroup.Section>
+
+          <FieldGroup.Section title="Statistics">
+            {statisticsPreferenceDescriptors.map(({ key, label }) => (
+              <Switch
+                key={key}
+                label={label}
+                value={state.statistics[key]}
+                onValueChange={(enabled) => setStatisticsPreference(key, enabled)}
+                disabled={controlsDisabled}
+              />
+            ))}
+          </FieldGroup.Section>
+
+          <FieldGroup.Section title="Developer">
+            <Switch
+              label="Developer mode"
+              value={state.developerMode}
+              onValueChange={setDeveloperMode}
+              disabled={controlsDisabled}
+            />
+          </FieldGroup.Section>
+
+          {state.developerMode ? (
+            <FieldGroup.Section title="Animations">
+              <Switch
+                label="All animations"
+                value={state.animations.master}
+                onValueChange={setGlobalAnimationsEnabled}
+                disabled={controlsDisabled}
+              />
+              {animationPreferenceDescriptors.map(({ key, label }) => (
+                <Switch
+                  key={key}
+                  label={label}
+                  value={state.animations[key]}
+                  onValueChange={(enabled) => setAnimationPreference(key, enabled)}
+                  disabled={animationDetailsDisabled}
+                />
+              ))}
+            </FieldGroup.Section>
+          ) : null}
+        </FieldGroup>
+      </Host>
+    </SafeAreaView>
   )
 }
-
-type ToggleRowProps = {
-  label: string
-  description?: string
-  value: boolean
-  onValueChange: (value: boolean) => void
-  disabled?: boolean
-  inactive?: boolean
-}
-
-const ToggleRow = ({
-  label,
-  description,
-  value,
-  onValueChange,
-  disabled,
-  inactive,
-}: ToggleRowProps) => (
-  <XStack gap="$3" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-    <YStack flex={1} gap="$1">
-      <Text fontWeight="600" color={inactive ? '$color8' : '$color'}>
-        {label}
-      </Text>
-      {description ? (
-        <Paragraph color={inactive ? '$color9' : '$color10'}>{description}</Paragraph>
-      ) : null}
-    </YStack>
-    <Host matchContents style={{ opacity: inactive ? 0.7 : 1 }}>
-      <Switch value={value} disabled={disabled} onValueChange={onValueChange} />
-    </Host>
-  </XStack>
-)

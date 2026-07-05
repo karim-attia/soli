@@ -3,7 +3,6 @@ import { Platform } from 'react-native'
 import { HeaderButton } from 'expo-router/react-navigation'
 import { useNavigation } from 'expo-router'
 import { Button, Text, XStack, YStack } from 'tamagui'
-import { Menu } from '@tamagui/lucide-icons-2'
 
 import {
   KlondikeGameSession,
@@ -12,18 +11,17 @@ import {
 import type { LaunchDemoGameOptions } from '../../src/features/klondike/hooks/useKlondikeGame'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
 import { AppSheet } from '../../components/AppSheet'
+import {
+  HeaderMenuButton,
+  HEADER_MENU_LEADING_PADDING,
+  IOS_HEADER_CONTROL_SIZE,
+} from '../../components/navigation/HeaderMenuButton'
 
-const IOS_HEADER_CONTROL_SIZE = 44
-const IOS_HEADER_ICON_SIZE = 26
-const IOS_HEADER_ICON_STROKE_WIDTH = 2.25
 const IOS_HEADER_TEXT_SIZE = 17
 const IOS_HEADER_ACTION_FONT_WEIGHT = '400'
-const IOS_HEADER_LEADING_PADDING = 4
 const IOS_HEADER_TRAILING_PADDING = 8
 const IOS_HEADER_ACTION_GAP = 4
 const IOS_HEADER_TEXT_HORIZONTAL_PADDING = 6
-const ANDROID_HEADER_CONTROL_SIZE = 48
-const ANDROID_HEADER_ICON_SIZE = 32
 
 export default function TabOneScreen() {
   const navigation = useNavigation()
@@ -70,12 +68,12 @@ export default function TabOneScreen() {
           fontSize: IOS_HEADER_TEXT_SIZE,
           fontWeight: '600',
         },
-        headerLeft: () => <IOSHeaderMenuButton onPress={openDrawer} />,
+        headerLeft: () => <HeaderMenuButton onPress={openDrawer} />,
         headerRight: () => (
           <IOSHeaderActions onNewGame={onNewGame} onDemoGame={onDemoGame} />
         ),
         headerLeftContainerStyle: {
-          paddingLeft: IOS_HEADER_LEADING_PADDING,
+          paddingLeft: HEADER_MENU_LEADING_PADDING,
         },
         headerRightContainerStyle: {
           paddingRight: IOS_HEADER_TRAILING_PADDING,
@@ -87,14 +85,13 @@ export default function TabOneScreen() {
     // PBI-17: Renamed from Klondike to Soli (iOS centers title by platform convention)
     navigation.setOptions({
       headerTitle: 'Soli',
-      headerLeft: () => null,
+      headerLeft: () => <HeaderMenuButton onPress={openDrawer} />,
       headerRight: () => (
-        <AndroidHeaderControls
-          onMenuPress={openDrawer}
-          onNewGame={onNewGame}
-          onDemoGame={onDemoGame}
-        />
+        <AndroidHeaderControls onNewGame={onNewGame} onDemoGame={onDemoGame} />
       ),
+      headerLeftContainerStyle: {
+        paddingLeft: HEADER_MENU_LEADING_PADDING,
+      },
     })
   }, [isIOS, navigation, openDemoChoice, openDrawer, sessionControls])
 
@@ -145,16 +142,11 @@ const DemoChoiceSheet = ({ isPresented, onDismiss, onSelect }: DemoChoiceSheetPr
 }
 
 type HeaderControlsProps = {
-  onMenuPress: () => void
   onNewGame: () => void
   onDemoGame?: () => void
 }
 
-const AndroidHeaderControls = ({
-  onMenuPress,
-  onNewGame,
-  onDemoGame,
-}: HeaderControlsProps) => (
+const AndroidHeaderControls = ({ onNewGame, onDemoGame }: HeaderControlsProps) => (
   <XStack gap="$3" style={{ alignItems: 'center' }}>
     {onDemoGame ? (
       <Button size="$3" onPress={onDemoGame}>
@@ -164,7 +156,6 @@ const AndroidHeaderControls = ({
     <Button size="$3" onPress={onNewGame}>
       New Game
     </Button>
-    <HeaderMenuButton onPress={onMenuPress} />
   </XStack>
 )
 
@@ -181,52 +172,6 @@ const IOSHeaderActions = ({
     />
   </XStack>
 )
-
-type IOSHeaderMenuButtonProps = {
-  onPress: () => void
-}
-
-const IOSHeaderMenuButton = ({ onPress }: IOSHeaderMenuButtonProps) => {
-  return (
-    <HeaderButton
-      // PBI-32: Use the shared header-button primitive on iOS so both sides of the
-      // bar follow the same spacing/alignment model while keeping a larger burger.
-      onPress={onPress}
-      accessibilityLabel="Open navigation menu"
-      pressOpacity={0.65}
-      style={{
-        minHeight: IOS_HEADER_CONTROL_SIZE,
-        justifyContent: 'center',
-      }}
-    >
-      <Menu
-        size={IOS_HEADER_ICON_SIZE}
-        strokeWidth={IOS_HEADER_ICON_STROKE_WIDTH}
-        color="$color"
-      />
-    </HeaderButton>
-  )
-}
-
-type HeaderMenuButtonProps = {
-  onPress: () => void
-}
-
-const HeaderMenuButton = ({ onPress }: HeaderMenuButtonProps) => {
-  return (
-    <Button
-      unstyled
-      onPress={onPress}
-      width={ANDROID_HEADER_CONTROL_SIZE}
-      height={ANDROID_HEADER_CONTROL_SIZE}
-      aria-label="Open navigation menu"
-      pressStyle={{ opacity: 0.65 }}
-      style={{ alignItems: 'center', justifyContent: 'center' }}
-    >
-      <Menu size={ANDROID_HEADER_ICON_SIZE} color="$color" />
-    </Button>
-  )
-}
 
 type HeaderTextActionProps = {
   label: string

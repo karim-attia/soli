@@ -2,9 +2,12 @@ import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { useNavigation } from 'expo-router'
 import { Paragraph, Separator, Spinner, Text, XStack, YStack, useTheme } from 'tamagui'
-import { Menu } from '@tamagui/lucide-icons-2'
 
 import { AppSheet } from '../components/AppSheet'
+import {
+  HeaderMenuButton,
+  HEADER_MENU_LEADING_PADDING,
+} from '../components/navigation/HeaderMenuButton'
 import {
   type HistoryEntry,
   type HistoryEntryStatus,
@@ -36,15 +39,12 @@ function HistoryScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTitle: 'Game History',
-      headerRight: () => (
-        <Pressable
-          onPress={openDrawer}
-          accessibilityLabel="Open navigation menu"
-          style={{ padding: 8 }}
-        >
-          <Menu size={32} color="$color" />
-        </Pressable>
-      ),
+      headerBackVisible: false,
+      headerLeft: () => <HeaderMenuButton onPress={openDrawer} />,
+      headerLeftContainerStyle: {
+        paddingLeft: HEADER_MENU_LEADING_PADDING,
+      },
+      headerRight: () => null,
     })
   }, [navigation, openDrawer])
 

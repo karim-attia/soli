@@ -1,6 +1,6 @@
 # React Native Safe Area Context Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-07-05
 
 ## Scope
 
@@ -19,13 +19,15 @@ Refresh check: 2026-07-03
 
 ## Purpose
 
-Fresh cache of the safe-area API details relevant to the Android undo scrubber regression fix.
+Fresh cache of the safe-area API details relevant to Android edge-to-edge and bottom
+system navigation overlap fixes.
 
 ## Source links
 
 - Expo library reference: [react-native-safe-area-context](https://docs.expo.dev/versions/latest/sdk/safe-area-context/)
 - Expo SDK 56 library reference: [react-native-safe-area-context](https://docs.expo.dev/versions/v56.0.0/sdk/safe-area-context/)
 - Expo system bars guide: [System bars](https://docs.expo.dev/develop/user-interface/system-bars/)
+- React Navigation safe areas: [Supporting safe areas](https://reactnavigation.org/docs/handling-safe-area/)
 - Safe Area Context API: [SafeAreaView](https://appandflow.github.io/react-native-safe-area-context/api/safe-area-view/)
 - npm latest metadata: [react-native-safe-area-context latest](https://registry.npmjs.org/react-native-safe-area-context/latest)
 
@@ -39,6 +41,18 @@ Status: updated and still useful.
   than taking npm latest directly.
 - The App & Flow API docs still support object-form `edges` with `off`, `additive`,
   and `maximum` modes, and still document `mode="margin"` / `mode="padding"`.
+
+## Refresh check (2026-07-05)
+
+Status: updated for the Expo UI Settings screen.
+
+- Soli currently has `react-native-safe-area-context` `~5.7.0` in `package.json`.
+- Current Expo docs still document `SafeAreaView`, `SafeAreaProvider`, and
+  `useSafeAreaInsets`.
+- Expo docs say `SafeAreaView` applies safe-area edges as padding, and custom padding is
+  added to the safe-area padding.
+- React Navigation docs note Android edge-to-edge draws under translucent system bars and
+  recommend explicit safe-area handling.
 
 ## Key takeaways
 
@@ -77,3 +91,7 @@ Why this matters here:
 
 - Prefer `SafeAreaView` for the undo scrubber wrapper instead of manual bottom padding when the goal is “float above the system area by at least X”.
 - Keep the change local to the scrubber so the board layout and other overlays do not inherit new bottom spacing rules accidentally.
+- For the Expo UI Settings form, wrap the full-height native `Host` in a bottom-edged
+  `SafeAreaView` instead of nesting `FieldGroup` in a React Native `ScrollView`.
+  `FieldGroup` should keep owning the scroll behavior while the outer safe-area wrapper
+  prevents Android's system navigation area from covering the last rows.

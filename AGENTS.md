@@ -3,6 +3,7 @@
 - Vision: Create the best Solitaire app in the world and keep it free, ad-free and open source.
 - Use web search to research a tool, library, pattern, etc. to see best practices on how to do something.
 - Concept: The main thread orchestrates changes and hands off planning (with implementation plan), implementation and testing to a sub-agent. Reason: Save context and tokens on the main thread.
+- Sometimes, you're not working with an implementation plan for whatever reason. Also then keep implementing and testing only with sub-agents.
 - If it makes sense, please reply in a list or table, so I can easily reference to your statements in my reply.
 - Self-improvement: Introspect on runs. Propose an edit to AGENTS.md if 
   - a rule in this file turned out to be wrong or caused friction during a run  

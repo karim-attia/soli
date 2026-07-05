@@ -1,6 +1,6 @@
 # Expo Router Guide
 
-Last refreshed: 2026-07-04
+Last refreshed: 2026-07-05
 
 ## Scope
 
@@ -26,7 +26,7 @@ The sections below are the definitive combined notes for this package or tool. K
   - https://docs.expo.dev/versions/latest/sdk/router/
   - https://expo.dev/changelog/sdk-57
 
-## Target facts
+#### Target facts
 
 - Expo SDK 57 recommends `expo-router` `~57.0.3`.
 - SDK 56 and later still require application code to import React Navigation APIs from
@@ -43,7 +43,7 @@ The sections below are the definitive combined notes for this package or tool. K
   the API and Soli later moves these screens under a Stack-owned header or gains a
   concrete badge/menu requirement.
 
-## Repo usage notes
+#### Repo usage notes
 
 - Let `npx expo install expo@^57.0.0 --fix` select the Router version.
 - After upgrade, re-run `rg "@react-navigation"` across app/source code and
@@ -51,6 +51,62 @@ The sections below are the definitive combined notes for this package or tool. K
 - Keep the existing options-based header configuration for the Drawer routes. The
   composition APIs (`Stack.Toolbar`, `Stack.Title`, and `Stack.Header`) do not provide
   a useful drop-in simplification for the current navigator structure.
+
+### Header and Drawer Menu Placement Notes
+
+- Package: `expo-router`
+- Retrieved: 2026-07-05
+- Primary docs and platform guidance:
+  - Expo Router Drawer: https://docs.expo.dev/router/advanced/drawer/
+  - Expo Router Stack Toolbar: https://docs.expo.dev/router/advanced/stack-toolbar/
+  - React Navigation header buttons: https://reactnavigation.org/docs/header-buttons/
+  - Android top app bars: https://developer.android.com/develop/ui/compose/components/app-bars
+  - Android accessibility API defaults: https://developer.android.com/develop/ui/compose/accessibility/api-defaults
+  - Apple Buttons HIG: https://developer.apple.com/design/human-interface-guidelines/buttons
+  - Expo UI Icon: https://docs.expo.dev/versions/latest/sdk/ui/universal/icon/
+
+#### Target facts
+
+- Expo Router Drawer docs describe the drawer as a common mobile navigation pattern that
+  is typically toggleable through a header button.
+- React Navigation header docs support both `headerLeft` and `headerRight`, and
+  recommend `navigation.setOptions` inside a screen when the header button needs to
+  interact with that screen's state or navigation helpers.
+- Android top app bar guidance separates the leading `navigationIcon` from trailing
+  `actions`. Treat Soli's drawer button as navigation, not a screen action.
+- This means Android should keep the drawer/menu button in `headerLeft` for Soli's
+  left-side drawer. Moving it right would make it a trailing action and would only be
+  appropriate for a deliberately right-side drawer.
+- Android touch-target guidance recommends at least 48x48dp. It explicitly allows a
+  smaller visual icon, such as 24x24dp, inside the full 48x48dp target.
+- React Navigation's `HeaderButton` provides platform press behavior, horizontal padding,
+  and Android hit slop, but no iOS hit slop or guaranteed 44pt minimum. Keep explicit
+  44pt iOS and 48dp Android control minima for clear accessible geometry.
+- Use Expo UI `Icon` inside the header button for the visual symbol: SF Symbol on iOS,
+  Material Symbol XML on Android.
+- Expo UI `Icon.size` is optional. The installed SwiftUI Image bridge defaults to 24pt,
+  and the Material menu XML declares intrinsic 24dp dimensions, so omit `size` for the
+  native/intrinsic glyph size.
+- The iOS 4pt leading padding is Soli-owned optical alignment, not a platform-native
+  constant.
+- `Stack.Toolbar` lets Stack-owned native toolbar items own more geometry, but it remains
+  alpha and is not applicable to Soli's Drawer-owned visible headers. Do not restructure
+  navigation for this sizing detail.
+
+#### Repo usage notes
+
+- Put the drawer menu in `headerLeft` for Play, Settings, History, and Hello.
+- Keep screen actions such as `Demo` and `New Game` in `headerRight`.
+- Use `components/navigation/HeaderMenuButton.tsx` instead of raw per-screen
+  `Pressable` / `Menu` header buttons so labels, placement, and the native symbol source
+  stay consistent.
+- Omit the header menu glyph's explicit size so Expo UI uses its intrinsic/default
+  24dp/pt size. The shared button supplies a 48dp minimum Android target and a 44pt iOS
+  target rather than visually enlarging the hamburger.
+- Keep the 4pt iOS leading inset as deliberate optical alignment in the current Drawer
+  header integration.
+- Continue using options-based header setup for these Drawer screens. `Stack.Toolbar`
+  remains a poor fit for Soli's current nested Drawer-owned headers.
 
 ### SDK 55 Router Notes
 
