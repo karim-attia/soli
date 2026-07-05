@@ -15,10 +15,7 @@ import {
   resolveDemoReplayAction,
   type DemoAutoSolvePlaylistEntry,
 } from '../../../solitaire/demoReplay'
-import {
-  demoAutoSolvePlaylist,
-  DEMO_AUTO_SOLVE_PLAYLIST_TOTAL,
-} from '../../../data/demoAutoSolvePlaylist'
+import { getDemoAutoSolvePlaylist } from '../../../data/demoAutoSolvePlaylist'
 import { devLog } from '../../../utils/devLogger'
 
 type DispatchGameActionFn = (action: GameAction) => void
@@ -182,12 +179,11 @@ export const useDemoGameLauncher = ({
       playlistRunIdRef.current += 1
       const runId = playlistRunIdRef.current
       demoPlaybackActiveRef.current = true
+      // First access evaluates the generated playlist module (lazy require).
+      const playlist = getDemoAutoSolvePlaylist()
       const gameLimit = Math.max(
         1,
-        Math.min(
-          options.gameLimit ?? DEMO_AUTO_SOLVE_PLAYLIST_TOTAL,
-          DEMO_AUTO_SOLVE_PLAYLIST_TOTAL
-        )
+        Math.min(options.gameLimit ?? playlist.length, playlist.length)
       )
       const shouldRecordHistory = options.recordHistory !== false
 
@@ -215,7 +211,7 @@ export const useDemoGameLauncher = ({
           return
         }
 
-        const entry = demoAutoSolvePlaylist[gameIndex]
+        const entry = playlist[gameIndex]
         if (!entry) {
           demoPlaybackActiveRef.current = false
           dispatch({ type: 'SET_AUTO_UP_ENABLED', enabled: autoUpEnabled })
@@ -466,10 +462,8 @@ export const useDemoGameLauncher = ({
 
       if (demoMode === 'playlist' || demoMode === 'single') {
         runDemoPlaylist({
-          gameLimit:
-            demoMode === 'single'
-              ? 1
-              : (options?.gameLimit ?? DEMO_AUTO_SOLVE_PLAYLIST_TOTAL),
+          // Undefined gameLimit means "full playlist"; runDemoPlaylist clamps it.
+          gameLimit: demoMode === 'single' ? 1 : options?.gameLimit,
           recordHistory: options?.recordHistory,
         })
         devLog(

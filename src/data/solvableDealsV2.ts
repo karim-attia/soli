@@ -1,7 +1,7 @@
 import { SOLVABLE_DEALS_V2 } from './solvableDealsV2.generated'
 import {
+  EXACT_ID_PREFIX,
   hasDrawCountInMask,
-  parseExactDealId,
   type ExactDealId,
 } from '../solitaire/dealIdentity'
 import type { DrawCount } from '../solitaire/drawCount'
@@ -59,10 +59,14 @@ export const isExactDealSolvableForDrawCount = (
 
 const parseGeneratedRow = (row: string): SolvableDealV2 => {
   const [exactId, rawMask] = row.split(':')
-  if (!exactId) {
+  // Cheap structural checks only. Full BigInt decoding of every row here
+  // (parseExactDealId) blocked the JS thread at first catalog access during
+  // startup (~86ms in V8 for 45k rows, far slower on Hermes devices). The deep
+  // validation now lives in test/unit/data/solvableDealsV2.generated.test.ts,
+  // so a bad regeneration fails tests instead of taxing every app launch.
+  if (!exactId || !exactId.startsWith(EXACT_ID_PREFIX)) {
     throw new Error(`Invalid v2 solvable exact ID row: ${row}`)
   }
-  parseExactDealId(exactId)
   const validatedExactId = exactId as ExactDealId
 
   const drawMask = Number(rawMask)

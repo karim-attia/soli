@@ -1,10 +1,12 @@
-import { demoAutoSolvePlaylist } from '../../../src/data/demoAutoSolvePlaylist'
+import { getDemoAutoSolvePlaylist } from '../../../src/data/demoAutoSolvePlaylist'
 import {
   applyDemoReplayMoveForValidation,
   createDemoReplayGameState,
   resolveDemoReplayAction,
 } from '../../../src/solitaire/demoReplay'
 import { klondikeReducer } from '../../../src/solitaire/klondike'
+
+const demoAutoSolvePlaylist = getDemoAutoSolvePlaylist()
 
 describe('demo auto-solve replay playlist', () => {
   it('solves every generated game through the reducer and exercises undo probes', () => {
