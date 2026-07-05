@@ -108,6 +108,47 @@ The sections below are the definitive combined notes for this package or tool. K
 - Continue using options-based header setup for these Drawer screens. `Stack.Toolbar`
   remains a poor fit for Soli's current nested Drawer-owned headers.
 
+#### Stack.Toolbar Drawer Prototype (2026-07-05)
+
+Soli tested the smallest page-level prototype with installed `expo-router@57.0.3`:
+
+```tsx
+<Stack.Toolbar placement="left">
+  <Stack.Toolbar.Button icon="sidebar.left" onPress={openDrawer} />
+</Stack.Toolbar>
+```
+
+The prototype temporarily cleared the Settings Drawer screen's existing `headerLeft` so
+the result was unambiguous. No toolbar item appeared in the visible Drawer-owned header.
+Screenshot evidence:
+`tmp/settings-validation/stack-toolbar-drawer-prototype-ios.png`.
+
+Installed source explains the result:
+
+- Header `Stack.Toolbar` calls `useCompositionOption` with the nearest route key.
+- Expo Router's native Stack owns the composition registry and merges registered options
+  only into descriptors keyed by that Stack's own routes.
+- The visible Settings screen is the nested Drawer's `settings` route; its key is not the
+  parent Stack's `(tabs)` route key, so the parent Stack cannot apply those options.
+- Android's toolbar implementation ultimately supplies `headerLeft`/`headerRight` too;
+  it does not bypass navigator ownership.
+
+The rejected prototype was removed. Production keeps `HeaderMenuButton` and the existing
+`line.3.horizontal` SF Symbol / Material menu icon. Do not introduce nested Stacks solely
+to make this API own one icon.
+
+Future migration estimate: **small-to-medium code work, medium validation work** only if
+`Stack.Toolbar` gains Drawer-owned-header support. Expected scope is four visible routes
+(Play, Hello, Settings, History), the shared `HeaderMenuButton`, the Play screen's existing
+Demo/New Game actions and shared iOS control-size constant, plus iOS/Android navigation
+smoke tests. If the API merely becomes stable without Drawer support, the migration is
+still not applicable; changing navigator ownership would instead be a disproportionate
+medium-to-large navigation project.
+
+Expo upgrade follow-up: on each future Expo Router upgrade, check both whether
+`Stack.Toolbar` is stable **and** whether its composition options can target Drawer-owned
+headers. Stability alone does not resolve the route-key/header-owner boundary.
+
 ### SDK 55 Router Notes
 
 - **Package**: `expo-router`

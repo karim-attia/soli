@@ -151,6 +151,11 @@ Costs and risks:
 - FieldGroup should own scrolling. Do not nest it in the current React Native
   `ScrollView`; use a full-height `Host` and verify safe-area behavior before removing
   the existing manual bottom inset.
+- iOS validation on 2026-07-05 confirmed that seeing only part of the Animations section
+  in the initial viewport is normal scroll continuation, not clipping. A direct in-form
+  swipe reached the absolute end with the full `Win celebrations` row and rounded section
+  bottom visible above the system area. Keep FieldGroup/SwiftUI Form-owned scrolling and
+  do not add app-owned bottom padding for this screenshot state.
 
 Implementation sequence:
 

@@ -54,6 +54,12 @@ draw count should remain setting because it's really something you choose becaus
 should native settings form be it's own file? right now, settings is just more or less completely empty.
 ```
 
+```text
+would expo stack toolbar also fix this? let's try? how big of maintenance work would this be once it becomes stable? should we just leave upgrade note for future expo upgrade that we should check the api?
+
+also different question: is it possible that on ios, the settings are a bit cut off on the bottom (see screenshot)
+```
+
 ## Description
 
 Replace the visually heavy FieldGroup prototype with a stricter native-first Settings
@@ -100,6 +106,14 @@ the native icon. Keep draw count as a durable player preference in Settings. Fol
 screen-specific native form into `app/settings.tsx`, while retaining
 `DrawCountPreference` as the boundary around the nontrivial native Picker trade-off.
 
+Fourth follow-up: prototype `Stack.Toolbar` against the current Drawer-owned visible
+headers before making any navigation changes. Keep it only if it replaces the shared
+menu button as a true drop-in and preserves the drawer plus existing actions. Otherwise,
+remove the prototype and leave a dated Expo-upgrade follow-up because API stability alone
+does not change navigator ownership. Separately validate the absolute bottom of the iOS
+native Settings form on a clean build; change layout only if the final row cannot scroll
+fully above the home indicator.
+
 ## Acceptance Criteria
 
 - A current implementation plan exists before the new application-code changes.
@@ -143,6 +157,14 @@ screen-specific native form into `app/settings.tsx`, while retaining
   preference rather than a per-game choice.
 - The screen-specific native Settings form is folded into `app/settings.tsx`.
 - `DrawCountPreference` remains separate because it isolates the native Picker trade-off.
+- A minimal `Stack.Toolbar` prototype establishes whether a Stack toolbar item can replace
+  the menu control in the current Drawer-owned header without nested stacks.
+- A rejected toolbar prototype leaves no production code behind and records concrete
+  source/runtime evidence plus a dated Expo-upgrade re-check note.
+- Future migration maintenance is estimated from the actual four routes, shared button,
+  existing actions, navigator ownership, and native validation surface.
+- A clean iOS build verifies whether the final Settings row scrolls fully above the home
+  indicator; no safe-area change is made for an intermediate scroll position.
 - No staging or commits.
 
 ## Possible approaches incl. pros and cons
@@ -199,8 +221,13 @@ across games, so Settings is its appropriate home.
   headers are Drawer-owned.
 - Cons: restructuring navigation would greatly exceed this visual follow-up.
 
-Decision: reject. Keep the current Drawer/React Navigation integration and its explicit
-accessible control geometry.
+Decision for the fourth follow-up: rejected after a one-screen runtime prototype. With
+the current Drawer `headerLeft` cleared, a page-level left `Stack.Toolbar` registered but
+rendered no item in the visible Settings header. Installed Router source confirms the
+composition registry is consumed by native Stack descriptors keyed to Stack routes; the
+nearest Settings route is owned by the nested Drawer and its key does not match the parent
+Stack's `(tabs)` descriptor. Retain the current React Navigation integration and do not
+add nested stacks for this icon.
 
 ## Open questions to the user
 
@@ -210,6 +237,9 @@ No blocking question. Recommended default for this implementation:
   minimal customization.
 - Mention the visible segmented selector as an alternative in the final reply. If it
   proves clearly better during product review, it can return as a deliberate exception.
+- Treat `Stack.Toolbar` as an evidence-gathering prototype, not a committed migration.
+- Treat Settings content below the viewport as normal scroll content unless the absolute
+  final row cannot clear the iOS home indicator.
 
 ## Dependencies
 
@@ -284,6 +314,11 @@ Primary research sources refreshed 2026-07-05:
 - Keep a 44pt iOS / 48dp Android press target around that glyph. React Navigation's
   header button does not supply the full iOS minimum by itself.
 - Keep the iOS 4pt leading inset as an app-specific optical alignment value.
+- For the toolbar prototype, prefer iOS `sidebar.left` because it communicates a leading
+  sidebar/drawer more specifically than the wide `line.3.horizontal` symbol. Keep that
+  icon only if the native toolbar path is applicable to the current header owner.
+- The prototype proved that path is not currently applicable, so production keeps the
+  existing intrinsic `line.3.horizontal` SF Symbol and Material menu icon.
 - Keep draw count on the universal `Picker` for now. Android's exposed-dropdown look is
   less compact than ideal, but it is the current native Expo UI selector that works inside
   `FieldGroup` without custom gesture plumbing.
@@ -339,6 +374,8 @@ settings persistence.
   entire screen adds indirection without reuse.
 - Keep `DrawCountPreference` separate because its Picker behavior and documented Android
   compromise are meaningful on their own.
+- Do not introduce nested Stack navigators solely to adopt `Stack.Toolbar`; that would
+  trade a small header integration for broader navigation ownership and testing work.
 
 ## Steps to implement
 
@@ -398,6 +435,25 @@ settings persistence.
 - [x] Run `yarn format:check`, `yarn typecheck`, `yarn lint`, `yarn jest`, and
   `git diff --check`.
 - [x] Inspect the final diff and staged state, then record results and residual concerns.
+- [x] Re-read the full implementation plan for the Stack.Toolbar/iOS-bottom follow-up.
+- [x] Append the latest user prompt verbatim and update the plan before code edits.
+- [x] Read the agent-device skill and run version-matched help for agent-device 0.17.10
+  before device automation.
+- [x] Inspect official `Stack.Toolbar` docs, installed Router source, current navigator
+  ownership, route headers, and safe-area/FieldGroup implementation.
+- [x] Run cheap checks before native prototyping/build validation.
+- [x] Prototype the smallest `Stack.Toolbar` use in one current Drawer screen and record
+  whether it reaches the visible header and opens the drawer.
+- [x] Keep and expand the toolbar implementation only if it is a reliable drop-in;
+  otherwise remove the rejected prototype without touching unrelated work.
+- [x] Stop competing builds, run a clean `yarn ios`, and confirm the fresh install.
+- [x] Use agent-device to verify Play menu/header actions and Settings absolute-bottom
+  visibility; capture screenshots under `tmp/settings-validation/`.
+- [x] Apply and retest the smallest native-safe bottom fix only if clipping is real; no
+  fix was needed because the final row scrolls fully above the system area.
+- [x] Update current Router, Expo UI, safe-area, SDK 57, and implementation-plan docs with
+  evidence, maintenance estimate, files, issues, and testing.
+- [x] Re-run all cheap checks, inspect final diff/staged state, and clean up sessions.
 
 ## Plan: Files to modify
 
@@ -429,6 +485,15 @@ Third follow-up changes within this existing change set:
 - `docs/product/expo-rn-sdk-57-upgrade/upgrade-to-expo-sdk-57-and-react-native-0-86.md`
 - `docs/product/expo-ui-fieldgroup-settings/native-fieldgroup-settings.md`
 
+Fourth follow-up planned files:
+
+- `docs/external-package-guides/expo-router.md`
+- `docs/external-package-guides/expo-ui.md`
+- `docs/external-package-guides/react-native-safe-area-context.md`
+- `docs/product/expo-rn-sdk-57-upgrade/upgrade-to-expo-sdk-57-and-react-native-0-86.md`
+- `docs/product/expo-ui-fieldgroup-settings/native-fieldgroup-settings.md`
+- `app/settings.tsx` only for the rejected prototype; restore it exactly afterward.
+
 ## Files actually modified
 
 - `app/settings.tsx`
@@ -448,6 +513,20 @@ Third follow-up changes within this existing change set:
 - `docs/external-package-guides/react-native-safe-area-context.md`
 - `docs/product/expo-rn-sdk-57-upgrade/upgrade-to-expo-sdk-57-and-react-native-0-86.md`
 - `docs/product/expo-ui-fieldgroup-settings/native-fieldgroup-settings.md`
+
+Fourth follow-up files actually modified:
+
+- No production application file remains changed by this follow-up. The temporary
+  `app/settings.tsx` prototype was removed exactly after evaluation.
+- `docs/external-package-guides/expo-router.md`
+- `docs/external-package-guides/expo-ui.md`
+- `docs/external-package-guides/react-native-safe-area-context.md`
+- `docs/product/expo-rn-sdk-57-upgrade/upgrade-to-expo-sdk-57-and-react-native-0-86.md`
+- `docs/product/expo-ui-fieldgroup-settings/native-fieldgroup-settings.md`
+- `tmp/settings-validation/stack-toolbar-drawer-prototype-ios.png`
+- `tmp/settings-validation/settings-bottom-absolute-ios.png`
+- `tmp/settings-validation/settings-bottom-production-ios.png`
+- `tmp/settings-validation/play-header-production-ios.png`
 
 ## Intermediary learnings
 
@@ -513,6 +592,29 @@ Third follow-up changes within this existing change set:
 - `NativeSettingsForm` had one caller and represented the entire route body. Folding it
   into `app/settings.tsx` removes indirection, while `DrawCountPreference` remains useful
   because it isolates normalization and the documented native Picker compromise.
+- Official Expo docs and installed `expo-router@57.0.3` both scope header
+  `Stack.Toolbar` to native Stack screens. Installed source registers toolbar composition
+  options with the nearest route key, then merges only keys present in the owning native
+  Stack's descriptors.
+- Soli's visible Settings route is owned by the nested Drawer. Its route key does not
+  match the parent Stack's `(tabs)` descriptor, so the toolbar registration is ignored.
+  The one-screen iOS prototype confirmed this: clearing Drawer `headerLeft` and rendering
+  a left `Stack.Toolbar` produced no visible toolbar item.
+- Android's implementation converts toolbar children to `headerLeft`/`headerRight`, but
+  still travels through the same Stack composition registry. It does not provide a
+  Drawer-specific escape hatch.
+- `sidebar.left` is a good native iOS symbol for a left drawer if this API later becomes
+  applicable, but the rejected prototype means production keeps `line.3.horizontal`.
+- A future migration is small-to-medium code work and medium validation work if Drawer
+  support arrives: four routes, `HeaderMenuButton`, Play's right-side actions and shared
+  size constant, plus both native platforms. Stability without Drawer support leaves the
+  migration inapplicable; changing navigator ownership would be medium-to-large work.
+- On iOS, `FieldGroup` is a SwiftUI Form and owns scrolling. The initial viewport showing
+  only part of Animations was an intermediate position. At the true end, the full
+  `Win celebrations` row and rounded section bottom are visible above the system area.
+- Agent-device's semantic `scroll bottom` selected the off-screen Drawer scroll view
+  because both Drawer and Form scroll containers remained in the accessibility tree. A
+  version-documented coordinate swipe inside the visible Form established the real end.
 
 ## Identified issues
 
@@ -572,6 +674,20 @@ Third follow-up changes within this existing change set:
 - Issue: The plan previously left moving draw count to New Game as a future option.
   Status: rejected; draw count is a durable player preference and remains persisted in
   Settings.
+- Issue: It was unclear whether `Stack.Toolbar` could replace app-managed menu geometry
+  in the current Drawer headers.
+  Status: rejected as a drop-in. Source and runtime evidence show Stack composition does
+  not target the nested Drawer's route/header. The prototype was fully removed.
+- Issue: The candidate `sidebar.left` symbol might be more semantically specific on iOS.
+  Status: not adopted because the API path that would own it is inapplicable. Production
+  icon and geometry remain unchanged.
+- Issue: The Settings screenshot appeared to cut off the bottom of Animations.
+  Status: not a clipping bug. The screenshot represented an intermediate scroll position;
+  the final row and section bottom are fully visible at the Form's true end.
+- Issue: Future Expo upgrades could stabilize `Stack.Toolbar` without making it useful
+  for Soli's Drawer-owned headers.
+  Status: documented as a dated upgrade check that requires both stability and compatible
+  navigator ownership before another migration attempt.
 
 ## Testing
 
@@ -711,3 +827,44 @@ Third follow-up results:
 - Residual concern: the intrinsic 24dp Android glyph remains visually smaller than the
   old 32dp Lucide glyph by design. Increasing it later would be a deliberate visual
   exception to the platform-default icon/target proportion, not a native sizing fix.
+
+Fourth follow-up results:
+
+- Agent-device: version 0.17.10; full skill and version-matched workflow/scroll help read
+  before automation.
+- Initial cheap checks: `yarn format:check`, `yarn typecheck`, `yarn lint`, `yarn jest`,
+  and `git diff --check` passed; Jest reported 11 suites and 56 tests.
+- Competing builds: no active Expo/Metro/Xcode build was present before the clean build.
+  A Gradle daemon was idle and did not represent an active build.
+- Clean iOS build: `yarn ios --no-build-cache` reported `Clean Succeeded` and
+  `Build Succeeded`, installed/opened `ch.karimattia.soli` on iPhone 17 Pro, with 0 errors
+  and the existing duplicate `-lc++` warning.
+- Toolbar prototype: with Drawer `headerLeft` removed, the left `Stack.Toolbar` using
+  `sidebar.left` rendered no item in Settings. Evidence:
+  `tmp/settings-validation/stack-toolbar-drawer-prototype-ios.png`.
+- Prototype cleanup: `app/settings.tsx` was restored exactly; `git diff` for that file was
+  empty before final validation.
+- Final installed source: a serialized incremental `yarn ios` build succeeded with 0
+  errors and the same warning, then reinstalled/reopened the app after prototype removal.
+- Production header smoke: Play and Settings exposed `Open navigation menu`; pressing it
+  opened the Drawer. Play exposed Demo and New Game; Demo opened the Run Demo sheet and
+  New Game opened its confirmation. Both were dismissed without starting a game.
+- iOS bottom: Developer mode was already enabled. A direct swipe inside the native Form
+  reached the absolute end; the full `Win celebrations` row and rounded Animations section
+  bottom were visible with clear space above the system area. Production evidence:
+  `tmp/settings-validation/settings-bottom-production-ios.png`.
+- Additional evidence:
+  `tmp/settings-validation/settings-bottom-absolute-ios.png` and
+  `tmp/settings-validation/play-header-production-ios.png`.
+- Layout/icon result: no safe-area/layout fix and no production icon change.
+- Final cheap checks: `yarn format:check`, `yarn typecheck`, `yarn lint`, `yarn jest`,
+  and `git diff --check` passed again; Jest reported 11 suites and 56 tests.
+- Final git audit: only the five intended documentation files are modified, production
+  app/component/source diff is empty, and the staging area is empty. No stage, unstage,
+  commit, reset, or unrelated revert occurred.
+- Cleanup: both agent-device sessions were closed, their lingering XCTest children were
+  stopped, and no `xcodebuild`, Expo, Metro, or `yarn ios` process remained.
+- Residual risk: Android did not need a runtime build because the prototype already
+  failed before platform-specific header rendering and no production code survived. The
+  installed Android source shares the same Stack composition ownership path, but a future
+  Router implementation change should be re-prototyped on both platforms.

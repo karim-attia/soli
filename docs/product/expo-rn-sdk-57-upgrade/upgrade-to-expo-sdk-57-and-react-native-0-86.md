@@ -555,7 +555,7 @@ for SDK 57 compatibility, and the current implementation remains the tested defa
 
 | Candidate | Recommendation | Reason |
 | --- | --- | --- |
-| `Stack.Toolbar` / Android toolbar badges | Do not adopt now. | SDK 57's highlighted change is Android badge support. Soli's main headers belong to a Drawer, not a Stack; the API is alpha, native-only, and Soli has no badge requirement. |
+| `Stack.Toolbar` / Android toolbar badges | Do not adopt now; re-check on Expo upgrades. | SDK 57's highlighted change is Android badge support. Soli's main headers belong to a Drawer, not a Stack; the API is alpha, native-only, and Soli has no badge requirement. A 2026-07-05 Settings prototype rendered no left toolbar item in the Drawer-owned header, matching installed Router source: composition options are merged only into matching native Stack route descriptors. |
 | Expo UI `Host.seedColor` | Defer. | A resolved Soli green can theme native switches through Material 3 on Android and SwiftUI tint on iOS, but Android also derives the whole Material palette from the seed. The native-default Settings pass starts unseeded; re-add tint only after screenshot comparison. |
 | History preview sheet | Leave unchanged. | Its requirement is to show the existing preview and adjust the sheet to that content, which the current content-fit `RNHostView matchContents` implementation already does. Detents would add unjustified interaction and complexity. |
 | Expo UI `FieldGroup` Settings form | Adopted as a separate implementation task. | The implementation plan keeps settings state unchanged while replacing the manual ScrollView/Tamagui sections, one-Host-per-switch layout, custom settings typography, helper footer copy, and segmented draw-count island with one native-default FieldGroup form. The one-use form lives directly in `app/settings.tsx`, while `DrawCountPreference` remains a focused control boundary. Draw count stays a durable persistent setting and uses the universal native Picker on iOS and Android; Android's exposed-dropdown TextField look is imperfect, but the tested compact row/menu/bottom-sheet/segmented/slider alternatives did not receive nested gestures reliably inside FieldGroup. |
@@ -567,6 +567,20 @@ Undo scrubber; status-bar/modal, Dimensions, layout, hit-testing, and animated m
 fixes apply under existing code. Soli does not use `expo-image`, `expo-navigation-bar`,
 React Native `BackHandler`, `KeyboardAvoidingView`, or the newly highlighted image/cache
 APIs, so there is no useful adoption change for those areas now.
+
+### Future Expo Upgrade Check: Stack.Toolbar
+
+Last evaluated: 2026-07-05 with `expo-router@57.0.3`.
+
+- Check whether `Stack.Toolbar` has left alpha and whether its API changed.
+- Separately check whether it supports Drawer-owned headers or a navigator-agnostic
+  composition registry. Stability alone does not fix Soli's current header ownership.
+- Re-run a one-screen Drawer prototype before changing navigation.
+- Do not add nested Stacks solely for the menu icon.
+- If Drawer support exists, expect small-to-medium code work across Play, Hello,
+  Settings, History, `HeaderMenuButton`, and Play's right-side actions, followed by
+  medium iOS/Android validation. Without Drawer support, changing header ownership would
+  be medium-to-large work and is not justified by this icon alone.
 
 Detailed Expo UI scope, row mappings, risks, and a staged FieldGroup migration are in
 `docs/external-package-guides/expo-ui.md`. Toolbar applicability is clarified in

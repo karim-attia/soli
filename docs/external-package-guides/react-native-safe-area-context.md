@@ -53,6 +53,11 @@ Status: updated for the Expo UI Settings screen.
   added to the safe-area padding.
 - React Navigation docs note Android edge-to-edge draws under translucent system bars and
   recommend explicit safe-area handling.
+- Clean iOS simulator validation confirmed the current bottom-edged `SafeAreaView` does
+  not prevent the native Expo UI `FieldGroup`/SwiftUI Form from reaching its final row.
+  The initial viewport shows only part of the Animations section, but a direct Form swipe
+  reaches the absolute end with `Win celebrations` and the rounded section bottom fully
+  visible above the system area. No extra iOS padding or nested ScrollView is needed.
 
 ## Key takeaways
 
@@ -95,3 +100,5 @@ Why this matters here:
   `SafeAreaView` instead of nesting `FieldGroup` in a React Native `ScrollView`.
   `FieldGroup` should keep owning the scroll behavior while the outer safe-area wrapper
   prevents Android's system navigation area from covering the last rows.
+- Do not infer clipping from an intermediate iOS scroll position. Verify the Form's true
+  scroll end before changing safe-area geometry.
