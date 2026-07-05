@@ -6,8 +6,9 @@ import {
   FOUNDATION_SUIT_ORDER,
   TABLEAU_COLUMN_COUNT,
   type Card,
-  type GameState,
+  type Foundations,
   type Suit,
+  type Tableau,
 } from '../../../../solitaire/klondike'
 import { useAnimationToggles } from '../../../../state/settings'
 import {
@@ -46,7 +47,12 @@ export const createEmptyAbsoluteCardLayerLayouts = (): AbsoluteCardLayerLayouts 
 })
 
 export type AbsoluteCardLayerProps = {
-  state: GameState
+  // Perf (A2): pile slices instead of the full GameState so React.memo on this layer
+  // can skip re-renders when the piles kept referential identity (e.g. TIMER_TICK).
+  stock: Card[]
+  waste: Card[]
+  foundations: Foundations
+  tableau: Tableau
   cardMetrics: CardMetrics
   layouts: AbsoluteCardLayerLayouts
   drawLabel: string
@@ -61,12 +67,20 @@ export type AbsoluteCardLayerProps = {
   onCardSettled?: (cardId: string) => void
 }
 
+// Perf (P3): press targets are plain data instead of per-item closures so the card
+// memo comparator can compare them by value; the actual (stable, ref-based) handlers
+// are passed to AbsoluteLayerCard separately.
+type CardLayerPress =
+  | { type: 'draw' }
+  | { type: 'foundation'; suit: Suit }
+  | { type: 'tableau'; columnIndex: number; cardIndex: number }
+
 type CardLayerItem = {
   card: Card
   x: number
   y: number
   zIndex: number
-  onPress?: () => void
+  press?: CardLayerPress
   disabled?: boolean
   backLabel?: string
 }
@@ -105,20 +119,20 @@ const resolveTableauPosition = (
 }
 
 const resolveWasteTapTarget = ({
-  state,
+  waste,
   cardMetrics,
   layouts,
   interactionsLocked,
   celebrationActive,
 }: Pick<
   AbsoluteCardLayerProps,
-  'state' | 'cardMetrics' | 'layouts' | 'interactionsLocked' | 'celebrationActive'
+  'waste' | 'cardMetrics' | 'layouts' | 'interactionsLocked' | 'celebrationActive'
 >): WasteTapTarget | null => {
   if (interactionsLocked || celebrationActive) {
     return null
   }
 
-  const visibleWaste = state.waste.slice(-3)
+  const visibleWaste = waste.slice(-3)
   const wastePosition = resolveTopRowPosition(layouts.topRow, layouts.waste)
   if (!visibleWaste.length || !wastePosition) {
     return null
@@ -138,18 +152,26 @@ const resolveWasteTapTarget = ({
 }
 
 const buildCardLayerItems = ({
-  state,
+  stock,
+  waste,
+  foundations,
+  tableau,
   cardMetrics,
   layouts,
   drawLabel,
   interactionsLocked,
   celebrationActive,
-  onDraw,
-  onFoundationPress,
-  onTableauCardPress,
-}: Omit<
+}: Pick<
   AbsoluteCardLayerProps,
-  'invalidWiggle' | 'animationResetKey' | 'onWasteTap'
+  | 'stock'
+  | 'waste'
+  | 'foundations'
+  | 'tableau'
+  | 'cardMetrics'
+  | 'layouts'
+  | 'drawLabel'
+  | 'interactionsLocked'
+  | 'celebrationActive'
 >): CardLayerItem[] => {
   if (celebrationActive) {
     return []
@@ -157,20 +179,20 @@ const buildCardLayerItems = ({
 
   const items: CardLayerItem[] = []
   const stockPosition = resolveTopRowPosition(layouts.topRow, layouts.stock)
-  const stockTop = state.stock[state.stock.length - 1]
+  const stockTop = stock[stock.length - 1]
   if (stockTop && stockPosition) {
     items.push({
       card: stockTop,
       x: stockPosition.x,
       y: stockPosition.y,
-      zIndex: 100 + state.stock.length,
-      onPress: interactionsLocked ? undefined : onDraw,
+      zIndex: 100 + stock.length,
+      press: interactionsLocked ? undefined : { type: 'draw' },
       disabled: interactionsLocked,
       backLabel: drawLabel,
     })
   }
 
-  const visibleWaste = state.waste.slice(-3)
+  const visibleWaste = waste.slice(-3)
   const wastePosition = resolveTopRowPosition(layouts.topRow, layouts.waste)
   if (visibleWaste.length && wastePosition) {
     const overlap = Math.min(
@@ -189,14 +211,15 @@ const buildCardLayerItems = ({
         // Waste taps are owned by one stable slot target below. Keeping the
         // visual card non-pressable lets fast second taps land while this card
         // is shifting to its new fan position.
-        onPress: undefined,
+        press: undefined,
         disabled: interactionsLocked || !isTop,
       })
     })
   }
 
   FOUNDATION_SUIT_ORDER.forEach((suit, suitIndex) => {
-    const topCard = state.foundations[suit][state.foundations[suit].length - 1]
+    const foundation = foundations[suit]
+    const topCard = foundation[foundation.length - 1]
     const foundationPosition = resolveTopRowPosition(
       layouts.topRow,
       layouts.foundations[suit] ?? null
@@ -205,7 +228,6 @@ const buildCardLayerItems = ({
       return
     }
 
-    const foundation = state.foundations[suit]
     const foundationDepth = foundation.length
     const underlayCard = foundationDepth > 1 ? foundation[foundationDepth - 2] : null
     if (underlayCard) {
@@ -222,8 +244,8 @@ const buildCardLayerItems = ({
       card: topCard,
       x: foundationPosition.x,
       y: foundationPosition.y,
-      zIndex: 500 + suitIndex * 20 + state.foundations[suit].length,
-      onPress: interactionsLocked ? undefined : () => onFoundationPress(suit),
+      zIndex: 500 + suitIndex * 20 + foundationDepth,
+      press: interactionsLocked ? undefined : { type: 'foundation', suit },
       disabled: interactionsLocked,
     })
   })
@@ -231,7 +253,7 @@ const buildCardLayerItems = ({
   const faceDownStackOffset = Math.round(
     cardMetrics.stackOffset / FACE_DOWN_STACK_OFFSET_DIVISOR
   )
-  state.tableau.forEach((column, columnIndex) => {
+  tableau.forEach((column, columnIndex) => {
     const columnPosition = resolveTableauPosition(
       layouts.tableauRow,
       layouts.tableauColumns[columnIndex] ?? null
@@ -249,9 +271,9 @@ const buildCardLayerItems = ({
         x: columnPosition.x,
         y: columnPosition.y + offset,
         zIndex: 1000 + columnIndex * 100 + cardIndex,
-        onPress:
+        press:
           card.faceUp && !interactionsLocked
-            ? () => onTableauCardPress(columnIndex, cardIndex)
+            ? { type: 'tableau', columnIndex, cardIndex }
             : undefined,
         disabled: interactionsLocked || !card.faceUp,
       })
@@ -261,84 +283,96 @@ const buildCardLayerItems = ({
   return items
 }
 
-export const AbsoluteCardLayer = ({
-  state,
-  cardMetrics,
-  layouts,
-  drawLabel,
-  invalidWiggle,
-  animationResetKey,
-  interactionsLocked,
-  celebrationActive,
-  onDraw,
-  onWasteTap,
-  onFoundationPress,
-  onTableauCardPress,
-  onCardSettled,
-}: AbsoluteCardLayerProps) => {
-  const { cardFlights: cardFlightsEnabled, cardFlip: cardFlipEnabled } =
-    useAnimationToggles()
-  const wasteTapTarget = useMemo(
-    () =>
-      resolveWasteTapTarget({
-        state,
+// Perf (A2): memoized so per-second TIMER_TICK renders (piles keep referential
+// identity through the reducer) skip the whole layer, including the items rebuild.
+export const AbsoluteCardLayer = React.memo(
+  ({
+    stock,
+    waste,
+    foundations,
+    tableau,
+    cardMetrics,
+    layouts,
+    drawLabel,
+    invalidWiggle,
+    animationResetKey,
+    interactionsLocked,
+    celebrationActive,
+    onDraw,
+    onWasteTap,
+    onFoundationPress,
+    onTableauCardPress,
+    onCardSettled,
+  }: AbsoluteCardLayerProps) => {
+    const { cardFlights: cardFlightsEnabled, cardFlip: cardFlipEnabled } =
+      useAnimationToggles()
+    const wasteTapTarget = useMemo(
+      () =>
+        resolveWasteTapTarget({
+          waste,
+          cardMetrics,
+          layouts,
+          interactionsLocked,
+          celebrationActive,
+        }),
+      [cardMetrics, celebrationActive, interactionsLocked, layouts, waste]
+    )
+    const items = useMemo(
+      () =>
+        buildCardLayerItems({
+          stock,
+          waste,
+          foundations,
+          tableau,
+          cardMetrics,
+          layouts,
+          drawLabel,
+          interactionsLocked,
+          celebrationActive,
+        }),
+      [
         cardMetrics,
-        layouts,
-        interactionsLocked,
         celebrationActive,
-      }),
-    [cardMetrics, celebrationActive, interactionsLocked, layouts, state]
-  )
-  const items = useMemo(
-    () =>
-      buildCardLayerItems({
-        state,
-        cardMetrics,
-        layouts,
         drawLabel,
+        foundations,
         interactionsLocked,
-        celebrationActive,
-        onDraw,
-        onFoundationPress,
-        onTableauCardPress,
-      }),
-    [
-      cardMetrics,
-      celebrationActive,
-      drawLabel,
-      interactionsLocked,
-      layouts,
-      onDraw,
-      onFoundationPress,
-      onTableauCardPress,
-      state,
-    ]
-  )
+        layouts,
+        stock,
+        tableau,
+        waste,
+      ]
+    )
 
-  return (
-    <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      {items.map((item) => (
-        <AbsoluteLayerCard
-          key={item.card.id}
-          item={item}
-          metrics={cardMetrics}
-          invalidWiggle={invalidWiggle}
-          animationResetKey={animationResetKey}
-          movementEnabled={cardFlightsEnabled}
-          flipEnabled={cardFlipEnabled}
-          onCardSettled={onCardSettled}
-        />
-      ))}
-      {wasteTapTarget ? (
-        <WasteTapZone
-          target={wasteTapTarget}
-          metrics={cardMetrics}
-          onPress={onWasteTap}
-        />
-      ) : null}
-    </View>
-  )
-}
+    return (
+      <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+        {items.map((item) => (
+          <AbsoluteLayerCard
+            key={item.card.id}
+            item={item}
+            metrics={cardMetrics}
+            invalidWiggle={invalidWiggle}
+            animationResetKey={animationResetKey}
+            movementEnabled={cardFlightsEnabled}
+            flipEnabled={cardFlipEnabled}
+            onDraw={onDraw}
+            onFoundationPress={onFoundationPress}
+            onTableauCardPress={onTableauCardPress}
+            onCardSettled={onCardSettled}
+          />
+        ))}
+        {wasteTapTarget ? (
+          <WasteTapZone
+            target={wasteTapTarget}
+            metrics={cardMetrics}
+            onPress={onWasteTap}
+          />
+        ) : null}
+      </View>
+    )
+  }
+)
+
+AbsoluteCardLayer.displayName = 'AbsoluteCardLayer'
 
 type AbsoluteLayerCardProps = {
   item: CardLayerItem
@@ -347,7 +381,78 @@ type AbsoluteLayerCardProps = {
   animationResetKey: number
   movementEnabled: boolean
   flipEnabled: boolean
+  onDraw: () => void
+  onFoundationPress: (suit: Suit) => void
+  onTableauCardPress: (columnIndex: number, cardIndex: number) => void
   onCardSettled?: (cardId: string) => void
+}
+
+const arePressTargetsEqual = (
+  prev: CardLayerPress | undefined,
+  next: CardLayerPress | undefined
+): boolean => {
+  if (!prev || !next) {
+    return prev === next
+  }
+  if (prev.type === 'draw') {
+    return next.type === 'draw'
+  }
+  if (prev.type === 'foundation') {
+    return next.type === 'foundation' && next.suit === prev.suit
+  }
+  return (
+    next.type === 'tableau' &&
+    next.columnIndex === prev.columnIndex &&
+    next.cardIndex === prev.cardIndex
+  )
+}
+
+// Perf (P3): items are rebuilt as fresh objects on every board change, so compare by
+// value exactly the fields that affect a card's render or its animation effects
+// (position targets, face, z-order, press target, wiggle membership). Function props
+// are deliberately ignored: all handlers read live state through refs in
+// useKlondikeGame, so a newer function identity never changes behavior — comparing
+// them would silently defeat this memo (e.g. onCardSettled changes identity whenever
+// foundations change). History note: an earlier comparator on the old pile-local card
+// surfaces regressed correctness via stale press closures (see animation-audit plan);
+// that hazard is avoided here by comparing press *data* and keeping handlers ref-based.
+const areAbsoluteLayerCardPropsEqual = (
+  prev: AbsoluteLayerCardProps,
+  next: AbsoluteLayerCardProps
+): boolean => {
+  const prevItem = prev.item
+  const nextItem = next.item
+  if (
+    prevItem.card.id !== nextItem.card.id ||
+    prevItem.card.faceUp !== nextItem.card.faceUp ||
+    prevItem.x !== nextItem.x ||
+    prevItem.y !== nextItem.y ||
+    prevItem.zIndex !== nextItem.zIndex ||
+    prevItem.disabled !== nextItem.disabled ||
+    prevItem.backLabel !== nextItem.backLabel ||
+    !arePressTargetsEqual(prevItem.press, nextItem.press)
+  ) {
+    return false
+  }
+
+  if (
+    prev.metrics !== next.metrics ||
+    prev.animationResetKey !== next.animationResetKey ||
+    prev.movementEnabled !== next.movementEnabled ||
+    prev.flipEnabled !== next.flipEnabled
+  ) {
+    return false
+  }
+
+  // Wiggle changes only need to re-render cards that are (or were) wiggling.
+  if (prev.invalidWiggle.key !== next.invalidWiggle.key) {
+    const cardId = nextItem.card.id
+    if (prev.invalidWiggle.lookup.has(cardId) || next.invalidWiggle.lookup.has(cardId)) {
+      return false
+    }
+  }
+
+  return true
 }
 
 const AbsoluteLayerCard = React.memo(
@@ -358,6 +463,9 @@ const AbsoluteLayerCard = React.memo(
     animationResetKey,
     movementEnabled,
     flipEnabled,
+    onDraw,
+    onFoundationPress,
+    onTableauCardPress,
     onCardSettled,
   }: AbsoluteLayerCardProps) => {
     const translateX = useRef(new NativeAnimated.Value(item.x)).current
@@ -536,13 +644,27 @@ const AbsoluteLayerCard = React.memo(
       />
     )
 
+    const press = item.press
+    const handlePress = () => {
+      if (!press) {
+        return
+      }
+      if (press.type === 'draw') {
+        onDraw()
+      } else if (press.type === 'foundation') {
+        onFoundationPress(press.suit)
+      } else {
+        onTableauCardPress(press.columnIndex, press.cardIndex)
+      }
+    }
+
     return (
       <NativeAnimated.View
-        pointerEvents={item.onPress && !pressDisabled ? 'auto' : 'none'}
+        pointerEvents={press && !pressDisabled ? 'auto' : 'none'}
         style={cardStyle}
       >
-        {item.onPress ? (
-          <Pressable onPress={item.onPress} disabled={pressDisabled}>
+        {press ? (
+          <Pressable onPress={handlePress} disabled={pressDisabled}>
             {body}
           </Pressable>
         ) : (
@@ -550,7 +672,8 @@ const AbsoluteLayerCard = React.memo(
         )}
       </NativeAnimated.View>
     )
-  }
+  },
+  areAbsoluteLayerCardPropsEqual
 )
 
 AbsoluteLayerCard.displayName = 'AbsoluteLayerCard'

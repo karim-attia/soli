@@ -222,8 +222,19 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     celebrations: celebrationAnimationsEnabled,
   } = animationToggles
 
-  // Precomputes drop targets for auto-move and hint rendering.
-  const dropHints = useMemo(() => getDropHints(state), [state])
+  // Precomputes drop targets for auto-move and hint rendering. Memoized on the state
+  // slices getDropHints reads (not the whole state) so hints keep identity across
+  // TIMER_TICK and memoized board components can skip re-renders (perf, A2).
+  const dropHints = useMemo(
+    () =>
+      getDropHints({
+        selected: state.selected,
+        tableau: state.tableau,
+        foundations: state.foundations,
+        waste: state.waste,
+      }),
+    [state.selected, state.tableau, state.foundations, state.waste]
+  )
 
   // Builds the statistics badges based on current settings and elapsed time.
   const { moveCount, elapsedMs, timerState, timerStartedAt } = state
@@ -688,38 +699,38 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   })
 
   // Triggers the invalid-move wiggle animation for the provided selection.
-  const triggerInvalidSelectionWiggle = useCallback(
-    (selection?: Selection | null) => {
-      const ids = collectSelectionCardIds(state, selection)
-      if (!ids.length) {
-        return
-      }
+  // Reads state via stateRef (synced before any user event can fire) so this callback
+  // stays referentially stable; a `state` dep here previously cascaded new identities
+  // into every press handler on each action, defeating board memoization (perf, P3/A2).
+  const triggerInvalidSelectionWiggle = useCallback((selection?: Selection | null) => {
+    const ids = collectSelectionCardIds(stateRef.current, selection)
+    if (!ids.length) {
+      return
+    }
+    if (invalidWiggleResetTimeoutRef.current) {
+      clearTimeout(invalidWiggleResetTimeoutRef.current)
+    }
+    const key = Date.now()
+    setInvalidWiggle({
+      key,
+      lookup: new Set(ids),
+    })
+    invalidWiggleResetTimeoutRef.current = setTimeout(() => {
+      setInvalidWiggle((current) =>
+        current.key === key ? createEmptyInvalidWiggle() : current
+      )
       if (invalidWiggleResetTimeoutRef.current) {
-        clearTimeout(invalidWiggleResetTimeoutRef.current)
+        invalidWiggleResetTimeoutRef.current = null
       }
-      const key = Date.now()
-      setInvalidWiggle({
-        key,
-        lookup: new Set(ids),
-      })
-      invalidWiggleResetTimeoutRef.current = setTimeout(() => {
-        setInvalidWiggle((current) =>
-          current.key === key ? createEmptyInvalidWiggle() : current
-        )
-        if (invalidWiggleResetTimeoutRef.current) {
-          invalidWiggleResetTimeoutRef.current = null
-        }
-      }, INVALID_WIGGLE_RESET_DELAY_MS)
-    },
-    [state]
-  )
-
-  const autoPlayActive = state.isAutoCompleting || state.autoQueue.length > 0
+    }, INVALID_WIGGLE_RESET_DELAY_MS)
+  }, [])
 
   // Provides invalid-move feedback when actions are not allowed.
+  // Auto-play state is read from stateRef to keep this callback stable (perf, P3/A2).
   const notifyInvalidMove = useCallback(
     (options?: { selection?: Selection | null }) => {
-      if (autoPlayActive) {
+      const current = stateRef.current
+      if (current.isAutoCompleting || current.autoQueue.length > 0) {
         return
       }
       if (boardLockedRef.current) {
@@ -727,7 +738,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       }
       triggerInvalidSelectionWiggle(options?.selection ?? null)
     },
-    [autoPlayActive, triggerInvalidSelectionWiggle]
+    [triggerInvalidSelectionWiggle]
   )
 
   // Sets the stock button label, fading when the stock is empty.
@@ -1008,11 +1019,13 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   )
 
   // Attempts to auto-move a selection and falls back to invalid feedback on failure.
+  // Uses stateRef (only ever called from user events, which fire after the ref sync
+  // effect) so the callback stays stable for memoized card layers (perf, P3/A2).
   const attemptAutoMove = useCallback(
     (selection: Selection) => {
-      attemptAutoMoveFromState(selection, state)
+      attemptAutoMoveFromState(selection, stateRef.current)
     },
-    [attemptAutoMoveFromState, state]
+    [attemptAutoMoveFromState]
   )
 
   const handleWasteTap = useCallback(() => {
@@ -1091,35 +1104,33 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   }, [attemptAutoMoveFromState, state, wasteTapQueueVersion])
 
   // Attempts an auto move from a tapped foundation stack or routes a selection to the foundation.
+  // Reads live state via stateRef and recomputes drop hints at event time (cheap) so
+  // the callback stays stable for memoized board components. Depending on the
+  // render-time `dropHints`/`state.selected` here previously gave every selection
+  // change a new handler identity, defeating card-layer memoization (perf, P3/A2).
   const handleFoundationPress = useCallback(
     (suit: Suit) => {
       if (boardLockedRef.current) {
         return
       }
-      if (!state.selected) {
-        if (state.foundations[suit].length) {
+      const current = stateRef.current
+      if (!current.selected) {
+        if (current.foundations[suit].length) {
           attemptAutoMove({ source: 'foundation', suit })
         }
         return
       }
-      if (dropHints.foundations[suit]) {
+      if (getDropHints(current).foundations[suit]) {
         dispatchGameAction({
           type: 'APPLY_MOVE',
-          selection: state.selected,
+          selection: current.selected,
           target: { type: 'foundation', suit },
         })
       } else {
-        notifyInvalidMove({ selection: state.selected })
+        notifyInvalidMove({ selection: current.selected })
       }
     },
-    [
-      attemptAutoMove,
-      dispatchGameAction,
-      dropHints.foundations,
-      notifyInvalidMove,
-      state.foundations,
-      state.selected,
-    ]
+    [attemptAutoMove, dispatchGameAction, notifyInvalidMove]
   )
 
   const {
@@ -1158,8 +1169,24 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     intervalMs: AUTO_QUEUE_INTERVAL_MS,
   })
 
+  // Stable per-position tableau press handler so the absolute card layer's memoized
+  // cards never see a new function identity (perf, P3).
+  const handleTableauCardPress = useCallback(
+    (columnIndex: number, cardIndex: number) => {
+      attemptAutoMove({ source: 'tableau', columnIndex, cardIndex })
+    },
+    [attemptAutoMove]
+  )
+
+  // Perf (A2): the board components receive narrow state slices instead of the whole
+  // GameState so their React.memo can skip re-renders when piles kept identity
+  // (TIMER_TICK, selection-only changes, moves that don't touch a given pile).
   const topRowProps: TopRowProps = {
-    state,
+    stockCount: state.stock.length,
+    wasteCount: state.waste.length,
+    foundations: state.foundations,
+    selected: state.selected,
+    hasWon: state.hasWon,
     drawLabel,
     onDraw: handleDraw,
     onFoundationPress: handleFoundationPress,
@@ -1175,7 +1202,9 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   }
 
   const tableauProps: TableauSectionProps = {
-    state,
+    tableau: state.tableau,
+    selected: state.selected,
+    hasWon: state.hasWon,
     cardMetrics,
     dropHints,
     interactionsLocked: boardLocked,
@@ -1209,7 +1238,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     onCelebrationAbort: handleCelebrationAbort,
     undoScrubProps,
     absoluteCardLayerProps: {
-      state,
+      stock: state.stock,
+      waste: state.waste,
+      foundations: state.foundations,
+      tableau: state.tableau,
       cardMetrics,
       layouts: absoluteCardLayerLayouts,
       drawLabel,
@@ -1220,8 +1252,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       onDraw: handleDraw,
       onWasteTap: handleWasteTap,
       onFoundationPress: handleFoundationPress,
-      onTableauCardPress: (columnIndex, cardIndex) =>
-        attemptAutoMove({ source: 'tableau', columnIndex, cardIndex }),
+      onTableauCardPress: handleTableauCardPress,
       onCardSettled: handleWinningCardFlightSettled,
     },
   }

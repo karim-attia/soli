@@ -392,7 +392,14 @@ const haltAutoQueue = (state: GameState): GameState =>
     ? { ...state, autoQueue: [], isAutoCompleting: false }
     : state
 
-export const getDropHints = (state: GameState): DropHints => {
+// Narrow input so callers (useKlondikeGame) can memoize drop hints on just the state
+// slices that affect them instead of the whole GameState (render memoization).
+export type DropHintsInput = Pick<
+  GameState,
+  'selected' | 'tableau' | 'foundations' | 'waste'
+>
+
+export const getDropHints = (state: DropHintsInput): DropHints => {
   const tableauHints = Array.from({ length: TABLEAU_COLUMN_COUNT }, () => false)
   const foundationHints: Record<Suit, boolean> = createSuitRecord(false)
 
@@ -474,7 +481,7 @@ export const findAutoMoveTargetWithTableauAdjacentFallback = (
 export const hasUndoHistory = (state: GameState): boolean => state.history.length > 0
 
 const listDropTargets = (
-  state: GameState,
+  state: DropHintsInput,
   selection: Selection
 ): { tableau: number[]; foundations: Suit[] } => {
   const stack = previewSelectionStack(state, selection)
@@ -707,9 +714,36 @@ const applyMove = (
 
   const recordHistory = options.recordHistory ?? true
   const history = recordHistory ? pushHistory(state) : state.history
-  const nextTableau = cloneTableau(state.tableau)
-  const nextFoundations = cloneFoundations(state.foundations)
-  const nextWaste = cloneCards(state.waste)
+
+  // Perf (render memoization): clone only the piles this move touches so unchanged
+  // piles keep referential identity across moves and memoized board components can
+  // skip re-renders. Previously all piles were deep-cloned per move, which defeated
+  // React.memo everywhere. extractMovingCards mutates (splice/pop) the piles it is
+  // given, so every pile the selection can touch must be cloned before the call.
+  let nextTableau = state.tableau
+  let nextFoundations = state.foundations
+  let nextWaste = state.waste
+
+  const cloneTableauColumnAt = (columnIndex: number) => {
+    if (nextTableau === state.tableau) {
+      nextTableau = state.tableau.slice()
+    }
+    nextTableau[columnIndex] = cloneCards(state.tableau[columnIndex])
+  }
+
+  if (selection.source === 'tableau') {
+    cloneTableauColumnAt(selection.columnIndex)
+  } else if (selection.source === 'waste') {
+    nextWaste = cloneCards(state.waste)
+  } else {
+    nextFoundations = {
+      ...state.foundations,
+      [selection.suit]: cloneCards(state.foundations[selection.suit]),
+    }
+  }
+  if (target.type === 'tableau') {
+    cloneTableauColumnAt(target.columnIndex)
+  }
 
   const movingCards = extractMovingCards({
     selection,
@@ -726,7 +760,10 @@ const applyMove = (
     const destination = nextTableau[target.columnIndex]
     movingCards.forEach((card) => destination.push(card))
   } else {
-    nextFoundations[target.suit] = [...nextFoundations[target.suit], movingCards[0]]
+    nextFoundations = {
+      ...nextFoundations,
+      [target.suit]: [...nextFoundations[target.suit], movingCards[0]],
+    }
   }
 
   return {
@@ -813,7 +850,10 @@ const canDropOnFoundation = (card: Card, pile: Card[], suit: Suit): boolean => {
   return topCard.rank + 1 === card.rank
 }
 
-const previewSelectionStack = (state: GameState, selection: Selection | null): Card[] => {
+const previewSelectionStack = (
+  state: DropHintsInput,
+  selection: Selection | null
+): Card[] => {
   if (!selection) {
     return []
   }
