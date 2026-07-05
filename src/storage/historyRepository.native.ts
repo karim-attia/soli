@@ -293,6 +293,31 @@ export const getHistoryEntryById = async (id: string): Promise<HistoryEntry | nu
   return row ? toHistoryEntry(row) : null
 }
 
+// R3: lets result recording find an active row that paged out of the in-memory list.
+// The partial unique index `history_entries_one_active` guarantees at most one row.
+export const getActiveHistoryEntry = async (): Promise<HistoryEntry | null> => {
+  const database = await getDatabase()
+  const row = await database.getFirstAsync<HistoryRow>(
+    `SELECT
+       id,
+       exact_id,
+       deck_checksum,
+       display_name,
+       started_at,
+       finished_at,
+       solved,
+       draw_count,
+       moves,
+       duration_ms,
+       preview_json,
+       status
+     FROM history_entries
+     WHERE status = 'active'`
+  )
+
+  return row ? toHistoryEntry(row) : null
+}
+
 export const getHistorySummary = async (): Promise<HistorySummary> => {
   const database = await getDatabase()
   const row = await database.getFirstAsync<SummaryRow>(`

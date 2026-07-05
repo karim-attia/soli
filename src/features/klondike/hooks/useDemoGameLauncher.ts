@@ -34,8 +34,10 @@ type UseDemoGameLauncherOptions = {
   foundationLayoutsRef: MutableRefObject<Partial<Record<Suit, LayoutRectangle>>>
   topRowLayoutRef: MutableRefObject<LayoutRectangle | null>
   winCelebrationsRef: MutableRefObject<number>
-  // Tracks the current active history row while the demo replaces the live game.
-  currentGameEntryIdRef: MutableRefObject<string | null>
+  // Detaches the live game from its active history row before the demo replaces it.
+  // Narrow callback (owned by useKlondikeHistoryEntry) instead of the raw entry-id
+  // ref so history-link mutation stays inside the history-entry hook.
+  clearCurrentGameEntryLink: () => void
   demoPlaybackActiveRef: MutableRefObject<boolean>
   updateBoardLocked: (locked: boolean) => void
   clearGameState: () => Promise<void>
@@ -75,7 +77,7 @@ export const useDemoGameLauncher = ({
   foundationLayoutsRef,
   topRowLayoutRef,
   winCelebrationsRef,
-  currentGameEntryIdRef,
+  clearCurrentGameEntryLink,
   demoPlaybackActiveRef,
   updateBoardLocked,
   clearGameState,
@@ -114,11 +116,11 @@ export const useDemoGameLauncher = ({
     foundationLayoutsRef.current = {}
     topRowLayoutRef.current = null
     winCelebrationsRef.current = 0
-    currentGameEntryIdRef.current = null
+    clearCurrentGameEntryLink()
     updateBoardLocked(false)
   }, [
     clearCelebrationDialogTimer,
-    currentGameEntryIdRef,
+    clearCurrentGameEntryLink,
     foundationLayoutsRef,
     setCelebrationState,
     topRowLayoutRef,

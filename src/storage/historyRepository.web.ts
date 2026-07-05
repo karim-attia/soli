@@ -20,6 +20,8 @@ export const getHistoryPage = async (
 export const getHistoryEntryById = async (_id: string): Promise<HistoryEntry | null> =>
   null
 
+export const getActiveHistoryEntry = async (): Promise<HistoryEntry | null> => null
+
 export const getHistorySummary = async (): Promise<HistorySummary> => ({
   totalCount: 0,
   solvedCount: 0,

@@ -19,7 +19,7 @@
 | P3 | `AbsoluteLayerCard` memoization defeated (all ~52 cards re-render per action) | Perf/render | Medium | ✅ Resolved | `docs/product/klondike-render-memoization/klondike-render-memoization.md` |
 | P4 | Persisted game payload grows unboundedly with game length | Perf/robustness | Medium (rare, real failure) | Open | — |
 | P5 | 3.1 MB generated TS bundled eagerly (catalog + dev-only demo playlist) | Perf/bundle | Low | ✅ Resolved / accepted | `docs/product/generated-data-startup-cost/generated-data-startup-cost.md` |
-| A1 | `useKlondikeGame` is a ~1,200-line god hook | Architecture | Medium | Proposal written | `docs/product/history-entry-hook-extraction/use-klondike-history-entry-proposal.md` |
+| A1 | `useKlondikeGame` is a ~1,200-line god hook | Architecture | Medium | ✅ Implemented (history-entry extraction; 1,266 → 1,028 lines) | `docs/product/history-entry-hook-extraction/use-klondike-history-entry-proposal.md` |
 | A2 | Whole-`GameState` prop threading defeats memoization structurally | Architecture/perf | Medium | ✅ Resolved | `docs/product/klondike-render-memoization/klondike-render-memoization.md` |
 | A3 | Two animation systems coexist (RN Animated + Reanimated) | Architecture | Accepted for now | Open (policy) | — |
 | A4 | `NEW_GAME` makes the reducer impure (crypto randomness inside reducer) | Architecture/correctness | Low | Open | — |
@@ -30,7 +30,7 @@
 | H5 | `react-native-web` / `react-dom` shipped though app is native-only | Hygiene | Accepted | Open (decision) | — |
 | R1 | Persisted-game validation is shallow (nested cards unvalidated) | Robustness | Low | Open | — |
 | R2 | "One active history row" invariant enforced in three places | Robustness (watch item) | Info | Open (watch) | — |
-| R3 | `recordCurrentGameResult` fallback searches only the loaded history page | Robustness | Theoretical | Open | — |
+| R3 | `recordCurrentGameResult` fallback searches only the loaded history page | Robustness | Theoretical | ✅ Fixed (with A1) | `docs/product/history-entry-hook-extraction/use-klondike-history-entry-proposal.md` |
 | R4 | No accessibility labels/roles on cards | Product gap | Medium (vision-level) | Open | — |
 | T1 | Test coverage was pure-logic only | Testing | — | ✅ Improved | `docs/product/klondike-move-validation-tests/`, `test/unit/solitaire/klondike.identity.test.ts`, `test/unit/data/solvableDealsV2.generated.test.ts` |
 
@@ -110,9 +110,10 @@
 
 - Enforced by: React-side `normalizeActiveEntries` (`src/state/history.tsx`), transactional `markOtherActiveRowsIncomplete` (`src/storage/historyRepository.native.ts`), and the SQLite partial unique index `history_entries_one_active`. The DB index is the real guarantee; the redundancy is defensible. **Rule:** any new history feature must keep working against that index — check this box when touching history code.
 
-### R3 — `recordCurrentGameResult` fallback searches only the loaded page
+### R3 — `recordCurrentGameResult` fallback searches only the loaded page (✅ fixed with A1)
 
-- In `useKlondikeGame`, when the entry-ID linkage is lost, the fallback looks for a matching active entry in `historyEntries` (first page only). If the active entry were paged out, a duplicate row would be created. In practice the active entry is the most recent and always on page one. Theoretical; fix only if the A1 extraction touches this code anyway (then: query the repository by status instead of the in-memory page).
+- Was: when the entry-ID linkage is lost, the fallback looked for a matching active entry in `historyEntries` (first page only); a paged-out active entry would produce a duplicate row.
+- Fixed 2026-07-05 as part of the A1 extraction (`useKlondikeHistoryEntry`): the in-memory match stays the synchronous fast path; when it misses, an async fallback queries the repository via `getActiveEntry()` (`getActiveHistoryEntry()` in `historyRepository.native.ts`, `WHERE status = 'active'`) before creating a new row. Details in `docs/product/history-entry-hook-extraction/use-klondike-history-entry-proposal.md`.
 
 ### R4 — No accessibility labels/roles on cards
 

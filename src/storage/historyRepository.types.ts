@@ -20,6 +20,7 @@ export type HistoryRepository = {
   initializeHistoryRepository: () => Promise<void>
   getHistoryPage: (limit: number, offset: number) => Promise<HistoryEntry[]>
   getHistoryEntryById: (id: string) => Promise<HistoryEntry | null>
+  getActiveHistoryEntry: () => Promise<HistoryEntry | null>
   getHistorySummary: () => Promise<HistorySummary>
   getSolvableDealHistoryStats: () => Promise<SolvableDealHistoryStats[]>
   insertHistoryEntry: (entry: HistoryEntry) => Promise<void>

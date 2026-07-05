@@ -15,6 +15,7 @@ import { normalizeDrawCount, type DrawCount } from '../solitaire/drawCount'
 import {
   HISTORY_PAGE_SIZE,
   clearHistoryEntries,
+  getActiveHistoryEntry,
   getHistoryEntryById,
   getHistoryPage,
   getHistorySummary,
@@ -116,6 +117,9 @@ type HistoryContextValue = {
   updateEntry: (id: string, updates: UpdateEntryInput) => void // Task 10-6: update existing entry
   clearHistory: () => void
   getEntryById: (id: string) => HistoryEntry | undefined
+  // R3: repository-backed lookup of the single active row, for callers whose
+  // in-memory page may not contain it (see useKlondikeHistoryEntry fallback).
+  getActiveEntry: () => Promise<HistoryEntry | null>
 }
 
 const HistoryContext = createContext<HistoryContextValue | undefined>(undefined)
@@ -316,6 +320,17 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
     [entries]
   )
 
+  const getActiveEntry = useCallback(async (): Promise<HistoryEntry | null> => {
+    if (!isHistorySupported) {
+      return null
+    }
+    await (readyPromiseRef.current ?? Promise.resolve())
+    // Wait out queued writes so a just-inserted or just-completed row is visible
+    // before we decide whether an active row exists.
+    await operationQueueRef.current
+    return getActiveHistoryEntry()
+  }, [])
+
   const loadMore = useCallback(async () => {
     if (!hydrated || !hasMore || loadingMoreRef.current || !isHistorySupported) {
       return
@@ -364,10 +379,12 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
       updateEntry,
       clearHistory,
       getEntryById,
+      getActiveEntry,
     }),
     [
       clearHistory,
       entries,
+      getActiveEntry,
       getEntryById,
       hasMore,
       hydrated,

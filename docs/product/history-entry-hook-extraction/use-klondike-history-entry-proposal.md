@@ -183,8 +183,11 @@ const {
 })
 ```
 
-Notes:
+Notes (final implemented API deviates slightly from the sketch above):
 
+- The hook additionally takes `demoPlaybackActiveRef`, because the active-row recovery effect, result recording, and the `hasWon` effect all skip work during demo playback and that ref lives in `useKlondikeGame.ts`.
+- `recordStartedGame` returns `string` (not `string | null`) since `recordResult` always returns an ID, and its options reuse `CreateStartedHistoryEntryInputOptions` from `src/state/history.tsx`.
+- The result additionally passes through `getActiveEntry()` usage internally for the R3 fallback (not part of the hook's returned API).
 - `currentGameEntryIdRef` stays outside the hook initially because persistence writes to it during saved-game hydration and saves from it during debounced persistence.
 - `useKlondikeHistoryEntry` should call `useHistory()` internally for `entries`, `hydrated`, `recordResult`, and `updateEntry`.
 - `recordStartedGame(nextState, options)` replaces the repeated preview/display-name/entry-input creation in both solvable and normal `dealNewGame` branches.
@@ -193,19 +196,24 @@ Notes:
 
 ## Implementation steps
 
-Future refactor steps, intentionally not performed in this proposal task:
+Implemented on 2026-07-05 (A1 refactor, with the R3 repository-fallback fix folded in):
 
-1. Create `src/features/klondike/hooks/useKlondikeHistoryEntry.ts`.
-2. Move `currentStartingPreviewRef`, `currentDisplayNameRef`, `pendingSolvedResultRef`, and `pendingSolvedResultTimeoutRef` into the new hook.
-3. Move active-row recovery after `historyHydrated && storageHydrated` into the hook.
-4. Move `recordCurrentGameResult` into the hook and preserve the current fallback behavior for lost entry-id linkage.
-5. Move delayed solved-result timer cleanup and `flushPendingSolvedResultAfterHandoff` into the hook.
-6. Move the `hasWon` transition effect into the hook, including timer stop dispatch and pending-solved reset behavior.
-7. Move the "new game begins" preview/display-name refresh effect into the hook.
-8. Replace duplicated started-entry creation in `dealNewGame` with `recordStartedGame(nextState, { startedAt })`.
-9. Update `useDemoGameLauncher` to receive `clearCurrentGameEntryLink` instead of `currentGameEntryIdRef`, unless that creates unnecessary churn.
-10. Keep `useKlondikePersistence` unchanged except for receiving the same ref from `useKlondikeGame.ts`.
-11. Run focused automated checks and native smoke checks.
+1. [completed] Create `src/features/klondike/hooks/useKlondikeHistoryEntry.ts`.
+2. [completed, with deviation] Move `currentStartingPreviewRef`, `currentDisplayNameRef`, `pendingSolvedResultRef`, and `pendingSolvedResultTimeoutRef` into the new hook. Deviation: `currentStartingPreviewRef` turned out to be write-only (no reads anywhere), so it was deleted instead of moved; the fallback recording path recomputes the preview from `history[0]`. An inline comment in the new hook documents this.
+3. [completed] Move active-row recovery after `historyHydrated && storageHydrated` into the hook.
+4. [completed] Move `recordCurrentGameResult` into the hook and preserve the current fallback behavior for lost entry-id linkage. Additionally implements the R3 fix: the in-memory active-entry match stays the synchronous fast path; when it misses, an async fallback queries the repository (`getActiveEntry`) for the single possible active row before creating a new one.
+5. [completed] Move delayed solved-result timer cleanup and `flushPendingSolvedResultAfterHandoff` into the hook.
+6. [completed] Move the `hasWon` transition effect into the hook, including timer stop dispatch and pending-solved reset behavior.
+7. [completed] Move the "new game begins" preview/display-name refresh effect into the hook (now only refreshes the display name; see step 2 deviation).
+8. [completed] Replace duplicated started-entry creation in `dealNewGame` with `recordStartedGame(nextState, { startedAt })`.
+9. [completed] Update `useDemoGameLauncher` to receive `clearCurrentGameEntryLink` instead of `currentGameEntryIdRef` (low churn: one option type, one destructure, one call site).
+10. [completed] Keep `useKlondikePersistence` unchanged; it still receives `currentGameEntryIdRef` created in `useKlondikeGame.ts`.
+11. [completed for automated checks] `yarn typecheck`, `yarn lint`, and the full `yarn jest` suite pass. Native builds/smoke tests are run separately by the orchestrator.
+
+R3 addition (repository support):
+
+- [completed] `getActiveHistoryEntry()` added to `src/storage/historyRepository.native.ts` (`WHERE status = 'active'`; the partial unique index `history_entries_one_active` guarantees at most one row), with a web stub and the `HistoryRepository` type entry.
+- [completed] Exposed via `useHistory()` as `getActiveEntry()`, which awaits the provider's ready promise and serialized write queue before querying, so queued inserts/completions are visible.
 
 ## Risks
 
@@ -249,6 +257,8 @@ This should make `useKlondikeGame.ts` easier to maintain while preserving the ap
 
 ## Steps to implement and status of these steps
 
+Proposal phase (2026-06-16):
+
 - [completed] Inspect the current Klondike history-entry lifecycle in `useKlondikeGame.ts`.
 - [completed] Inspect related persistence, demo launcher, history provider, and existing tests.
 - [completed] Review current React custom hook and effect guidance.
@@ -256,27 +266,49 @@ This should make `useKlondikeGame.ts` easier to maintain while preserving the ap
 - [completed] Draft this proposal document.
 - [completed] Verify the file contents and changed files.
 
+Implementation phase (2026-07-05): see the numbered statuses under "Implementation steps" above — all steps completed; native smoke checks handed to the orchestrator.
+
 ## Plan: Files to modify
 
 - `docs/product/history-entry-hook-extraction/use-klondike-history-entry-proposal.md`
+- `src/features/klondike/hooks/useKlondikeHistoryEntry.ts` (new)
+- `src/features/klondike/hooks/useKlondikeGame.ts`
+- `src/features/klondike/hooks/useDemoGameLauncher.ts`
+- `src/state/history.tsx` (R3)
+- `src/storage/historyRepository.native.ts`, `historyRepository.web.ts`, `historyRepository.types.ts` (R3)
 
 ## Files actually modified
 
-- `docs/product/history-entry-hook-extraction/use-klondike-history-entry-proposal.md` - created this proposal document.
+- `docs/product/history-entry-hook-extraction/use-klondike-history-entry-proposal.md` - proposal, then updated in place with implementation status.
+- `src/features/klondike/hooks/useKlondikeHistoryEntry.ts` - new hook (360 lines) owning the active history-entry lifecycle.
+- `src/features/klondike/hooks/useKlondikeGame.ts` - lifecycle code removed; now calls the new hook. 1,266 → 1,028 lines.
+- `src/features/klondike/hooks/useDemoGameLauncher.ts` - takes `clearCurrentGameEntryLink()` instead of `currentGameEntryIdRef`.
+- `src/state/history.tsx` - added `getActiveEntry()` to the context (awaits ready + write queue, then queries the repository).
+- `src/storage/historyRepository.native.ts` - added `getActiveHistoryEntry()`.
+- `src/storage/historyRepository.web.ts` - stub returning null.
+- `src/storage/historyRepository.types.ts` - added the method to `HistoryRepository`.
+- `useKlondikePersistence.ts` - intentionally untouched.
+
+## Intermediary learnings
+
+- `currentStartingPreviewRef` was dead weight: every site wrote to it, none read it (the fallback recording path recomputes the preview from `history[0]`). Deleted with an inline comment rather than moved. Trade-off: if a future feature wants the cached starting preview, it must re-derive it or reintroduce the ref.
+- The "new game begins" refresh effect previously depended on the whole `state` object and recomputed a preview on every commit while `moveCount === 0`. After dropping the preview ref it only needs `state.exactId` + `state.moveCount`, so it does strictly less work.
+- R3 sync/async decision: `recordCurrentGameResult` stays synchronous on all realistic paths (tracked entry ID, or in-memory active match). Only the last-resort branch — no linkage and no in-memory match — became async to query the repository. A fully-async fallback was rejected because the demo launcher relies on the synchronous "record current game → clear link → hydrate demo state" sequence and win recording timing. All recorded values (moves, duration, finishedAt, snapshot state) are captured synchronously before the await, so the async part only decides *which* row receives them.
+- The async fallback compares `activeEntry.startedAt <= recordCalledAt` before completing the row, because `getActiveEntry()` resolves after queued writes and a new deal's active row may already exist by then; a coincidental same-deal replay must not have its fresh row completed on behalf of the previous game.
 
 ## Identified issues and status of these issues
 
-- History-entry lifecycle logic is currently spread through `useKlondikeGame.ts`. Status: documented, not changed.
-- `useDemoGameLauncher` directly clears `currentGameEntryIdRef.current`. Status: documented as a future extraction consideration, not changed.
-- The future hook needs to coordinate with `useKlondikePersistence` hydration ordering. Status: documented as the main API-shape constraint.
+- History-entry lifecycle logic spread through `useKlondikeGame.ts`. Status: resolved by this extraction.
+- `useDemoGameLauncher` directly cleared `currentGameEntryIdRef.current`. Status: resolved; it now calls `clearCurrentGameEntryLink()`.
+- The hook coordinates with `useKlondikePersistence` hydration ordering. Status: preserved; `currentGameEntryIdRef` is still created in `useKlondikeGame.ts` and shared with both hooks, so persistence restores `historyEntryId` into the same ref the lifecycle hook reads.
+- R3 (findings doc): result-recording fallback searched only the loaded history page, risking a duplicate row when the active entry paged out. Status: resolved via repository-backed `getActiveEntry()` fallback-of-the-fallback.
 
 ## Testing
 
-Completed proposal-only verification:
+Implementation verification (2026-07-05):
 
-- `test -f docs/product/history-entry-hook-extraction/use-klondike-history-entry-proposal.md` - passed.
-- `find docs/product/history-entry-hook-extraction -maxdepth 2 -type f -print` - returned only this proposal file.
-- `git ls-files --others --exclude-standard docs/product/history-entry-hook-extraction` - returned only this proposal file.
-- `git status --short` - confirmed this folder is untracked and also showed unrelated existing changes outside this task; no app files were modified for this proposal.
-
-No typecheck, Jest, native build, or app smoke test was run because this task changed documentation only and explicitly did not implement the refactor.
+- `yarn typecheck` - passed.
+- `yarn lint` - passed.
+- `yarn jest` (full suite) - 18 suites, 139 tests, all passed (includes `history.startedEntry`, `history.drawCount`, `history.pagination`, `gamePersistence`, `klondike.undo`).
+- No new hook-render tests added, per the proposal recommendation (no new test dependency; wiring is covered by type/lint/Jest plus native smoke tests).
+- Native iOS/Android builds and device smoke tests are run separately by the orchestrator (out of scope for this sub-agent run).
