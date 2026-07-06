@@ -11,6 +11,9 @@ export type PileButtonProps = PropsWithChildren<{
   disabled?: boolean
   disablePress?: boolean
   width?: number
+  // A11y/automation handles for the pressable slot (e.g. stock recycle/empty).
+  accessibilityLabel?: string
+  testID?: string
 }>
 
 export const PileButton = ({
@@ -19,6 +22,8 @@ export const PileButton = ({
   disabled,
   disablePress,
   width,
+  accessibilityLabel,
+  testID,
   children,
 }: PileButtonProps) => {
   // Task 1-8: Fix pile alignment (labels must not change pile width / column alignment).
@@ -31,7 +36,14 @@ export const PileButton = ({
   const body = disablePress ? (
     <View style={baseStyle}>{children}</View>
   ) : (
-    <Pressable onPress={onPress} disabled={disabled} style={baseStyle}>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
+      style={baseStyle}
+    >
       {children}
     </Pressable>
   )

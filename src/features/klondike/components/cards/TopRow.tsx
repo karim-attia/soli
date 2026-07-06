@@ -11,6 +11,11 @@ import {
   type Suit,
 } from '../../../../solitaire/klondike'
 import type { CardMetrics, DropHints } from '../../types'
+import {
+  STOCK_EMPTY_LABEL,
+  STOCK_RECYCLE_LABEL,
+  STOCK_RECYCLE_TEST_ID,
+} from './accessibility'
 import { EmptySlot, CardBack } from './CardVisual'
 import { PileButton } from './PileButton'
 import { FoundationPile } from './FoundationPile'
@@ -206,6 +211,16 @@ export const TopRow = React.memo(
                     // underneath the absolute stock card during rapid taps.
                     disablePress={drawVariant === 'stock'}
                     width={cardMetrics.width}
+                    // The 'stock' variant is disablePress (absolute stock card owns the
+                    // a11y node); only recycle/empty states are labeled here.
+                    accessibilityLabel={
+                      drawVariant === 'recycle'
+                        ? STOCK_RECYCLE_LABEL
+                        : drawVariant === 'empty'
+                          ? STOCK_EMPTY_LABEL
+                          : undefined
+                    }
+                    testID={STOCK_RECYCLE_TEST_ID}
                   >
                     {drawVariant === 'stock' ? (
                       <View

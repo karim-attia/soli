@@ -699,7 +699,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
           })
           dealNewGame()
           updateBoardLocked(false)
-          devLog('log', '[Toast suppressed] New game dealt', { reason, forced })
+          devLog('log', '[Game] New game dealt', { reason, forced })
         },
       })
 
@@ -886,7 +886,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Requirement PBI-13: persist state changes after hydration.
   useEffect(() => {
     if (state.autoCompleteRuns > autoCompleteRunsRef.current) {
-      devLog('log', '[Toast suppressed] Auto-complete engaged', {
+      devLog('log', '[Game] Auto-complete engaged', {
         previousRuns: autoCompleteRunsRef.current,
         runs: state.autoCompleteRuns,
       })

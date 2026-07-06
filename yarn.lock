@@ -12529,7 +12529,6 @@ __metadata:
     "@tamagui/lucide-icons-2": "npm:2.2.0"
     "@tamagui/metro-plugin": "npm:2.2.0"
     "@tamagui/native": "npm:2.2.0"
-    "@tamagui/toast": "npm:2.2.0"
     "@types/jest": "npm:29.5.14"
     "@types/react": "npm:^19.2.0"
     "@typescript/native-preview": "npm:7.0.0-dev.20260421.2"

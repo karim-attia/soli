@@ -20,6 +20,17 @@ import {
   WIGGLE_SEGMENT_DURATION_MS,
 } from '../../constants'
 import type { CardMetrics, InvalidWiggleConfig } from '../../types'
+import {
+  getCardTestID,
+  getFaceDownCardLabel,
+  getFoundationLabel,
+  getFoundationTestID,
+  getStockLabel,
+  getTableauCardLabel,
+  getWasteLabel,
+  STOCK_TEST_ID,
+  WASTE_TEST_ID,
+} from './accessibility'
 import { CardBack, CardVisual } from './CardVisual'
 import { styles as cardStyles } from './styles'
 
@@ -83,11 +94,17 @@ type CardLayerItem = {
   press?: CardLayerPress
   disabled?: boolean
   backLabel?: string
+  // A11y/automation handles are precomputed stable strings on the item (not derived in
+  // AbsoluteLayerCard) so face-down cards get column context and the memo comparator
+  // can compare them cheaply by value.
+  accessibilityLabel?: string
+  testID?: string
 }
 
 type WasteTapTarget = {
   x: number
   y: number
+  accessibilityLabel: string
 }
 
 const resolveTopRowPosition = (
@@ -148,6 +165,9 @@ const resolveWasteTapTarget = ({
   return {
     x: baseX + (visibleWaste.length - 1) * overlap,
     y: wastePosition.y,
+    // The tap zone owns the waste's a11y node (the fan visuals stay unlabeled to
+    // avoid duplicate focus targets), so it carries the top card's name.
+    accessibilityLabel: getWasteLabel(visibleWaste[visibleWaste.length - 1]),
   }
 }
 
@@ -189,6 +209,10 @@ const buildCardLayerItems = ({
       press: interactionsLocked ? undefined : { type: 'draw' },
       disabled: interactionsLocked,
       backLabel: drawLabel,
+      // Count in the label lets device tests assert draws without coordinates; the
+      // item already re-renders on every draw (zIndex depends on stock length).
+      accessibilityLabel: getStockLabel(stock.length),
+      testID: STOCK_TEST_ID,
     })
   }
 
@@ -210,7 +234,8 @@ const buildCardLayerItems = ({
         zIndex: 300 + index,
         // Waste taps are owned by one stable slot target below. Keeping the
         // visual card non-pressable lets fast second taps land while this card
-        // is shifting to its new fan position.
+        // is shifting to its new fan position. The visuals also stay unlabeled:
+        // the WasteTapZone carries the a11y node (avoids duplicate focus targets).
         press: undefined,
         disabled: interactionsLocked || !isTop,
       })
@@ -240,6 +265,8 @@ const buildCardLayerItems = ({
       })
     }
 
+    // Only the top card gets an a11y label; the underlay is visual-only (a second
+    // labeled node per foundation would duplicate focus targets).
     items.push({
       card: topCard,
       x: foundationPosition.x,
@@ -247,6 +274,8 @@ const buildCardLayerItems = ({
       zIndex: 500 + suitIndex * 20 + foundationDepth,
       press: interactionsLocked ? undefined : { type: 'foundation', suit },
       disabled: interactionsLocked,
+      accessibilityLabel: getFoundationLabel(suit, topCard),
+      testID: getFoundationTestID(suit),
     })
   })
 
@@ -276,6 +305,13 @@ const buildCardLayerItems = ({
             ? { type: 'tableau', columnIndex, cardIndex }
             : undefined,
         disabled: interactionsLocked || !card.faceUp,
+        // Face-down cards are labeled too: hidden-card counts per column are real game
+        // state for screen-reader players and device tests. If narration proves too
+        // noisy, dropping the label here is a one-line revert.
+        accessibilityLabel: card.faceUp
+          ? getTableauCardLabel(card, columnIndex)
+          : getFaceDownCardLabel(columnIndex),
+        testID: getCardTestID(card),
       })
     })
   })
@@ -416,6 +452,9 @@ const arePressTargetsEqual = (
 // foundations change). History note: an earlier comparator on the old pile-local card
 // surfaces regressed correctness via stale press closures (see animation-audit plan);
 // that hazard is avoided here by comparing press *data* and keeping handlers ref-based.
+// WARNING: any new CardLayerItem field that affects rendering MUST be compared here,
+// or updates to it will be silently swallowed by the memo (pattern: backLabel,
+// accessibilityLabel, testID).
 const areAbsoluteLayerCardPropsEqual = (
   prev: AbsoluteLayerCardProps,
   next: AbsoluteLayerCardProps
@@ -430,6 +469,8 @@ const areAbsoluteLayerCardPropsEqual = (
     prevItem.zIndex !== nextItem.zIndex ||
     prevItem.disabled !== nextItem.disabled ||
     prevItem.backLabel !== nextItem.backLabel ||
+    prevItem.accessibilityLabel !== nextItem.accessibilityLabel ||
+    prevItem.testID !== nextItem.testID ||
     !arePressTargetsEqual(prevItem.press, nextItem.press)
   ) {
     return false
@@ -632,6 +673,12 @@ const AbsoluteLayerCard = React.memo(
       <CardBack label={item.backLabel} metrics={metrics} variant="stock" />
     ) : (
       <View
+        // Face-down tableau cards are non-pressable, so the a11y node lives on the
+        // body view. `pointerEvents="none"` on the animated wrapper does not remove
+        // children from the a11y tree, which is exactly what we rely on here.
+        accessible={!item.press && !!item.accessibilityLabel}
+        accessibilityLabel={item.press ? undefined : item.accessibilityLabel}
+        testID={item.press ? undefined : item.testID}
         style={[
           cardStyles.cardBase,
           cardStyles.faceDown,
@@ -664,7 +711,13 @@ const AbsoluteLayerCard = React.memo(
         style={cardStyle}
       >
         {press ? (
-          <Pressable onPress={handlePress} disabled={pressDisabled}>
+          <Pressable
+            onPress={handlePress}
+            disabled={pressDisabled}
+            accessibilityRole="button"
+            accessibilityLabel={item.accessibilityLabel}
+            testID={item.testID}
+          >
             {body}
           </Pressable>
         ) : (
@@ -687,6 +740,9 @@ type WasteTapZoneProps = {
 const WasteTapZone = React.memo(({ target, metrics, onPress }: WasteTapZoneProps) => (
   <Pressable
     onPress={onPress}
+    accessibilityRole="button"
+    accessibilityLabel={target.accessibilityLabel}
+    testID={WASTE_TEST_ID}
     style={[
       layerStyles.wasteTapZone,
       {

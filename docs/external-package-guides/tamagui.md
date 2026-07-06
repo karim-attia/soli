@@ -297,6 +297,10 @@ npx tamagui check
 
 ## Scope decisions
 
+- REMOVED 2026-07-06: `@tamagui/toast` was dropped entirely (no code ever showed a
+  toast, and its `ToastViewport` full-screen focusable wrapper hid the whole app from
+  the Android accessibility tree). If toasts return, avoid a full-screen focusable
+  viewport and re-verify the Android a11y tree. Historical note kept below:
 - The published `@tamagui/toast@2.2.0` root types still export `ToastProvider`,
   `ToastViewport`, `useToastController`, and `useToastState`. Retain that legacy API
   initially and verify it at runtime. The migration checklist's `Toaster` instruction

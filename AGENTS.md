@@ -37,6 +37,9 @@ Fill in the following sections:
 - # [Feature Name] [Story Name]
 - ## User prompt
   - Add all prompts from the chat 1:1 in here.
+  ## Summary
+  - Latest up to date summary
+  - (Leave empty at start)
 - ## Description
   - Framing context
   - Leading words
@@ -117,6 +120,10 @@ Android: Run "yarn release" and wait until the build is complete. Use scripts/an
 Never run two builds at the same time as otherwise the computer nearly crashes when running builds in parallel, e.g. iOS and Android in parallel. Also check if there are other processes running a build and kill them first. If there is already a build running, this is no excuse to not run the build and test on an outdated build. Kill the other build first, then build, then test.
 
 Check if the build was actually installed on the device or the device/emulator.
+
+- The board exposes a full a11y tree — prefer it over coordinate taps. Android handle: labels/content-desc (e.g. "Seven of hearts, column 3", "Stock, 24 cards", "Face-down card, column N"). iOS handle: testIDs ("stock", "waste", "card-<suit>-<rank>", "foundation-<suit>"). Source of truth: src/features/klondike/components/cards/accessibility.ts.
+- agent-device: `snapshot -i` dedupes identical labels; use `snapshot --raw` to count face-down cards. `uiautomator dump` fails on this app (timer never idles).
+
 
 ## Commands
 

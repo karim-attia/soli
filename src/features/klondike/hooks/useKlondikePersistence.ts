@@ -131,7 +131,7 @@ export const useKlondikePersistence = ({
 
         previousHasWonRef.current = false
         dispatch({ type: 'NEW_GAME', drawCount: preferredDrawCountRef.current })
-        devLog('warn', '[Toast suppressed] Game reset', { message })
+        devLog('warn', '[Game] Game reset', { message })
       } finally {
         if (!isCancelled) {
           setStorageHydrationComplete(true)

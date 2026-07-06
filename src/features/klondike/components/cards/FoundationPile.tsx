@@ -14,6 +14,7 @@ import {
   SUIT_COLORS,
   SUIT_SYMBOLS,
 } from '../../constants'
+import { getFoundationLabel, getFoundationSlotTestID } from './accessibility'
 import { useFoundationGlowAnimation } from './animations'
 import { styles } from './styles'
 
@@ -66,6 +67,11 @@ export const FoundationPile = ({
     <Pressable
       onPress={disableInteractions ? undefined : onPress}
       disabled={disableInteractions}
+      accessibilityRole="button"
+      // Only the empty state is labeled here: with cards present, the absolute-layer
+      // top card owns the foundation's a11y node (avoids duplicate focus targets).
+      accessibilityLabel={showEmptyOutline ? getFoundationLabel(suit, null) : undefined}
+      testID={getFoundationSlotTestID(suit)}
       style={[
         styles.foundation,
         {

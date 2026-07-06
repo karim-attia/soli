@@ -11,6 +11,7 @@ import {
   COLOR_COLUMN_SELECTED,
   COLOR_DROP_BORDER,
 } from '../../constants'
+import { getEmptyColumnLabel, getTableauColumnTestID } from './accessibility'
 import { EmptySlot } from './CardVisual'
 import { styles } from './styles'
 
@@ -114,16 +115,24 @@ export const TableauColumn = React.memo(
       ? cardOffsets[cardOffsets.length - 1] + cardMetrics.height
       : cardMetrics.height
     const isFirstColumn = columnIndex === 0
+    const isEmpty = column.length === 0
 
     return (
       <View
+        // The column frame only becomes an a11y node when empty (informational, not a
+        // tap target — moves to empty columns happen via auto-move on the tapped card).
+        // Making it accessible while populated would swallow nothing (cards live in the
+        // absolute layer) but adds a meaningless focus stop.
+        accessible={isEmpty}
+        accessibilityLabel={isEmpty ? getEmptyColumnLabel(columnIndex) : undefined}
+        testID={isEmpty ? getTableauColumnTestID(columnIndex) : undefined}
         style={[
           styles.column,
           {
             width: cardMetrics.width,
             height: columnHeight,
             borderColor:
-              column.length === 0
+              isEmpty
                 ? 'transparent'
                 : isDroppable
                   ? COLOR_DROP_BORDER
@@ -138,7 +147,7 @@ export const TableauColumn = React.memo(
         pointerEvents={disableInteractions ? 'none' : 'auto'}
       >
         {/* Task 28-2: Fade empty tableau outlines after the visual win handoff, instead of unmounting them in one frame. */}
-        {column.length === 0 ? (
+        {isEmpty ? (
           <EmptySlot
             highlight={isDroppable}
             hidden={showWinCleanup}

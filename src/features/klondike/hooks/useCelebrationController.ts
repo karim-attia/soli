@@ -513,7 +513,7 @@ export const useCelebrationController = ({
     ) {
       winCelebrationsRef.current = state.winCelebrations
       devLog('info', '[Game] Foundations complete, player won the game.')
-      devLog('log', '[Toast suppressed] Celebration triggered', {
+      devLog('log', '[Game] Celebration triggered', {
         celebrations: state.winCelebrations,
       })
 

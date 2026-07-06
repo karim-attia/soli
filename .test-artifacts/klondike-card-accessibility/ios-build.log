@@ -1,0 +1,316 @@
+env: load .env
+env: export SOLI_UPLOAD_KEY_ALIAS SOLI_UPLOAD_KEY_PASSWORD SOLI_UPLOAD_STORE_FILE SOLI_UPLOAD_STORE_PASSWORD
+- Installing CocoaPods...
+✔ Installed CocoaPods
+› Planning build
+› Preparing Pods/React-timing-React-timing_privacy » ResourceBundle-React-timing_privacy-React-timing-Info.plist
+› Executing react-native Pods/hermes-engine » [CP-User] [Hermes] Replace Hermes for the right configuration, if needed
+› Executing react-native Pods/hermes-engine » [CP] Copy XCFrameworks
+› Executing react-native Pods/ReactNativeDependencies » [CP-User] [RNDeps] Replace React Native Dependencies for the right configuration, if needed
+› Executing react-native Pods/ReactNativeDependencies » [CP] Copy XCFrameworks
+› Executing react-native Pods/React-Core-prebuilt » [CP-User] [RNCore] Replace React Native Core for the right configuration, if needed
+› Preparing Pods/ExpoFileSystem-ExpoFileSystem_privacy » ResourceBundle-ExpoFileSystem_privacy-ExpoFileSystem-Info.plist
+› Preparing Pods/React-cxxreact-React-cxxreact_privacy » ResourceBundle-React-cxxreact_privacy-React-cxxreact-Info.plist
+› Preparing Pods/React-Core-React-Core_privacy » ResourceBundle-React-Core_privacy-React-Core-Info.plist
+› Preparing Pods/RNSVG-RNSVGFilters » ResourceBundle-RNSVGFilters-RNSVG-Info.plist
+› Preparing Pods/EXConstants-ExpoConstants_privacy » ResourceBundle-ExpoConstants_privacy-EXConstants-Info.plist
+› Preparing Pods/ExpoSystemUI-ExpoSystemUI_privacy » ResourceBundle-ExpoSystemUI_privacy-ExpoSystemUI-Info.plist
+› Preparing expo-constants Pods/EXConstants-EXConstants » ResourceBundle-EXConstants-EXConstants-Info.plist
+› Executing react-native Pods/React-Core-prebuilt » [CP] Copy XCFrameworks
+› Executing expo-modules-jsi Pods/ExpoModulesJSI » [CP-User] Build ExpoModulesJSI xcframework
+› Executing react-native Pods/React-RCTFBReactNativeSpec » [CP-User] [RN]Check FBReactNativeSpec
+› Executing @expo/log-box Pods/ExpoLogBox » Copy generated compatibility header
+› Executing soli Pods/ReactCodegen » [CP-User] Generate Specs
+› Executing expo-modules-jsi Pods/ExpoModulesJSI » [CP] Copy XCFrameworks
+› Executing soli Pods/ReactCodegen » [Expo] Remove duplicate codegen output
+› Compiling react-native-teleport Pods/Teleport » ComponentDescriptors.cpp
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaContext.mm
+› Compiling soli Pods/ReactAppDependencyProvider » RCTAppDependencyProvider.mm
+› Compiling soli Pods/ReactCodegen » rnworklets-generated.mm
+› Compiling soli Pods/ReactCodegen » rnsvg-generated.mm
+› Compiling soli Pods/ReactCodegen » rnscreens-generated.mm
+› Compiling soli Pods/ReactCodegen » rnreanimated-generated.mm
+› Compiling soli Pods/ReactCodegen » safeareacontext-generated.mm
+› Compiling soli Pods/ReactCodegen » rngesturehandler_codegen-generated.mm
+› Compiling soli Pods/ReactCodegen » TeleportViewSpec-generated.mm
+› Compiling soli Pods/ReactCodegen » States.cpp
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaViewState.cpp
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaViewShadowNode.cpp
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaViewComponentView.mm
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaProviderComponentView.mm
+› Compiling soli Pods/ReactCodegen » States.cpp
+› Compiling soli Pods/ReactCodegen » States.cpp
+› Compiling soli Pods/ReactCodegen » States.cpp
+› Compiling soli Pods/ReactCodegen » States.cpp
+› Compiling soli Pods/ReactCodegen » States.cpp
+› Compiling react-native-teleport Pods/Teleport » RNTPortalViewShadowNode.cpp
+› Compiling react-native-teleport Pods/Teleport » RNTPortalHostViewShadowNode.cpp
+› Compiling react-native-teleport Pods/Teleport » PortalView.mm
+› Compiling react-native-teleport Pods/Teleport » PortalHostView.mm
+› Compiling soli Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling soli Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling soli Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling soli Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling soli Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling soli Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling soli Pods/ReactCodegen » RCTUnstableModulesRequiringMainQueueSetupProvider.mm
+› Compiling soli Pods/ReactCodegen » RCTThirdPartyComponentsProvider.mm
+› Compiling soli Pods/ReactCodegen » RCTModulesConformingToProtocolsProvider.mm
+› Compiling soli Pods/ReactCodegen » RCTModuleProviders.mm
+› Compiling soli Pods/ReactCodegen » Props.cpp
+› Compiling soli Pods/ReactCodegen » Props.cpp
+› Compiling soli Pods/ReactCodegen » Props.cpp
+› Compiling soli Pods/ReactCodegen » Props.cpp
+› Compiling soli Pods/ReactCodegen » Props.cpp
+› Compiling soli Pods/ReactCodegen » Props.cpp
+› Compiling soli Pods/ReactCodegen » EventEmitters.cpp
+› Compiling soli Pods/ReactCodegen » EventEmitters.cpp
+› Compiling soli Pods/ReactCodegen » EventEmitters.cpp
+› Compiling soli Pods/ReactCodegen » EventEmitters.cpp
+› Compiling soli Pods/ReactCodegen » EventEmitters.cpp
+› Compiling soli Pods/ReactCodegen » EventEmitters.cpp
+› Compiling soli Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling soli Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling soli Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling soli Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling soli Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling soli Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling react-native-worklets Pods/RNWorklets » WorkletsModule.mm
+› Compiling react-native-screens Pods/RNScreens » RNSConversions.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGCircle.mm
+› Compiling react-native-reanimated Pods/RNReanimated » LayoutAnimationsProxy_Experimental.cpp
+› Compiling react-native-gesture-handler Pods/RNGestureHandler » RNGestureHandlerButtonComponentView.mm
+› Compiling react-native-screens Pods/RNScreens » UIViewController+RNScreens.mm
+› Compiling react-native-screens Pods/RNScreens » RNSViewInteractionManager.mm
+› Compiling react-native-screens Pods/RNScreens » RNSTabsScreenViewController.mm
+› Compiling react-native-screens Pods/RNScreens » RNSTabsScreenEventEmitter.mm
+› Compiling react-native-screens Pods/RNScreens » RNSTabsScreenComponentView.mm
+› Packaging soli Pods/ReactCodegen » libReactCodegen.a
+› Compiling react-native-screens Pods/RNScreens » RNSTabsNavigationStateObserverRegistry.mm
+› Compiling react-native-screens Pods/RNScreens » RNSTabsHostShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSTabsHostEventEmitter.mm
+› Compiling react-native-screens Pods/RNScreens » RNSTabsHostComponentView.mm
+› Compiling react-native-screens Pods/RNScreens » RNSTabsHostComponentView+RNSImageLoader.mm
+› Compiling react-native-screens Pods/RNScreens » RNSTabsBottomAccessoryShadowStateProxy.mm
+› Compiling react-native-screens Pods/RNScreens » RNSTabsBottomAccessoryShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSTabsBottomAccessoryHelper.mm
+› Compiling react-native-screens Pods/RNScreens » RNSTabsBottomAccessoryEventEmitter.mm
+› Compiling react-native-screens Pods/RNScreens » RNSTabsBottomAccessoryContentComponentView.mm
+› Compiling react-native-screens Pods/RNScreens » RNSTabsBottomAccessoryComponentView.mm
+› Compiling react-native-screens Pods/RNScreens » RNSTabBarController.mm
+› Compiling react-native-screens Pods/RNScreens » RNSTabBarAppearanceCoordinator.mm
+› Compiling react-native-screens Pods/RNScreens » RNSStackScreenShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSStackScreenController.mm
+› Compiling react-native-screens Pods/RNScreens » RNSStackScreenComponentView.mm
+› Compiling react-native-screens Pods/RNScreens » RNSStackScreenComponentEventEmitter.mm
+› Compiling react-native-screens Pods/RNScreens » RNSStackOperationCoordinator.mm
+› Compiling react-native-screens Pods/RNScreens » RNSStackOperation.mm
+› Compiling react-native-screens Pods/RNScreens » RNSStackNavigationController.mm
+› Compiling react-native-screens Pods/RNScreens » RNSStackHostComponentView.mm
+› Compiling react-native-screens Pods/RNScreens » RNSStackHeaderSubviewShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSStackHeaderConfigShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSSplitScreenShadowStateProxy.mm
+› Compiling react-native-screens Pods/RNScreens » RNSSplitScreenShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSSplitScreenComponentView.mm
+› Compiling react-native-screens Pods/RNScreens » RNSSplitScreenComponentEventEmitter.mm
+› Compiling react-native-screens Pods/RNScreens » RNSSplitHostComponentView.mm
+› Compiling react-native-screens Pods/RNScreens » RNSSplitHostComponentEventEmitter.mm
+› Compiling react-native-screens Pods/RNScreens » RNSSearchBar.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScrollViewMarkerComponentView.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenStackHeaderSubviewShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSScreenStackHeaderSubview.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenStackHeaderConfigShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSScreenStackHeaderConfig.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenStack.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSScreenNavigationContainer.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenFooter.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenContentWrapper.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreenContainer.mm
+› Compiling react-native-screens Pods/RNScreens » RNSScreen.mm
+› Compiling react-native-screens Pods/RNScreens » RNSSafeAreaViewState.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSSafeAreaViewShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSSafeAreaViewComponentView.mm
+› Compiling react-native-screens Pods/RNScreens » RNSModule.mm
+› Compiling react-native-screens Pods/RNScreens » RNSModalScreenShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSModalScreen.mm
+› Compiling react-native-screens Pods/RNScreens » RNSFullWindowOverlayShadowNode.cpp
+› Compiling react-native-screens Pods/RNScreens » RNSFullWindowOverlay.mm
+› Compiling react-native-screens Pods/RNScreens » RNSConvert.mm
+› Compiling react-native-screens Pods/RNScreens » RNSConversions-Tabs.mm
+› Compiling react-native-screens Pods/RNScreens » RNSConversions-Stack.mm
+› Compiling react-native-screens Pods/RNScreens » RNSConversions-SplitView.mm
+› Compiling react-native-screens Pods/RNScreens » RNSConversions-ScrollViewMarker.mm
+› Compiling react-native-screens Pods/RNScreens » RNSConversions-Fabric.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGUse.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGTextPath.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGText.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGTSpan.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGSymbol.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGSvgViewModule.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGSvgView.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGShadowNodes.cpp
+› Compiling react-native-svg Pods/RNSVG » RNSVGRenderableModule.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGRect.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGRadialGradient.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGPattern.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGPath.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGNode.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGMask.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGMarker.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGLinearGradient.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGLine.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGImageShadowNode.cpp
+› Compiling react-native-svg Pods/RNSVG » RNSVGImage.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGGroup.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGForeignObject.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFilterPrimitive.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFilter.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeOffset.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeMerge.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeGaussianBlur.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeFlood.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeComposite.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeColorMatrix.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGFeBlend.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGEllipse.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGDefs.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGConvert.mm
+› Compiling react-native-svg Pods/RNSVG » RNSVGClipPath.mm
+› Compiling react-native-reanimated Pods/RNReanimated » SharedTransitions.cpp
+› Compiling react-native-reanimated Pods/RNReanimated » ReanimatedModuleProxy.cpp
+› Compiling react-native-reanimated Pods/RNReanimated » ReanimatedModule.mm
+› Compiling react-native-reanimated Pods/RNReanimated » REASharedTransitionBoundaryView.mm
+› Compiling react-native-reanimated Pods/RNReanimated » REASharedTransitionBoundaryShadowNode.cpp
+› Compiling react-native-reanimated Pods/RNReanimated » PropsDiffer.cpp
+› Compiling react-native-reanimated Pods/RNReanimated » NativeProxy.mm
+› Compiling react-native-reanimated Pods/RNReanimated » LayoutAnimationsUtils.cpp
+› Compiling react-native-reanimated Pods/RNReanimated » LayoutAnimationsProxy_Legacy.cpp
+› Compiling react-native-gesture-handler Pods/RNGestureHandler » RNGestureHandlerModule.mm
+› Packaging react-native-teleport Pods/Teleport » libTeleport.a
+› Packaging react-native-safe-area-context Pods/react-native-safe-area-context » libreact-native-safe-area-context.a
+› Packaging soli Pods/ReactAppDependencyProvider » libReactAppDependencyProvider.a
+› Packaging react-native-worklets Pods/RNWorklets » libRNWorklets.a
+› Packaging react-native-screens Pods/RNScreens » libRNScreens.a
+› Packaging react-native-svg Pods/RNSVG » libRNSVG.a
+› Executing expo-modules-core Pods/ExpoModulesCore » [CP-User] [Expo] Resolve ExpoModulesCore dSYM source maps
+› Executing react-native-screens Pods/RNScreens » Copy generated compatibility header
+› Executing expo-modules-core Pods/ExpoModulesCore » [CP-User] [Expo] Switch ExpoModulesCore XCFramework for build configuration
+› Executing expo-modules-core Pods/ExpoModulesCore » [CP] Copy XCFrameworks
+› Executing expo-system-ui Pods/ExpoSystemUI » Copy generated compatibility header
+› Executing expo-modules-core Pods/ExpoModulesWorklets » [CP-User] [Expo] Resolve ExpoModulesWorklets dSYM source maps
+› Executing expo-font Pods/ExpoFont » [CP-User] [Expo] Resolve ExpoFont dSYM source maps
+› Executing expo-web-browser Pods/ExpoWebBrowser » Copy generated compatibility header
+› Executing expo-symbols Pods/ExpoSymbols » Copy generated compatibility header
+› Executing expo-splash-screen Pods/ExpoSplashScreen » Copy generated compatibility header
+› Executing expo-linking Pods/ExpoLinking » Copy generated compatibility header
+› Executing expo-linear-gradient Pods/ExpoLinearGradient » Copy generated compatibility header
+› Executing expo-keep-awake Pods/ExpoKeepAwake » Copy generated compatibility header
+› Executing expo-glass-effect Pods/ExpoGlassEffect » Copy generated compatibility header
+› Executing expo-file-system Pods/ExpoFileSystem » [CP-User] [Expo] Resolve ExpoFileSystem dSYM source maps
+› Executing @expo/dom-webview Pods/ExpoDomWebView » Copy generated compatibility header
+› Executing expo-crypto Pods/ExpoCrypto » Copy generated compatibility header
+› Executing expo-asset Pods/ExpoAsset » Copy generated compatibility header
+› Executing expo Pods/Expo » Copy generated compatibility header
+› Executing expo-constants Pods/EXConstants » [CP-User] Generate app.config for prebuilt Constants.manifest
+› Executing expo-constants Pods/EXConstants » Copy generated compatibility header
+› Executing expo-modules-core Pods/ExpoModulesWorklets » [CP-User] [Expo] Switch ExpoModulesWorklets XCFramework for build configuration
+› Executing expo-modules-core Pods/ExpoModulesWorklets » [CP] Copy XCFrameworks
+› Executing expo-font Pods/ExpoFont » [CP-User] [Expo] Switch ExpoFont XCFramework for build configuration
+› Executing expo-file-system Pods/ExpoFileSystem » [CP-User] [Expo] Switch ExpoFileSystem XCFramework for build configuration
+› Packaging react-native-gesture-handler Pods/RNGestureHandler » libRNGestureHandler.a
+› Executing @expo/ui Pods/ExpoUI » Copy generated compatibility header
+› Executing expo-font Pods/ExpoFont » [CP] Copy XCFrameworks
+› Executing expo-file-system Pods/ExpoFileSystem » [CP] Copy XCFrameworks
+› Compiling expo-sqlite Pods/ExpoSQLite » sqlite3.c
+› Packaging react-native-reanimated Pods/RNReanimated » libRNReanimated.a
+› Compiling expo-router Pods/ExpoRouter » ExpoRouter-dummy.m
+› Packaging expo-router Pods/ExpoRouter » libExpoRouter.a
+› Executing expo-router Pods/ExpoRouter » Copy generated compatibility header
+› Packaging expo-sqlite Pods/ExpoSQLite » libExpoSQLite.a
+› Executing expo-sqlite Pods/ExpoSQLite » Copy generated compatibility header
+› Compiling Pods/Pods-Soli » Pods-Soli-dummy.m
+› Packaging Pods/Pods-Soli » libPods-Soli.a
+› Executing Soli » [CP] Check Pods Manifest.lock
+› Executing Soli » [Expo] Configure project
+› Linking   Soli » __preview.dylib
+› Copying   ./PrivacyInfo.xcprivacy ➜ ios/Soli/PrivacyInfo.xcprivacy
+› Preparing Soli » Info.plist
+› Compiling Soli » Soli_vers.c
+› Linking   Soli » Soli.debug.dylib
+
+⚠️  (ios/Soli.xcodeproj:)
+
+
+ignoring duplicate libraries: '-lc++'
+(warning truncated)
+› Generating debug Soli » Soli.app.dSYM
+› Linking   Soli » Soli
+› Generating debug Soli » Soli.app.dSYM
+› Executing Soli » Bundle React Native code and images
+› Executing Soli » [CP] Copy Pods Resources
+› Executing Soli » [CP] Embed Pods Frameworks
+› Signing   Soli » Soli.debug.dylib
+› Signing   Soli » __preview.dylib
+› Signing   Soli » Soli.app
+› Build Succeeded
+
+› 0 error(s), and 1 warning(s)
+
+Starting Metro Bundler
+
+Waiting on http://localhost:8081
+› Installing /Users/karim/Library/Developer/Xcode/DerivedData/Soli-gqprxhxqsihpoafdfbbnfjtbgsbs/Build/Products/Debug-iphonesimulator/Soli.app
+› Installing on iPhone 17 Pro
+› Opening on iPhone 17 Pro (ch.karimattia.soli)
+› Opening ch.karimattia.soli://expo-development-client/?url=http%3A%2F%2F192.168.1.11%3A8081 on iPhone 17 Pro
+
+› Logs for your project will appear below.
+| (node:9601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:9601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:9601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:9601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:9601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:9601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:9601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:9601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:9601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:9601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:9601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:9601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+|   [tamagui] skipped loading 2 module, see: https://tamagui.dev/docs/intro/errors#warning-001
+|   [tamagui] skipped loading 2 module, see: https://tamagui.dev/docs/intro/errors#warning-001
+|   [tamagui] skipped loading 2 module, see: https://tamagui.dev/docs/intro/errors#warning-001
+|  🐥 [tamagui]  [33mnative[0m modal                      ·    5 found   ·    0 opt   ·    0 flat     7ms 
+|   [tamagui] skipped loading 2 module, see: https://tamagui.dev/docs/intro/errors#warning-001
+|  🐥 [tamagui]  [33mnative[0m history                    ·   28 found   ·    0 opt   ·    0 flat     4ms 
+|  🐥 [tamagui]  [33mnative[0m hello                      ·   10 found   ·    0 opt   ·    0 flat   788ms 
+|  🐥 [tamagui]  [33mnative[0m index                      ·   13 found   ·    0 opt   ·    0 flat   769ms 
+|  🐥 [tamagui]  [33mnative[0m +not-found                 ·    3 found   ·    0 opt   ·    0 flat     1ms 
+|   [tamagui] skipped loading 2 module, see: https://tamagui.dev/docs/intro/errors#warning-001
+|  🐥 [tamagui]  [33mnative[0m feature-graphic            ·   77 found   ·    0 opt   ·    0 flat   799ms 
+|   [tamagui] skipped loading 2 module, see: https://tamagui.dev/docs/intro/errors#warning-001
+|  🐥 [tamagui]  [33mnative[0m CardVisual                 ·    5 found   ·    0 opt   ·    0 flat     7ms 
+|  🐥 [tamagui]  [33mnative[0m KlondikeGameView           ·    2 found   ·    0 opt   ·    0 flat     1ms 
+|  🐥 [tamagui]  [33mnative[0m CurrentToast               ·    1 found   ·    0 opt   ·    0 flat     1ms 
+|  🐥 [tamagui]  [33mnative[0m TopRow                     ·    8 found   ·    0 opt   ·    0 flat     1ms 
+|  🐥 [tamagui]  [33mnative[0m CelebrationDebugBadge      ·    2 found   ·    0 opt   ·    0 flat     3ms 
+|  🐥 [tamagui]  [33mnative[0m PileButton                 ·    2 found   ·    0 opt   ·    0 flat     1ms 
+|  🐥 [tamagui]  [33mnative[0m FoundationPile             ·    1 found   ·    0 opt   ·    0 flat     3ms 
+iOS Bundled 16198ms index.js (4570 modules)
+[UIKitCore] RCTScrollViewComponentView implements focusItemsInRect: - caching
+for linear focus movement is limited as long as this view is on screen.
+[Foundation] NSBundle (null) initWithPath failed because the resolved path is
+empty or nil
