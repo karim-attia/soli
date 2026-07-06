@@ -5888,6 +5888,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"agent-device@npm:0.18.3":
+  version: 0.18.3
+  resolution: "agent-device@npm:0.18.3"
+  dependencies:
+    yaml: "npm:^2.9.0"
+  bin:
+    agent-device: bin/agent-device.mjs
+  checksum: 10/8991fca42d76599623de34d15ff2c95b13b0706b4ae7efd6b0b748879a615d338f1461a1a37ae09f46dbc731a2b94b023dbd2a1ff83387f71e1bdc76256797ca
+  languageName: node
+  linkType: hard
+
 "ajv@npm:^8.0.1":
   version: 8.17.1
   resolution: "ajv@npm:8.17.1"
@@ -12522,6 +12533,7 @@ __metadata:
     "@types/jest": "npm:29.5.14"
     "@types/react": "npm:^19.2.0"
     "@typescript/native-preview": "npm:7.0.0-dev.20260421.2"
+    agent-device: "npm:0.18.3"
     babel-preset-expo: "npm:~57.0.0"
     expo: "npm:^57.0.0"
     expo-constants: "npm:~57.0.3"
@@ -13713,6 +13725,15 @@ __metadata:
   bin:
     yaml: bin.mjs
   checksum: 10/4eab0074da6bc5a5bffd25b9b359cf7061b771b95d1b3b571852098380db3b1b8f96e0f1f354b56cc7216aa97cea25163377ccbc33a2e9ce00316fe8d02f4539
+  languageName: node
+  linkType: hard
+
+"yaml@npm:^2.9.0":
+  version: 2.9.0
+  resolution: "yaml@npm:2.9.0"
+  bin:
+    yaml: bin.mjs
+  checksum: 10/9a95e8e08651c3d292ab6a5befeb5f57b76801caa097c75bb45c9a70ce19c1b11f57e87a6ef84a579ea070ed2c2c8ac541c88c0ae684d544d5f42c7e77d11b7b
   languageName: node
   linkType: hard
 
