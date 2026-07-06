@@ -2,7 +2,7 @@
 // This file must stay on the ASYNC API: the persisted blob grows ~3.5 KB per move
 // (undo-history snapshots) and reaches hundreds of KB mid-game. A sync write of that
 // size would block the JS thread during animation-heavy play; the async API writes
-// off-thread. See docs/product/mmkv-migration/asyncstorage-to-mmkv-evaluation.md.
+// off-thread. See docs/product/expo-sqlite-kv-store-migration/asyncstorage-to-expo-sqlite-kv-store.md.
 import Storage from 'expo-sqlite/kv-store'
 
 import type { GameSnapshot, GameState, TimerState } from '../solitaire/klondike'

@@ -161,7 +161,7 @@ Docs: [Expo SQLite SDK 57 — Key-value storage](https://docs.expo.dev/versions/
 
 Soli uses this as the replacement for `@react-native-async-storage/async-storage`
 (removed 2026-07-05, clean-slate release — see
-`docs/product/mmkv-migration/asyncstorage-to-mmkv-evaluation.md`). It stores key-value
+`docs/product/expo-sqlite-kv-store-migration/asyncstorage-to-expo-sqlite-kv-store.md`). It stores key-value
 pairs in a `storage` table inside its own SQLite database file (`ExpoSQLiteStorage`),
 separate from the history DB (`soli-history.db`).
 

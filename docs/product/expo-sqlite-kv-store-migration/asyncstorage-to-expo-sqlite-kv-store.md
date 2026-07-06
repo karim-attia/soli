@@ -1,9 +1,15 @@
-# MMKV Migration — AsyncStorage → react-native-mmkv Evaluation
+# Expo SQLite KV Store Migration — AsyncStorage → expo-sqlite/kv-store
+
+(Started as an MMKV evaluation; renamed 2026-07-06 after the decision landed on
+`expo-sqlite/kv-store` so the plan is findable under the package we actually use.)
 
 Created: 2026-07-05
-Status: Approach E implemented 2026-07-05 (expo-sqlite/kv-store switch, async-storage
-removed, all cheap gates green). Device smoke tests **PASS** on iOS simulator + Android
-physical device (2026-07-05).
+Status: DONE. Approach E implemented 2026-07-05 (expo-sqlite/kv-store switch,
+async-storage removed, all cheap gates green). Device smoke tests **PASS** on iOS
+simulator + Android physical device (2026-07-05). Flicker fix confirmed manually by
+Karim on cold start (2026-07-06). Docs cleanup 2026-07-06: the react-native-mmkv and
+react-native-async-storage package guides were deleted (we only keep guides for
+packages actually in use; MMKV research facts survive in this file).
 
 ## User prompt
 
@@ -23,6 +29,10 @@ game, the current game [...] we can do the other JSON optimization as well, but 
 that's kind of less urgent at the moment right now."
 
 Go-ahead (2026-07-05): "OK, do it now"
+
+Wrap-up (2026-07-06): "it is flicker free. pls Update documentation according to your
+recommendation. can at this point also remove mmkv and async storage docs. only need
+things that we actually use."
 
 ## Summary / Recommendation (revised 2026-07-05 — clean-slate context)
 
@@ -116,7 +126,8 @@ removes.
 
 ### react-native-mmkv facts (researched 2026-07-05)
 
-See `docs/external-package-guides/react-native-mmkv.md` for the full guide. Key points:
+(A full package guide was written during evaluation and deleted 2026-07-06 after MMKV
+was rejected — guides are only kept for packages in use.) Key points:
 
 - Current version **4.3.2**; V4 is a full rewrite as a **Nitro Module** — requires the
   peer dep `react-native-nitro-modules` and RN 0.76+. Soli (RN 0.86, Expo SDK 57, New
@@ -274,8 +285,10 @@ New (only if the switch is executed):
 - `react-native-mmkv` ^4.3.2
 - `react-native-nitro-modules` (peer, keep in lockstep with mmkv's codegen range)
 
-Package guide: [docs/external-package-guides/react-native-mmkv.md](../../external-package-guides/react-native-mmkv.md)
-Existing guide affected: [docs/external-package-guides/react-native-async-storage.md](../../external-package-guides/react-native-async-storage.md)
+Package guides: the react-native-mmkv and react-native-async-storage guides were
+deleted 2026-07-06 (MMKV rejected, async-storage removed — only in-use packages get
+guides). The kv-store API actually adopted is documented in
+[docs/external-package-guides/expo-sqlite.md](../../external-package-guides/expo-sqlite.md).
 
 ## Simplification ideas
 
@@ -311,7 +324,8 @@ Evaluation (this story):
 - [x] Inventory AsyncStorage usage sites, write frequency, payload sizes
 - [x] Research react-native-mmkv v4 (version, Nitro/New-Arch/Expo compat, API,
       migration pattern, Jest story)
-- [x] Write date-stamped package guide `docs/external-package-guides/react-native-mmkv.md`
+- [x] Write date-stamped package guide for react-native-mmkv
+      (deleted 2026-07-06 after MMKV was rejected — only in-use packages get guides)
 - [x] Write this evaluation with an opinionated recommendation
 
 Approach E — `expo-sqlite/kv-store` switch (recommended; NOT started):
@@ -343,6 +357,7 @@ Approach E — `expo-sqlite/kv-store` switch (recommended; NOT started):
       **Android PASS 2026-07-05** (see Testing section)
 - [x] Mark `docs/external-package-guides/react-native-async-storage.md` superseded;
       kv-store section added to `docs/external-package-guides/expo-sqlite.md`
+      (the superseded async-storage guide was then deleted entirely 2026-07-06)
 
 Approach A — MMKV migration (NOT chosen; kept for reference; steps for a future implementer):
 
@@ -380,8 +395,9 @@ Approach A — MMKV migration (NOT chosen; kept for reference; steps for a futur
 
 Evaluation phase (docs only):
 
-- `docs/external-package-guides/react-native-mmkv.md` (new)
-- `docs/product/mmkv-migration/asyncstorage-to-mmkv-evaluation.md` (this file, new)
+- `docs/external-package-guides/react-native-mmkv.md` (new; deleted again 2026-07-06)
+- this file (new; created as `docs/product/mmkv-migration/asyncstorage-to-mmkv-evaluation.md`,
+  renamed 2026-07-06 to `docs/product/expo-sqlite-kv-store-migration/asyncstorage-to-expo-sqlite-kv-store.md`)
 
 Approach E implementation (2026-07-05):
 
@@ -410,7 +426,12 @@ Approach E implementation (2026-07-05):
 - `test/unit/state/history.startedEntry.test.ts`, `history.drawCount.test.ts`,
   `history.pagination.test.ts` — vestigial async-storage mock blocks deleted
 - `docs/external-package-guides/react-native-async-storage.md` — superseded note
+  (file deleted entirely 2026-07-06)
 - `docs/external-package-guides/expo-sqlite.md` — kv-store section (verified API)
+
+Docs cleanup (2026-07-06): deleted `docs/external-package-guides/react-native-mmkv.md`
+and `docs/external-package-guides/react-native-async-storage.md` — guides exist only
+for packages actually in use.
 
 ## Intermediary learnings
 
@@ -496,3 +517,6 @@ None open.
   - **(f) Logs:** PASS — no storage/sqlite/kv/persistence/`database is locked`/ExpoSQLite
     errors in logcat. Benign unrelated system noise only (TaskPersister, Finsky package
     stats).
+- **Manual flicker check (2026-07-06)** — **PASS**. Karim confirmed the cold-start
+  card-metrics flicker is gone ("it is flicker free") — the one item automation could
+  not prove from static screenshots. This closes the story.
