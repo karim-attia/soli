@@ -4,6 +4,13 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${ROOT_DIR}/.env"
+
+# Local phone builds only need arm64-v8a. This env project property overrides the
+# 4-ABI default in android/gradle.properties (survives `expo prebuild --clean`) and
+# does NOT affect Play Store builds (build-android.sh keeps all ABIs).
+# Benchmarked 2026-07-06: warm loop 47.6s -> ~39s (install of 50MB vs 113MB APK);
+# cold builds skip ~75% of native C++ compilation. See docs/product/faster-builds/.
+export ORG_GRADLE_PROJECT_reactNativeArchitectures="${ORG_GRADLE_PROJECT_reactNativeArchitectures:-arm64-v8a}"
 BUILD_GRADLE_FILE="${ROOT_DIR}/android/app/build.gradle"
 EXPO_RELEASE_COMMAND=(yarn expo run:android --variant release)
 CONNECT_CANDIDATES=()
