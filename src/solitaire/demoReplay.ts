@@ -11,6 +11,9 @@ import {
 } from './klondike'
 import type { DrawCount } from './drawCount'
 import type { DealCard, ExactDealId } from './dealIdentity'
+// Value import from ../data is safe: demoAutoSolvePlaylist.ts only imports TYPES
+// from this module, so there is no runtime cycle.
+import { getDemoAutoSolvePlaylist } from '../data/demoAutoSolvePlaylist'
 
 // Same shape as dealIdentity's DealCard (clean-code review #13: was a third
 // structural clone of {suit, rank}).
@@ -44,6 +47,35 @@ export type DemoAutoSolvePlaylistEntry = {
   readonly undoProbeMoveIndices: readonly number[]
   readonly moves: readonly DemoReplayMove[]
 }
+
+export type DemoUndoProbe = {
+  readonly moveIndex: number
+  readonly depth: number
+}
+
+// Back-and-forth undo probe depths live here in code instead of the generated
+// fixture on purpose: regenerating the ~617 KB Lonelybot fixture for a tiny
+// semantic change risks a different playlist if solver output shifts, and buys
+// nothing at runtime (demo-sheet-undo-probes-info-hud, approach A). The fixture
+// keeps owning the probe *locations* (undoProbeMoveIndices); this table only
+// deepens the FIRST probe of selected playlist entries.
+const FIRST_PROBE_DEPTH_BY_PLAYLIST_INDEX: Readonly<Record<number, number>> = {
+  0: 3,
+  2: 2,
+  4: 2,
+}
+
+export const getDemoUndoProbePlan = (
+  entry: DemoAutoSolvePlaylistEntry,
+  playlistIndex: number
+): DemoUndoProbe[] =>
+  entry.undoProbeMoveIndices.map((moveIndex, probeIndex) => {
+    const plannedDepth =
+      probeIndex === 0 ? (FIRST_PROBE_DEPTH_BY_PLAYLIST_INDEX[playlistIndex] ?? 1) : 1
+    // Fixture probes always sit at moveIndex >= 3, so this clamp is defensive
+    // only: a probe can never undo past the start of the game.
+    return { moveIndex, depth: Math.min(plannedDepth, moveIndex + 1) }
+  })
 
 export type DemoReplayActionResolution =
   | {
@@ -183,3 +215,41 @@ const describeReplayCard = (card: DemoReplayCard): string => getCardStableId(car
 
 const describeGameCard = (card: { suit: Suit; rank: Rank } | null | undefined): string =>
   card ? getCardStableId(card) : 'nothing'
+
+// --- "Far game, scrubbed to middle" fixture (scrubber-test-automation) ---
+// 80 steps into playlist entry 0 (244 primitive steps) keeps mid-game texture
+// (face-down cards, stock cycling) while giving 40 undos + 40 redos; tunable.
+export const SCRUBBED_DEMO_STEPS = 80
+export const SCRUBBED_DEMO_SCRUB_INDEX = 40
+
+// Deterministic mid-game state for scrubber/undo/redo device tests: same deal
+// (playlist entry `default-0-draw-1`), same board, same labels on every launch,
+// so tests can assert exact cards and the readout "position 40 of 80".
+// The fold goes through applyDemoReplayMoveForValidation on purpose — each move
+// is validated against the expected card and THROWS on mismatch, so a future
+// playlist regeneration cannot silently change this fixture.
+// Because the fold runs the real reducer, the state carries a real exactId and
+// a populated moveLog → the move-log persistence path replays it after
+// kill/relaunch with full undo/redo depths (acceptance criterion 6).
+export const createScrubbedMidGameState = (options?: {
+  steps?: number
+  scrubIndex?: number
+}): GameState => {
+  const steps = options?.steps ?? SCRUBBED_DEMO_STEPS
+  const scrubIndex = options?.scrubIndex ?? SCRUBBED_DEMO_SCRUB_INDEX
+  const entry = getDemoAutoSolvePlaylist()[0]
+  if (!entry) {
+    throw new Error('Demo auto-solve playlist is empty.')
+  }
+  if (steps > entry.moves.length) {
+    throw new Error(
+      `Scrubbed demo needs ${steps} steps but playlist entry ${entry.id} has ${entry.moves.length}.`
+    )
+  }
+
+  let state = createDemoReplayGameState(entry)
+  for (const move of entry.moves.slice(0, steps)) {
+    state = applyDemoReplayMoveForValidation(state, move)
+  }
+  return klondikeReducer(state, { type: 'SCRUB_TO_INDEX', index: scrubIndex })
+}

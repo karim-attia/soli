@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import {
-  Alert,
-  LayoutChangeEvent,
-  LayoutRectangle,
-  useColorScheme,
-} from 'react-native'
+import { Alert, LayoutChangeEvent, LayoutRectangle, useColorScheme } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {

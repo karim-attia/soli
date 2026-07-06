@@ -13,14 +13,17 @@ import {
 import type { DrawCount } from '../../../solitaire/drawCount'
 import {
   createDemoReplayGameState,
+  createScrubbedMidGameState,
+  getDemoUndoProbePlan,
   resolveDemoReplayAction,
   type DemoAutoSolvePlaylistEntry,
 } from '../../../solitaire/demoReplay'
 import { getDemoAutoSolvePlaylist } from '../../../data/demoAutoSolvePlaylist'
+import { setDemoProgress } from '../state/demoProgressStore'
 import { devLog } from '../../../utils/devLogger'
 
 type DispatchGameActionFn = (action: GameAction) => void
-export type DemoLaunchMode = 'old' | 'single' | 'playlist'
+export type DemoLaunchMode = 'old' | 'single' | 'playlist' | 'scrubbed'
 
 type UseDemoGameLauncherOptions = {
   stateRef: MutableRefObject<GameState>
@@ -66,7 +69,8 @@ export const DEMO_AUTO_STEP_INTERVAL_MS = 300
 const DEMO_PLAYLIST_POLL_INTERVAL_MS = 30
 const DEMO_PLAYLIST_ACTION_TIMEOUT_MS = 2500
 const DEMO_PLAYLIST_BETWEEN_GAMES_MS = 600
-
+// HUD throttle: step progress is published at most this often; game loads and
+// undo-probe start/end publish immediately (force) so the HUD never misses them.
 const parseOptionalBooleanParam = (value: string | null): boolean | null => {
   if (value === null) {
     return null
@@ -153,6 +157,7 @@ export const useDemoGameLauncher = ({
       }
       clearPlaylistTimers()
       demoPlaybackActiveRef.current = false
+      setDemoProgress(null)
       dispatch({ type: 'SET_AUTO_UP_ENABLED', enabled: autoUpEnabled })
       devLog('error', `[DemoPlaylist] Playlist failed: ${message}`)
     },
@@ -226,6 +231,7 @@ export const useDemoGameLauncher = ({
 
         if (gameIndex >= gameLimit) {
           demoPlaybackActiveRef.current = false
+          setDemoProgress(null)
           dispatch({ type: 'SET_AUTO_UP_ENABLED', enabled: autoUpEnabled })
           devLog('info', `[DemoPlaylist] Playlist completed (games=${gameLimit}).`)
           return
@@ -234,6 +240,7 @@ export const useDemoGameLauncher = ({
         const entry = playlist[gameIndex]
         if (!entry) {
           demoPlaybackActiveRef.current = false
+          setDemoProgress(null)
           dispatch({ type: 'SET_AUTO_UP_ENABLED', enabled: autoUpEnabled })
           devLog('info', `[DemoPlaylist] Playlist completed (games=${gameIndex}).`)
           return
@@ -260,12 +267,23 @@ export const useDemoGameLauncher = ({
             )
           },
           onReady: () => {
+            // Probe depths are derived once per game; the map keys are the
+            // fixture's probe move indices.
+            const probeDepths = new Map(
+              getDemoUndoProbePlan(entry, gameIndex).map((probe) => [
+                probe.moveIndex,
+                probe.depth,
+              ])
+            )
+            // HUD shows only game-level progress (user feedback 2026-07-06:
+            // step/heap/elapsed detail was noise), so one publish per game.
+            setDemoProgress({ gameIndex, gameCount: gameLimit })
             devLog(
               'info',
               `[DemoPlaylist] Game ${gameIndex + 1}/${gameLimit} loaded (${entry.id}, moves=${entry.moves.length}, undoProbes=${entry.undoProbeMoveIndices.length}).`
             )
             schedulePlaylistTimer(() => {
-              playStep(entry, gameIndex, 0)
+              playStep(entry, gameIndex, 0, probeDepths)
             }, DEMO_AUTO_STEP_INTERVAL_MS)
           },
         })
@@ -274,7 +292,8 @@ export const useDemoGameLauncher = ({
       const playStep = (
         entry: DemoAutoSolvePlaylistEntry,
         gameIndex: number,
-        moveIndex: number
+        moveIndex: number,
+        probeDepths: ReadonlyMap<number, number>
       ) => {
         if (playlistRunIdRef.current !== runId) {
           return
@@ -315,44 +334,97 @@ export const useDemoGameLauncher = ({
           description: `Game ${gameIndex + 1} step ${moveIndex + 1}`,
           predicate: () => stateRef.current.moveCount > beforeMoveCount,
           onReady: () => {
-            if (!shouldRecordHistory || !entry.undoProbeMoveIndices.includes(moveIndex)) {
-              playStep(entry, gameIndex, moveIndex + 1)
+            // Probes need reducer history snapshots, so they only run when
+            // history recording is on (unchanged from the single-step version).
+            const plannedDepth = shouldRecordHistory
+              ? (probeDepths.get(moveIndex) ?? 0)
+              : 0
+            if (plannedDepth <= 0) {
+              playStep(entry, gameIndex, moveIndex + 1, probeDepths)
               return
             }
-
-            const beforeUndoHistoryLength = stateRef.current.history.length
-            devLog(
-              'info',
-              `[DemoPlaylist] Undo probe at game ${gameIndex + 1}, step ${moveIndex + 1}.`
-            )
-            dispatchGameAction({ type: 'UNDO' })
-            waitForPlaylistState({
-              runId,
-              description: `Game ${gameIndex + 1} undo probe ${moveIndex + 1}`,
-              predicate: () => stateRef.current.history.length < beforeUndoHistoryLength,
-              onReady: () => {
-                const beforeReplayMoveCount = stateRef.current.moveCount
-                const replayResolved = resolveDemoReplayAction(stateRef.current, move)
-                if (!replayResolved.ok) {
-                  failPlaylist(
-                    runId,
-                    `Game ${gameIndex + 1} replay after undo at step ${moveIndex + 1}: ${replayResolved.reason}`
-                  )
-                  return
-                }
-                dispatchGameAction(applyHistoryPreference(replayResolved.action))
-                waitForPlaylistState({
-                  runId,
-                  description: `Game ${gameIndex + 1} replay after undo ${moveIndex + 1}`,
-                  predicate: () => stateRef.current.moveCount > beforeReplayMoveCount,
-                  onReady: () => {
-                    playStep(entry, gameIndex, moveIndex + 1)
-                  },
-                })
-              },
-            })
+            runUndoProbe(entry, gameIndex, moveIndex, plannedDepth, probeDepths)
           },
         })
+      }
+
+      // Back-and-forth undo probe: undo `depth` moves one by one, then replay
+      // the same fixture moves forward. Undo restores the exact pre-move
+      // snapshot, so each replayed move re-resolves against live state exactly
+      // like first-pass replay (demo-sheet-undo-probes-info-hud scope 2).
+      const runUndoProbe = (
+        entry: DemoAutoSolvePlaylistEntry,
+        gameIndex: number,
+        moveIndex: number,
+        plannedDepth: number,
+        probeDepths: ReadonlyMap<number, number>
+      ) => {
+        // getDemoUndoProbePlan already clamps against moveIndex; clamping against
+        // live history length too keeps a bad plan from underflowing undo.
+        const depth = Math.min(plannedDepth, stateRef.current.history.length)
+        if (depth <= 0) {
+          playStep(entry, gameIndex, moveIndex + 1, probeDepths)
+          return
+        }
+
+        devLog(
+          'info',
+          `[DemoPlaylist] Undo probe at game ${gameIndex + 1}, step ${moveIndex + 1} (depth ${depth}).`
+        )
+
+        const replayForward = (replayIndex: number) => {
+          if (replayIndex > moveIndex) {
+            playStep(entry, gameIndex, moveIndex + 1, probeDepths)
+            return
+          }
+
+          const replayMove = entry.moves[replayIndex]
+          if (!replayMove) {
+            failPlaylist(
+              runId,
+              `Game ${gameIndex + 1} undo probe at step ${moveIndex + 1} (depth ${depth}): missing replay move ${replayIndex + 1}.`
+            )
+            return
+          }
+
+          const beforeReplayMoveCount = stateRef.current.moveCount
+          const replayResolved = resolveDemoReplayAction(stateRef.current, replayMove)
+          if (!replayResolved.ok) {
+            failPlaylist(
+              runId,
+              `Game ${gameIndex + 1} undo probe at step ${moveIndex + 1} (depth ${depth}), replay of step ${replayIndex + 1}: ${replayResolved.reason}`
+            )
+            return
+          }
+          dispatchGameAction(applyHistoryPreference(replayResolved.action))
+          waitForPlaylistState({
+            runId,
+            description: `Game ${gameIndex + 1} undo probe replay ${replayIndex + 1} (depth ${depth})`,
+            predicate: () => stateRef.current.moveCount > beforeReplayMoveCount,
+            onReady: () => {
+              replayForward(replayIndex + 1)
+            },
+          })
+        }
+
+        const undoOnce = (remaining: number) => {
+          if (remaining <= 0) {
+            replayForward(moveIndex - depth + 1)
+            return
+          }
+          const beforeHistoryLength = stateRef.current.history.length
+          dispatchGameAction({ type: 'UNDO' })
+          waitForPlaylistState({
+            runId,
+            description: `Game ${gameIndex + 1} undo probe at step ${moveIndex + 1}, undo ${depth - remaining + 1}/${depth}`,
+            predicate: () => stateRef.current.history.length < beforeHistoryLength,
+            onReady: () => {
+              undoOnce(remaining - 1)
+            },
+          })
+        }
+
+        undoOnce(depth)
       }
 
       loadGame(0)
@@ -474,6 +546,10 @@ export const useDemoGameLauncher = ({
         return
       }
 
+      // Clear stale HUD progress on every demo (re)launch; playlist runs
+      // re-publish once their first game is hydrated, the old demo stays clear.
+      setDemoProgress(null)
+
       recordCurrentGameResult()
       resetDemoRuntimeState()
 
@@ -499,6 +575,35 @@ export const useDemoGameLauncher = ({
 
       clearPlaylistTimers()
       demoPlaybackActiveRef.current = false
+
+      if (demoMode === 'scrubbed') {
+        // Deterministic "far game, scrubbed to middle" fixture for scrubber/
+        // undo/redo tests (scrubber-test-automation): 40 undos + 40 redos
+        // available, exact same board every launch. Auto Up stays OFF so no
+        // auto-queue mutates depths underneath a test's assertions.
+        let scrubbedState: GameState
+        try {
+          scrubbedState = createScrubbedMidGameState()
+        } catch (error) {
+          // Only reachable on fixture drift (regenerated playlist); fail loudly
+          // instead of hydrating a corrupt board.
+          devLog('error', `[Demo] Scrubbed mid-game fixture failed: ${String(error)}`)
+          return
+        }
+        dispatch({ type: 'HYDRATE_STATE', state: scrubbedState, autoUpEnabled: false })
+
+        devLog(
+          'info',
+          '[Demo] Game loaded (options=' + JSON.stringify(options ?? {}) + ')'
+        )
+
+        // Same pattern as the other branches: drop the previous persisted game;
+        // the debounced save then persists the hydrated scrubbed state.
+        void clearGameState().catch((error) => {
+          console.warn('Failed to clear persisted game before scrubbed demo', error)
+        })
+        return
+      }
 
       // Plain handcrafted demo games mirror the player's chosen draw setting; the
       // solver playlist above owns its own Draw 1 fixture state.
@@ -573,6 +678,9 @@ export const useDemoGameLauncher = ({
         demoRequestsAutoSolve ||
         normalizedDemoParam === 'autoreveal' ||
         normalizedDemoParam === 'auto'
+      // soli://demo-game?demo=scrubbed → deterministic mid-game state; lets
+      // automated tests enter the scrubbed fixture with zero UI taps.
+      const demoRequestsScrubbed = normalizedDemoParam === 'scrubbed'
       const recordHistoryParam =
         parsed.searchParams.get('recordHistory') ?? parsed.searchParams.get('history')
       const nextRecordHistoryEnabled = parseOptionalBooleanParam(recordHistoryParam)
@@ -583,9 +691,21 @@ export const useDemoGameLauncher = ({
         pathname === '/demo' ||
         demoParam === '1' ||
         normalizedDemoParam === 'true' ||
-        demoRequestsAutoReveal
+        demoRequestsAutoReveal ||
+        demoRequestsScrubbed
       ) {
         lastDemoLinkRef.current = incomingUrl
+
+        if (demoRequestsScrubbed) {
+          if (!developerModeEnabled) {
+            setDeveloperMode(true)
+          }
+          setTimeout(() => {
+            handleLaunchDemoGame({ demoMode: 'scrubbed', force: true })
+          }, DEMO_AUTO_STEP_INTERVAL_MS)
+          return
+        }
+
         const autoParam =
           parsed.searchParams.get('auto') ?? parsed.searchParams.get('autoreveal')
         const solveParam =

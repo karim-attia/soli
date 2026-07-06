@@ -132,6 +132,7 @@ Check if the build was actually installed on the device or the device/emulator.
 - Typecheck: `yarn typecheck` — Lint: `yarn lint` — Tests: `yarn jest`
 - iOS build+run: `yarn ios` (connected simulator, clean build)
 - Android release: `yarn release`; unlock device: `scripts/android-unlock-pattern.sh`
+- iOS scrub drag: start `appium`, then `node scripts/ios-scrub.js --from N --max M --to T` (agent-device can't pan on iOS; Android pans natively; serialize with agent-device — see docs/external-package-guides/appium.md)
 
 # External packages
 

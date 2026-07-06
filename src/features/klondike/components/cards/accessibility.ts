@@ -29,7 +29,8 @@ const RANK_WORDS = [
 
 type CardIdentity = Pick<Card, 'suit' | 'rank'>
 
-const capitalize = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1)
+const capitalize = (value: string): string =>
+  value.charAt(0).toUpperCase() + value.slice(1)
 
 export const getCardAccessibilityLabel = (card: CardIdentity): string =>
   `${RANK_WORDS[card.rank - 1]} of ${card.suit}`

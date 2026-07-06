@@ -121,12 +121,11 @@ export const TableauColumn = React.memo(
           {
             width: cardMetrics.width,
             height: columnHeight,
-            borderColor:
-              isEmpty
-                ? 'transparent'
-                : isDroppable
-                  ? COLOR_DROP_BORDER
-                  : COLOR_COLUMN_BORDER,
+            borderColor: isEmpty
+              ? 'transparent'
+              : isDroppable
+                ? COLOR_DROP_BORDER
+                : COLOR_COLUMN_BORDER,
             backgroundColor: isSelected ? COLOR_COLUMN_SELECTED : 'transparent',
             // Task 1-8: reduce board column gaps and keep edge gutters equal to the column gap.
             marginLeft: isFirstColumn ? BOARD_COLUMN_GAP : BOARD_COLUMN_MARGIN,

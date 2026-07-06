@@ -12,6 +12,7 @@ import { CelebrationOverlayLayer } from './cards/CelebrationOverlayLayer'
 import { CelebrationTouchBlocker } from './cards/CelebrationTouchBlocker'
 import { CelebrationDebugBadge } from './CelebrationDebugBadge'
 import { UndoScrubber, type UndoScrubberProps } from './UndoScrubber'
+import { DemoPlaylistHud } from './DemoPlaylistHud'
 import type { CelebrationBindings } from '../types'
 import { EDGE_GUTTER, STACK_PADDING } from '../constants'
 
@@ -105,7 +106,14 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
         {celebrationLabel ? <CelebrationDebugBadge label={celebrationLabel} /> : null}
       </YStack>
 
-      <UndoScrubber {...undoScrubProps} />
+      {/* Shared relative wrapper so the demo HUD (absolute, left half) aligns
+          exactly with the Undo button's bottom dock without duplicating the
+          root padding tokens. The HUD self-subscribes and renders null outside
+          demo playback, so mounting it unconditionally costs nothing. */}
+      <View style={styles.bottomDock}>
+        <UndoScrubber {...undoScrubProps} />
+        <DemoPlaylistHud />
+      </View>
     </YStack>
   )
 }
@@ -117,6 +125,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   boardShell: {
+    alignSelf: 'stretch',
+    position: 'relative',
+  },
+  bottomDock: {
     alignSelf: 'stretch',
     position: 'relative',
   },

@@ -14,8 +14,9 @@ const FACE_DOWN_STACK_OFFSET_DIVISOR = 2
 // Vertical offset of each card in a tableau column. Shared by the structural
 // TableauColumn (column height) and AbsoluteCardLayer (card positions) so the two
 // layers' stacking math can't drift apart (clean-code review #12: was duplicated).
+// Structural pick so BoardPreview (history sheet) can pass id-less preview cards.
 export const computeTableauStackOffsets = (
-  column: readonly Card[],
+  column: readonly Pick<Card, 'faceUp'>[],
   faceUpStackOffset: number
 ): number[] => {
   const faceDownStackOffset = Math.round(

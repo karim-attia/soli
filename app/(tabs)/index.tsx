@@ -116,25 +116,45 @@ type DemoChoiceSheetProps = {
 const DemoChoiceSheet = ({ isPresented, onDismiss, onSelect }: DemoChoiceSheetProps) => {
   return (
     <AppSheet isPresented={isPresented} onDismiss={onDismiss}>
-      <YStack gap="$3" p="$4">
-        <Text fontSize={18} fontWeight="700">
+      {/* No Cancel button on purpose: the @expo/ui BottomSheet is natively
+          dismissible (swipe down / scrim tap -> onDismiss), so an in-sheet
+          Cancel was dead weight (demo-sheet-undo-probes-info-hud scope 1).
+          Buttons use size="$3" + tight gaps: the Android sheet detent clipped
+          the sixth option with default-size buttons (device smoke 2026-07-06). */}
+      <YStack gap="$2" p="$4" pb="$5">
+        {/* No dismiss hint on purpose: internal dev-only sheet, swipe/scrim
+            dismissal is the platform convention (user feedback 2026-07-06). */}
+        <Text fontSize={18} fontWeight="700" pb="$2">
           Run Demo
         </Text>
-        <Button onPress={() => onSelect({ demoMode: 'old' })}>Old demo game</Button>
-        <Button onPress={() => onSelect({ demoMode: 'single' })}>
+        <Button size="$3" onPress={() => onSelect({ demoMode: 'old' })}>
+          Old demo game
+        </Button>
+        <Button size="$3" onPress={() => onSelect({ demoMode: 'single' })}>
           One generated game
         </Button>
-        <Button onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 5 })}>
+        <Button
+          size="$3"
+          onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 5 })}
+        >
           5 generated games
         </Button>
-        <Button onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 10 })}>
+        <Button
+          size="$3"
+          onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 10 })}
+        >
           10 generated games
         </Button>
-        <Button onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 20 })}>
+        <Button
+          size="$3"
+          onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 20 })}
+        >
           20 generated games
         </Button>
-        <Button chromeless onPress={onDismiss}>
-          Cancel
+        {/* Deterministic mid-game fixture (scrubber-test-automation): 40 undos +
+            40 redos available for scrubber/undo/redo testing. */}
+        <Button size="$3" onPress={() => onSelect({ demoMode: 'scrubbed' })}>
+          Mid-game, scrubbed to middle
         </Button>
       </YStack>
     </AppSheet>

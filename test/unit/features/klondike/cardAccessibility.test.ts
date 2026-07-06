@@ -18,19 +18,13 @@ describe('getCardAccessibilityLabel', () => {
   it('spells out ranks so screen readers pronounce them well', () => {
     expect(getCardAccessibilityLabel({ suit: 'hearts', rank: 1 })).toBe('Ace of hearts')
     expect(getCardAccessibilityLabel({ suit: 'clubs', rank: 2 })).toBe('Two of clubs')
-    expect(getCardAccessibilityLabel({ suit: 'spades', rank: 7 })).toBe(
-      'Seven of spades'
-    )
+    expect(getCardAccessibilityLabel({ suit: 'spades', rank: 7 })).toBe('Seven of spades')
     expect(getCardAccessibilityLabel({ suit: 'diamonds', rank: 10 })).toBe(
       'Ten of diamonds'
     )
-    expect(getCardAccessibilityLabel({ suit: 'hearts', rank: 11 })).toBe(
-      'Jack of hearts'
-    )
+    expect(getCardAccessibilityLabel({ suit: 'hearts', rank: 11 })).toBe('Jack of hearts')
     expect(getCardAccessibilityLabel({ suit: 'clubs', rank: 12 })).toBe('Queen of clubs')
-    expect(getCardAccessibilityLabel({ suit: 'spades', rank: 13 })).toBe(
-      'King of spades'
-    )
+    expect(getCardAccessibilityLabel({ suit: 'spades', rank: 13 })).toBe('King of spades')
   })
 })
 

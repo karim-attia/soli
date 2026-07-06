@@ -652,7 +652,9 @@ const AbsoluteLayerCard = React.memo(
     ]
 
     const body = renderFaceUp ? (
-      <CardVisual card={{ ...item.card, faceUp: true }} metrics={metrics} />
+      // CardVisual only reads suit/rank (structural Pick), so no faceUp override
+      // is needed here — renderFaceUp already decided the face.
+      <CardVisual card={item.card} metrics={metrics} />
     ) : item.backLabel ? (
       <CardBack label={item.backLabel} metrics={metrics} variant="stock" />
     ) : (

@@ -53,7 +53,8 @@ const deriveCardScale = (metrics: CardMetrics) => {
 }
 
 export type CardVisualProps = {
-  card: Card
+  // Structural pick so BoardPreview (history sheet) can pass id-less preview cards.
+  card: Pick<Card, 'suit' | 'rank'>
   metrics: CardMetrics
   onPress?: () => void
   disabled?: boolean

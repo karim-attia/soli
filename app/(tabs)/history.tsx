@@ -1,5 +1,6 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react'
-import { FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { FlatList, Pressable, useWindowDimensions } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from 'expo-router'
 import { Paragraph, Separator, Spinner, Text, XStack, YStack, useTheme } from 'tamagui'
 
@@ -8,11 +9,10 @@ import {
   HeaderMenuButton,
   HEADER_MENU_LEADING_PADDING,
 } from '../../components/navigation/HeaderMenuButton'
+import { BoardPreview } from '../../src/features/klondike/components/BoardPreview'
 import {
   type HistoryEntry,
   type HistoryEntryStatus,
-  type HistoryPreviewCard,
-  type HistoryPreviewColumn,
   useHistory,
 } from '../../src/state/history'
 import { devLog } from '../../src/utils/devLogger'
@@ -83,7 +83,7 @@ function HistoryScreen() {
           <EmptyHistory hydrated={hydrated} paddingHorizontal={24} paddingVertical={48} />
         }
         renderItem={({ item }) => (
-          <HistoryListItem entry={item} onPress={() => setSelectedEntry(item)} />
+          <HistoryListItem entry={item} onSelect={setSelectedEntry} />
         )}
         ItemSeparatorComponent={ListSpacer}
         ListFooterComponent={loadingMore ? LoadingFooter : null}
@@ -104,10 +104,12 @@ function HistoryScreen() {
 
 type HistoryListItemProps = {
   entry: HistoryEntry
-  onPress?: () => void
+  // Stable callback (not an inline closure from renderItem) so React.memo below
+  // actually skips re-renders; the row builds its own onPress from it.
+  onSelect: (entry: HistoryEntry) => void
 }
 
-// Task 10-6: Map status to display labels and colors
+// Task 10-6: Map status to display labels and colors.
 const STATUS_DISPLAY: Record<
   HistoryEntryStatus,
   { label: string; colorKey: 'green' | 'yellow' | 'blue' }
@@ -117,14 +119,13 @@ const STATUS_DISPLAY: Record<
   active: { label: 'Active', colorKey: 'blue' },
 }
 
-const SOLVABLE_BADGE_LABEL = 'Solvable'
-
-const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
+// Feedback round 2: plain colored text instead of Badge pills — the pills were
+// "too aggressive and colorful". Shared by list rows and the sheet header.
+const StatusText = ({ status }: { status: HistoryEntryStatus }) => {
   const theme = useTheme()
-  const statusDisplay = STATUS_DISPLAY[entry.status] ?? STATUS_DISPLAY.incomplete
-  const statusLabel = statusDisplay.label
-  const statusColor = useMemo(() => {
-    switch (statusDisplay.colorKey) {
+  const display = STATUS_DISPLAY[status] ?? STATUS_DISPLAY.incomplete
+  const color = useMemo(() => {
+    switch (display.colorKey) {
       case 'green':
         return theme.green10?.val ?? '#15803d'
       case 'blue':
@@ -133,24 +134,44 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
       default:
         return theme.yellow11?.val ?? '#854d0e'
     }
-  }, [statusDisplay.colorKey, theme.blue10?.val, theme.green10?.val, theme.yellow11?.val])
-  // Task 10-6: Show "Started" for active/incomplete, "Finished" for solved
-  const timeLabel = useMemo(() => {
-    if (entry.status === 'solved' && entry.finishedAt) {
-      return `Finished ${formatFinishedAt(entry.finishedAt)}`
-    }
-    return `Started ${formatFinishedAt(entry.startedAt)}`
-  }, [entry.finishedAt, entry.startedAt, entry.status])
-  const metadata = useMemo(() => {
-    const segments = [timeLabel]
-    if (typeof entry.moves === 'number' && entry.moves >= 0) {
-      segments.push(`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`)
-    }
-    if (typeof entry.durationMs === 'number' && entry.durationMs >= 0) {
-      segments.push(`Time ${formatElapsedDuration(entry.durationMs)}`)
-    }
-    return segments.join(' · ')
-  }, [entry.durationMs, entry.moves, timeLabel])
+  }, [display.colorKey, theme.blue10?.val, theme.green10?.val, theme.yellow11?.val])
+
+  return (
+    <Text fontSize={14} fontWeight="600" style={{ color, flexShrink: 0 }}>
+      {display.label}
+    </Text>
+  )
+}
+
+// Product decision (feedback round 2): solved entries show finishedAt, others
+// startedAt; no "Started"/"Finished" prefix — the status text already conveys it.
+const formatEntryTimeLabel = (entry: HistoryEntry) =>
+  formatHistoryTimestamp(
+    entry.status === 'solved' && entry.finishedAt ? entry.finishedAt : entry.startedAt
+  )
+
+// Feedback round 2: draw count and solvability are plain text segments (no badges)
+// so the row has just two text styles: title + secondary.
+const formatEntryDetails = (entry: HistoryEntry): string => {
+  const segments: string[] = []
+  if (typeof entry.moves === 'number' && entry.moves >= 0) {
+    segments.push(`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`)
+  }
+  if (typeof entry.durationMs === 'number' && entry.durationMs >= 0) {
+    segments.push(formatElapsedDuration(entry.durationMs))
+  }
+  segments.push(`Draw ${entry.drawCount}`)
+  if (entry.solvable) {
+    segments.push('Solvable')
+  }
+  return segments.join(' · ')
+}
+
+// History-entries-cleanup B4: memoized so FlatList re-renders (pagination, sheet
+// open/close) don't re-render unchanged rows.
+const HistoryListItem = memo(({ entry, onSelect }: HistoryListItemProps) => {
+  const theme = useTheme()
+  const onPress = useCallback(() => onSelect(entry), [entry, onSelect])
 
   const cardStyle = useMemo(
     () => ({
@@ -163,7 +184,11 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
   )
 
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={{ width: '100%' }}>
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => ({ width: '100%', opacity: pressed ? 0.7 : 1 })}
+    >
       <YStack gap="$2" style={cardStyle} mx="$3" bg="$color3">
         <XStack
           gap="$2"
@@ -172,25 +197,21 @@ const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
           <Text fontSize={16} fontWeight="700" flex={1} numberOfLines={1}>
             {entry.displayName}
           </Text>
-          <Text
-            fontSize={14}
-            fontWeight="600"
-            style={{ color: statusColor, flexShrink: 0 }}
-          >
-            {statusLabel}
-          </Text>
+          <StatusText status={entry.status} />
         </XStack>
 
-        <Paragraph color="$color10">{metadata}</Paragraph>
-
-        <XStack gap="$2" flexWrap="wrap">
-          <Badge label={`Draw ${entry.drawCount}`} tone="neutral" />
-          {entry.solvable ? <Badge label={SOLVABLE_BADGE_LABEL} tone="info" /> : null}
-        </XStack>
+        {/* Feedback round 2: one shared secondary style for both metadata lines. */}
+        <Paragraph color="$color10" fontSize={14}>
+          {formatEntryTimeLabel(entry)}
+        </Paragraph>
+        <Paragraph color="$color10" fontSize={14}>
+          {formatEntryDetails(entry)}
+        </Paragraph>
       </YStack>
     </Pressable>
   )
-}
+})
+HistoryListItem.displayName = 'HistoryListItem'
 
 const ListSpacer = () => <YStack height="$2" />
 
@@ -221,67 +242,15 @@ const EmptyHistory = ({
   </YStack>
 )
 
-type BadgeProps = {
-  label: string
-  tone: 'success' | 'warning' | 'info' | 'neutral'
-}
+const isSameCalendarDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate()
 
-const Badge = ({ label, tone }: BadgeProps) => {
-  const theme = useTheme()
-  const { backgroundColor, textColor } = useMemo(() => {
-    switch (tone) {
-      case 'success':
-        return {
-          backgroundColor: theme.green4?.val ?? '#bbf7d0',
-          textColor: theme.green11?.val ?? '#166534',
-        }
-      case 'warning':
-        return {
-          backgroundColor: theme.yellow4?.val ?? '#fef3c7',
-          textColor: theme.yellow11?.val ?? '#854d0e',
-        }
-      case 'info':
-        return {
-          backgroundColor: theme.blue4?.val ?? '#bfdbfe',
-          textColor: theme.blue11?.val ?? '#1e3a8a',
-        }
-      default:
-        return {
-          backgroundColor: theme.color4?.val ?? '#e2e8f0',
-          textColor: theme.color11?.val ?? '#111827',
-        }
-    }
-  }, [
-    tone,
-    theme.blue11?.val,
-    theme.blue4?.val,
-    theme.color11?.val,
-    theme.color4?.val,
-    theme.green11?.val,
-    theme.green4?.val,
-    theme.yellow11?.val,
-    theme.yellow4?.val,
-  ])
-  const badgeStyle = useMemo(
-    () => ({
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 999,
-      backgroundColor,
-    }),
-    [backgroundColor]
-  )
-
-  return (
-    <YStack style={badgeStyle}>
-      <Text fontSize={12} fontWeight="600" style={{ color: textColor }}>
-        {label}
-      </Text>
-    </YStack>
-  )
-}
-
-const formatFinishedAt = (isoTimestamp: string | undefined) => {
+// History-entries-cleanup B3: friendly dates shared by the list rows and the sheet
+// header — "Today, 5:33 PM" / "Yesterday, 5:33 PM" / "Jul 6, 5:33 PM" (same year) /
+// "Jul 6, 2025" (older, no time).
+const formatHistoryTimestamp = (isoTimestamp: string | undefined) => {
   if (!isoTimestamp) {
     return 'just now'
   }
@@ -291,9 +260,30 @@ const formatFinishedAt = (isoTimestamp: string | undefined) => {
     if (Number.isNaN(timestamp.getTime())) {
       return isoTimestamp
     }
+
+    const now = new Date()
+    const time = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' }).format(
+      timestamp
+    )
+    if (isSameCalendarDay(timestamp, now)) {
+      return `Today, ${time}`
+    }
+    const yesterday = new Date(now)
+    yesterday.setDate(now.getDate() - 1)
+    if (isSameCalendarDay(timestamp, yesterday)) {
+      return `Yesterday, ${time}`
+    }
+    if (timestamp.getFullYear() === now.getFullYear()) {
+      const monthDay = new Intl.DateTimeFormat(undefined, {
+        month: 'short',
+        day: 'numeric',
+      }).format(timestamp)
+      return `${monthDay}, ${time}`
+    }
     return new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
     }).format(timestamp)
   } catch (error) {
     devLog('warn', '[history] Failed to format timestamp', error)
@@ -371,318 +361,41 @@ type HistoryPreviewSheetProps = {
   onDismiss: () => void
 }
 
-const PREVIEW_TABLEAU_COLUMN_COUNT = 7
-const PREVIEW_TABLEAU_GAP = 10
-const PREVIEW_COLUMN_MARGIN = PREVIEW_TABLEAU_GAP / 2
-const PREVIEW_BASE_CARD_WIDTH = 72
-const PREVIEW_BASE_CARD_HEIGHT = 102
-const PREVIEW_CARD_ASPECT_RATIO = PREVIEW_BASE_CARD_HEIGHT / PREVIEW_BASE_CARD_WIDTH
-const PREVIEW_BASE_STACK_OFFSET = 28
-const PREVIEW_MIN_CARD_WIDTH = 24
-const PREVIEW_MAX_CARD_WIDTH = 96
-const PREVIEW_COLOR_CARD_FACE = '#ffffff'
-const PREVIEW_COLOR_CARD_BACK = '#3b4d75'
-const PREVIEW_COLOR_CARD_BORDER = '#cbd5f5'
-const PREVIEW_COLOR_COLUMN_BORDER = '#d0d5dd'
-const PREVIEW_FACE_CARD_LABELS: Partial<Record<HistoryPreviewCard['rank'], string>> = {
-  1: 'A',
-  11: 'J',
-  12: 'Q',
-  13: 'K',
-}
-const PREVIEW_SUIT_SYMBOLS: Record<HistoryPreviewCard['suit'], string> = {
-  clubs: '♣',
-  diamonds: '♦',
-  hearts: '♥',
-  spades: '♠',
-}
-const PREVIEW_SUIT_COLORS: Record<HistoryPreviewCard['suit'], string> = {
-  clubs: '#111827',
-  spades: '#111827',
-  diamonds: '#c92a2a',
-  hearts: '#c92a2a',
-}
-
+// History-entries-cleanup A1/A4: the board preview reuses the main game's card
+// renderer via BoardPreview (the previous duplicated PREVIEW_* renderer is gone).
 const HistoryPreviewSheet = ({ entry, onDismiss }: HistoryPreviewSheetProps) => {
   const { width } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
   // Expo's universal sheet supplies 16 dp/pt/px of horizontal content padding per side.
   const contentWidth = Math.max(1, width - 32)
-  const metrics = useMemo(() => computePreviewMetrics(contentWidth), [contentWidth])
 
   return (
     <AppSheet isPresented onDismiss={onDismiss}>
-      <YStack gap="$3" width={contentWidth}>
+      {/* Expo UI's content-sized sheet doesn't apply a bottom safe-area inset to the
+          RN content, so pad manually (home-indicator devices need more than 16). */}
+      <YStack gap="$3" width={contentWidth} pb={Math.max(16, insets.bottom)}>
         <YStack gap="$1">
-          <Text fontSize={16} fontWeight="700">
-            {entry.displayName}
-          </Text>
-          <Paragraph color="$color10">
-            {entry.status === 'solved' && entry.finishedAt
-              ? `Finished ${formatFinishedAt(entry.finishedAt)}`
-              : `Started ${formatFinishedAt(entry.startedAt)}`}{' '}
-            · {STATUS_DISPLAY[entry.status]?.label ?? 'Unknown'}
+          <XStack
+            gap="$2"
+            style={{ alignItems: 'center', justifyContent: 'space-between' }}
+          >
+            <Text fontSize={16} fontWeight="700" flex={1} numberOfLines={1}>
+              {entry.displayName}
+            </Text>
+            <StatusText status={entry.status} />
+          </XStack>
+          {/* Feedback round 2: one plain metadata line, no badges (sheet is wide
+              enough; falls back to wrapping naturally if it ever overflows). */}
+          <Paragraph color="$color10" fontSize={14}>
+            {`${formatEntryTimeLabel(entry)} · ${formatEntryDetails(entry)}`}
           </Paragraph>
         </YStack>
-        <XStack gap="$2" flexWrap="wrap">
-          <Badge label={`Draw ${entry.drawCount}`} tone="neutral" />
-          {entry.solvable ? <Badge label={SOLVABLE_BADGE_LABEL} tone="info" /> : null}
-          {typeof entry.moves === 'number' && entry.moves >= 0 ? (
-            <Badge
-              label={`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`}
-              tone="neutral"
-            />
-          ) : null}
-          {typeof entry.durationMs === 'number' && entry.durationMs >= 0 ? (
-            <Badge label={formatElapsedDuration(entry.durationMs)} tone="info" />
-          ) : null}
-        </XStack>
 
-        <View style={previewStyles.boardShell} pointerEvents="none">
-          <View style={previewStyles.tableauRow}>
-            {entry.preview.tableau.map((column, index) => (
-              <PreviewColumn key={`col-${index}`} column={column} metrics={metrics} />
-            ))}
-          </View>
-        </View>
+        <BoardPreview tableau={entry.preview.tableau} availableWidth={contentWidth} />
       </YStack>
     </AppSheet>
   )
 }
-
-type PreviewMetrics = {
-  width: number
-  height: number
-  stackOffset: number
-  radius: number
-}
-
-const computePreviewMetrics = (availableWidth: number | null): PreviewMetrics => {
-  if (!availableWidth || availableWidth <= 0) {
-    return computePreviewMetrics(
-      PREVIEW_BASE_CARD_WIDTH * PREVIEW_TABLEAU_COLUMN_COUNT +
-        PREVIEW_TABLEAU_GAP * (PREVIEW_TABLEAU_COLUMN_COUNT - 1)
-    )
-  }
-
-  const totalGap = PREVIEW_TABLEAU_GAP * (PREVIEW_TABLEAU_COLUMN_COUNT - 1)
-  const widthAvailable = Math.max(
-    availableWidth - totalGap,
-    PREVIEW_MIN_CARD_WIDTH * PREVIEW_TABLEAU_COLUMN_COUNT
-  )
-  const rawWidth = widthAvailable / PREVIEW_TABLEAU_COLUMN_COUNT
-  const unclampedWidth = Math.max(Math.floor(rawWidth), PREVIEW_MIN_CARD_WIDTH)
-  const constrainedWidth = Math.min(
-    Math.max(unclampedWidth, PREVIEW_MIN_CARD_WIDTH),
-    PREVIEW_MAX_CARD_WIDTH
-  )
-  const height = Math.round(constrainedWidth * PREVIEW_CARD_ASPECT_RATIO)
-  const stackOffset = Math.max(
-    24,
-    Math.round(
-      constrainedWidth * (PREVIEW_BASE_STACK_OFFSET / PREVIEW_BASE_CARD_WIDTH + 0.12)
-    )
-  )
-  const radius = Math.max(6, Math.round(constrainedWidth * 0.12))
-
-  return {
-    width: constrainedWidth,
-    height,
-    stackOffset,
-    radius,
-  }
-}
-
-const PreviewColumn = ({
-  column,
-  metrics,
-}: {
-  column: HistoryPreviewColumn
-  metrics: PreviewMetrics
-}) => {
-  const totalCards = column.cards.length
-  const height = totalCards
-    ? metrics.height + (totalCards - 1) * metrics.stackOffset
-    : metrics.height
-
-  return (
-    <View
-      style={[
-        previewStyles.column,
-        {
-          width: metrics.width,
-          height,
-          marginHorizontal: PREVIEW_COLUMN_MARGIN,
-        },
-      ]}
-    >
-      {totalCards === 0 && <PreviewEmptySlot metrics={metrics} />}
-      {column.cards.map((card, index) =>
-        card.faceUp ? (
-          <PreviewCard
-            key={`${card.suit}-${card.rank}-${index}`}
-            card={card}
-            metrics={metrics}
-            top={index * metrics.stackOffset}
-          />
-        ) : (
-          <PreviewHiddenCard
-            key={`hidden-${index}`}
-            metrics={metrics}
-            top={index * metrics.stackOffset}
-          />
-        )
-      )}
-    </View>
-  )
-}
-
-const PreviewCard = ({
-  card,
-  metrics,
-  top,
-}: {
-  card: HistoryPreviewCard
-  metrics: PreviewMetrics
-  top: number
-}) => (
-  <View
-    style={[
-      previewStyles.cardBase,
-      previewStyles.faceUp,
-      {
-        width: metrics.width,
-        height: metrics.height,
-        borderRadius: metrics.radius,
-        top,
-      },
-    ]}
-  >
-    <Text
-      style={[previewStyles.cardCornerRank, { color: PREVIEW_SUIT_COLORS[card.suit] }]}
-      numberOfLines={1}
-      allowFontScaling={false}
-    >
-      {PREVIEW_FACE_CARD_LABELS[card.rank] ?? card.rank}
-    </Text>
-    <Text
-      style={[previewStyles.cardCornerSuit, { color: PREVIEW_SUIT_COLORS[card.suit] }]}
-      numberOfLines={1}
-      allowFontScaling={false}
-    >
-      {PREVIEW_SUIT_SYMBOLS[card.suit]}
-    </Text>
-    <Text
-      style={[previewStyles.cardSymbol, { color: PREVIEW_SUIT_COLORS[card.suit] }]}
-      numberOfLines={1}
-      allowFontScaling={false}
-    >
-      {PREVIEW_SUIT_SYMBOLS[card.suit]}
-    </Text>
-  </View>
-)
-
-const PreviewHiddenCard = ({
-  metrics,
-  top,
-}: {
-  metrics: PreviewMetrics
-  top: number
-}) => (
-  <View
-    style={[
-      previewStyles.cardBase,
-      previewStyles.faceDown,
-      {
-        width: metrics.width,
-        height: metrics.height,
-        borderRadius: metrics.radius,
-        top,
-      },
-    ]}
-  />
-)
-
-const PreviewEmptySlot = ({ metrics }: { metrics: PreviewMetrics }) => (
-  <View
-    style={[
-      previewStyles.emptySlot,
-      {
-        width: metrics.width,
-        height: metrics.height,
-        borderRadius: metrics.radius,
-      },
-    ]}
-  />
-)
-
-const previewStyles = StyleSheet.create({
-  boardShell: {
-    width: '100%',
-    alignSelf: 'stretch',
-    paddingHorizontal: PREVIEW_COLUMN_MARGIN,
-    paddingBottom: 16,
-    position: 'relative',
-  },
-  tableauRow: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    flexWrap: 'nowrap',
-  },
-  column: {
-    position: 'relative',
-    paddingBottom: 8,
-  },
-  cardBase: {
-    position: 'absolute',
-    shadowColor: 'rgba(0,0,0,0.15)',
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 6,
-    justifyContent: 'center',
-    backgroundColor: PREVIEW_COLOR_CARD_FACE,
-    overflow: 'hidden',
-  },
-  faceUp: {
-    borderWidth: 1,
-    borderColor: PREVIEW_COLOR_CARD_BORDER,
-  },
-  faceDown: {
-    borderWidth: 1,
-    borderColor: PREVIEW_COLOR_CARD_BORDER,
-    backgroundColor: PREVIEW_COLOR_CARD_BACK,
-  },
-  emptySlot: {
-    position: 'absolute',
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: PREVIEW_COLOR_COLUMN_BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
-  cardCornerRank: {
-    position: 'absolute',
-    top: -2,
-    left: 3,
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  cardCornerSuit: {
-    position: 'absolute',
-    top: 0,
-    right: 3,
-    fontSize: 12,
-  },
-  cardSymbol: {
-    textAlign: 'center',
-    fontSize: 28,
-    fontWeight: '600',
-    marginTop: 16,
-  },
-})
 
 // PBI-17: Memoize the entire screen component to prevent re-renders
 export default memo(HistoryScreen)
