@@ -8,7 +8,7 @@ import {
   PersistedGameError,
   clearGameState,
   loadGameState,
-  saveGameState,
+  saveGameStateWithHistory,
 } from '../../../src/storage/gamePersistence'
 
 describe('gamePersistence', () => {
@@ -23,7 +23,7 @@ describe('gamePersistence', () => {
       selected: { source: 'waste' } as const,
     }
 
-    await saveGameState(state)
+    await saveGameStateWithHistory(state, null)
 
     expect(Storage.setItem).toHaveBeenCalledTimes(1)
     const [, serialized] = (Storage.setItem as jest.Mock).mock.calls[0]
@@ -108,7 +108,7 @@ describe('gamePersistence', () => {
     let state = createInitialState(5)
     state = klondikeReducer(state, { type: 'DRAW_OR_RECYCLE' })
 
-    await saveGameState(state)
+    await saveGameStateWithHistory(state, null)
     const [, serialized] = (Storage.setItem as jest.Mock).mock.calls[0]
     ;(Storage.getItem as jest.Mock).mockResolvedValue(serialized)
 

@@ -16,7 +16,7 @@ export {
 } from 'expo-router'
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
+  // Ensure that reloading on a nested route keeps a back button present.
   initialRouteName: '(tabs)',
 }
 
@@ -64,20 +64,6 @@ function RootLayoutNav() {
           name="(tabs)"
           options={{
             headerShown: false,
-          }}
-        />
-
-        <Stack.Screen
-          name="modal"
-          options={{
-            title: 'Tamagui + Expo',
-            presentation: 'modal',
-            animation: 'slide_from_right',
-            gestureEnabled: true,
-            gestureDirection: 'horizontal',
-            contentStyle: {
-              backgroundColor: theme.background?.val,
-            },
           }}
         />
 

@@ -139,4 +139,4 @@ Check if the build was actually installed on the device or the device/emulator.
 Exception today: Use Fable high for everything, both flagship and efficient.
  (high, xhigh, medium = reasoning)
 - Flagship: Anthropic Fable high, GPT 5.5 xhigh
-- Efficient: GPT 5.5 medium, Opus 4.8 medium
+- Efficient: GPT 5.5 medium, Opus 4.8 medium. fallback: composer 2.5 (ignore! today: use Fable high for everything)

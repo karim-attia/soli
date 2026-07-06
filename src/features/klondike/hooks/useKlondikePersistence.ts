@@ -7,7 +7,11 @@ import {
   loadGameState,
   saveGameStateWithHistory,
 } from '../../../storage/gamePersistence'
-import type { GameAction, GameState } from '../../../solitaire/klondike'
+import {
+  createInitialState,
+  type GameAction,
+  type GameState,
+} from '../../../solitaire/klondike'
 import type { DrawCount } from '../../../solitaire/drawCount'
 
 type UseKlondikePersistenceParams = {
@@ -69,6 +73,17 @@ export const useKlondikePersistence = ({
   useEffect(() => {
     let isCancelled = false
 
+    // A4: the reducer must stay pure (StrictMode double-invokes reducers in dev),
+    // so fresh games are always built outside the reducer and dispatched via
+    // HYDRATE_STATE — the same pattern as dealNewGame in useKlondikeGame.
+    const dispatchFreshGame = () => {
+      dispatch({
+        type: 'HYDRATE_STATE',
+        state: createInitialState(preferredDrawCountRef.current),
+        autoUpEnabled: autoUpEnabledRef.current,
+      })
+    }
+
     ;(async () => {
       try {
         const persisted = await loadGameState()
@@ -79,7 +94,7 @@ export const useKlondikePersistence = ({
         if (!persisted) {
           // No saved game: replace the reducer's placeholder deal with one that uses
           // the user's preferred draw-count rule.
-          dispatch({ type: 'NEW_GAME', drawCount: preferredDrawCountRef.current })
+          dispatchFreshGame()
           return
         }
 
@@ -94,7 +109,7 @@ export const useKlondikePersistence = ({
             devLog('warn', 'Failed clearing completed saved game state', clearError)
           }
           previousHasWonRef.current = false
-          dispatch({ type: 'NEW_GAME', drawCount: preferredDrawCountRef.current })
+          dispatchFreshGame()
           return
         }
 
@@ -130,7 +145,7 @@ export const useKlondikePersistence = ({
         }
 
         previousHasWonRef.current = false
-        dispatch({ type: 'NEW_GAME', drawCount: preferredDrawCountRef.current })
+        dispatchFreshGame()
         devLog('warn', '[Game] Game reset', { message })
       } finally {
         if (!isCancelled) {

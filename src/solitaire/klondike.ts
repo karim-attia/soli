@@ -85,7 +85,6 @@ export interface GameState extends GameSnapshot {
 }
 
 export type GameAction =
-  | { type: 'NEW_GAME'; drawCount?: DrawCount }
   | { type: 'DRAW_OR_RECYCLE'; recordHistory?: boolean }
   | { type: 'UNDO' }
   | { type: 'SCRUB_TO_INDEX'; index: number }
@@ -291,13 +290,13 @@ export const createDemoGameState = (
   }
 }
 
+// A4: the reducer must stay pure — no NEW_GAME action here. Fresh deals use
+// expo-crypto randomness (createRandomExactDealId), and React may invoke reducers
+// twice in dev (StrictMode), which would deal two different decks with only one
+// committed. Always build fresh games outside the reducer (createInitialState)
+// and dispatch HYDRATE_STATE instead.
 export const klondikeReducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
-    case 'NEW_GAME':
-      return {
-        ...createInitialState(action.drawCount ?? state.drawCount),
-        autoUpEnabled: state.autoUpEnabled,
-      }
     case 'DRAW_OR_RECYCLE':
       return finalizeState(
         drawFromStock(haltAutoQueue(state), { recordHistory: action.recordHistory })

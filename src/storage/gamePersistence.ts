@@ -116,13 +116,9 @@ const isPersistedGamePayload = (value: unknown): value is PersistedGamePayload =
   )
 }
 
-export const saveGameState = async (state: GameState): Promise<void> => {
-  // Task 10-7: Include optional history entry linkage.
-  const payload = serializeState(state, null)
-  const serialized = JSON.stringify(payload)
-  await Storage.setItem(KLONDIKE_STORAGE_KEY, serialized)
-}
-
+// H3: a history-less `saveGameState(state)` variant used to exist but was
+// production-dead — the app always saves with history linkage (pass null when
+// there is no linked entry).
 export const saveGameStateWithHistory = async (
   state: GameState,
   historyEntryId: string | null

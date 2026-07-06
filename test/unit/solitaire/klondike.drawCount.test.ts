@@ -180,7 +180,7 @@ describe('Klondike draw count', () => {
     expect(ids(redone.waste)).toEqual(ids(drawn.waste))
   })
 
-  it('only applies a changed setting when a new game action carries it', () => {
+  it('only applies a changed setting when a fresh game carries it', () => {
     const active = createState(2, [card('a', 1), card('b', 2), card('c', 3)])
     const unchanged = klondikeReducer(active, {
       type: 'HYDRATE_STATE',
@@ -188,7 +188,12 @@ describe('Klondike draw count', () => {
     })
     expect(unchanged.drawCount).toBe(2)
 
-    const nextGame = klondikeReducer(active, { type: 'NEW_GAME', drawCount: 5 })
+    // A4: NEW_GAME was removed to keep the reducer pure; fresh deals are built
+    // outside the reducer (createInitialState) and hydrated in.
+    const nextGame = klondikeReducer(active, {
+      type: 'HYDRATE_STATE',
+      state: createInitialState(5),
+    })
     expect(nextGame.drawCount).toBe(5)
   })
 })

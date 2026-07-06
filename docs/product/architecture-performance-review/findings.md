@@ -15,18 +15,18 @@
 | ID | Finding | Area | Severity | Status | Plan/doc |
 |----|---------|------|----------|--------|----------|
 | P1 | BigInt validation of 45k catalog rows at first access | Perf/startup | High | ✅ Resolved | `docs/product/generated-data-startup-cost/generated-data-startup-cost.md` |
-| P2 | `TIMER_TICK` dispatches through the reducer every second | Perf/simplification | ~~Medium-high~~ → Low (after P3+A2) | Open | — |
+| P2 | `TIMER_TICK` dispatches through the reducer every second | Perf/simplification | ~~Medium-high~~ → Low (after P3+A2) | Deferred (risky — see detail) | — |
 | P3 | `AbsoluteLayerCard` memoization defeated (all ~52 cards re-render per action) | Perf/render | Medium | ✅ Resolved | `docs/product/klondike-render-memoization/klondike-render-memoization.md` |
-| P4 | Persisted game payload grows unboundedly with game length | Perf/robustness | Medium (rare, real failure) | Open | — |
+| P4 | Persisted game payload grows unboundedly with game length | Perf/robustness | ~~Medium~~ → Low (after kv-store migration) | Won't cap (user decision); move-log rewrite maybe later | `docs/product/expo-sqlite-kv-store-migration/asyncstorage-to-expo-sqlite-kv-store.md` (option D) |
 | P5 | 3.1 MB generated TS bundled eagerly (catalog + dev-only demo playlist) | Perf/bundle | Low | ✅ Resolved / accepted | `docs/product/generated-data-startup-cost/generated-data-startup-cost.md` |
 | A1 | `useKlondikeGame` is a ~1,200-line god hook | Architecture | Medium | ✅ Implemented (history-entry extraction; 1,266 → 1,028 lines) | `docs/product/history-entry-hook-extraction/use-klondike-history-entry-proposal.md` |
 | A2 | Whole-`GameState` prop threading defeats memoization structurally | Architecture/perf | Medium | ✅ Resolved | `docs/product/klondike-render-memoization/klondike-render-memoization.md` |
 | A3 | Two animation systems coexist (RN Animated + Reanimated) | Architecture | Accepted for now | Open (policy) | — |
-| A4 | `NEW_GAME` makes the reducer impure (crypto randomness inside reducer) | Architecture/correctness | Low | Open | — |
-| H1 | Dev/template screens ship as production routes (`feature-graphic`, `modal`) | Hygiene | Medium | Open | — |
+| A4 | `NEW_GAME` makes the reducer impure (crypto randomness inside reducer) | Architecture/correctness | Low | ✅ Resolved | `docs/product/small-fixes-a4-h1-h3/small-fixes-a4-h1-h3.md` |
+| H1 | Dev/template screens ship as production routes (`feature-graphic`, `modal`) | Hygiene | Medium | ✅ Resolved | `docs/product/small-fixes-a4-h1-h3/small-fixes-a4-h1-h3.md` |
 | H2 | `jest-expo` / `babel-preset-expo` in `dependencies` | Hygiene | Low | ✅ Resolved | commit `2d60158 devdep` |
-| H3 | `saveGameState` export only used by tests | Hygiene | Low | Open | — |
-| H4 | About screen lives at route name `hello` | Hygiene/cosmetic | Low | Open | — |
+| H3 | `saveGameState` export only used by tests | Hygiene | Low | ✅ Resolved | `docs/product/small-fixes-a4-h1-h3/small-fixes-a4-h1-h3.md` |
+| H4 | About screen lives at route name `hello` | Hygiene/cosmetic | Low | ❌ Won't fix (intentional: "it says hello to people") | — |
 | H5 | `react-native-web` / `react-dom` shipped though app is native-only | Hygiene | Accepted | Open (decision) | — |
 | R1 | Persisted-game validation is shallow (nested cards unvalidated) | Robustness | Low | Open | — |
 | R2 | "One active history row" invariant enforced in three places | Robustness (watch item) | Info | Open (watch) | — |
@@ -40,6 +40,8 @@
 
 **Severity: Low** (downgraded — was Medium-high before P3+A2 landed; board components no longer re-render on ticks. The remaining win is mostly code simplification.)
 
+**Status: DEFERRED (2026-07-06, user decision).** Timer changes have bitten before: past timer refactors had to be reverted because when the app was **hard-killed**, the timer effectively kept running if elapsed time wasn't written every second — on restart the game showed absurdly long durations. The current every-second `TIMER_TICK` → reducer → persisted `elapsedMs` flow is what makes hard-kill recovery correct. Any future removal of `TIMER_TICK` must explicitly design for the hard-kill case (persist a wall-clock anchor or elapsed value at least once per second, or fold elapsed at save time) and test it: play → hard-kill mid-game → relaunch → duration must be plausible. Tackle separately, not as a drive-by simplification.
+
 - **Problem:** While the timer runs, `useKlondikeTimer` dispatches `TIMER_TICK` every 1000 ms (`TIMER_TICK_INTERVAL_MS` in `src/utils/time.ts`). Each tick creates a new `GameState`, re-runs `useKlondikeGame`, and rebuilds `statisticsRows`/`viewProps` — for a clock that only the HUD displays. Board components are now memoized (P3/A2), so the per-tick cost is small, but the reducer round-trip is still unnecessary machinery.
 - **Key insight:** the display value is already derivable without ticks. `buildStatisticsRows` (in `StatisticsHud.tsx`) computes elapsed time via `computeElapsedWithReference(elapsedMs, timerState, timerStartedAt, Date.now())`, and `useKlondikePersistence` already skips persisting tick-only updates. `elapsedMs` is folded in at boundaries anyway (`TIMER_STOP` on background/blur/win).
 - **Recommended fix:** move a local 1-second interval into `StatisticsHud` (or a tiny `useDisplayClock` hook) that recomputes display time from `elapsedMs + timerStartedAt`. Then delete the `TIMER_TICK` action, the interval management in `useKlondikeTimer` (lines ~95–125), and the tick-skip branch in `useKlondikePersistence`. Net code deletion.
@@ -48,7 +50,9 @@
 
 ### P4 — Persisted game payload grows unboundedly with game length
 
-**Severity: Medium.** Rare in practice but a real, silent failure mode.
+**Severity: Low** (downgraded 2026-07-06). The original data-loss failure mode — Android AsyncStorage's ~2 MB CursorWindow limit corrupting hydration — no longer applies since the migration to `expo-sqlite/kv-store` (commit `94c939b`); SQLite handles large values fine. What remains is `JSON.stringify` cost on the JS thread during debounced saves in marathon games, which is off the interaction path.
+
+**Status: WON'T CAP (2026-07-06, user decision).** Capping persisted snapshots (e.g. last 150) is a product regression: full undo history must survive device restarts — it works today, is flawless and fast. Do **not** trim `history`/`future` in the save path. If the write cost ever becomes measurable, the accepted future direction is option D in `docs/product/expo-sqlite-kv-store-migration/asyncstorage-to-expo-sqlite-kv-store.md` (persist `exactId` + move log, rebuild snapshots by replay on load, ~100x smaller payloads) — but that is a real project (v2→v3 payload migration, replay-on-load), not a quick fix.
 
 - **Problem:** Every move pushes a full 52-card `GameSnapshot` into `state.history` (`pushHistory` in `src/solitaire/klondike.ts`), and `useKlondikePersistence` serializes the entire state — `history` and `future` included — to AsyncStorage on each debounced write (180 ms). Data grows O(n²) over a game:
   - Each snapshot ≈ 4 KB JSON → a 500–1000-move session (draw-heavy marathon) produces multi-MB `JSON.stringify` calls on the JS thread on every move.
@@ -93,7 +97,7 @@
 
 ### H4 — About screen lives at route name `hello`
 
-- `app/(tabs)/hello.tsx` is the About/credits screen. Rename route + drawer label to `about` for readability and nicer deep links. Cosmetic; bundle with H1.
+- **WON'T FIX (2026-07-06, user decision):** the name is intentional — "it says hello to people." Keep `hello`; don't propose renaming again.
 
 ### H5 — `react-native-web` / `react-dom` shipped though app is native-only (decision)
 
@@ -134,17 +138,16 @@
 
 ## Strengths (context for future threads — don't "fix" these)
 
-- Pure reducer core in `src/solitaire/klondike.ts`; UI never leaks in (A4 is the one exception).
+- Pure reducer core in `src/solitaire/klondike.ts`; UI never leaks in (A4, the one exception, was fixed 2026-07-06).
 - Exact deal ID = Lehmer-code permutation rank (`dealIdentity.ts`): the ID *is* the deck; replay is exact; checksum guards corruption.
 - Storage done right: versioned game persistence with sanitize-on-load; SQLite history with WAL, partial unique active-row index, serialized write queue coordinating optimistic UI and DB.
 - Inline decision comments (easing choices, waste-tap-zone stability, write serialization) are load-bearing institutional memory — preserve them through refactors.
 
 ## Suggested implementation order (remaining work)
 
-1. **P4** — cap persisted snapshots (small, protects real users from silent save loss).
-2. **H1 + H3 + H4** — route/dead-code cleanup in one small pass.
-3. **P2** — HUD-local clock, delete `TIMER_TICK` (net code deletion; low urgency after P3/A2).
-4. **A4** — remove `NEW_GAME` impurity (small, pairs naturally with P2 since both touch reducer + persistence hook).
-5. **A1** — implement the existing `useKlondikeHistoryEntry` proposal (medium; fold R3's repository-query fix in).
-6. **R4** — accessibility as its own planned feature when prioritized.
-7. **R1** — optional hardening, lowest priority.
+_Updated 2026-07-06: P4 cap rejected, H4 won't-fix, P2 deferred (timer risk), A1 done, R4 in progress in separate thread._
+
+1. ~~**A4 + H1 + H3**~~ — ✅ done 2026-07-06 (`docs/product/small-fixes-a4-h1-h3/`).
+2. **P2** — only when picked up deliberately, with hard-kill timer testing (see deferral note in detail section).
+3. **R1** — optional hardening, lowest priority.
+4. **P4 option D** (move log persistence) — only if profiling ever shows the debounced save hurts.

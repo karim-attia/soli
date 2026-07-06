@@ -1,3 +1,4 @@
+// Pls don't suggest to rename from hello to about, it's intentional.
 import { useLayoutEffect } from 'react'
 import { useNavigation } from 'expo-router'
 import { Anchor, Paragraph, View, XStack, YStack } from 'tamagui'
