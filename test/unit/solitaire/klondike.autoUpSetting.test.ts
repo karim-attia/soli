@@ -56,8 +56,38 @@ describe('Auto Up setting', () => {
     cardCounter = 0
   })
 
-  it('keeps Auto Up enabled by default and schedules the existing queue on a ready board', () => {
+  // R2b (review fix batch, 2026-07-06): same-value toggles must be pure no-ops.
+  // The enable branch used to run finalizeState, which could schedule an auto
+  // queue — and scheduling pushes a history snapshot WITHOUT a move-log entry,
+  // silently drifting the persisted replay. A halted queue (e.g. after SELECT_*)
+  // is legitimately rescheduled by the next logged action's finalize instead.
+  it('treats a same-value enable as a pure no-op even on an auto-ready board', () => {
     const state = createEmptyState({
+      tableau: [[card('hearts', 1)], ...Array.from({ length: 6 }, () => [])],
+    })
+
+    const nextState = klondikeReducer(state, {
+      type: 'SET_AUTO_UP_ENABLED',
+      enabled: true,
+    })
+
+    expect(nextState).toBe(state)
+    expect(nextState.autoQueue).toHaveLength(0)
+    expect(nextState.history).toHaveLength(0)
+    expect(nextState.moveLog).toHaveLength(0)
+  })
+
+  it('treats a same-value disable as a pure no-op', () => {
+    const state = createEmptyState({ autoUpEnabled: false })
+
+    expect(klondikeReducer(state, { type: 'SET_AUTO_UP_ENABLED', enabled: false })).toBe(
+      state
+    )
+  })
+
+  it('still schedules the queue when enabling flips the value on a ready board', () => {
+    const state = createEmptyState({
+      autoUpEnabled: false,
       tableau: [[card('hearts', 1)], ...Array.from({ length: 6 }, () => [])],
     })
 
@@ -69,6 +99,7 @@ describe('Auto Up setting', () => {
     expect(nextState.autoUpEnabled).toBe(true)
     expect(nextState.isAutoCompleting).toBe(true)
     expect(nextState.autoQueue).toHaveLength(1)
+    expect(nextState.moveLog).toEqual([{ k: 'autoUp', on: true }])
   })
 
   it('does not start Auto Up when the final covered card is uncovered while disabled', () => {
@@ -113,7 +144,9 @@ describe('Auto Up setting', () => {
   })
 
   it('keeps the existing Draw 1 trigger while cards remain in the stock', () => {
+    // Enabling must flip the value: same-value dispatches are pure no-ops (R2b).
     const state = createEmptyState({
+      autoUpEnabled: false,
       drawCount: 1,
       stock: [card('hearts', 1, false)],
     })
@@ -135,7 +168,9 @@ describe('Auto Up setting', () => {
   })
 
   it('waits for an empty top-right draw area before starting Auto Up for Draw 2-5', () => {
+    // Enabling must flip the value: same-value dispatches are pure no-ops (R2b).
     const state = createEmptyState({
+      autoUpEnabled: false,
       drawCount: 2,
       stock: [card('hearts', 1, false)],
     })

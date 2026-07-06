@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite'
 
 import { isExactDealSolvableForDrawCount } from '../data/solvableDealsV2'
-import type { MoveLogEntry } from '../solitaire/klondike'
+import { isMoveLogEntry, type MoveLogEntry } from '../solitaire/klondike'
 import type { HistoryEntry } from '../state/history'
 import {
   HISTORY_PAGE_SIZE,
@@ -472,7 +472,10 @@ export const getHistoryEntryMoveLog = async (
 
   try {
     const parsed = JSON.parse(row.moves_json) as unknown
-    if (!Array.isArray(parsed)) {
+    // Review fix R4 (2026-07-06): structural validation instead of a blind cast —
+    // a damaged entry would otherwise only surface as a crash/drift deep inside a
+    // future resume replay.
+    if (!Array.isArray(parsed) || !parsed.every(isMoveLogEntry)) {
       return null
     }
     return {

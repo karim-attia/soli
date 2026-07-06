@@ -10,6 +10,12 @@ import {
   type Selection,
 } from '../../../src/solitaire/klondike'
 import { boardSignature } from '../../../src/storage/gamePersistence'
+import {
+  card as makeCard,
+  createTestState,
+  resetCardCounter,
+  tableauWith,
+} from './helpers'
 
 const firstValidMove = (
   state: GameState
@@ -140,6 +146,71 @@ describe('move log recording', () => {
         },
       ])
     ).toThrow(/did not apply/)
+  })
+
+  it('throws when a non-applying scrub targets a position other than the current one (R2c)', () => {
+    // history is empty, so a scrub to index 3 clamps to the current position and
+    // does not apply — but it is NOT a true no-op (entry.i !== history.length),
+    // which means the replayed timeline diverged from the recorded one.
+    const base = createGameStateFromExactId(createInitialState().exactId, 1)
+    expect(() => replayMoveLog(base, [{ k: 'scrub', i: 3 }])).toThrow(/did not apply/)
+  })
+
+  it('round-trips two consecutive scrubs across an auto-ready position without depth drift (R2a)', () => {
+    resetCardCounter()
+    // Codex review (2026-07-06): scrub #1 landing on an auto-ready board makes
+    // finalizeState schedule an auto-queue — which pushes a history snapshot and
+    // clears future. Coalescing scrub #2 over scrub #1 dropped the log entry that
+    // triggered that push, so replay skipped it and the undo/redo depths drifted.
+    // Draw 3 makes auto-readiness vary across the timeline (requires empty
+    // stock+waste), which this synthetic board exploits via a face-down card.
+    const start = createTestState({
+      autoUpEnabled: true,
+      drawCount: 3,
+      tableau: tableauWith(
+        [makeCard('spades', 1)],
+        [makeCard('hearts', 2, false), makeCard('hearts', 1)],
+        [makeCard('spades', 2)]
+      ),
+    })
+    const base = structuredClone(start)
+
+    let live = start
+    // Move 1: A♠ → foundation; the face-down 2♥ keeps the board not auto-ready.
+    live = klondikeReducer(live, {
+      type: 'APPLY_MOVE',
+      selection: { source: 'tableau', columnIndex: 0, cardIndex: 0 },
+      target: { type: 'foundation', suit: 'spades' },
+    })
+    expect(live.autoQueue).toHaveLength(0)
+    // Move 2: A♥ → foundation flips 2♥ face-up → auto-ready → queue scheduled
+    // (history push).
+    live = klondikeReducer(live, {
+      type: 'APPLY_MOVE',
+      selection: { source: 'tableau', columnIndex: 1, cardIndex: 1 },
+      target: { type: 'foundation', suit: 'hearts' },
+    })
+    expect(live.autoQueue.length).toBeGreaterThan(0)
+    // Move 3: manual move on the ready board (halts the queue, reschedules).
+    live = klondikeReducer(live, {
+      type: 'APPLY_MOVE',
+      selection: { source: 'tableau', columnIndex: 1, cardIndex: 0 },
+      target: { type: 'foundation', suit: 'hearts' },
+    })
+
+    // Scrub #1 lands on the auto-ready move-2 position (schedules again → push +
+    // future clear); scrub #2 continues to the start — two consecutive scrub
+    // dispatches, exactly the coalescing case.
+    live = klondikeReducer(live, { type: 'SCRUB_TO_INDEX', index: 2 })
+    live = klondikeReducer(live, { type: 'SCRUB_TO_INDEX', index: 0 })
+
+    const replayed = replayMoveLog(base, live.moveLog)
+    expect(boardSignature(replayed)).toBe(boardSignature(live))
+    expect(replayed.history).toHaveLength(live.history.length)
+    expect(replayed.future).toHaveLength(live.future.length)
+    live.future.forEach((snapshot, index) => {
+      expect(boardSignature(replayed.future[index])).toBe(boardSignature(snapshot))
+    })
   })
 
   it('derives the deal-time Auto Up value from the first logged toggle', () => {

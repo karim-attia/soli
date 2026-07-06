@@ -186,6 +186,58 @@ describe('historyRepository.native (fresh v1 schema with move log columns)', () 
     expect(await repository.getHistoryEntryMoveLog('hist_test_1')).toBeNull()
   })
 
+  it('returns null for structurally invalid move-log entries instead of a blind cast (R4)', async () => {
+    const fake = createFakeDatabase()
+    const repository = loadRepository(fake)
+
+    // Unknown entry kind.
+    fake.setMoveLogRow({
+      moves_json: JSON.stringify([{ k: 'teleport' }]),
+      move_log_version: 1,
+    })
+    expect(await repository.getHistoryEntryMoveLog('hist_test_1')).toBeNull()
+
+    // Known kind with a missing required field.
+    fake.setMoveLogRow({
+      moves_json: JSON.stringify([{ k: 'draw' }, { k: 'scrub' }]),
+      move_log_version: 1,
+    })
+    expect(await repository.getHistoryEntryMoveLog('hist_test_1')).toBeNull()
+
+    // Move entry with a malformed selection.
+    fake.setMoveLogRow({
+      moves_json: JSON.stringify([
+        {
+          k: 'move',
+          sel: { source: 'teleporter' },
+          tgt: { type: 'tableau', columnIndex: 1 },
+        },
+      ]),
+      move_log_version: 1,
+    })
+    expect(await repository.getHistoryEntryMoveLog('hist_test_1')).toBeNull()
+
+    // Valid entries of every kind still round-trip.
+    const valid = [
+      { k: 'draw' },
+      { k: 'draw', rh: false },
+      {
+        k: 'move',
+        sel: { source: 'waste' },
+        tgt: { type: 'foundation', suit: 'hearts' },
+      },
+      { k: 'undo' },
+      { k: 'scrub', i: 2 },
+      { k: 'adv' },
+      { k: 'autoUp', on: false },
+    ]
+    fake.setMoveLogRow({ moves_json: JSON.stringify(valid), move_log_version: 1 })
+    expect(await repository.getHistoryEntryMoveLog('hist_test_1')).toEqual({
+      moveLogVersion: 1,
+      moveLog: valid,
+    })
+  })
+
   it('keeps moves_json out of the page query (pages stay light)', async () => {
     const fake = createFakeDatabase()
     const repository = loadRepository(fake)

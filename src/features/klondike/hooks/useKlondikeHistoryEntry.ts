@@ -3,6 +3,7 @@ import type { Dispatch, MutableRefObject } from 'react'
 
 import { MOVE_LOG_VERSION } from '../../../solitaire/klondike'
 import type { GameAction, GameState } from '../../../solitaire/klondike'
+import type { HistoryEntryMoveLog } from '../../../storage/historyRepository.types'
 import { computeElapsedWithReference } from '../../../utils/time'
 import { devLog } from '../../../utils/devLogger'
 import {
@@ -12,6 +13,19 @@ import {
   useHistory,
   type CreateStartedHistoryEntryInputOptions,
 } from '../../../state/history'
+
+// Review fix R4 (2026-07-06): a session hydrated via the snapshot fallback carries
+// moveLog: [] while moveCount > 0 — its play line was truncated, not "no moves made".
+// Recording that as an empty-but-valid log would let a future resume-from-history
+// feature misread it as the initial deal. Store SQL NULL instead: "no replayable
+// log for this game". Exported for direct unit testing (the hook itself needs a
+// heavy harness).
+export const moveLogForGameRecord = (
+  state: Pick<GameState, 'moveLog' | 'moveCount'>
+): HistoryEntryMoveLog | null =>
+  state.moveLog.length === 0 && state.moveCount > 0
+    ? null
+    : { version: MOVE_LOG_VERSION, entries: state.moveLog }
 
 type UseKlondikeHistoryEntryParams = {
   state: GameState
@@ -187,8 +201,9 @@ export const useKlondikeHistoryEntry = ({
         finishedAt,
         // Move-log persistence: game boundaries are the only history writes that
         // carry the log (kv payload covers the live session). Demo playback never
-        // reaches this line (early return above).
-        moveLog: { version: MOVE_LOG_VERSION, entries: currentState.moveLog },
+        // reaches this line (early return above). Null when the session's log was
+        // truncated by a snapshot-fallback load (see moveLogForGameRecord).
+        moveLog: moveLogForGameRecord(currentState),
       } as const
 
       // If we have a tracked entry ID, update it; otherwise find or create one.

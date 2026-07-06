@@ -9,7 +9,10 @@ implemented 2026-07-06 — see "Follow-up steps". Simplification round 2 (S1–S
 remove `e`, timer off GameSnapshot, top-level clock, clean-v1 reset, 4b-guardrail
 audit) implemented 2026-07-06, gates green 21 suites / 171 tests — **iOS simulator
 smoke after round 2 PASSED (2026-07-06, all checks incl. clean-v1 data inspection;
-see "iOS simulator smoke after simplification round 2" in Testing).**
+see "iOS simulator smoke after simplification round 2" in Testing).** Review fix
+batch R1–R6 (two-review convergence on 9b8475f) implemented 2026-07-06, gates
+green 22 suites / 179 tests — see "Review fix batch" steps; device smoke pending
+(orchestrator).
 
 Origin: "Approach D" from
 [docs/product/expo-sqlite-kv-store-migration/asyncstorage-to-expo-sqlite-kv-store.md](../expo-sqlite-kv-store-migration/asyncstorage-to-expo-sqlite-kv-store.md)
@@ -41,6 +44,8 @@ dont alter table. really fully from scratch. saves thoughts and lines of code. c
 "pls implement what we discussed in 2a
 remember: all data can be erased on both test devices. so no migration or even db version update. in fact, pls reset all dbs/schemas to without migration and v1. both history, settings, this.
 if we do 2a, can we then have a look at the code again that we changed in 4b? did we add extra guardrails that are now unnecessary because we don't even think with this timestamp in move concept anymore?"
+
+"use your judgement to implement what makes sense <3"
 
 ## Summary
 
@@ -473,6 +478,97 @@ not clocks.
   `e`-free `moves_json`, clean logs). Details in Testing → "iOS simulator smoke
   after simplification round 2".
 
+### Review fix batch (internal + Codex review convergence, 2026-07-06)
+
+Two independent code reviews of commit 9b8475f converged on these findings. R2
+fixes were written failing-test-FIRST (all four new R2 tests verified failing
+against the pre-fix reducer before the fixes landed; R2a failed with exactly the
+predicted depth drift, replayed future 5 vs live 3).
+
+- [x] **R1. Depth-aware replay guard** (`gamePersistence.ts`) — DONE.
+  `boardSignature` covers piles + moveCount only; replay drift in undo/redo
+  *depth* passed silently (wrong scrubber depths). The persisted payload now
+  carries `guard: { historyLength, futureLength, hasWon, autoCompleteRuns }`
+  (captured at save); after a successful replay + signature match the guard is
+  compared against the replayed state → any mismatch takes the snapshot fallback
+  (devLog warn). Guard fields are validated on load. Payload shape changed in
+  place, `PERSISTENCE_VERSION` stays 1 (pre-release; old payloads on the 2 test
+  devices fail validation and are cleared — acceptable, Karim confirmed data is
+  disposable). Tested: tampered guard → fallback; guard-less payload → invalid.
+- [x] **R2a. Scrub coalescing vs auto-up** (Codex's top finding, `klondike.ts`) —
+  DONE, failing test first. Scrub #1 landing on an auto-ready board makes
+  finalizeState schedule a queue → pushes a history snapshot + clears future;
+  scrub #2's coalescing replaced scrub #1's log entry, losing that push → replay
+  drift. Fix: coalesce only when safe — `appendMoveLogEntry` gained a
+  `coalesce: false` escape used when the pre-scrub board (= the previous scrub's
+  landing board; board changes are always logged so nothing changed it in
+  between) is auto-schedulable (`state.autoUpEnabled &&
+  isAutoCompleteReady(workingState)`); then the entry is appended instead of
+  replacing. Conservative: a ready board whose auto-plan is empty also appends
+  (harmless; extra scrubs replay exactly). No live-scheduling semantics change
+  (scrubbing onto an auto-ready board still starts the run); no log-size
+  regression for the common non-auto-ready drag.
+- [x] **R2b. Unlogged finalize on same-value SET_AUTO_UP_ENABLED and dangling
+  ADVANCE_AUTO_QUEUE** (`klondike.ts`) — DONE, tests first. Both could newly
+  schedule a queue (unlogged history push). Same-value toggles now return `state`
+  unchanged (both directions); the dangling empty-queue advance returns the
+  flag-cleared state without finalize. Safety reasoning: every board-changing
+  action is logged and its own finalize schedules; a queue halted by SELECT_*
+  (which doesn't finalize) is legitimately rescheduled by the next logged
+  action's finalize — no scheduling is lost, it just stops piggy-backing on
+  unlogged dispatches. Two pre-existing autoUpSetting tests that piggy-backed on
+  the same-value-enable side effect were switched to value-flipping toggles
+  (their intent — scheduling trigger conditions — is unchanged).
+- [x] **R2c. Tighten scrub no-op tolerance in `replayMoveLog`** — DONE, tests in
+  both directions. Previously ANY non-applying scrub entry was skipped; now only
+  a true no-op (entry targets the current position, `entry.i ===
+  state.history.length` — the coalesced back-to-origin drag) is tolerated;
+  anything else (e.g. a clamped index) throws as drift.
+- [x] **R3. Fallback robustness** (`gamePersistence.ts` `loadGameState`) — DONE.
+  (1) `isStructurallySoundSnapshot` deep-walks the stored snapshot (four suit
+  arrays, tableau of card arrays, `{suit, rank, faceUp}`-shaped cards) —
+  deliberately NOT part of the upfront payload validator, so a corrupted snapshot
+  with a valid log stays recoverable; (2) replay now happens in its own try/catch
+  and the snapshot comparison runs only when the snapshot is sound — a malformed
+  snapshot can no longer veto a successful replay (replayed state is kept with a
+  warn, unverifiable beats unrecoverable); (3) failed replay + unusable snapshot
+  throws `PersistedGameError('invalid')` (hook clears storage) instead of an
+  unhandled rejection from `cloneSnapshot`. Tested: malformed snapshot + valid
+  log → replayed state survives with full depths; malformed snapshot +
+  unreplayable log → PersistedGameError, no crash.
+- [x] **R4. Honest history move logs** — DONE. New exported
+  `moveLogForGameRecord` in `useKlondikeHistoryEntry.ts`: at game end, a session
+  with `moveLog: []` but `moveCount > 0` (= truncated by a snapshot-fallback
+  load, not replayable) records `moveLog: null` (SQL NULL) instead of an
+  apparently-valid empty log a future resume feature would misread as "initial
+  deal". `getHistoryEntryMoveLog` now validates parsed entries structurally via
+  new `isMoveLogEntry` (exported from `klondike.ts`, single source of truth for
+  the entry shape: known `k`, required fields per kind) instead of a blind cast;
+  returns null on invalid. Both tested.
+- [x] **R5. Delete dead `PLACE_ON_TABLEAU`/`PLACE_ON_FOUNDATION` reducer
+  actions** — DONE. They applied board changes without logging; production only
+  ever dispatched APPLY_MOVE. Action types + reducer cases + their 5 tests
+  deleted (grep-verified nothing in src/ or app/ dispatches them; a short
+  deletion note remains at the reducer). The earlier "trade-off comment" about
+  them not logging is moot now that they're gone.
+- [x] **R6. Won-game history durability** — DONE (implemented, ~25 lines).
+  Decision rationale below in Intermediary learnings.
+- [x] **Extras** — DONE. Payload-size test bound tightened 60 KB → 40 KB (matches
+  acceptance criterion 4; passes with the new guard fields — a 150-action payload
+  is well under it). Fuzz round-trip driver now drains scheduled auto-queues only
+  partially ~30% of the time (0–2 advances, deterministic-seeded), so saves,
+  scrubs and undos land mid-auto-run — the class of hole the old drain-fully
+  driver could never catch (SET_AUTO_UP_ENABLED toggles were already fuzzed).
+- [x] **Gates**: `yarn typecheck` ✓ `yarn lint` ✓ `yarn jest` ✓ — **22 suites,
+  179 tests** (was 21/171: +1 suite `historyMoveLogRecord`, +13 new tests, −5
+  deleted PLACE_ON_* tests).
+
+Consciously skipped (review findings assessed, not fixed): mid-auto-run debounce
+loss — a kill during an auto-run can lose the last few queue advances from the
+debounced save; pre-existing and self-healing (the restored board replays and the
+remaining auto-run reschedules on hydration finalize), not worth new save-path
+complexity.
+
 ## Plan: Files to modify
 
 - `src/solitaire/klondike.ts` — `MoveLogEntry`, `moveLog` on `GameState`,
@@ -567,6 +663,40 @@ Simplification round 2 (2026-07-06):
 - `test/unit/storage/historyRepository.test.ts` — `e` removed from fixtures;
   describe wording updated.
 
+Review fix batch (2026-07-06):
+
+- `src/solitaire/klondike.ts` — R2a: safe scrub coalescing (`coalesce` option on
+  `appendMoveLogEntry`, schedulability check in SCRUB_TO_INDEX); R2b: same-value
+  SET_AUTO_UP_ENABLED returns `state`, dangling empty-queue ADVANCE_AUTO_QUEUE no
+  longer finalizes; R2c: replay tolerates only position-matching no-op scrubs;
+  R4: exported `isMoveLogEntry` structural validator; R5: PLACE_ON_TABLEAU /
+  PLACE_ON_FOUNDATION action types + cases deleted.
+- `src/storage/gamePersistence.ts` — R1: `guard` block in the payload
+  (serialize + validate + post-replay comparison); R3: `isStructurallySoundSnapshot`
+  deep walk, replay/verification restructure, invalid error for
+  corrupt-snapshot-plus-unreplayable-log.
+- `src/features/klondike/hooks/useKlondikeHistoryEntry.ts` — R4: exported
+  `moveLogForGameRecord` (null for fallback-truncated sessions), used in
+  `resultFields`.
+- `src/storage/historyRepository.native.ts` — R4: `getHistoryEntryMoveLog`
+  validates entries via `isMoveLogEntry`.
+- `src/features/klondike/hooks/useKlondikePersistence.ts` — R6: won-game startup
+  path finalizes a still-active linked history row from the payload before
+  clearing (uses `useHistory`'s `getActiveEntry`/`updateEntry`).
+- `test/unit/solitaire/klondike.moveLog.test.ts` — R2a depth-drift round-trip
+  (failing-first), R2c drift-throw test.
+- `test/unit/solitaire/klondike.autoUpSetting.test.ts` — R2b same-value no-op
+  tests; two existing tests switched to value-flipping toggles.
+- `test/unit/solitaire/klondike.autoQueue.test.ts` — R2b dangling-advance test.
+- `test/unit/solitaire/klondike.selection.test.ts` — R5: PLACE_ON_* describe
+  block deleted.
+- `test/unit/storage/gamePersistence.test.ts` — R1 guard tests (tamper →
+  fallback, missing → invalid), R3 tests (malformed snapshot × valid/unreplayable
+  log), 40 KB bound, partial-drain fuzz driver.
+- `test/unit/storage/historyRepository.test.ts` — R4 invalid-entry tests.
+- `test/unit/features/klondike/historyMoveLogRecord.test.ts` — NEW
+  (`moveLogForGameRecord`).
+
 ## Intermediary learnings
 
 Verified code facts from this evaluation (2026-07-06):
@@ -658,7 +788,8 @@ Discovered during implementation (2026-07-06):
 - **`PLACE_ON_TABLEAU`/`PLACE_ON_FOUNDATION` reducer cases are UI-dead** (only tests
   dispatch them; the app uses `APPLY_MOVE`). They intentionally do NOT log; if a
   future caller dispatches them the final-snapshot guard catches the missing entries
-  and falls back. Candidate for deletion in a cleanup story.
+  and falls back. Candidate for deletion in a cleanup story. → **DELETED in the
+  review fix batch (R5, 2026-07-06).**
 - **Node replay timing evidence: 300 draw entries ≈ 5 ms** (Jest/Node, debug) —
   consistent with the ≪100 ms release-Hermes estimate.
 
@@ -763,6 +894,59 @@ Simplification round 2 (2026-07-06):
   snapshot's 0:00 as the game's duration. With F3 the recorded duration reflects
   the real live elapsed time.
 
+Review fix batch (2026-07-06):
+
+- **Why the R2a bug hid from the fuzz and the smokes: a self-healing degeneracy.**
+  When scrub #1 lands on a ready position and schedules, the destroyed `future`
+  tail often consists only of a copy of the landing board — in that case the
+  scheduling push recreates exactly what was destroyed and replay coincidentally
+  matches. Divergence needs ≥ 2 timeline entries after the landing position (built
+  in the failing test via a manual move on an already-ready board, which pushes
+  twice: applyMove's pre-move snapshot + scheduleAutoQueue's post-move snapshot).
+  The old fuzz driver drained every queue immediately, so a scheduled queue never
+  survived into the next scrub — hence the new partial-drain driver.
+- **`MOVE_LOG_VERSION` stays 1 despite R2's reducer-behavior changes.** The bump
+  rule protects *shipped* logs from replaying under drifted rules. Nothing has
+  shipped, and R1's payload change (required `guard` block) makes every
+  pre-batch payload fail validation and get cleared anyway, so no old log can
+  ever reach the changed reducer. (Also: same-value toggles and dangling advances
+  were never logged, and coalescing changes only what gets *written*, not how
+  entries replay.)
+- **R2b removed behavior a couple of tests silently depended on.** The
+  autoUpSetting suite dispatched same-value `SET_AUTO_UP_ENABLED(true)` as a
+  convenient way to trigger scheduling. That convenience WAS the bug (an unlogged
+  scheduling path reachable from the settings-mirror effect in useKlondikeGame,
+  which dispatches on every mount/focus with an unchanged value after e.g. a
+  SELECT_* halted the queue). The tests now flip the value; the mount-time mirror
+  dispatch is a pure no-op.
+- **R1 guard vs signature: complementary, not redundant.** The board signature
+  catches wrong *piles*; the guard catches wrong *depths* (`history`/`future`
+  lengths, `hasWon`, `autoCompleteRuns`) — R2a-class bugs can reproduce the exact
+  final board while silently shifting depths, and per-index snapshot comparison
+  would be much more code + payload than four counters. Note the guard still
+  can't see different *content* at equal depth (a mid-timeline snapshot swap);
+  accepted as beyond the cheap-guard budget — the fuzz's per-index signature
+  assertions cover that class in CI.
+- **R6 decision: implemented (not skipped), ~25 lines, one new (acceptable)
+  coupling.** `useKlondikePersistence` now consumes `useHistory` (both hooks
+  already live under the same provider in useKlondikeGame). On loading a `won`
+  payload with a `historyEntryId`, it asks the repository for THE active row
+  (`getActiveEntry` awaits the serialized write queue, so a normally-committed
+  win shows the row as 'solved' and the repair is a no-op) and only if that
+  active row IS the linked entry finalizes it from the payload: solved + moves +
+  `elapsedMs` as duration (the win handler stopped the clock, so it is the final
+  duration) + `savedAt` as finishedAt + `moveLogForGameRecord(state)`. Then the
+  session is cleared as before. Alternative rejected: threading a callback from
+  useKlondikeHistoryEntry through useKlondikeGame — more plumbing across three
+  files for the same effect. Not unit-tested (hook harness heavy; the branch is
+  guarded and logs its action) — flagged for the iOS smoke instead.
+- **Review finding consciously NOT fixed: mid-auto-run debounce loss.** A kill
+  during an auto-run can lose the last few queue advances (the 180 ms debounced
+  save hasn't fired). Pre-existing, self-healing by design: the restored board
+  replays to the last-saved position and, being auto-ready with Auto Up on,
+  hydration's finalize reschedules the remaining run. Fixing it would mean
+  save-path special-casing for zero user-visible benefit.
+
 ## Identified issues
 
 - Demo board (`DEMO_EXACT_DEAL_ID`) is a custom 42-card layout not derivable from its
@@ -778,6 +962,22 @@ Simplification round 2 (2026-07-06):
   Intermediary learnings) — both tested.
 - Deal-time Auto Up value is a replay input → discovered during implementation,
   handled via logged toggles + `initialAutoUpFromMoveLog`. Status: DONE, tested.
+- Unlogged history pushes from `scheduleAutoQueue` on paths without a move-log
+  entry (scrub coalescing, same-value autoUp toggles, dangling advances) →
+  review fix batch R2a–c. Status: DONE, failing-tests-first, all green.
+- Replay depth drift invisible to `boardSignature` → R1 guard block in the
+  payload. Status: DONE, tested. Residual (accepted): equal-depth content drift
+  is only covered by the fuzz, not the runtime guard.
+- Malformed `finalSnapshot` could veto a successful replay or crash the fallback
+  → R3 restructure. Status: DONE, tested.
+- Fallback-truncated sessions wrote an empty-but-valid `moves_json` → R4
+  (`moveLog: null` + read-side structural validation). Status: DONE, tested.
+- Won session cleared at startup before its history result committed → row stuck
+  'active' without result → R6 startup repair in useKlondikePersistence. Status:
+  DONE (not unit-tested; verify in the next device smoke).
+- Mid-auto-run debounce loss (kill during auto-run loses the last few advances)
+  → consciously skipped: pre-existing, self-healing (hydration finalize
+  reschedules the remaining run). Status: WON'T FIX.
 
 ## Testing
 
@@ -801,6 +1001,16 @@ Simplification round 2 (2026-07-06): gates green — `yarn typecheck` ✓, `yarn
 consolidated into two; the fuzz round-trip now also covers consecutive scrubs, see
 Intermediary learnings). Net code delta this round: −40 lines. Device smoke: see
 "iOS simulator smoke after simplification round 2" below — PASSED 2026-07-06.
+
+Review fix batch (2026-07-06): gates green — `yarn typecheck` ✓, `yarn lint` ✓,
+`yarn jest` ✓ **22 suites, 179 tests** (was 171: +13 new — R2a depth-drift
+round-trip, R2c drift throw, 2 same-value no-ops + 1 flip-schedules pin, 1
+dangling-advance, 2 R1 guard, 2 R3 fallback, 1 R4 repo validation, 3
+`moveLogForGameRecord`; −5 deleted PLACE_ON_* tests). All four R2 tests were
+verified FAILING against the pre-fix reducer first (R2a with exactly the
+predicted future-depth drift 5 vs 3). The fuzz round-trip now partially drains
+auto-queues (deterministic-seeded) and stays green post-fix; the payload-size
+bound is 40 KB per acceptance criterion 4.
 
 What landed where:
 

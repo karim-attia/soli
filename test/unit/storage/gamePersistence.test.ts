@@ -83,11 +83,16 @@ const playRandomGame = (
 
   const dispatch = (action: GameAction) => {
     state = klondikeReducer(state, action)
-    // Drain any auto-queue the action scheduled, like the UI's advance loop does.
-    let guard = 0
-    while ((state.autoQueue.length || state.isAutoCompleting) && guard < 600) {
-      state = klondikeReducer(state, { type: 'ADVANCE_AUTO_QUEUE' })
-      guard += 1
+    // Drain any auto-queue the action scheduled, like the UI's advance loop does —
+    // but only partially sometimes (review fix batch, 2026-07-06): the always-fully-
+    // drained driver could never catch unlogged-history-push bugs that only surface
+    // when a scrub/undo/save lands mid-auto-run (the R2 class).
+    if (state.autoQueue.length || state.isAutoCompleting) {
+      let remaining = random() < 0.7 ? 600 : Math.floor(random() * 3)
+      while ((state.autoQueue.length || state.isAutoCompleting) && remaining > 0) {
+        state = klondikeReducer(state, { type: 'ADVANCE_AUTO_QUEUE' })
+        remaining -= 1
+      }
     }
   }
 
@@ -189,6 +194,13 @@ describe('gamePersistence (payload v1: deal + move log + final snapshot + clock)
     })
     expect(payload.moveLog).toEqual([{ k: 'draw' }])
     expect(payload.finalSnapshot.moveCount).toBe(1)
+    // R1: depth-aware replay guard captured at save time.
+    expect(payload.guard).toEqual({
+      historyLength: 1,
+      futureLength: 0,
+      hasWon: false,
+      autoCompleteRuns: 0,
+    })
     // The clock lives once at top level; snapshots are boards, not clocks.
     expect(payload.elapsedMs).toBe(4_321)
     expect(payload.finalSnapshot.elapsedMs).toBeUndefined()
@@ -310,6 +322,70 @@ describe('gamePersistence (payload v1: deal + move log + final snapshot + clock)
     expect(loaded!.state.history).toHaveLength(0)
   })
 
+  it('falls back to the final snapshot when the replayed depth mismatches the guard (R1)', async () => {
+    const live = playRandomGame(13, 40, { allowScrub: false })
+    expect(live.history.length).toBeGreaterThan(0)
+
+    await saveGameStateWithHistory(live, null)
+    const [, serialized] = (Storage.setItem as jest.Mock).mock.calls[0]
+    const payload = JSON.parse(serialized as string)
+    // Simulate an unlogged history push: the board still replays identically, so
+    // only the depth-aware guard can catch it.
+    payload.guard.historyLength += 1
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+
+    const loaded = await loadGameState()
+    expect(boardSignature(loaded!.state)).toBe(boardSignature(live))
+    expect(loaded!.state.history).toHaveLength(0)
+    expect(loaded!.state.future).toHaveLength(0)
+  })
+
+  it('rejects payloads without guard fields as invalid (pre-guard payload shape)', async () => {
+    const live = playRandomGame(17, 20, { allowScrub: false })
+    await saveGameStateWithHistory(live, null)
+    const [, serialized] = (Storage.setItem as jest.Mock).mock.calls[0]
+    const payload = JSON.parse(serialized as string)
+    delete payload.guard
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+
+    await expect(loadGameState()).rejects.toMatchObject({ reason: 'invalid' })
+  })
+
+  it('keeps a successful replay when the stored snapshot is malformed (R3)', async () => {
+    const live = playRandomGame(23, 40, { allowScrub: false })
+    expect(live.history.length).toBeGreaterThan(0)
+
+    await saveGameStateWithHistory(live, null)
+    const [, serialized] = (Storage.setItem as jest.Mock).mock.calls[0]
+    const payload = JSON.parse(serialized as string)
+    // Structural corruption: a malformed snapshot must not veto a good replay.
+    payload.finalSnapshot.foundations = { hearts: 'garbage' }
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+
+    const loaded = await loadGameState()
+    expect(loaded).not.toBeNull()
+    expect(boardSignature(loaded!.state)).toBe(boardSignature(live))
+    expect(loaded!.state.history).toHaveLength(live.history.length)
+    expect(loaded!.state.future).toHaveLength(live.future.length)
+  })
+
+  it('throws PersistedGameError when the snapshot is malformed AND the log is unreplayable (R3)', async () => {
+    const live = playRandomGame(29, 40, { allowScrub: false })
+    await saveGameStateWithHistory(live, null)
+    const [, serialized] = (Storage.setItem as jest.Mock).mock.calls[0]
+    const payload = JSON.parse(serialized as string)
+    payload.finalSnapshot.tableau = [[{ bogus: true }]]
+    payload.moveLog[0] = {
+      k: 'move',
+      sel: { source: 'foundation', suit: 'hearts' },
+      tgt: { type: 'foundation', suit: 'hearts' },
+    }
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+
+    // No unhandled rejection/crash: the hook treats 'invalid' by clearing storage.
+    await expect(loadGameState()).rejects.toMatchObject({ reason: 'invalid' })
+  })
+
   it('persists the demo board with an empty log and restores it via the snapshot fallback', async () => {
     let demo = createDemoGameState()
     demo = klondikeReducer(demo, { type: 'DRAW_OR_RECYCLE' })
@@ -323,11 +399,11 @@ describe('gamePersistence (payload v1: deal + move log + final snapshot + clock)
     expect(loaded!.state.history).toHaveLength(0)
   })
 
-  it('keeps a 150-action payload under 60 KB (regression tripwire)', async () => {
+  it('keeps a 150-action payload under 40 KB (acceptance criterion 4)', async () => {
     const live = playRandomGame(99, 150, { allowScrub: false })
     await saveGameStateWithHistory(live, 'entry-size')
     const [, serialized] = (Storage.setItem as jest.Mock).mock.calls[0]
-    expect((serialized as string).length).toBeLessThan(60_000)
+    expect((serialized as string).length).toBeLessThan(40_000)
   })
 
   it('normalizes an out-of-range draw count from the stored deal', async () => {

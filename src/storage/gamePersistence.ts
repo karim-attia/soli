@@ -75,6 +75,19 @@ interface PersistedGamePayload {
   }
   moveLog: MoveLogEntry[]
   finalSnapshot: GameSnapshot
+  // Review fix R1 (2026-07-06): boardSignature covers piles + moveCount only, so a
+  // replay that rebuilds the right board with the WRONG undo/redo depth would pass
+  // silently (scrubber depths off). These cheap counters, captured at save time,
+  // are compared against the replayed state; any mismatch takes the snapshot
+  // fallback. Payload shape changed in place with PERSISTENCE_VERSION kept at 1:
+  // pre-release, old payloads only exist on the two test devices and simply fail
+  // validation (cleared on load) — confirmed acceptable.
+  guard: {
+    historyLength: number
+    futureLength: number
+    hasWon: boolean
+    autoCompleteRuns: number
+  }
   autoUpEnabled: boolean
   // The clock is one live monotonic value persisted once at top level (snapshots are
   // boards, not clocks — GameSnapshot carries no timer fields). timerState/
@@ -104,6 +117,12 @@ const serializeState = (
   // history after a demo restart is acceptable, dev-only).
   moveLog: state.exactId === DEMO_EXACT_DEAL_ID ? [] : state.moveLog,
   finalSnapshot: snapshotFromState(state),
+  guard: {
+    historyLength: state.history.length,
+    futureLength: state.future.length,
+    hasWon: state.hasWon,
+    autoCompleteRuns: state.autoCompleteRuns,
+  },
   autoUpEnabled: state.autoUpEnabled,
   elapsedMs: state.elapsedMs,
 })
@@ -151,6 +170,22 @@ const isPersistedGamePayload = (value: unknown): value is PersistedGamePayload =
     return false
   }
 
+  const guard = payload.guard as Partial<PersistedGamePayload['guard']> | undefined
+  if (
+    !guard ||
+    typeof guard !== 'object' ||
+    typeof guard.historyLength !== 'number' ||
+    typeof guard.futureLength !== 'number' ||
+    typeof guard.hasWon !== 'boolean' ||
+    typeof guard.autoCompleteRuns !== 'number'
+  ) {
+    return false
+  }
+
+  // Only shallow snapshot checks here on purpose: a deeper walk lives in
+  // isStructurallySoundSnapshot, which must NOT gate the whole payload — a
+  // corrupted snapshot with a valid move log is still fully recoverable via replay
+  // (review fix R3).
   const snapshot = payload.finalSnapshot as Partial<GameSnapshot> | undefined
   return Boolean(
     snapshot &&
@@ -163,6 +198,33 @@ const isPersistedGamePayload = (value: unknown): value is PersistedGamePayload =
     typeof snapshot.deckChecksum === 'string'
   )
 }
+
+const isCardShaped = (value: unknown): boolean => {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const card = value as Partial<Card>
+  return (
+    typeof card.suit === 'string' &&
+    typeof card.rank === 'number' &&
+    typeof card.faceUp === 'boolean'
+  )
+}
+
+const isCardArray = (value: unknown): boolean =>
+  Array.isArray(value) && value.every(isCardShaped)
+
+// Review fix R3: cheap structural walk over the stored snapshot (all four suit
+// arrays, tableau of card arrays, {suit, rank, faceUp}-shaped cards) so that a
+// corrupted snapshot is detected up front instead of throwing mid-hydration.
+const isStructurallySoundSnapshot = (snapshot: GameSnapshot): boolean =>
+  isCardArray(snapshot.stock) &&
+  isCardArray(snapshot.waste) &&
+  Boolean(snapshot.foundations) &&
+  typeof snapshot.foundations === 'object' &&
+  FOUNDATION_SUIT_ORDER.every((suit) => isCardArray(snapshot.foundations[suit])) &&
+  Array.isArray(snapshot.tableau) &&
+  snapshot.tableau.every(isCardArray)
 
 // H3: a history-less `saveGameState(state)` variant used to exist but was
 // production-dead — the app always saves with history linkage (pass null when
@@ -199,7 +261,8 @@ export const boardSignature = (
 // should be used instead; the game itself is never lost either way.
 const buildReplayedState = (
   payload: PersistedGamePayload,
-  drawCount: DrawCount
+  drawCount: DrawCount,
+  snapshotUsable: boolean
 ): GameState | null => {
   // Reducer behavior changed since this log was written — replaying under new rules
   // would silently diverge, so take the snapshot fallback.
@@ -215,24 +278,66 @@ const buildReplayedState = (
     return null
   }
 
+  let replayed: GameState
   try {
     const base = createGameStateFromExactId(payload.deal.exactId, drawCount, {
       revealInitialWaste: payload.deal.revealInitialWaste,
       autoUpEnabled: initialAutoUpFromMoveLog(payload.moveLog, payload.autoUpEnabled),
     })
-    const replayed = replayMoveLog(base, payload.moveLog)
-    if (boardSignature(replayed) !== boardSignature(payload.finalSnapshot)) {
-      devLog(
-        'warn',
-        '[Game] Replayed board mismatches stored snapshot; hydrating final snapshot.'
-      )
-      return null
-    }
-    return replayed
+    replayed = replayMoveLog(base, payload.moveLog)
   } catch (error) {
     devLog('warn', '[Game] Move-log replay failed; hydrating final snapshot.', error)
     return null
   }
+
+  // Review fix R3: the verification below reads the stored snapshot, so it must run
+  // OUTSIDE the replay try/catch and only when the snapshot is structurally sound —
+  // a malformed snapshot used to throw here and veto a perfectly good replay,
+  // discarding the recoverable game. Unverifiable beats unrecoverable: keep the
+  // internally consistent replayed state and warn.
+  if (!snapshotUsable) {
+    devLog(
+      'warn',
+      '[Game] Stored final snapshot is malformed; keeping the replayed state unverified.'
+    )
+    return replayed
+  }
+
+  if (boardSignature(replayed) !== boardSignature(payload.finalSnapshot)) {
+    devLog(
+      'warn',
+      '[Game] Replayed board mismatches stored snapshot; hydrating final snapshot.'
+    )
+    return null
+  }
+
+  // Review fix R1: depth-aware guard — the board can match while the undo/redo
+  // depth drifted (unlogged history push). Fall back rather than hydrate wrong
+  // scrubber depths.
+  const guard = payload.guard
+  if (
+    replayed.history.length !== guard.historyLength ||
+    replayed.future.length !== guard.futureLength ||
+    replayed.hasWon !== guard.hasWon ||
+    replayed.autoCompleteRuns !== guard.autoCompleteRuns
+  ) {
+    devLog(
+      'warn',
+      '[Game] Replayed state mismatches saved guard; hydrating final snapshot.',
+      {
+        guard,
+        replayed: {
+          historyLength: replayed.history.length,
+          futureLength: replayed.future.length,
+          hasWon: replayed.hasWon,
+          autoCompleteRuns: replayed.autoCompleteRuns,
+        },
+      }
+    )
+    return null
+  }
+
+  return replayed
 }
 
 export const loadGameState = async (): Promise<LoadedGameState | null> => {
@@ -270,7 +375,19 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
   const autoUpEnabled =
     typeof parsed.autoUpEnabled === 'boolean' ? parsed.autoUpEnabled : true
 
-  const replayed = buildReplayedState(parsed, drawCount)
+  const snapshotUsable = isStructurallySoundSnapshot(finalSnapshot)
+  const replayed = buildReplayedState(parsed, drawCount, snapshotUsable)
+
+  // Review fix R3: the fallback path needs a usable snapshot. Reaching this with
+  // both a failed replay AND a corrupted snapshot must surface as a regular
+  // invalid-payload error (the hook clears storage and deals fresh) instead of an
+  // unhandled throw from cloneSnapshot below.
+  if (!replayed && !snapshotUsable) {
+    throw new PersistedGameError(
+      'invalid',
+      'Saved game snapshot is corrupted and the move log is not replayable.'
+    )
+  }
 
   // All cards in the hydrated state must come from ONE source. The replayed state's
   // card ids are internally consistent across board + history + future, which keeps

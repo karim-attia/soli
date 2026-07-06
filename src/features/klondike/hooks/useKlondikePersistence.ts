@@ -13,6 +13,8 @@ import {
   type GameState,
 } from '../../../solitaire/klondike'
 import type { DrawCount } from '../../../solitaire/drawCount'
+import { useHistory } from '../../../state/history'
+import { moveLogForGameRecord } from './useKlondikeHistoryEntry'
 
 type UseKlondikePersistenceParams = {
   state: GameState
@@ -64,6 +66,10 @@ export const useKlondikePersistence = ({
   preferredDrawCount,
 }: UseKlondikePersistenceParams) => {
   const [storageHydrationComplete, setStorageHydrationComplete] = useState(false)
+  // Review fix R6 (2026-07-06): both callbacks are referentially stable (their
+  // useCallback deps bottom out in []), so using them in the one-shot load effect
+  // below keeps it single-run.
+  const { getActiveEntry, updateEntry } = useHistory()
   const lastQueuedStateRef = useRef<GameState | null>(null)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const autoUpEnabledRef = useRef(autoUpEnabled)
@@ -102,6 +108,38 @@ export const useKlondikePersistence = ({
         }
 
         if (persisted.status === 'won') {
+          // Review fix R6 (2026-07-06): if the app died after the won payload was
+          // saved but before the async history update committed, the linked row is
+          // still 'active' without a result — and clearing the session below would
+          // orphan it forever. Finalize it from the payload first. getActiveEntry
+          // resolves after queued history writes, so when the normal win recording
+          // DID commit the row is already 'solved' (not active) and this is a no-op.
+          if (persisted.historyEntryId) {
+            try {
+              const activeEntry = await getActiveEntry()
+              if (!isCancelled && activeEntry?.id === persisted.historyEntryId) {
+                devLog(
+                  'info',
+                  '[Game] Repairing history row for a won session whose result never committed.'
+                )
+                updateEntry(activeEntry.id, {
+                  solved: true,
+                  status: 'solved',
+                  moves: persisted.state.moveCount,
+                  // The win handler stops the clock, so the saved elapsedMs is the
+                  // final duration; savedAt approximates the win time.
+                  durationMs: persisted.state.elapsedMs,
+                  finishedAt: persisted.savedAt,
+                  moveLog: moveLogForGameRecord(persisted.state),
+                })
+              }
+            } catch (repairError) {
+              devLog('warn', '[Game] Failed repairing won-game history row', repairError)
+            }
+          }
+          if (isCancelled) {
+            return
+          }
           devLog(
             'info',
             '[Game] Cleared completed session on startup; starting new deal.'
@@ -160,7 +198,7 @@ export const useKlondikePersistence = ({
     return () => {
       isCancelled = true
     }
-  }, [currentGameEntryIdRef, dispatch, previousHasWonRef])
+  }, [currentGameEntryIdRef, dispatch, getActiveEntry, previousHasWonRef, updateEntry])
 
   useEffect(() => {
     if (!storageHydrationComplete) {

@@ -30,6 +30,24 @@ describe('ADVANCE_AUTO_QUEUE', () => {
     expect(advance(state)).toBe(state)
   })
 
+  // R2b (review fix batch, 2026-07-06): the dangling empty-queue advance must not
+  // run finalizeState — it could newly schedule an auto queue, and scheduling
+  // pushes a history snapshot without a move-log entry (persisted replay drift).
+  it('does not schedule a new queue from a dangling advance on an auto-ready board', () => {
+    const state = createTestState({
+      autoUpEnabled: true,
+      tableau: tableauWith([card('hearts', 1)]),
+      isAutoCompleting: true,
+    })
+
+    const next = advance(state)
+
+    expect(next.isAutoCompleting).toBe(false)
+    expect(next.autoQueue).toHaveLength(0)
+    expect(next.history).toHaveLength(0)
+    expect(next.moveLog).toHaveLength(0)
+  })
+
   it('applies a queued move without recording history and stays auto-completing while items remain', () => {
     const state = createTestState({
       tableau: tableauWith([card('hearts', 1)]),

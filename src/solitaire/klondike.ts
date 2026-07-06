@@ -132,8 +132,6 @@ export type GameAction =
   | { type: 'SELECT_WASTE' }
   | { type: 'SELECT_FOUNDATION_TOP'; suit: Suit }
   | { type: 'CLEAR_SELECTION' }
-  | { type: 'PLACE_ON_TABLEAU'; columnIndex: number }
-  | { type: 'PLACE_ON_FOUNDATION'; suit: Suit }
   | { type: 'ADVANCE_AUTO_QUEUE' }
   | { type: 'SET_AUTO_UP_ENABLED'; enabled: boolean }
   | {
@@ -378,7 +376,23 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
       if (nextState === workingState) {
         return workingState
       }
-      return finalizeState(appendMoveLogEntry(nextState, { k: 'scrub', i: action.index }))
+      // Review fix R2a (Codex, 2026-07-06): coalescing may only replace the previous
+      // scrub entry when that scrub cannot have scheduled an auto-queue.
+      // scheduleAutoQueue pushes an extra history snapshot and clears future, and
+      // dropping the entry that triggered it makes replay skip that push (undo-depth
+      // drift). The pre-scrub board IS the previous scrub's landing board (board
+      // changes are always logged, so nothing changed it in between), so check
+      // auto-schedulability there. Conservative: an auto-ready board whose plan came
+      // up empty also appends — harmless, replay applies extra scrubs exactly.
+      const previousScrubMayHaveScheduled =
+        state.autoUpEnabled && isAutoCompleteReady(workingState)
+      return finalizeState(
+        appendMoveLogEntry(
+          nextState,
+          { k: 'scrub', i: action.index },
+          { coalesce: !previousScrubMayHaveScheduled }
+        )
+      )
     }
     case 'HYDRATE_STATE': {
       const nextAutoUp = action.autoUpEnabled ?? state.autoUpEnabled
@@ -418,43 +432,30 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
       const workingState = haltAutoQueue(state)
       return workingState.selected ? { ...workingState, selected: null } : workingState
     }
-    case 'PLACE_ON_TABLEAU':
-      if (!state.selected) {
-        return state
-      }
-      {
-        const workingState = haltAutoQueue(state)
-        const nextState = applyMove(workingState, workingState.selected!, {
-          type: 'tableau',
-          columnIndex: action.columnIndex,
-        })
-        return nextState ? finalizeState(nextState) : workingState
-      }
-    case 'PLACE_ON_FOUNDATION':
-      if (!state.selected) {
-        return state
-      }
-      {
-        const workingState = haltAutoQueue(state)
-        const nextState = applyMove(workingState, workingState.selected!, {
-          type: 'foundation',
-          suit: action.suit,
-        })
-        return nextState ? finalizeState(nextState) : workingState
-      }
+    // Review fix R5 (2026-07-06): PLACE_ON_TABLEAU / PLACE_ON_FOUNDATION were
+    // deleted — production only ever dispatched APPLY_MOVE, and the dead cases
+    // applied board changes WITHOUT appending a move-log entry (a silent replay
+    // hole if anything had ever dispatched them).
     case 'ADVANCE_AUTO_QUEUE': {
       // Only a real queue advance mutates the board; the dangling "clear the
       // isAutoCompleting flag" call with an empty queue needs no log entry (the
-      // last advance already set isAutoCompleting = rest.length > 0).
-      const advanced = advanceAutoQueue(state)
-      const logged = state.autoQueue.length
-        ? appendMoveLogEntry(advanced, { k: 'adv' })
-        : advanced
-      return finalizeState(logged)
+      // last advance already set isAutoCompleting = rest.length > 0). Review fix
+      // R2b (2026-07-06): the dangling call must NOT finalize either — finalize
+      // could newly schedule a queue, and scheduling pushes a history snapshot
+      // without a log entry (persisted replay drift). Any board that became
+      // auto-schedulable did so through a logged action whose own finalize ran.
+      if (!state.autoQueue.length) {
+        return state.isAutoCompleting ? { ...state, isAutoCompleting: false } : state
+      }
+      return finalizeState(appendMoveLogEntry(advanceAutoQueue(state), { k: 'adv' }))
     }
     case 'SET_AUTO_UP_ENABLED': {
+      // Review fix R2b (2026-07-06): same-value dispatches are pure no-ops. The
+      // enable branch used to finalize, which could schedule a queue (unlogged
+      // history push → replay drift); a queue halted by SELECT_* is legitimately
+      // rescheduled by the next logged action's finalize instead.
       if (state.autoUpEnabled === action.enabled) {
-        return action.enabled ? finalizeState(state) : haltAutoQueue(state)
+        return state
       }
       // Logged because Auto Up gates scheduleAutoQueue (which pushes a history
       // snapshot), so replay must toggle it at the same points to stay deterministic.
@@ -1205,14 +1206,81 @@ const pushHistory = (state: GameState): GameSnapshot[] => {
   return [...state.history, snapshot]
 }
 
-const appendMoveLogEntry = (state: GameState, entry: MoveLogEntry): GameState => {
+const appendMoveLogEntry = (
+  state: GameState,
+  entry: MoveLogEntry,
+  // `coalesce: false` forces an append even after another scrub — used when the
+  // previous scrub may have scheduled an auto-queue (see the R2a comment at
+  // SCRUB_TO_INDEX): its entry must survive so replay reproduces the scheduling push.
+  options: { coalesce?: boolean } = {}
+): GameState => {
   const previous = state.moveLog[state.moveLog.length - 1]
   // Coalesce consecutive scrubs: one scrubber drag dispatches dozens of rAF-throttled
   // SCRUB_TO_INDEX actions; only the final resting index matters for replay.
-  if (entry.k === 'scrub' && previous?.k === 'scrub') {
+  if (entry.k === 'scrub' && previous?.k === 'scrub' && options.coalesce !== false) {
     return { ...state, moveLog: [...state.moveLog.slice(0, -1), entry] }
   }
   return { ...state, moveLog: [...state.moveLog, entry] }
+}
+
+const isSuitValue = (value: unknown): value is Suit =>
+  value === 'hearts' || value === 'diamonds' || value === 'clubs' || value === 'spades'
+
+const isSelectionShaped = (value: unknown): value is Selection => {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const selection = value as Partial<Selection> & { [key: string]: unknown }
+  switch (selection.source) {
+    case 'tableau':
+      return (
+        typeof selection.columnIndex === 'number' &&
+        typeof selection.cardIndex === 'number'
+      )
+    case 'waste':
+      return true
+    case 'foundation':
+      return isSuitValue(selection.suit)
+    default:
+      return false
+  }
+}
+
+const isMoveTargetShaped = (value: unknown): value is MoveTarget => {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const target = value as Partial<MoveTarget> & { [key: string]: unknown }
+  if (target.type === 'tableau') {
+    return typeof target.columnIndex === 'number'
+  }
+  return target.type === 'foundation' && isSuitValue(target.suit)
+}
+
+// Structural validator for move-log entries parsed from storage (history rows,
+// persisted payloads). Review fix R4 (2026-07-06): readers used to blindly cast
+// parsed JSON to MoveLogEntry[]; a damaged row must yield null, not a crash-on-replay.
+export const isMoveLogEntry = (value: unknown): value is MoveLogEntry => {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const entry = value as Record<string, unknown>
+  const validRh = entry.rh === undefined || entry.rh === false
+  switch (entry.k) {
+    case 'draw':
+      return validRh
+    case 'move':
+      return validRh && isSelectionShaped(entry.sel) && isMoveTargetShaped(entry.tgt)
+    case 'undo':
+    case 'adv':
+      return true
+    case 'scrub':
+      return typeof entry.i === 'number'
+    case 'autoUp':
+      return typeof entry.on === 'boolean'
+    default:
+      return false
+  }
 }
 
 const actionFromMoveLogEntry = (entry: MoveLogEntry): GameAction => {
@@ -1265,8 +1333,11 @@ export const replayMoveLog = (base: GameState, log: MoveLogEntry[]): GameState =
     const next = klondikeReducer(state, actionFromMoveLogEntry(entry))
     if (next === state) {
       // A coalesced scrub run that ends where it started (drag back and forth,
-      // release at the origin) legitimately replays as a no-op — not drift.
-      if (entry.k === 'scrub') {
+      // release at the origin) legitimately replays as a no-op — but ONLY when the
+      // entry targets the current position. Review fix R2c (2026-07-06): any other
+      // non-applying scrub means the replayed timeline diverged from the recorded
+      // one (e.g. the index clamped), which is drift, not a tolerable no-op.
+      if (entry.k === 'scrub' && entry.i === state.history.length) {
         continue
       }
       throw new Error(`Move log entry did not apply during replay: ${entry.k}`)
