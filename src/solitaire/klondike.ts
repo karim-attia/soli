@@ -126,6 +126,10 @@ export const getNextStockDrawCards = ({
   return stock.slice(stock.length - count).reverse()
 }
 
+// Product decision: every new deal reveals the first stock draw into the waste as part
+// of the deal itself — moveCount stays 0 and no history entry is recorded (it is not a
+// player move, so it must not be undoable). Device testers: "Waste, <card>" at moves 0
+// on a fresh game is therefore expected, not a bug (flagged as an anomaly once, 2026-07-06).
 const revealInitialWaste = (
   stock: Card[],
   drawCount: DrawCount

@@ -1,161 +1,84 @@
 # Soli — Release Notes
 
-## 0.6.0 (in progress)
+Soli is a free, ad-free, open-source Solitaire.
 
-### Card Font Parity
+---
 
-Cross-platform card rendering now uses a single custom font family derived from Android's native card glyphs. Cards look identical on iOS, Android, and web.
+## 1.0 (upcoming)
 
-- Implemented exact Android-derived card glyphs for consistent visuals across all platforms
-- Merged multiple font weights (regular, semi-bold, bold) into a single `CardTextAndroid` family
-- Improved rendering metrics for sharper, more accurate card text at all sizes
-- Removed legacy/unused font assets
+- **Unlimited game history**: history now lives in an on-device database — every game you've played stays available, and the history screen stays fast
+- **Smoother board**: rebuilt card rendering; no more stutter or memory build-up after many games in a row, plus tightened draw and wiggle animations
+- **Cleaner settings** with native controls and a tidier header menu
+- New catalog of guaranteed-solvable deals
+- Faster loading of settings and saved games
+- Framework upgrade (Expo SDK 57, React Native 0.86)
 
-### Header & Navigation
+---
 
-- Redesigned iOS and Android header controls for improved navigation consistency
+## 0.8.0 — 2026-06-11
 
-### Celebration & Auto-Up Polish
+- **Draw 1–5**: choose how many cards are drawn from the stock. Remembered per game, shown in your history
+- Improved undo scrubber handling and layout
 
-- Refined celebration animation timing for smoother victory sequences
-- Enhanced auto-up performance for faster card movement to foundations
+---
 
-### Build & Release Infrastructure
+## 0.7.0 — 2026-04-02
 
-- Added release signing configuration for Android builds
-- Improved Android signing configuration validation in build scripts
-- New deployment script for streamlined Android releases
+- More reliable card-flight animations: rapid moves no longer spawn duplicate flights during fast auto-complete
+
+---
+
+## 0.6.0 — 2026-03-24
+
+- Cards now look identical on iOS and Android: one custom card font on all platforms, with sharper rendering at all sizes
+- Redesigned header controls
+- Smoother celebration timing and faster auto-complete
 
 ---
 
 ## 0.5.0 — 2026-03-11
 
-### Build & Release
-
-- Enhanced Android build script with updated signing configuration
-- Prepared build pipeline for production releases
-
-*This was primarily a build-infrastructure release, locking down the Android signing and deployment story.*
+- Build-infrastructure release; no gameplay changes
 
 ---
 
 ## 0.4.0 — 2026-03-03
 
-### Expo SDK 55 Upgrade
-
-- Upgraded from Expo SDK 53 to Expo SDK 55 with all dependencies aligned
-- React Native 0.83, React 19.2
-
-### Tooling Migration
-
-- Migrated from Biome to **tsgo**, **oxlint**, and **oxfmt** for type-checking, linting, and formatting
-- Standardized code formatting across the entire codebase
-
-### Gameplay
-
-- Enhanced auto-up performance and celebration animation responsiveness
-- Improved Klondike game logic
+- Framework upgrade (Expo SDK 55, React Native 0.83, React 19)
+- Snappier auto-complete and celebrations
 
 ---
 
 ## 0.3.0 — 2025-12-14
 
-### Gameplay
-
-- **Tableau tap fallback**: tapping a tableau column now selects the adjacent valid card when the top card can't move, making single-tap play more forgiving
-- **History entry linkage**: game history entries are linked and tracked with active/inactive status for better session management
-
-### UI Polish
-
-- Hidden empty foundation/tableau outlines during the celebration state for a cleaner victory screen
-- Safe-area adjustments for `CelebrationDebugBadge` so debug info stays visible on notched devices
-- Safe-area adjustments for `UndoScrubber` to keep the gesture area usable on all screen sizes
-
-### Build
-
-- Added `yarn android` build command
-- Enhanced timer logic during auto-up to avoid counting auto-play time
+- **Forgiving taps**: tapping a tableau column now picks the nearest valid card when the top card can't move
+- Cleaner victory screen: empty pile outlines hidden during the celebration
+- Timer no longer counts time spent in auto-complete
+- Layout fixes for notched devices
 
 ---
 
 ## 0.2.0 — 2025-12-14
 
-### Gameplay
-
-- Hardened animation flight gating — cards no longer overlap or glitch during fast auto-up sequences
-- Sped up auto-up queue processing with simplified timing logic
-
-### UI
-
-- Enhanced board layout and spacing for improved visual balance
+- Fixed cards overlapping or glitching during fast auto-complete sequences
+- Faster auto-complete
+- Better board spacing and visual balance
 
 ---
 
 ## 0.1.1 — 2025-11-30
 
-### Security & Build
-
-- Moved Android signing passwords out of `gradle.properties` into environment variables
-- Enhanced `.gitignore` for Android build artifacts
+- Security and build housekeeping; no gameplay changes
 
 ---
 
-## 0.1.0 — 2025-12-14 (initial public version)
+## 0.1.0 — 2025-12-14 (initial version)
 
-### Core Klondike MVP
-
-- Full Klondike Solitaire with draw-1 stock cycling
-- Tap and hold interactions for card selection and movement
-- Responsive layout with header controls
-- Auto-complete endgame workflow (cards fly to foundations when all are face-up)
-- New game confirmation dialog
-
-### Animations
-
-- Card flight animations for tableau and foundation moves
-- Waste fan sliding animation
-- Wiggle effect for invalid moves
-- Card flip animation (enabled by default)
-
-### Victory Celebrations
-
-- Ten distinct celebration animation modes on game completion
-- Gameplay locked during celebration with auto-launch of new game dialog
-
-### Solvable Games
-
-- Curated catalog of solvable shuffles with settings toggle
-- Solvable-games-only mode enabled by default
-
-### Game History & Statistics
-
-- Game result recording with solvable status and metadata
-- AsyncStorage-backed persistence for game history
-- History screen with preview sheet for tableau snapshots
-- Move count and elapsed time tracking with HUD display
-- Timer starts after first valid move
-
-### Undo & Time Travel
-
-- Full undo with unlimited history depth
-- Timeline scrubber (slider) for rewinding and fast-forwarding through game history
-- Accurate move counts maintained during scrubbing
-
-### Settings
-
-- Configurable settings experience (draw mode, solvable games, statistics visibility, etc.)
-- Developer mode with demo game functionality, devLog, and celebration debug labels
-
-### App Identity
-
-- App renamed to "Soli" with updated slug and bundle identifiers
-- Custom app icon with adaptive icon padding for circular displays
-- Splash screen with themed background (#416F57)
-- Feature graphic variants for store listing (glass-modern style)
-
-### Platform & Infrastructure
-
-- Expo SDK 53 alignment
-- EAS build configuration
-- iOS and Android build scripts
-- Automated demo/auto-solve script with progress tracking
+- **Full Klondike Solitaire** with tap-to-move and hold interactions, responsive layout
+- **Auto-complete**: once every card is face-up, cards fly to the foundations
+- **Ten victory celebrations**
+- **Solvable games**: curated catalog of winnable deals, on by default
+- **Unlimited undo and a timeline scrubber** to rewind and fast-forward through a game
+- **Game history and stats**: move counts, times, and a tableau preview per game
+- **Animations**: card flights, waste fan, flips, and a wiggle for invalid moves
+- **Settings** for draw mode, solvable-games-only, statistics, and more
