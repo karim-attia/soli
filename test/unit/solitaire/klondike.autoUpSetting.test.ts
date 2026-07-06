@@ -42,6 +42,8 @@ const createEmptyState = (overrides: Partial<GameState> = {}): GameState => ({
   future: [],
   selected: null,
   autoUpEnabled: true,
+  moveLog: [],
+  initialWasteRevealed: true,
   ...overrides,
   drawCount: overrides.drawCount ?? 1,
 })

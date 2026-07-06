@@ -58,5 +58,7 @@ export const createTestState = (overrides: Partial<GameState> = {}): GameState =
   // schedules an auto queue mid-assertion; Auto Up scheduling behaviour is
   // owned by klondike.autoUpSetting.test.ts. Override per test when needed.
   autoUpEnabled: false,
+  moveLog: [],
+  initialWasteRevealed: true,
   ...overrides,
 })

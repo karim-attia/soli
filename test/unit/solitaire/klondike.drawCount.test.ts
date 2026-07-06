@@ -43,6 +43,8 @@ const createState = (drawCount: GameState['drawCount'], stock: Card[]): GameStat
   future: [],
   selected: null,
   autoUpEnabled: false,
+  moveLog: [],
+  initialWasteRevealed: true,
 })
 
 const ids = (cards: Card[]): string[] => cards.map((item) => item.id)

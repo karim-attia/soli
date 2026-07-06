@@ -25,7 +25,10 @@ import {
   isHistorySupported,
   updateHistoryEntry,
 } from '../storage/historyRepository'
-import type { HistorySummary } from '../storage/historyRepository.types'
+import type {
+  HistoryEntryMoveLog,
+  HistorySummary,
+} from '../storage/historyRepository.types'
 import { isExactDealSolvableForDrawCount } from '../data/solvableDealsV2'
 import { formatExactDealDisplayName } from '../solitaire/dealIdentity'
 import { devLog } from '../utils/devLogger'
@@ -58,10 +61,15 @@ export type RecordGameResultInput = {
   startedAt?: string | Date // Task 10-6: When game started
   finishedAt?: string | Date | null // Task 10-6: When game completed
   moves?: number
-  durationMs?: number
+  // null is allowed so active rows can explicitly carry "no duration yet"
+  // (createEntry stores non-numbers as null either way, but the type makes it visible).
+  durationMs?: number | null
   preview: HistoryPreview
   displayName?: string
   status?: HistoryEntryStatus
+  // Move log recorded at game boundaries (solved/incomplete). Not part of
+  // HistoryEntry — page queries never load it; it goes straight to the repository.
+  moveLog?: HistoryEntryMoveLog | null
 }
 
 // Task 10-6: Partial updates for existing entries
@@ -72,6 +80,8 @@ export type UpdateEntryInput = {
   durationMs?: number
   finishedAt?: string | Date | null
   preview?: HistoryPreview
+  // undefined = leave the stored move log untouched; null = clear; value = write.
+  moveLog?: HistoryEntryMoveLog | null
 }
 
 export type CreateStartedHistoryEntryInputOptions = {
@@ -267,7 +277,7 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
       // update the same entry before React commits another render.
       entriesRef.current = normalized
       setEntries(normalized)
-      queueRepositoryTask(() => insertHistoryEntry(entry))
+      queueRepositoryTask(() => insertHistoryEntry(entry, input.moveLog ?? null))
       return entry.id
     },
     [queueRepositoryTask]
@@ -287,7 +297,10 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
             devLog('warn', `[history] Attempted to update non-existent entry: ${id}`)
             return
           }
-          await updateHistoryEntry(applyHistoryEntryUpdates(persisted, updates))
+          await updateHistoryEntry(
+            applyHistoryEntryUpdates(persisted, updates),
+            updates.moveLog
+          )
         })
         return
       }
@@ -300,7 +313,7 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
       const normalized = normalizeActiveEntries(next, preferredActiveId)
       entriesRef.current = normalized
       setEntries(normalized)
-      queueRepositoryTask(() => updateHistoryEntry(updated))
+      queueRepositoryTask(() => updateHistoryEntry(updated, updates.moveLog))
     },
     [queueRepositoryTask]
   )
@@ -420,7 +433,9 @@ export const createStartedHistoryEntryInputFromState = (
     startedAt: options.startedAt ?? new Date().toISOString(),
     finishedAt: null,
     moves: 0,
-    durationMs: 0,
+    // Product decision: active games show no "Time ..." in history (a 0 here rendered
+    // as "Time 0:00"); the real duration is written when the game ends.
+    durationMs: null,
     preview: options.preview ?? createHistoryPreviewFromState(state),
     displayName: options.displayName ?? formatDealDisplayName(state.exactId),
     status: 'active',

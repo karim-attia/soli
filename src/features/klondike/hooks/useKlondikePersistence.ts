@@ -48,7 +48,10 @@ const didGameShapeChange = (previous: GameState | null, next: GameState): boolea
     // Exact ID is both the history key and replay recipe in phase 1.
     previous.exactId !== next.exactId ||
     previous.deckChecksum !== next.deckChecksum ||
-    previous.drawCount !== next.drawCount
+    previous.drawCount !== next.drawCount ||
+    // Covers SET_AUTO_UP_ENABLED, the only log-appending action that changes none of
+    // the board fields above (the log itself must reach the persisted payload).
+    previous.moveLog !== next.moveLog
   )
 }
 

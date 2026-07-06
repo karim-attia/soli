@@ -1,6 +1,8 @@
+import type { MoveLogEntry } from '../solitaire/klondike'
 import type { HistoryEntry } from '../state/history'
 import {
   HISTORY_PAGE_SIZE,
+  type HistoryEntryMoveLog,
   type HistorySummary,
   type SolvableDealHistoryStats,
 } from './historyRepository.types'
@@ -33,8 +35,18 @@ export const getSolvableDealHistoryStats = async (): Promise<
   SolvableDealHistoryStats[]
 > => []
 
-export const insertHistoryEntry = async (_entry: HistoryEntry): Promise<void> => {}
+export const insertHistoryEntry = async (
+  _entry: HistoryEntry,
+  _moveLog?: HistoryEntryMoveLog | null
+): Promise<void> => {}
 
-export const updateHistoryEntry = async (_entry: HistoryEntry): Promise<void> => {}
+export const updateHistoryEntry = async (
+  _entry: HistoryEntry,
+  _moveLog?: HistoryEntryMoveLog | null
+): Promise<void> => {}
+
+export const getHistoryEntryMoveLog = async (
+  _id: string
+): Promise<{ moveLogVersion: number; moveLog: MoveLogEntry[] } | null> => null
 
 export const clearHistoryEntries = async (): Promise<void> => {}

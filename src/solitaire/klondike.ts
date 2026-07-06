@@ -56,6 +56,31 @@ export type MoveTarget =
   | { type: 'tableau'; columnIndex: number }
   | { type: 'foundation'; suit: Suit }
 
+// Move-log persistence (Approach D): the reducer appends one tiny entry per
+// board-changing action so the persisted payload can be deal identity + move log
+// instead of full undo-snapshot arrays. Log entries are pure board actions — the
+// timer is not part of the game tree (snapshots are boards, the clock is live-only
+// GameState; see GameSnapshot). Any future change to reducer *behavior* that
+// affects board or history/future outcomes (move legality, auto-queue planning,
+// undo/scrub semantics, initial reveal, …) must bump MOVE_LOG_VERSION — stored
+// logs replay through this exact reducer, and a version mismatch makes load fall
+// back to the stored final snapshot instead of replaying with drifted rules.
+// See docs/product/move-log-persistence/move-log-persistence-and-resumable-history.md
+export const MOVE_LOG_VERSION = 1
+
+// Terse keys (k/sel/tgt) keep a ~300-move log at ~15–25 KB serialized.
+// `rh: false` mirrors recordHistory === false (demo/auto flows skip undo snapshots).
+// 2026-07-06: entries used to carry `e` (elapsedMs at dispatch) so replay could
+// re-stamp snapshot timers — removed when the timer fields moved off GameSnapshot;
+// the clock is one live monotonic value that moves/undo/scrub/replay never touch.
+export type MoveLogEntry =
+  | { k: 'draw'; rh?: false }
+  | { k: 'move'; sel: Selection; tgt: MoveTarget; rh?: false }
+  | { k: 'undo' }
+  | { k: 'scrub'; i: number }
+  | { k: 'adv' }
+  | { k: 'autoUp'; on: boolean }
+
 export interface GameSnapshot {
   stock: Card[]
   waste: Card[]
@@ -72,9 +97,6 @@ export interface GameSnapshot {
   exactId: string
   deckChecksum: string
   drawCount: DrawCount
-  elapsedMs: number
-  timerState: TimerState
-  timerStartedAt: number | null
 }
 
 export interface GameState extends GameSnapshot {
@@ -82,6 +104,20 @@ export interface GameState extends GameSnapshot {
   future: GameSnapshot[]
   selected: Selection | null
   autoUpEnabled: boolean
+  // Ordered record of every board-changing action since the deal. Lives on
+  // GameState only — NOT on GameSnapshot — because every undo snapshot embedding
+  // the log would make the persisted payload grow quadratically with game length.
+  moveLog: MoveLogEntry[]
+  // Whether the deal revealed the first stock draw at deal time (normal games: yes;
+  // demo playlist replays: no). Recorded so persistence can rebuild the replay base
+  // deal identically via createGameStateFromExactId.
+  initialWasteRevealed: boolean
+  // Snapshots are boards; the clock is live-only state. One monotonic timer value
+  // updated by TIMER_* actions only — undo/scrub/replay cannot touch it by
+  // construction because GameSnapshot carries no timer fields.
+  elapsedMs: number
+  timerState: TimerState
+  timerStartedAt: number | null
 }
 
 export type GameAction =
@@ -188,9 +224,6 @@ export const createGameStateFromExactId = (
     winCelebrations: 0,
     ...dealIdentity,
     drawCount: normalizedDrawCount,
-    elapsedMs: 0,
-    timerState: 'idle',
-    timerStartedAt: null,
   }
 
   return {
@@ -199,6 +232,11 @@ export const createGameStateFromExactId = (
     future: [],
     selected: null,
     autoUpEnabled: options.autoUpEnabled ?? true,
+    moveLog: [],
+    initialWasteRevealed: options.revealInitialWaste !== false,
+    elapsedMs: 0,
+    timerState: 'idle',
+    timerStartedAt: null,
   }
 }
 
@@ -280,9 +318,6 @@ export const createDemoGameState = (
     exactId: DEMO_EXACT_DEAL_ID,
     deckChecksum: DEMO_DECK_CHECKSUM,
     drawCount,
-    elapsedMs: 0,
-    timerState: 'idle',
-    timerStartedAt: null,
   }
 
   return {
@@ -291,6 +326,15 @@ export const createDemoGameState = (
     future: [],
     selected: null,
     autoUpEnabled: true,
+    // The demo board is a custom 42-card layout that is NOT reconstructible from its
+    // exactId, so its move log is never replayed — persistence saves it with an empty
+    // log and load takes the snapshot-fallback path by design (empty undo history
+    // after restart is acceptable for this dev-only flow).
+    moveLog: [],
+    initialWasteRevealed: true,
+    elapsedMs: 0,
+    timerState: 'idle',
+    timerStartedAt: null,
   }
 }
 
@@ -301,22 +345,57 @@ export const createDemoGameState = (
 // and dispatch HYDRATE_STATE instead.
 export const klondikeReducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
-    case 'DRAW_OR_RECYCLE':
-      return finalizeState(
-        drawFromStock(haltAutoQueue(state), { recordHistory: action.recordHistory })
-      )
-    case 'UNDO':
-      return finalizeState(handleUndo(haltAutoQueue(state)))
+    case 'DRAW_OR_RECYCLE': {
+      const workingState = haltAutoQueue(state)
+      const nextState = drawFromStock(workingState, {
+        recordHistory: action.recordHistory,
+      })
+      // Log only when the draw actually changed the board (empty stock+waste is a no-op).
+      const logged =
+        nextState === workingState
+          ? nextState
+          : appendMoveLogEntry(nextState, {
+              k: 'draw',
+              ...(action.recordHistory === false ? { rh: false as const } : {}),
+            })
+      return finalizeState(logged)
+    }
+    case 'UNDO': {
+      const workingState = haltAutoQueue(state)
+      const nextState = handleUndo(workingState)
+      const logged =
+        nextState === workingState
+          ? nextState
+          : appendMoveLogEntry(nextState, { k: 'undo' })
+      return finalizeState(logged)
+    }
     case 'SCRUB_TO_INDEX': {
       const workingState = haltAutoQueue(state)
       const nextState = scrubToIndex(workingState, action.index)
-      return nextState === workingState ? workingState : finalizeState(nextState)
+      if (nextState === workingState) {
+        return workingState
+      }
+      return finalizeState(appendMoveLogEntry(nextState, { k: 'scrub', i: action.index }))
     }
     case 'HYDRATE_STATE': {
-      const hydratedState = {
+      const nextAutoUp = action.autoUpEnabled ?? state.autoUpEnabled
+      let hydratedState: GameState = {
         ...action.state,
         selected: null,
-        autoUpEnabled: action.autoUpEnabled ?? state.autoUpEnabled,
+        autoUpEnabled: nextAutoUp,
+        // Defensive defaults: hydrated states predating the move log carry neither field.
+        moveLog: action.state.moveLog ?? [],
+        initialWasteRevealed: action.state.initialWasteRevealed ?? true,
+      }
+      // If hydration flips Auto Up relative to the incoming state (the settings value
+      // can change between app runs), log the flip: replay derives the deal-time
+      // Auto Up value from the first 'autoUp' entry (see initialAutoUpFromMoveLog),
+      // so every change after dealing must be in the log for auto-queue determinism.
+      if (nextAutoUp !== action.state.autoUpEnabled) {
+        hydratedState = appendMoveLogEntry(hydratedState, {
+          k: 'autoUp',
+          on: nextAutoUp,
+        })
       }
       return finalizeState(
         hydratedState.autoUpEnabled ? hydratedState : haltAutoQueue(hydratedState)
@@ -360,14 +439,26 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
         })
         return nextState ? finalizeState(nextState) : workingState
       }
-    case 'ADVANCE_AUTO_QUEUE':
-      return finalizeState(advanceAutoQueue(state))
+    case 'ADVANCE_AUTO_QUEUE': {
+      // Only a real queue advance mutates the board; the dangling "clear the
+      // isAutoCompleting flag" call with an empty queue needs no log entry (the
+      // last advance already set isAutoCompleting = rest.length > 0).
+      const advanced = advanceAutoQueue(state)
+      const logged = state.autoQueue.length
+        ? appendMoveLogEntry(advanced, { k: 'adv' })
+        : advanced
+      return finalizeState(logged)
+    }
     case 'SET_AUTO_UP_ENABLED': {
-      const nextState =
-        state.autoUpEnabled === action.enabled
-          ? state
-          : { ...state, autoUpEnabled: action.enabled }
-
+      if (state.autoUpEnabled === action.enabled) {
+        return action.enabled ? finalizeState(state) : haltAutoQueue(state)
+      }
+      // Logged because Auto Up gates scheduleAutoQueue (which pushes a history
+      // snapshot), so replay must toggle it at the same points to stay deterministic.
+      const nextState = appendMoveLogEntry(
+        { ...state, autoUpEnabled: action.enabled },
+        { k: 'autoUp', on: action.enabled }
+      )
       return action.enabled ? finalizeState(nextState) : haltAutoQueue(nextState)
     }
     case 'APPLY_MOVE': {
@@ -375,7 +466,17 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
       const nextState = applyMove(workingState, action.selection, action.target, {
         recordHistory: action.recordHistory,
       })
-      return nextState ? finalizeState(nextState) : workingState
+      if (!nextState) {
+        return workingState
+      }
+      return finalizeState(
+        appendMoveLogEntry(nextState, {
+          k: 'move',
+          sel: action.selection,
+          tgt: action.target,
+          ...(action.recordHistory === false ? { rh: false as const } : {}),
+        })
+      )
     }
     case 'TIMER_START':
       return startTimer(state, action.startedAt)
@@ -582,9 +683,13 @@ const handleUndo = (state: GameState): GameState => {
   const nextHistory = state.history.slice(0, -1)
   const nextFuture = [snapshotFromState(state), ...state.future]
 
-  const restoredState = cloneSnapshot(previousSnapshot, state.autoUpEnabled)
+  // Product decision (2026-07-06): undo rewinds the board, not the clock — once the
+  // game is started, it runs. Structurally guaranteed: GameSnapshot carries no timer
+  // fields (nor moveLog/deal flag/autoUpEnabled), so spreading the restored board
+  // over the live state cannot touch them.
   return {
-    ...restoredState,
+    ...state,
+    ...cloneSnapshot(previousSnapshot),
     history: nextHistory,
     future: nextFuture,
     selected: null,
@@ -618,15 +723,15 @@ const scrubToIndex = (state: GameState, targetIndex: number): GameState => {
   const nextHistory = timeline.slice(0, clampedIndex)
   const nextFuture = timeline.slice(clampedIndex + 1)
 
-  const baseState = cloneSnapshot(nextSnapshot, state.autoUpEnabled)
+  // See handleUndo: snapshots are boards only, so live-only state (timer, moveLog,
+  // …) survives the restore by construction.
   return {
-    ...baseState,
+    ...state,
+    ...cloneSnapshot(nextSnapshot),
     history: nextHistory,
     future: nextFuture,
+    selected: null,
     moveCount: state.moveCount,
-    timerState: state.timerState,
-    timerStartedAt: state.timerStartedAt,
-    elapsedMs: state.elapsedMs,
   }
 }
 
@@ -1099,6 +1204,77 @@ const pushHistory = (state: GameState): GameSnapshot[] => {
   return [...state.history, snapshot]
 }
 
+const appendMoveLogEntry = (state: GameState, entry: MoveLogEntry): GameState => {
+  const previous = state.moveLog[state.moveLog.length - 1]
+  // Coalesce consecutive scrubs: one scrubber drag dispatches dozens of rAF-throttled
+  // SCRUB_TO_INDEX actions; only the final resting index matters for replay.
+  if (entry.k === 'scrub' && previous?.k === 'scrub') {
+    return { ...state, moveLog: [...state.moveLog.slice(0, -1), entry] }
+  }
+  return { ...state, moveLog: [...state.moveLog, entry] }
+}
+
+const actionFromMoveLogEntry = (entry: MoveLogEntry): GameAction => {
+  switch (entry.k) {
+    case 'draw':
+      return entry.rh === false
+        ? { type: 'DRAW_OR_RECYCLE', recordHistory: false }
+        : { type: 'DRAW_OR_RECYCLE' }
+    case 'move':
+      return entry.rh === false
+        ? {
+            type: 'APPLY_MOVE',
+            selection: entry.sel,
+            target: entry.tgt,
+            recordHistory: false,
+          }
+        : { type: 'APPLY_MOVE', selection: entry.sel, target: entry.tgt }
+    case 'undo':
+      return { type: 'UNDO' }
+    case 'scrub':
+      return { type: 'SCRUB_TO_INDEX', index: entry.i }
+    case 'adv':
+      return { type: 'ADVANCE_AUTO_QUEUE' }
+    case 'autoUp':
+      return { type: 'SET_AUTO_UP_ENABLED', enabled: entry.on }
+  }
+}
+
+// Derives the Auto Up value in effect at deal time so the replay base matches live
+// play (Auto Up gates scheduleAutoQueue, which pushes history snapshots — replaying
+// with the wrong value would drift the undo depth). Every post-deal change is logged
+// as an 'autoUp' entry, so: first logged entry means the value was its opposite
+// before; no entries means the saved value never changed since the deal.
+export const initialAutoUpFromMoveLog = (
+  log: MoveLogEntry[],
+  savedAutoUpEnabled: boolean
+): boolean => {
+  const firstToggle = log.find((entry) => entry.k === 'autoUp')
+  return firstToggle?.k === 'autoUp' ? !firstToggle.on : savedAutoUpEnabled
+}
+
+// Rebuilds the exact in-memory GameState (board + full undo history/future arrays)
+// by folding a stored move log through the reducer, starting from the reconstructed
+// base deal. Throws when an entry does not change the state — that signals reducer
+// drift; callers fall back to the stored final snapshot (see gamePersistence
+// loadGameState).
+export const replayMoveLog = (base: GameState, log: MoveLogEntry[]): GameState => {
+  let state = base
+  for (const entry of log) {
+    const next = klondikeReducer(state, actionFromMoveLogEntry(entry))
+    if (next === state) {
+      // A coalesced scrub run that ends where it started (drag back and forth,
+      // release at the origin) legitimately replays as a no-op — not drift.
+      if (entry.k === 'scrub') {
+        continue
+      }
+      throw new Error(`Move log entry did not apply during replay: ${entry.k}`)
+    }
+    state = next
+  }
+  return state
+}
+
 const startTimer = (state: GameState, startedAt: number): GameState => {
   if (!Number.isFinite(startedAt)) {
     return state
@@ -1168,7 +1344,9 @@ const resetTimer = (state: GameState): GameState => {
   }
 }
 
-const snapshotFromState = (state: GameState): GameSnapshot => ({
+// Exported for gamePersistence: the persisted payload stores one final snapshot as
+// the replay-verification guard (and the fallback board if replay ever drifts).
+export const snapshotFromState = (state: GameState): GameSnapshot => ({
   stock: cloneCards(state.stock),
   waste: cloneCards(state.waste),
   foundations: cloneFoundations(state.foundations),
@@ -1182,12 +1360,14 @@ const snapshotFromState = (state: GameState): GameSnapshot => ({
   exactId: state.exactId,
   deckChecksum: state.deckChecksum,
   drawCount: state.drawCount,
-  elapsedMs: state.elapsedMs,
-  timerState: state.timerState,
-  timerStartedAt: state.timerStartedAt,
 })
 
-const cloneSnapshot = (snapshot: GameSnapshot, autoUpEnabled = true): GameState => ({
+// Deep clone of a snapshot's board. Used by the undo/scrub restores (spread over the
+// live state) and exported for gamePersistence's snapshot-fallback load path (replay
+// mismatch/throw, moveLogVersion bump, demo board). Returns a plain GameSnapshot —
+// GameState-only fields (history/future/selected/autoUpEnabled/moveLog/timer/…) are
+// the caller's responsibility.
+export const cloneSnapshot = (snapshot: GameSnapshot): GameSnapshot => ({
   stock: cloneCards(snapshot.stock),
   waste: cloneCards(snapshot.waste),
   foundations: cloneFoundations(snapshot.foundations),
@@ -1201,13 +1381,6 @@ const cloneSnapshot = (snapshot: GameSnapshot, autoUpEnabled = true): GameState 
   exactId: snapshot.exactId,
   deckChecksum: snapshot.deckChecksum,
   drawCount: normalizeDrawCount(snapshot.drawCount),
-  elapsedMs: snapshot.elapsedMs,
-  timerState: snapshot.timerState,
-  timerStartedAt: snapshot.timerStartedAt,
-  history: [],
-  future: [],
-  selected: null,
-  autoUpEnabled,
 })
 
 const cloneCards = (cards: Card[]): Card[] => cards.map((card) => ({ ...card }))

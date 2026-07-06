@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { Dispatch, MutableRefObject } from 'react'
 
+import { MOVE_LOG_VERSION } from '../../../solitaire/klondike'
 import type { GameAction, GameState } from '../../../solitaire/klondike'
 import { computeElapsedWithReference } from '../../../utils/time'
 import { devLog } from '../../../utils/devLogger'
@@ -184,6 +185,10 @@ export const useKlondikeHistoryEntry = ({
         moves: currentState.moveCount,
         durationMs: elapsedForRecord,
         finishedAt,
+        // Move-log persistence: game boundaries are the only history writes that
+        // carry the log (kv payload covers the live session). Demo playback never
+        // reaches this line (early return above).
+        moveLog: { version: MOVE_LOG_VERSION, entries: currentState.moveLog },
       } as const
 
       // If we have a tracked entry ID, update it; otherwise find or create one.

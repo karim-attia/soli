@@ -23,7 +23,8 @@ describe('started history entries', () => {
       startedAt,
       finishedAt: null,
       moves: 0,
-      durationMs: 0,
+      // Active rows carry no duration so the history screen shows no "Time 0:00".
+      durationMs: null,
       status: 'active',
     })
     expect(input.preview).toBe(preview)

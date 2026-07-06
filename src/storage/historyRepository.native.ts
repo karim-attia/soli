@@ -1,9 +1,11 @@
 import * as SQLite from 'expo-sqlite'
 
 import { isExactDealSolvableForDrawCount } from '../data/solvableDealsV2'
+import type { MoveLogEntry } from '../solitaire/klondike'
 import type { HistoryEntry } from '../state/history'
 import {
   HISTORY_PAGE_SIZE,
+  type HistoryEntryMoveLog,
   type HistorySummary,
   type SolvableDealHistoryStats,
 } from './historyRepository.types'
@@ -12,10 +14,11 @@ export { HISTORY_PAGE_SIZE }
 
 export const isHistorySupported = true
 
-// Phase 1 starts exact-ID history in a fresh SQLite file. Earlier SQLite schemas
-// only existed on local test devices, so a new file is simpler than carrying
-// migration code for pre-release identity columns.
-const DATABASE_NAME = 'soli-history-v4.db'
+// Pre-release convention (2026-07-06, per Karim): no migrations before the first
+// App Store release. A schema change simply renames the DB file (abandoning the old
+// one) or wipes — the data only exists on Karim's two throwaway test devices. Once
+// this ships, schema changes need real migrations and a DATABASE_VERSION bump.
+const DATABASE_NAME = 'soli-history.db'
 const DATABASE_VERSION = 1
 
 type HistoryRow = {
@@ -59,13 +62,13 @@ const INSERT_SQL = `
     moves,
     duration_ms,
     preview_json,
-    status
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    status,
+    moves_json,
+    move_log_version
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
-const UPDATE_SQL = `
-  UPDATE history_entries
-  SET
+const UPDATE_COLUMNS_SQL = `
     exact_id = ?,
     deck_checksum = ?,
     display_name = ?,
@@ -76,7 +79,21 @@ const UPDATE_SQL = `
     moves = ?,
     duration_ms = ?,
     preview_json = ?,
-    status = ?
+    status = ?`
+
+const UPDATE_SQL = `
+  UPDATE history_entries
+  SET${UPDATE_COLUMNS_SQL}
+  WHERE id = ?
+`
+
+// Separate statement so updates WITHOUT a moveLog argument (status flips, active-row
+// normalization, …) never overwrite an already-recorded move log with NULL.
+const UPDATE_WITH_MOVE_LOG_SQL = `
+  UPDATE history_entries
+  SET${UPDATE_COLUMNS_SQL},
+    moves_json = ?,
+    move_log_version = ?
   WHERE id = ?
 `
 
@@ -113,7 +130,9 @@ const openHistoryDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
             moves INTEGER,
             duration_ms INTEGER,
             preview_json TEXT NOT NULL,
-            status TEXT NOT NULL
+            status TEXT NOT NULL,
+            moves_json TEXT,
+            move_log_version INTEGER
           );
           CREATE INDEX IF NOT EXISTS history_entries_started_at
             ON history_entries(started_at DESC, id DESC);
@@ -145,7 +164,15 @@ const getDatabase = (): Promise<SQLite.SQLiteDatabase> => {
   return databasePromise
 }
 
-const toInsertParams = (entry: HistoryEntry): SQLite.SQLiteBindValue[] => [
+const toMoveLogParams = (
+  moveLog: HistoryEntryMoveLog | null
+): [string | null, number | null] =>
+  moveLog ? [JSON.stringify(moveLog.entries), moveLog.version] : [null, null]
+
+const toInsertParams = (
+  entry: HistoryEntry,
+  moveLog: HistoryEntryMoveLog | null
+): SQLite.SQLiteBindValue[] => [
   entry.id,
   entry.exactId,
   entry.deckChecksum,
@@ -158,6 +185,7 @@ const toInsertParams = (entry: HistoryEntry): SQLite.SQLiteBindValue[] => [
   entry.durationMs,
   JSON.stringify(entry.preview),
   entry.status,
+  ...toMoveLogParams(moveLog),
 ]
 
 const toUpdateParams = (entry: HistoryEntry): SQLite.SQLiteBindValue[] => [
@@ -172,7 +200,6 @@ const toUpdateParams = (entry: HistoryEntry): SQLite.SQLiteBindValue[] => [
   entry.durationMs,
   JSON.stringify(entry.preview),
   entry.status,
-  entry.id,
 ]
 
 const createEmptyPreview = (): HistoryEntry['preview'] => ({
@@ -377,25 +404,39 @@ export const getSolvableDealHistoryStats = async (): Promise<
   }))
 }
 
-export const insertHistoryEntry = async (entry: HistoryEntry): Promise<void> => {
+// moveLog semantics (insert + update): `undefined` leaves the moves_json column
+// untouched (rows are created without a log; only game-boundary writes carry one),
+// `null` clears it, a value writes it.
+export const insertHistoryEntry = async (
+  entry: HistoryEntry,
+  moveLog: HistoryEntryMoveLog | null = null
+): Promise<void> => {
   const database = await getDatabase()
 
   if (entry.status !== 'active') {
-    await database.runAsync(INSERT_SQL, toInsertParams(entry))
+    await database.runAsync(INSERT_SQL, toInsertParams(entry, moveLog))
     return
   }
 
   await database.withExclusiveTransactionAsync(async (transaction) => {
     await markOtherActiveRowsIncomplete(transaction, entry.id)
-    await transaction.runAsync(INSERT_SQL, toInsertParams(entry))
+    await transaction.runAsync(INSERT_SQL, toInsertParams(entry, moveLog))
   })
 }
 
-export const updateHistoryEntry = async (entry: HistoryEntry): Promise<void> => {
+export const updateHistoryEntry = async (
+  entry: HistoryEntry,
+  moveLog?: HistoryEntryMoveLog | null
+): Promise<void> => {
   const database = await getDatabase()
+  const sql = moveLog === undefined ? UPDATE_SQL : UPDATE_WITH_MOVE_LOG_SQL
+  const params: SQLite.SQLiteBindValue[] =
+    moveLog === undefined
+      ? [...toUpdateParams(entry), entry.id]
+      : [...toUpdateParams(entry), ...toMoveLogParams(moveLog), entry.id]
 
   if (entry.status !== 'active') {
-    await database.runAsync(UPDATE_SQL, toUpdateParams(entry))
+    await database.runAsync(sql, params)
     return
   }
 
@@ -409,8 +450,39 @@ export const updateHistoryEntry = async (entry: HistoryEntry): Promise<void> => 
     }
 
     await markOtherActiveRowsIncomplete(transaction, entry.id)
-    await transaction.runAsync(UPDATE_SQL, toUpdateParams(entry))
+    await transaction.runAsync(sql, params)
   })
+}
+
+// moves_json is intentionally NOT part of the page/active/summary SELECTs (a full
+// log is ~15–25 KB per row; pages stay light). The future resume-from-history UI
+// fetches a single row's log on demand through this function.
+export const getHistoryEntryMoveLog = async (
+  id: string
+): Promise<{ moveLogVersion: number; moveLog: MoveLogEntry[] } | null> => {
+  const database = await getDatabase()
+  const row = await database.getFirstAsync<{
+    moves_json: string | null
+    move_log_version: number | null
+  }>('SELECT moves_json, move_log_version FROM history_entries WHERE id = ?', [id])
+
+  if (!row || row.moves_json === null || row.move_log_version === null) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(row.moves_json) as unknown
+    if (!Array.isArray(parsed)) {
+      return null
+    }
+    return {
+      moveLogVersion: row.move_log_version,
+      moveLog: parsed as MoveLogEntry[],
+    }
+  } catch {
+    // A damaged log must not break callers; they treat the game as non-resumable.
+    return null
+  }
 }
 
 export const clearHistoryEntries = async (): Promise<void> => {
