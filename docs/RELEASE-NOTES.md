@@ -20,11 +20,17 @@ Soli is a free, ad-free, open-source Solitaire.
 - **Draw 1–5**: choose how many cards are drawn from the stock. Remembered per game, shown in your history
 - Improved undo scrubber handling and layout
 
+Google Play:
+Added game mode "Draw 3" (or any other number between 1 and 5). Go to the settings to turn it on. Happy playing!
 ---
 
 ## 0.7.0 — 2026-04-02
 
 - More reliable card-flight animations: rapid moves no longer spawn duplicate flights during fast auto-complete
+
+Google Play:
+1. Introduced a setting to disable automatically moving all cards up to the foundation once all cards are uncovered. (Community request)
+2. Performance improvements.
 
 ---
 
@@ -34,18 +40,25 @@ Soli is a free, ad-free, open-source Solitaire.
 - Redesigned header controls
 - Smoother celebration timing and faster auto-complete
 
+Google Play:
+Improved card layout and winning animation.
 ---
 
 ## 0.5.0 — 2026-03-11
 
 - Build-infrastructure release; no gameplay changes
 
+Google Play:
+Improved animations, card layout, and a bug fix.
 ---
 
 ## 0.4.0 — 2026-03-03
 
 - Framework upgrade (Expo SDK 55, React Native 0.83, React 19)
 - Snappier auto-complete and celebrations
+
+Google Play:
+1. Improved animations and a bug fix.
 
 ---
 
@@ -56,6 +69,8 @@ Soli is a free, ad-free, open-source Solitaire.
 - Timer no longer counts time spent in auto-complete
 - Layout fixes for notched devices
 
+Google Play:
+Animation and board layout improvements
 ---
 
 ## 0.2.0 — 2025-12-14
@@ -64,6 +79,8 @@ Soli is a free, ad-free, open-source Solitaire.
 - Faster auto-complete
 - Better board spacing and visual balance
 
+Google Play:
+Animation and board layout improvements
 ---
 
 ## 0.1.1 — 2025-11-30
@@ -82,3 +99,6 @@ Soli is a free, ad-free, open-source Solitaire.
 - **Game history and stats**: move counts, times, and a tableau preview per game
 - **Animations**: card flights, waste fan, flips, and a wiggle for invalid moves
 - **Settings** for draw mode, solvable-games-only, statistics, and more
+
+Google Play:
+First version
