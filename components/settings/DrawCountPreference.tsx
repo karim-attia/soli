@@ -6,16 +6,16 @@ import {
   type DrawCount,
 } from '../../src/solitaire/drawCount'
 
+// `disabled` prop removed 2026-07-05: it only existed for the settings-hydration
+// loading state, which went away when settings became a synchronous kv-store read.
 type DrawCountPreferenceProps = {
   value: DrawCount
   onValueChange: (value: DrawCount) => void
-  disabled: boolean
 }
 
 export const DrawCountPreference = ({
   value,
   onValueChange,
-  disabled,
 }: DrawCountPreferenceProps) => (
   <Row alignment="center" spacing={12}>
     <Text>Cards drawn</Text>
@@ -25,7 +25,6 @@ export const DrawCountPreference = ({
     <Picker
       selectedValue={value}
       onValueChange={(nextValue) => onValueChange(normalizeDrawCount(nextValue))}
-      enabled={!disabled}
     >
       {DRAW_COUNT_OPTIONS.map((drawCount) => (
         <Picker.Item key={drawCount} label={`Draw ${drawCount}`} value={drawCount} />

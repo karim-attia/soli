@@ -16,7 +16,6 @@ type UseKlondikePersistenceParams = {
   previousHasWonRef: React.MutableRefObject<boolean>
   // Task 10-7: Persist linkage to the active history entry across restarts.
   currentGameEntryIdRef: React.MutableRefObject<string | null>
-  settingsHydrated: boolean
   autoUpEnabled: boolean
   preferredDrawCount: DrawCount
 }
@@ -54,7 +53,6 @@ export const useKlondikePersistence = ({
   dispatch,
   previousHasWonRef,
   currentGameEntryIdRef,
-  settingsHydrated,
   autoUpEnabled,
   preferredDrawCount,
 }: UseKlondikePersistenceParams) => {
@@ -66,11 +64,9 @@ export const useKlondikePersistence = ({
   const preferredDrawCountRef = useRef(preferredDrawCount)
   preferredDrawCountRef.current = preferredDrawCount
 
+  // Settings hydrate synchronously (expo-sqlite/kv-store), so the preferred draw count
+  // is already correct on mount and this effect can load the saved game right away.
   useEffect(() => {
-    if (!settingsHydrated) {
-      return
-    }
-
     let isCancelled = false
 
     ;(async () => {
@@ -81,8 +77,8 @@ export const useKlondikePersistence = ({
         }
 
         if (!persisted) {
-          // The reducer starts before settings hydration. Replace that placeholder
-          // only when there is no active game, so returning users get their saved rule.
+          // No saved game: replace the reducer's placeholder deal with one that uses
+          // the user's preferred draw-count rule.
           dispatch({ type: 'NEW_GAME', drawCount: preferredDrawCountRef.current })
           return
         }
@@ -146,7 +142,7 @@ export const useKlondikePersistence = ({
     return () => {
       isCancelled = true
     }
-  }, [currentGameEntryIdRef, dispatch, previousHasWonRef, settingsHydrated])
+  }, [currentGameEntryIdRef, dispatch, previousHasWonRef])
 
   useEffect(() => {
     if (!storageHydrationComplete) {

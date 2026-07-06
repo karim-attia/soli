@@ -53,7 +53,7 @@ import {
   createEmptyAbsoluteCardLayerLayouts,
   type AbsoluteCardLayerLayouts,
 } from '../components/cards/AbsoluteCardLayer'
-import { loadBoardMetrics, saveBoardMetrics } from '../../../storage/uiPreferences'
+import { loadBoardMetricsSync, saveBoardMetrics } from '../../../storage/uiPreferences'
 
 export type { LaunchDemoGameOptions } from './useDemoGameLauncher'
 
@@ -145,37 +145,18 @@ const areLayoutsEquivalent = (
 // Provides the stateful container for the Klondike screen, exposing navigation callbacks and view props.
 export const useKlondikeGame = (): UseKlondikeGameResult => {
   const [state, dispatch] = useReducer(klondikeReducer, undefined, createInitialState)
+  // Seed board metrics synchronously from the last session (tiny kv-store read) so
+  // card metrics exist on the very first render — the old async hydration caused a
+  // visible flicker while the board waited for onLayout.
   const [boardLayout, setBoardLayout] = useState<{
     width: number | null
     height: number | null
-  }>({
-    width: null,
-    height: null,
+  }>(() => {
+    const stored = loadBoardMetricsSync()
+    return { width: stored?.width ?? null, height: stored?.height ?? null }
   })
   const [absoluteCardLayerLayouts, setAbsoluteCardLayerLayouts] =
     useState<AbsoluteCardLayerLayouts>(() => createEmptyAbsoluteCardLayerLayouts())
-
-  useEffect(() => {
-    let cancelled = false
-
-    const hydrateBoardMetrics = async () => {
-      const stored = await loadBoardMetrics()
-      if (cancelled || !stored) {
-        return
-      }
-
-      setBoardLayout((previous) => ({
-        width: previous.width ?? stored.width ?? previous.width,
-        height: previous.height ?? stored.height ?? previous.height,
-      }))
-    }
-
-    void hydrateBoardMetrics()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   const safeArea = useSafeAreaInsets()
   const boardAvailableWidth = useMemo(() => {
@@ -192,11 +173,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const colorScheme = useColorScheme()
   const feltBackground = colorScheme === 'dark' ? COLOR_FELT_DARK : COLOR_FELT_LIGHT
 
-  const {
-    state: settingsState,
-    hydrated: settingsHydrated,
-    setDeveloperMode,
-  } = useSettings()
+  const { state: settingsState, setDeveloperMode } = useSettings()
   const { showMoves, showTime } = settingsState.statistics
   const solvableGamesOnly = settingsState.solvableGamesOnly
   const preferredDrawCount = settingsState.drawCount
@@ -356,23 +333,18 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   useKlondikeTimer({ state, dispatch, stateRef })
 
   useEffect(() => {
-    if (!settingsHydrated) {
-      return
-    }
-
     // Auto Up lives in settings, but queue scheduling is pure reducer logic.
     // Mirror it into runtime state so turning it off can stop an active queue immediately.
     dispatch({ type: 'SET_AUTO_UP_ENABLED', enabled: autoUpEnabled })
-  }, [autoUpEnabled, dispatch, settingsHydrated])
+  }, [autoUpEnabled, dispatch])
 
-  // Hook: hydrate and persist game state via AsyncStorage once per relevant change.
+  // Hook: hydrate and persist game state via expo-sqlite/kv-store once per relevant change.
   // Task 10-7: Persist the current history entry linkage across restarts.
   const storageHydrated = useKlondikePersistence({
     state,
     dispatch,
     previousHasWonRef,
     currentGameEntryIdRef,
-    settingsHydrated,
     autoUpEnabled,
     preferredDrawCount,
   })
@@ -414,7 +386,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       setDealResetKey((current) => current + 1)
     }
 
-    if (settingsHydrated && solvableGamesOnly) {
+    if (solvableGamesOnly) {
       const solvableDeal = selectNextSolvableDeal()
       if (solvableDeal) {
         const startedAt = new Date().toISOString()
@@ -436,7 +408,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     preferredDrawCount,
     recordStartedGame,
     selectNextSolvableDeal,
-    settingsHydrated,
     solvableGamesOnly,
   ])
 

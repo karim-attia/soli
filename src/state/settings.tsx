@@ -1,10 +1,12 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
+// Storage engine: expo-sqlite/kv-store (AsyncStorage-compatible API, backed by SQLite).
+import Storage from 'expo-sqlite/kv-store'
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type PropsWithChildren,
 } from 'react'
@@ -47,7 +49,6 @@ export type SettingsState = {
 
 type SettingsContextValue = {
   state: SettingsState
-  hydrated: boolean
   setDrawCount: (drawCount: DrawCount) => void
   setGlobalAnimationsEnabled: (enabled: boolean) => void
   setAnimationPreference: (key: AnimationPreferenceKey, enabled: boolean) => void
@@ -137,43 +138,37 @@ export const statisticsPreferenceDescriptors: Array<{
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined)
 
-export const SettingsProvider = ({ children }: PropsWithChildren) => {
-  const [state, setState] = useState<SettingsState>(DEFAULT_SETTINGS)
-  const [hydrated, setHydrated] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-
-    ;(async () => {
-      try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY)
-        if (stored && !cancelled) {
-          const parsed = JSON.parse(stored) as Partial<SettingsState>
-          setState((previous) => mergeSettings(previous, parsed))
-        }
-      } catch (error) {
-        devLog('warn', '[settings] Failed to load persisted settings', error)
-      } finally {
-        if (!cancelled) {
-          setHydrated(true)
-        }
-      }
-    })()
-
-    return () => {
-      cancelled = true
+// Sync read is intentional: settings are ~400 B read once at startup, so getItemSync
+// is effectively free. Hydrating in the useState initializer removes the old async
+// `hydrated` flag and all downstream gating (useKlondikePersistence/useKlondikeGame).
+const readPersistedSettings = (): SettingsState => {
+  try {
+    const stored = Storage.getItemSync(STORAGE_KEY)
+    if (stored) {
+      return mergeSettings(DEFAULT_SETTINGS, JSON.parse(stored) as Partial<SettingsState>)
     }
-  }, [])
+  } catch (error) {
+    devLog('warn', '[settings] Failed to load persisted settings', error)
+  }
+  return DEFAULT_SETTINGS
+}
+
+export const SettingsProvider = ({ children }: PropsWithChildren) => {
+  const [state, setState] = useState<SettingsState>(readPersistedSettings)
+  const skipInitialWriteRef = useRef(true)
 
   useEffect(() => {
-    if (!hydrated) {
+    // Skip the mount run: state was just read from storage, no need to write it back.
+    if (skipInitialWriteRef.current) {
+      skipInitialWriteRef.current = false
       return
     }
 
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch((error) => {
+    // Writes stay async to keep the JS thread free; the payload is tiny either way.
+    Storage.setItem(STORAGE_KEY, JSON.stringify(state)).catch((error) => {
       devLog('warn', '[settings] Failed to persist settings', error)
     })
-  }, [hydrated, state])
+  }, [state])
 
   const setDrawCount = useCallback((drawCount: DrawCount) => {
     setState((previous) =>
@@ -280,13 +275,12 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
   )
 
   useEffect(() => {
-    setDeveloperLoggingEnabled(hydrated ? state.developerMode : false)
-  }, [hydrated, state.developerMode])
+    setDeveloperLoggingEnabled(state.developerMode)
+  }, [state.developerMode])
 
   const value = useMemo<SettingsContextValue>(
     () => ({
       state,
-      hydrated,
       setDrawCount,
       setGlobalAnimationsEnabled,
       setAnimationPreference,
@@ -297,7 +291,6 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setStatisticsPreference,
     }),
     [
-      hydrated,
       setAnimationPreference,
       setGlobalAnimationsEnabled,
       setStatisticsPreference,

@@ -4,10 +4,6 @@ import {
   type HistoryPreview,
 } from '../../../src/state/history'
 
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
-)
-
 const preview: HistoryPreview = {
   tableau: [],
   wasteTop: null,

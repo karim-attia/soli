@@ -1,4 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
+// Resolves to test/mocks/expo-sqlite-kv-store via the Jest moduleNameMapper.
+import Storage from 'expo-sqlite/kv-store'
 
 import { createInitialState, klondikeReducer } from '../../../src/solitaire/klondike'
 import {
@@ -9,10 +10,6 @@ import {
   loadGameState,
   saveGameState,
 } from '../../../src/storage/gamePersistence'
-
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
-)
 
 describe('gamePersistence', () => {
   beforeEach(() => {
@@ -28,8 +25,8 @@ describe('gamePersistence', () => {
 
     await saveGameState(state)
 
-    expect(AsyncStorage.setItem).toHaveBeenCalledTimes(1)
-    const [, serialized] = (AsyncStorage.setItem as jest.Mock).mock.calls[0]
+    expect(Storage.setItem).toHaveBeenCalledTimes(1)
+    const [, serialized] = (Storage.setItem as jest.Mock).mock.calls[0]
     expect(typeof serialized).toBe('string')
     expect(serialized).toContain(`"selected":null`)
   })
@@ -46,7 +43,7 @@ describe('gamePersistence', () => {
       },
     }
 
-    ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
 
     const restored = await loadGameState()
 
@@ -65,7 +62,7 @@ describe('gamePersistence', () => {
       state: savedState,
     }
 
-    ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
 
     const restored = await loadGameState()
 
@@ -87,7 +84,7 @@ describe('gamePersistence', () => {
       delete snapshot.drawCount
     })
 
-    ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue(
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(
       JSON.stringify({
         version: PERSISTENCE_VERSION,
         savedAt: new Date().toISOString(),
@@ -112,8 +109,8 @@ describe('gamePersistence', () => {
     state = klondikeReducer(state, { type: 'DRAW_OR_RECYCLE' })
 
     await saveGameState(state)
-    const [, serialized] = (AsyncStorage.setItem as jest.Mock).mock.calls[0]
-    ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue(serialized)
+    const [, serialized] = (Storage.setItem as jest.Mock).mock.calls[0]
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(serialized)
 
     const restored = await loadGameState()
 
@@ -131,7 +128,7 @@ describe('gamePersistence', () => {
       state: unidentifiedState,
     }
 
-    ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
 
     await expect(loadGameState()).rejects.toMatchObject({
       reason: 'invalid',
@@ -139,13 +136,13 @@ describe('gamePersistence', () => {
   })
 
   it('throws PersistedGameError for invalid JSON', async () => {
-    ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue('not-json')
+    ;(Storage.getItem as jest.Mock).mockResolvedValue('not-json')
 
     await expect(loadGameState()).rejects.toBeInstanceOf(PersistedGameError)
   })
 
   it('removes saved state via clearGameState', async () => {
     await clearGameState()
-    expect(AsyncStorage.removeItem).toHaveBeenCalledWith(KLONDIKE_STORAGE_KEY)
+    expect(Storage.removeItem).toHaveBeenCalledWith(KLONDIKE_STORAGE_KEY)
   })
 })

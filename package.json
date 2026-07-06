@@ -31,7 +31,6 @@
   "dependencies": {
     "@expo/material-symbols": "^0.1.1",
     "@expo/ui": "~57.0.3",
-    "@react-native-async-storage/async-storage": "^2.2.0",
     "@tamagui/colors": "2.2.0",
     "@tamagui/config": "2.2.0",
     "@tamagui/font-inter": "2.2.0",
@@ -83,6 +82,7 @@
   "jest": {
     "moduleNameMapper": {
       "^expo-sqlite$": "<rootDir>/test/mocks/expo-sqlite",
+      "^expo-sqlite/kv-store$": "<rootDir>/test/mocks/expo-sqlite-kv-store",
       "^expo/src/winter$": "<rootDir>/test/mocks/expo-winter",
       "^expo/src/winter/.*": "<rootDir>/test/mocks/expo-winter",
       "^expo/winter$": "<rootDir>/test/mocks/expo-winter",
@@ -94,7 +94,7 @@
       "<rootDir>/test/setup/mock-expo-winter.ts"
     ],
     "transformIgnorePatterns": [
-      "node_modules/(?!(expo|expo-modules-core|@expo|@react-native|react-native|@react-native-async-storage|react-native-reanimated)/)"
+      "node_modules/(?!(expo|expo-modules-core|@expo|@react-native|react-native|react-native-reanimated)/)"
     ]
   },
   "packageManager": "yarn@4.12.0",

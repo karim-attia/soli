@@ -1,5 +1,12 @@
 # React Native AsyncStorage Guide
 
+> **SUPERSEDED (2026-07-05):** `@react-native-async-storage/async-storage` was removed
+> from Soli. All key-value persistence now goes through `expo-sqlite/kv-store` (same
+> AsyncStorage-shaped API plus sync variants) — see the "Key-value store" section in
+> [expo-sqlite.md](./expo-sqlite.md) and the decision record in
+> `docs/product/mmkv-migration/asyncstorage-to-mmkv-evaluation.md`. This guide is kept
+> for historical reference only.
+
 Last refreshed: 2026-07-03
 
 ## Scope

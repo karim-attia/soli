@@ -129,6 +129,7 @@ Check if the build was actually installed on the device or the device/emulator.
 **External Package Research and Documentation**: For any proposed tasks that involve external packages, to avoid hallucinations, use the web to research the documentation first to ensure it's 100% clear how to use the API of the package. Then for each package, create or update a document in `docs/external-package-guides/` named `<package>.md` that contains a fresh cache of the information needed to use the API. It should be date-stamped and link to the original docs provided. This documents foundational assumptions about how to use the package, with example snippets.
 
 # AI models
+Exception today: Use Fable high for everything, both flagship and efficient.
  (high, xhigh, medium = reasoning)
 - Flagship: Anthropic Fable high, GPT 5.5 xhigh
 - Efficient: GPT 5.5 medium, Opus 4.8 medium

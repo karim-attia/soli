@@ -1,4 +1,9 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
+// Storage engine: expo-sqlite/kv-store (AsyncStorage-compatible API, backed by SQLite).
+// This file must stay on the ASYNC API: the persisted blob grows ~3.5 KB per move
+// (undo-history snapshots) and reaches hundreds of KB mid-game. A sync write of that
+// size would block the JS thread during animation-heavy play; the async API writes
+// off-thread. See docs/product/mmkv-migration/asyncstorage-to-mmkv-evaluation.md.
+import Storage from 'expo-sqlite/kv-store'
 
 import type { GameSnapshot, GameState, TimerState } from '../solitaire/klondike'
 import { normalizeDrawCount, type DrawCount } from '../solitaire/drawCount'
@@ -115,7 +120,7 @@ export const saveGameState = async (state: GameState): Promise<void> => {
   // Task 10-7: Include optional history entry linkage.
   const payload = serializeState(state, null)
   const serialized = JSON.stringify(payload)
-  await AsyncStorage.setItem(KLONDIKE_STORAGE_KEY, serialized)
+  await Storage.setItem(KLONDIKE_STORAGE_KEY, serialized)
 }
 
 export const saveGameStateWithHistory = async (
@@ -124,11 +129,11 @@ export const saveGameStateWithHistory = async (
 ): Promise<void> => {
   const payload = serializeState(state, historyEntryId)
   const serialized = JSON.stringify(payload)
-  await AsyncStorage.setItem(KLONDIKE_STORAGE_KEY, serialized)
+  await Storage.setItem(KLONDIKE_STORAGE_KEY, serialized)
 }
 
 export const loadGameState = async (): Promise<LoadedGameState | null> => {
-  const serialized = await AsyncStorage.getItem(KLONDIKE_STORAGE_KEY)
+  const serialized = await Storage.getItem(KLONDIKE_STORAGE_KEY)
   if (!serialized) {
     return null
   }
@@ -240,7 +245,7 @@ export const loadGameState = async (): Promise<LoadedGameState | null> => {
 }
 
 export const clearGameState = async (): Promise<void> => {
-  await AsyncStorage.removeItem(KLONDIKE_STORAGE_KEY)
+  await Storage.removeItem(KLONDIKE_STORAGE_KEY)
 }
 
 const isTimerState = (value: unknown): value is TimerState =>

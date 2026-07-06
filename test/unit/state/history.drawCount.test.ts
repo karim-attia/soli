@@ -1,10 +1,6 @@
 import { normalizeHistoryEntry, type HistoryEntry } from '../../../src/state/history'
 import { getSolvableDealsForDrawCount } from '../../../src/data/solvableDealsV2'
 
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
-)
-
 const createEntry = (overrides: Partial<HistoryEntry> = {}): HistoryEntry =>
   ({
     id: 'history-1',

@@ -4,10 +4,6 @@ import {
 } from '../../../src/state/history'
 import { createInitialState } from '../../../src/solitaire/klondike'
 
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
-)
-
 describe('started history entries', () => {
   it('creates an active entry for a newly dealt random game', () => {
     const state = createInitialState(3)

@@ -1,5 +1,5 @@
 import { useLayoutEffect } from 'react'
-import { FieldGroup, Host, Switch, Text } from '@expo/ui'
+import { FieldGroup, Host, Switch } from '@expo/ui'
 import { useNavigation } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
@@ -20,7 +20,6 @@ export default function SettingsScreen() {
   const openDrawer = useDrawerOpener()
   const {
     state,
-    hydrated,
     setGlobalAnimationsEnabled,
     setAnimationPreference,
     setDrawCount,
@@ -30,8 +29,9 @@ export default function SettingsScreen() {
     setStatisticsPreference,
   } = useSettings()
 
-  const controlsDisabled = !hydrated
-  const animationDetailsDisabled = controlsDisabled || !state.animations.master
+  // Settings hydrate synchronously (expo-sqlite/kv-store getItemSync), so there is no
+  // loading state and controls are always live.
+  const animationDetailsDisabled = !state.animations.master
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -49,23 +49,12 @@ export default function SettingsScreen() {
     <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
       <Host style={{ flex: 1 }}>
         <FieldGroup>
-          {!hydrated ? (
-            <FieldGroup.Section>
-              <Text>Loading preferences...</Text>
-            </FieldGroup.Section>
-          ) : null}
-
           <FieldGroup.Section title="New Games">
-            <DrawCountPreference
-              value={state.drawCount}
-              onValueChange={setDrawCount}
-              disabled={controlsDisabled}
-            />
+            <DrawCountPreference value={state.drawCount} onValueChange={setDrawCount} />
             <Switch
               label="Solvable deals"
               value={state.solvableGamesOnly}
               onValueChange={setSolvableGamesOnly}
-              disabled={controlsDisabled}
             />
           </FieldGroup.Section>
 
@@ -74,7 +63,6 @@ export default function SettingsScreen() {
               label="Auto Up"
               value={state.autoUpEnabled}
               onValueChange={setAutoUpEnabled}
-              disabled={controlsDisabled}
             />
           </FieldGroup.Section>
 
@@ -85,7 +73,6 @@ export default function SettingsScreen() {
                 label={label}
                 value={state.statistics[key]}
                 onValueChange={(enabled) => setStatisticsPreference(key, enabled)}
-                disabled={controlsDisabled}
               />
             ))}
           </FieldGroup.Section>
@@ -95,7 +82,6 @@ export default function SettingsScreen() {
               label="Developer mode"
               value={state.developerMode}
               onValueChange={setDeveloperMode}
-              disabled={controlsDisabled}
             />
           </FieldGroup.Section>
 
@@ -105,7 +91,6 @@ export default function SettingsScreen() {
                 label="All animations"
                 value={state.animations.master}
                 onValueChange={setGlobalAnimationsEnabled}
-                disabled={controlsDisabled}
               />
               {animationPreferenceDescriptors.map(({ key, label }) => (
                 <Switch

@@ -1,0 +1,54 @@
+07-05 23:30:56.527 D/BoundBrokerSvc( 3766): onRebind: Intent { act=com.google.android.gms.auth.aang.events.services.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentApiService }
+07-05 23:30:56.548 W/ProcessStats( 2570): Tracking association SourceState{94c07cb com.google.android.gms.persistent/10137 BFgs #77659} whose proc state 4 is better than process ProcessState{f10a3a com.google.android.gms/10137 pkg=com.google.android.gms} proc state 14 (0 skipped)
+07-05 23:30:57.533 D/BoundBrokerSvc( 3766): onRebind: Intent { act=com.google.android.gms.libs.gmscorelogger.service.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentDirectBootAwareApiService }
+07-05 23:31:11.555 D/BoundBrokerSvc( 3766): onUnbind: Intent { act=com.google.android.gms.auth.aang.events.services.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentApiService }
+07-05 23:31:11.558 W/ProcessStats( 2570): Tracking association SourceState{94c07cb com.google.android.gms.persistent/10137 BFgs #77666} whose proc state 4 is better than process ProcessState{f10a3a com.google.android.gms/10137 pkg=com.google.android.gms} proc state 14 (6 skipped)
+07-05 23:31:12.544 D/BoundBrokerSvc( 3766): onUnbind: Intent { act=com.google.android.gms.libs.gmscorelogger.service.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentDirectBootAwareApiService }
+07-05 23:31:49.841 W/ProcessStats( 2570): Tracking association SourceState{2ae26f com.google.android.gms.persistent/10137 ImpBg #77679} whose proc state 6 is better than process ProcessState{f10a3a com.google.android.gms/10137 pkg=com.google.android.gms} proc state 14 (0 skipped)
+07-05 23:31:49.846 D/OomAdjuster( 2570): process : com.google.android.gms.persistent, pid = 30320, isTop = false, uid = 99910137, hasActivity = false
+07-05 23:31:49.846 D/OomAdjuster( 2570): process : com.google.android.gms.persistent is not top!
+07-05 23:32:04.865 W/ProcessStats( 2570): Tracking association SourceState{94c07cb com.google.android.gms.persistent/10137 BFgs #77704} whose proc state 4 is better than process ProcessState{f10a3a com.google.android.gms/10137 pkg=com.google.android.gms} proc state 14 (20 skipped)
+07-05 23:33:42.629 I/.gms.persistent( 3766): Explicit concurrent mark compact GC freed 12MB AllocSpace bytes, 1(20KB) LOS objects, 48% free, 33MB/65MB, paused 190us,1.156ms total 135.956ms
+07-05 23:34:34.006 I/SQLiteCastStore( 3766): [CastNetworkInfo] saved: 1, skipped: 0, [CastDeviceInfo]: saved 1, skipped 0, [ProbedNetworks]: saved 0, skipped: 0, [ProbedSocketAddress]: saved 1, skipped: 0, [Network-Device pairs]: saved: 1
+07-05 23:34:42.260 I/.gms.persistent(30320): Explicit concurrent mark compact GC freed 612KB AllocSpace bytes, 0(0B) LOS objects, 49% free, 12MB/25MB, paused 546us,1.636ms total 148.460ms
+07-05 23:36:12.542 E/TaskPersister( 2570): File error accessing recents directory (directory doesn't exist?).
+07-05 23:36:30.861 W/SQLiteLog(18178): (28) double-quoted string literal: "ch.karimattia.soli"
+07-05 23:36:31.273 D/nativeloader(18164): Load /data/app/~~M3dkqxbMeTrQ7dbHrsZl5Q==/ch.karimattia.soli-u3p5R9z9O4AFydtDlJ8gkg==/base.apk!/lib/arm64-v8a/libexpo-sqlite.so using class loader ns clns-9 (caller=/data/app/~~M3dkqxbMeTrQ7dbHrsZl5Q==/ch.karimattia.soli-u3p5R9z9O4AFydtDlJ8gkg==/base.apk!classes3.dex): ok
+07-05 23:36:31.904 I/BugleRestore(19293): reclaimMemory: Clearing persistent caches
+07-05 23:36:31.995 I/BugleRestore(19293): reclaimMemory: Clearing persistent caches
+07-05 23:36:32.000 I/BugleRestore(19293): reclaimMemory: Clearing persistent caches
+07-05 23:36:32.061 I/sscrpcd ( 1069): vendor/qcom/proprietary/adsprpc/src/apps_std_imp.c:860: Successfully opened file /mnt/vendor/persist/sensors/registry/registry/../temp.json
+07-05 23:36:32.064 I/sscrpcd ( 1069): vendor/qcom/proprietary/adsprpc/src/apps_std_imp.c:860: Successfully opened file /mnt/vendor/persist/sensors/registry/registry/../temp.json
+07-05 23:36:32.067 I/sscrpcd ( 1069): vendor/qcom/proprietary/adsprpc/src/apps_std_imp.c:860: Successfully opened file /mnt/vendor/persist/sensors/registry/registry/../temp.json
+07-05 23:36:32.070 I/sscrpcd ( 1069): vendor/qcom/proprietary/adsprpc/src/apps_std_imp.c:860: Successfully opened file /mnt/vendor/persist/sensors/registry/registry/../temp.json
+07-05 23:36:32.072 I/sscrpcd ( 1069): vendor/qcom/proprietary/adsprpc/src/apps_std_imp.c:860: Successfully opened file /mnt/vendor/persist/sensors/registry/registry/../temp.json
+07-05 23:36:32.075 I/sscrpcd ( 1069): vendor/qcom/proprietary/adsprpc/src/apps_std_imp.c:860: Successfully opened file /mnt/vendor/persist/sensors/registry/registry/../temp.json
+07-05 23:36:32.078 I/sscrpcd ( 1069): vendor/qcom/proprietary/adsprpc/src/apps_std_imp.c:860: Successfully opened file /mnt/vendor/persist/sensors/registry/registry/../temp.json
+07-05 23:36:32.080 I/sscrpcd ( 1069): vendor/qcom/proprietary/adsprpc/src/apps_std_imp.c:860: Successfully opened file /mnt/vendor/persist/sensors/registry/registry/../temp.json
+07-05 23:36:32.083 I/sscrpcd ( 1069): vendor/qcom/proprietary/adsprpc/src/apps_std_imp.c:860: Successfully opened file /mnt/vendor/persist/sensors/registry/registry/../temp.json
+07-05 23:36:32.087 I/sscrpcd ( 1069): vendor/qcom/proprietary/adsprpc/src/apps_std_imp.c:860: Successfully opened file /mnt/vendor/persist/sensors/registry/registry/../temp.json
+07-05 23:36:32.089 I/sscrpcd ( 1069): vendor/qcom/proprietary/adsprpc/src/apps_std_imp.c:860: Successfully opened file /mnt/vendor/persist/sensors/registry/registry/../temp.json
+07-05 23:36:34.251 E/TaskPersister( 2570): File error accessing recents directory (directory doesn't exist?).
+07-05 23:37:06.267 W/ActivityTaskManager( 2570): Force removing ActivityRecord{218764043 u0 ch.karimattia.soli/.MainActivity t45978 f}}: app died, no saved state
+07-05 23:37:07.934 W/SQLiteLog(18178): (28) double-quoted string literal: "ch.karimattia.soli"
+07-05 23:37:08.412 D/nativeloader(18610): Load /data/app/~~M3dkqxbMeTrQ7dbHrsZl5Q==/ch.karimattia.soli-u3p5R9z9O4AFydtDlJ8gkg==/base.apk!/lib/arm64-v8a/libexpo-sqlite.so using class loader ns clns-9 (caller=/data/app/~~M3dkqxbMeTrQ7dbHrsZl5Q==/ch.karimattia.soli-u3p5R9z9O4AFydtDlJ8gkg==/base.apk!classes3.dex): ok
+07-05 23:37:08.649 I/BugleRestore(19293): reclaimMemory: Clearing persistent caches
+07-05 23:37:08.702 I/BugleRestore(19293): reclaimMemory: Clearing persistent caches
+07-05 23:37:10.465 E/TaskPersister( 2570): File error accessing recents directory (directory doesn't exist?).
+07-05 23:39:49.902 I/BugleRestore(19293): reclaimMemory: Clearing persistent caches
+07-05 23:40:56.537 D/BoundBrokerSvc( 3766): onRebind: Intent { act=com.google.android.gms.auth.aang.events.services.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentApiService }
+07-05 23:40:56.551 D/BoundBrokerSvc( 3766): onRebind: Intent { act=com.google.android.gms.common.telemetry.service.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentApiService }
+07-05 23:40:56.554 W/ProcessStats( 2570): Tracking association SourceState{94c07cb com.google.android.gms.persistent/10137 BFgs #77848} whose proc state 4 is better than process ProcessState{f10a3a com.google.android.gms/10137 pkg=com.google.android.gms} proc state 15 (47 skipped)
+07-05 23:40:57.544 D/BoundBrokerSvc( 3766): onRebind: Intent { act=com.google.android.gms.libs.gmscorelogger.service.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentDirectBootAwareApiService }
+07-05 23:41:01.581 D/BoundBrokerSvc( 3766): onUnbind: Intent { act=com.google.android.gms.common.telemetry.service.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentApiService }
+07-05 23:41:11.603 D/BoundBrokerSvc( 3766): onUnbind: Intent { act=com.google.android.gms.auth.aang.events.services.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentApiService }
+07-05 23:41:12.553 D/BoundBrokerSvc( 3766): onUnbind: Intent { act=com.google.android.gms.libs.gmscorelogger.service.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentDirectBootAwareApiService }
+07-05 23:41:42.738 I/.gms.persistent( 3766): Explicit concurrent mark compact GC freed 10MB AllocSpace bytes, 5(100KB) LOS objects, 48% free, 33MB/65MB, paused 187us,1.187ms total 107.715ms
+07-05 23:42:18.296 W/ActivityTaskManager( 2570): Force removing ActivityRecord{254617872 u0 ch.karimattia.soli/.MainActivity t45979 f}}: app died, no saved state
+07-05 23:42:20.141 W/SQLiteLog(19942): (28) double-quoted string literal: "ch.karimattia.soli"
+07-05 23:42:20.566 D/nativeloader(19918): Load /data/app/~~M3dkqxbMeTrQ7dbHrsZl5Q==/ch.karimattia.soli-u3p5R9z9O4AFydtDlJ8gkg==/base.apk!/lib/arm64-v8a/libexpo-sqlite.so using class loader ns clns-9 (caller=/data/app/~~M3dkqxbMeTrQ7dbHrsZl5Q==/ch.karimattia.soli-u3p5R9z9O4AFydtDlJ8gkg==/base.apk!classes3.dex): ok
+07-05 23:42:20.841 I/BugleRestore(19293): reclaimMemory: Clearing persistent caches
+07-05 23:42:20.917 I/BugleRestore(19293): reclaimMemory: Clearing persistent caches
+07-05 23:42:20.921 I/BugleRestore(19293): reclaimMemory: Clearing persistent caches
+07-05 23:42:22.489 E/TaskPersister( 2570): File error accessing recents directory (directory doesn't exist?).
+07-05 23:42:42.409 I/.gms.persistent(30320): Explicit concurrent mark compact GC freed 396KB AllocSpace bytes, 0(0B) LOS objects, 49% free, 12MB/25MB, paused 543us,1.620ms total 147.646ms
