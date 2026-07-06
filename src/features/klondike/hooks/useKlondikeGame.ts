@@ -826,6 +826,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     scrubActive,
     scrubIndex: scrubAnimatedIndex,
     sliderMax: scrubSliderMax,
+    historyIndex: state.history.length,
     gesture: undoScrubGesture,
     canUndo,
     onTrackMetrics: handleTrackMetrics,

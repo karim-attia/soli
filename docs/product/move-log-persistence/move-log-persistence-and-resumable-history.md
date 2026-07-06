@@ -11,8 +11,9 @@ audit) implemented 2026-07-06, gates green 21 suites / 171 tests — **iOS simul
 smoke after round 2 PASSED (2026-07-06, all checks incl. clean-v1 data inspection;
 see "iOS simulator smoke after simplification round 2" in Testing).** Review fix
 batch R1–R6 (two-review convergence on 9b8475f) implemented 2026-07-06, gates
-green 22 suites / 179 tests — see "Review fix batch" steps; device smoke pending
-(orchestrator).
+green 22 suites / 179 tests — see "Review fix batch" steps; **iOS simulator smoke
+after the review fix batch PASSED (2026-07-06, incl. live R6 crash-window repair;
+see "iOS simulator smoke after review fix batch" in Testing).**
 
 Origin: "Approach D" from
 [docs/product/expo-sqlite-kv-store-migration/asyncstorage-to-expo-sqlite-kv-store.md](../expo-sqlite-kv-store-migration/asyncstorage-to-expo-sqlite-kv-store.md)
@@ -552,7 +553,10 @@ predicted depth drift, replayed future 5 vs live 3).
   deletion note remains at the reducer). The earlier "trade-off comment" about
   them not logging is moot now that they're gone.
 - [x] **R6. Won-game history durability** — DONE (implemented, ~25 lines).
-  Decision rationale below in Intermediary learnings.
+  Decision rationale below in Intermediary learnings. **Device-verified on the
+  iOS simulator (2026-07-06): the exact crash window was staged at the data
+  level (won payload + linked row still 'active') and the startup repair
+  finalized the row correctly — see Testing.**
 - [x] **Extras** — DONE. Payload-size test bound tightened 60 KB → 40 KB (matches
   acceptance criterion 4; passes with the new guard fields — a 150-action payload
   is well under it). Fuzz round-trip driver now drains scheduled auto-queues only
@@ -974,7 +978,7 @@ Review fix batch (2026-07-06):
   (`moveLog: null` + read-side structural validation). Status: DONE, tested.
 - Won session cleared at startup before its history result committed → row stuck
   'active' without result → R6 startup repair in useKlondikePersistence. Status:
-  DONE (not unit-tested; verify in the next device smoke).
+  DONE — device-verified on iOS (2026-07-06, staged crash window; see Testing).
 - Mid-auto-run debounce loss (kill during auto-run loses the last few advances)
   → consciously skipped: pre-existing, self-healing (hydration finalize
   reschedules the remaining run). Status: WON'T FIX.
@@ -1118,3 +1122,41 @@ there (36k lines).
 
 Environment note: `yarn ios` (expo run:ios) keeps Metro alive in the background
 after the smoke; left running so the installed debug build stays launchable.
+
+### iOS simulator smoke after review fix batch R1–R6 (2026-07-06) — PASS
+
+Verifies the review-fix-batch state on device: R1 `guard` block in the payload,
+R2 depth-exact restores with no guard warns, R6 won-game startup repair (the one
+change with NO unit test — device verification was the point). Setup: no live
+builds running (only idle gradle/kotlin daemons from earlier Android work — left
+alone, they are not builds), app uninstalled from the iPhone 17 Pro simulator,
+clean `yarn ios` (Build Succeeded, installed + launched, pid verified).
+Automation via agent-device 0.18.3. Developer mode was enabled mid-run so devLog
+warns are observable in Metro from the R2/R6 checks onward. Evidence in
+`.test-artifacts/review-fix-smoke-ios/`; OS log `sim-log.txt` (218k lines),
+Metro/JS output in the build terminal.
+
+| # | Check | Result | Evidence / notes |
+|---|-------|--------|------------------|
+| 1 | Clean build + install + launch | PASS | `build.log` ("Build Succeeded", installed, opened); `a-fresh-launch.png` (MOVES 0, TIME 0:00) |
+| 2 | Standard restore: 8 moves (6 draws + 2 tableau) → kill → relaunch | PASS | `b-8-moves.png`, label diff `b-prekill-labels.txt` vs `c-postkill-labels.txt`: board identical (only timer text + occlusion-dependent rank glyphs differ), MOVES 8, timer resumed ahead of saved value — never rewound (0:26 → 1:29 → 2:25 → 3:02 monotonic across undos and relaunch) |
+| 2b | Undo to move 0 after relaunch | PASS | 8 undos reached the exact initial deal (stock 23, waste 3♥, 4♣ back on column 5). MOVES stays 8 — by design ("undo rewinds board state, but not the move counter", comment in `handleUndo`) |
+| 3a | R1: payload `guard` object present + plausible | PASS | `r1-payload.json`: guard `{historyLength: 0, futureLength: 8, hasWon: false, autoCompleteRuns: 0}` exactly matching the 8-undos-deep session; later sessions showed `{3,3,…}` and `{0,6,…}` all consistent. No guard-mismatch warns in any restore |
+| 3b | R2: scrub/undo-heavy restore, depth exact, no warns | PASS (scrub drag limited, see notes) | Second session: 6 draws + 3 undos → kill → relaunch → board + MOVES + guard `{3,3}` restored, then 3 more undos reached the initial deal (payload guard `{0,6}` with 6 undo entries — full redo depth preserved). devLog shows ONLY "Hydrating saved in-progress session", zero replay/guard/fallback warns across 4 relaunches |
+| 3b-2 | R2c live bonus: no-op scrub entry replays cleanly | PASS | One pan attempt appended a coalesced back-to-origin `{k:'scrub',i:0}` entry (visible in `r2-prekill-payload.json`); the next relaunch replayed it without drift warn, and the regenerated log correctly drops the no-op (`r2-postrelaunch-payload.json`) — the exact R2c tolerance case, observed live |
+| 3b-3 | R2b live: mount-time same-value SET_AUTO_UP_ENABLED is a pure no-op | PASS | 4+ relaunches (each dispatches the settings mirror with an unchanged value): zero spurious `autoUp` entries in the persisted log, depths always guard-exact |
+| 3c | R6: win crash window → startup repair | PASS (staged) | No dev shortcut to a near-won board exists (demo playlist detaches history rows via `demoPlaybackActiveRef` by design; natural win impractical), so the exact production condition was staged at the data level: kill app → set payload `status:'won'` in the kv DB (backup `kv-backup-before-r6.db`) while linked row `hist_mr9cx2bd_mbe4vt` was still 'active'/0 moves/NULL log → relaunch. Repair fired: devLog "Repairing history row for a won session whose result never committed."; row → solved, moves 12, duration_ms 667494, finished_at = payload savedAt, `moves_json` 21 valid entries; History UI shows "Solved … 12 moves · Time 11:07" (`r6-history-after-repair.png`); session cleared, fresh deal + new active row; subsequent relaunches show no repeated repair |
+| 3c-2 | R6: normal win (no kill) → single Solved row | SKIP | Requires actually winning a game; no shortcut exists (see 3c). The no-kill path is the long-standing win handler flow (unchanged by this batch) and `getActiveEntry` resolving after queued writes makes the repair a no-op there (unit-reasoned in Intermediary learnings) |
+| 3d | Logs: sqlite errors, "database is locked", replay/persistence/guard warns, JS exceptions | PASS | None in 218k OS-log lines nor in Metro output. All 4 SoliDev log lines are expected INFOs (2 hydrations, R6 repair pair) |
+
+iOS automation limitations hit (both known/pre-documented): (1) RNGH pan on the
+Undo button still cannot be synthesized (4 fresh variants incl. 6 s slow pans;
+scrub-drag coverage exists from the earlier Android smoke) — hence the
+undo-tap-heavy R2 fallback; (2) Settings switch rows mostly don't toggle via
+XCTest taps (Developer mode toggled once; Auto Up never flipped despite
+row-center/thumb-coordinate taps, visually confirmed unchanged), so no live
+`autoUp` toggle entries could be produced mid-game — value-flip logging remains
+unit-covered (`klondike.autoUpSetting.test.ts`). Auto Up stayed ON the whole
+run; a natural auto-run was not reachable in a smoke-length random deal
+(requires an all-face-up tableau), so R2a's coalescing-near-auto-ready path
+rests on its failing-first unit test plus the depth-exact guard evidence above.

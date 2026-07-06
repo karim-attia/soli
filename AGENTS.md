@@ -76,6 +76,8 @@ Fill in the following sections:
 - ## Identified issues
   - and status of these issues
 - ## Testing
+- ## Follow-ups
+  - Quick description, pros and cons, reasoning with trade-offs and a recommendation
 
 # Implementation
 

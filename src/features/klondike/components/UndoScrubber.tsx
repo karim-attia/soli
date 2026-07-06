@@ -23,6 +23,9 @@ export type UndoScrubberProps = {
   scrubActive: SharedValue<number>
   scrubIndex: SharedValue<number>
   sliderMax: number
+  // Current resting timeline position (history length). Only used for the track's
+  // a11y readout so automated tests can assert where a scrub landed.
+  historyIndex: number
   gesture: GestureType
   canUndo: boolean
   onTrackMetrics: (metrics: { left: number; right: number }) => void
@@ -59,7 +62,15 @@ const GestureWrapper = React.memo(
 
     return (
       <GestureDetector gesture={gesture}>
-        <Animated.View style={[styles.undoButton, buttonStyle]} collapsable={false}>
+        <Animated.View
+          style={[styles.undoButton, buttonStyle]}
+          collapsable={false}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel="Undo"
+          accessibilityState={{ disabled: !canUndo }}
+          testID="undo"
+        >
           <Undo2 size={20} color="#000" />
           <Text style={styles.undoButtonText}>Undo</Text>
         </Animated.View>
@@ -76,6 +87,7 @@ export const UndoScrubber = React.memo(
     scrubActive,
     scrubIndex,
     sliderMax,
+    historyIndex,
     gesture,
     canUndo,
     onTrackMetrics,
@@ -176,7 +188,25 @@ export const UndoScrubber = React.memo(
           {/* Keep the visual scrub overlay on shared values instead of Slider props:
             we learned that React-driven per-step updates add avoidable churn during long scrubs. */}
           <View style={styles.slider}>
-            <View ref={trackRef} onLayout={handleTrackLayout} style={styles.track}>
+            {/* Automation handle (klondike-card-accessibility follow-up): this node's
+              bounds ARE the gesture's scrub bounds (same trackRef the pan math uses),
+              and the label carries the resting position readout. Deterministic scrub
+              drag for device tests: press on the Undo button (anchor = current
+              position), then drag horizontally to
+                x = fingerStartX - ((anchor - target) / anchor) * (fingerStartX - trackLeft)
+              for target < anchor (mirror with the right edge for redo). Keep vertical
+              movement < 100px or the pan fails; needs >= 5px horizontal to start.
+              Trade-off: historyIndex in the label makes this subtree re-render per scrub
+              step (the memoized GestureWrapper hot path stays isolated). If long scrubs
+              ever jank, drop historyIndex from the label — geometry alone still helps. */}
+            <View
+              ref={trackRef}
+              onLayout={handleTrackLayout}
+              style={styles.track}
+              accessible
+              accessibilityLabel={`Undo scrubber, position ${historyIndex} of ${sliderMax}`}
+              testID="undo-scrubber-track"
+            >
               <AnimatedView style={[styles.trackActive, activeTrackStyle]} />
               <AnimatedView style={[styles.thumb, thumbStyle]} />
             </View>
