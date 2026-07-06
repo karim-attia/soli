@@ -1,6 +1,6 @@
 # Agent Device Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-07-06
 
 ## Scope
 
@@ -10,7 +10,23 @@ Last refreshed: 2026-07-03
 
 ## Current guidance
 
-Use this for real-device/simulator automation. Prefer explicit device selection and confirm the installed build before reporting native smoke results.
+Use this for real-device/simulator automation. Soli owns an exact CLI version through
+its dev dependencies and `yarn.lock`; run it as `yarn agent-device ...`. Prefer
+explicit device selection and confirm the installed build before reporting native
+smoke results.
+
+## Repository-controlled CLI
+
+- Package: `agent-device@0.18.3`, pinned exactly in `devDependencies`.
+- Invocation: `yarn agent-device <command>` from the repository root.
+- Upgrade by changing the exact dependency version and committing both
+  `package.json` and `yarn.lock`.
+- Do not use a global installation or `npx` for Soli automation, because either can
+  bypass the version selected by the repository.
+- The daemon and generated runner state remain machine-local under
+  `~/.agent-device`; only the CLI package version is controlled by Git.
+- Yarn already exposes dependency binaries, so a duplicate package script is not
+  needed.
 
 ## Detailed guidance
 
