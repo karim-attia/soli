@@ -102,7 +102,13 @@ export function computeCelebrationFrame({
 
   const safeTotalCards = Math.max(totalCards, 1)
   const totalProgress = progress * CELEBRATION_SPEED_MULTIPLIER
-  const rawProgress = totalProgress % 1
+  // Never wrap this with `% 1`: several modes use non-integer frequency multipliers
+  // (e.g. `theta * 1.5` in modes 2/3/10, `theta * 1.7` / `theta * 2.3` in mode 11) and the
+  // overlay wobble runs at 5.5 * 1.25 / 5.5 * 0.95 — none of which are periodic over one
+  // cycle. Wrapping caused a visible position/rotation jump every ~5.8s in those modes.
+  // Unwrapped progress keeps every path continuous by construction (guarded by
+  // test/unit/animation/celebrationModes.test.ts).
+  const rawProgress = totalProgress
   const launchProgress = Math.min(
     1,
     Math.max(
