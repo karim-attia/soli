@@ -1,13 +1,12 @@
 import '../tamagui-web.css'
 
 import { useEffect } from 'react'
-import { Platform, useColorScheme } from 'react-native'
+import { useColorScheme } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation'
 import { useFonts } from 'expo-font'
 import { SplashScreen, Stack } from 'expo-router'
 import { Provider } from 'components/Provider'
-import { useTheme } from 'tamagui'
 import { isDarkTheme, resolveThemeName } from '../src/theme'
 
 export {
@@ -53,12 +52,14 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme()
-  const theme = useTheme()
   const resolvedThemeName = resolveThemeName(colorScheme)
   const navigationTheme = resolvedThemeName === 'dark' ? DarkTheme : DefaultTheme
   return (
     <ThemeProvider value={navigationTheme}>
       <StatusBar style={isDarkTheme(resolvedThemeName) ? 'light' : 'dark'} />
+      {/* Settings/History live inside the (tabs) drawer only. They used to also be
+          root stack routes with re-export shims in (tabs)/; nothing ever navigated
+          to the root routes, so the duplication was removed (clean-code review #2). */}
       <Stack>
         <Stack.Screen
           name="(tabs)"
@@ -66,28 +67,6 @@ function RootLayoutNav() {
             headerShown: false,
           }}
         />
-
-        <Stack.Screen
-          name="settings"
-          options={{
-            title: 'Settings',
-            contentStyle: {
-              backgroundColor: theme.background?.val,
-            },
-          }}
-        />
-
-        <Stack.Protected guard={Platform.OS !== 'web'}>
-          <Stack.Screen
-            name="history"
-            options={{
-              title: 'History',
-              contentStyle: {
-                backgroundColor: theme.background?.val,
-              },
-            }}
-          />
-        </Stack.Protected>
       </Stack>
     </ThemeProvider>
   )

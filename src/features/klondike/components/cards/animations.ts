@@ -17,18 +17,20 @@ import {
 } from '../../constants'
 import type { CardMetrics } from '../../types'
 
+// Note: an `onCardArrived` callback used to be threaded through here (via
+// TopRow.onFoundationArrival); it was removed in the clean-code review because
+// win-settle detection moved to AbsoluteCardLayer.onCardSettled and the callback
+// was always undefined.
 export type UseFoundationGlowAnimationParams = {
   cards: Card[]
   cardMetrics: CardMetrics
   celebrationActive: boolean
-  onCardArrived?: (cardId: string | null | undefined) => void
 }
 
 export const useFoundationGlowAnimation = ({
   cards,
   cardMetrics,
   celebrationActive,
-  onCardArrived,
 }: UseFoundationGlowAnimationParams) => {
   const { foundationGlow: foundationGlowEnabled } = useAnimationToggles()
   const glowOpacity = useSharedValue(0)
@@ -45,15 +47,11 @@ export const useFoundationGlowAnimation = ({
     const previousCount = previousCountRef.current
     previousCountRef.current = cards.length
     const removedCard = cards.length < previousCount
-    const previousId = lastGlowCardRef.current
     const topCard = cards[cards.length - 1] ?? null
     const currentId = topCard?.id ?? null
 
     if (!foundationGlowEnabled) {
       glowOpacity.value = 0
-      if (!removedCard && currentId && currentId !== previousId) {
-        onCardArrived?.(currentId)
-      }
       lastGlowCardRef.current = currentId
       return
     }
@@ -83,7 +81,6 @@ export const useFoundationGlowAnimation = ({
     }
 
     lastGlowCardRef.current = currentId
-    onCardArrived?.(currentId)
     cancelAnimation(glowOpacity)
     glowOpacity.value = 0
     // Keep the proven shared-value sequence: the four foundation pulses are tiny, and the
@@ -92,7 +89,7 @@ export const useFoundationGlowAnimation = ({
       withTiming(FOUNDATION_GLOW_MAX_OPACITY, FOUNDATION_GLOW_IN_TIMING),
       withTiming(0, FOUNDATION_GLOW_OUT_TIMING)
     )
-  }, [cards, celebrationActive, foundationGlowEnabled, glowOpacity, onCardArrived])
+  }, [cards, celebrationActive, foundationGlowEnabled, glowOpacity])
 
   useEffect(() => {
     return () => {

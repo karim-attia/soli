@@ -3,7 +3,6 @@ import {
   Alert,
   LayoutChangeEvent,
   LayoutRectangle,
-  Linking,
   useColorScheme,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -38,11 +37,7 @@ import { useKlondikeHistoryEntry } from './useKlondikeHistoryEntry'
 import { useSolvableDealSelector } from './useSolvableDealSelector'
 import { useCelebrationController } from './useCelebrationController'
 import { useUndoScrubber } from './useUndoScrubber'
-import {
-  useDemoGameLauncher,
-  DEMO_AUTO_STEP_INTERVAL_MS,
-  type LaunchDemoGameOptions,
-} from './useDemoGameLauncher'
+import { useDemoGameLauncher, type LaunchDemoGameOptions } from './useDemoGameLauncher'
 import { useAutoQueueRunner } from './useAutoQueueRunner'
 import type { KlondikeGameViewProps } from '../components/KlondikeGameView'
 import { buildStatisticsRows, type StatisticsRow } from '../components/StatisticsHud'
@@ -69,21 +64,6 @@ const WIGGLE_RESET_BUFFER_MS = 40
 const INVALID_WIGGLE_RESET_DELAY_MS =
   WIGGLE_SEGMENT_DURATION_MS * WIGGLE_SEQUENCE_SEGMENT_COUNT + WIGGLE_RESET_BUFFER_MS
 const MAX_BUFFERED_WASTE_TAPS = 1
-
-const parseOptionalBooleanParam = (value: string | null): boolean | null => {
-  if (value === null) {
-    return null
-  }
-
-  const normalized = value.trim().toLowerCase()
-  if (['1', 'true', 'yes', 'on', 'enabled'].includes(normalized)) {
-    return true
-  }
-  if (['0', 'false', 'no', 'off', 'disabled'].includes(normalized)) {
-    return false
-  }
-  return null
-}
 
 const createEmptyInvalidWiggle = (): InvalidWiggleConfig => ({
   ...EMPTY_INVALID_WIGGLE,
@@ -240,7 +220,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const topRowLayoutRef = useRef<LayoutRectangle | null>(null)
   const foundationLayoutsRef = useRef<Partial<Record<Suit, LayoutRectangle>>>({})
   const boardLockedRef = useRef(false)
-  const lastDemoLinkRef = useRef<string | null>(null)
   const demoPlaybackActiveRef = useRef(false)
   const bufferedWasteTapCountRef = useRef(0)
   const lastWasteAutoMoveRef = useRef<WasteAutoMoveMarker | null>(null)
@@ -254,17 +233,30 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     setBoardLocked(locked)
   }, [])
 
-  // Stores the top-row layout for later celebration positioning.
-  const handleTopRowLayout = useCallback((layout: LayoutRectangle) => {
-    topRowLayoutRef.current = layout
-    setAbsoluteCardLayerLayouts((previous) => {
-      if (areLayoutsEquivalent(previous.topRow, layout)) {
-        return previous
-      }
+  // Shared "merge one measured slot into absoluteCardLayerLayouts" step for all
+  // layout handlers below (clean-code review #10: was six copies of the same
+  // compare-then-merge pattern).
+  const mergeCardLayerLayout = useCallback(
+    (key: 'topRow' | 'stock' | 'waste' | 'tableauRow', layout: LayoutRectangle) => {
+      setAbsoluteCardLayerLayouts((previous) => {
+        if (areLayoutsEquivalent(previous[key], layout)) {
+          return previous
+        }
 
-      return { ...previous, topRow: layout }
-    })
-  }, [])
+        return { ...previous, [key]: layout }
+      })
+    },
+    []
+  )
+
+  // Stores the top-row layout for later celebration positioning.
+  const handleTopRowLayout = useCallback(
+    (layout: LayoutRectangle) => {
+      topRowLayoutRef.current = layout
+      mergeCardLayerLayout('topRow', layout)
+    },
+    [mergeCardLayerLayout]
+  )
 
   // Caches foundation layouts so celebration trajectories know their origins.
   const handleFoundationLayout = useCallback((suit: Suit, layout: LayoutRectangle) => {
@@ -284,35 +276,20 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     })
   }, [])
 
-  const handleStockLayout = useCallback((layout: LayoutRectangle) => {
-    setAbsoluteCardLayerLayouts((previous) => {
-      if (areLayoutsEquivalent(previous.stock, layout)) {
-        return previous
-      }
+  const handleStockLayout = useCallback(
+    (layout: LayoutRectangle) => mergeCardLayerLayout('stock', layout),
+    [mergeCardLayerLayout]
+  )
 
-      return { ...previous, stock: layout }
-    })
-  }, [])
+  const handleWasteLayout = useCallback(
+    (layout: LayoutRectangle) => mergeCardLayerLayout('waste', layout),
+    [mergeCardLayerLayout]
+  )
 
-  const handleWasteLayout = useCallback((layout: LayoutRectangle) => {
-    setAbsoluteCardLayerLayouts((previous) => {
-      if (areLayoutsEquivalent(previous.waste, layout)) {
-        return previous
-      }
-
-      return { ...previous, waste: layout }
-    })
-  }, [])
-
-  const handleTableauRowLayout = useCallback((layout: LayoutRectangle) => {
-    setAbsoluteCardLayerLayouts((previous) => {
-      if (areLayoutsEquivalent(previous.tableauRow, layout)) {
-        return previous
-      }
-
-      return { ...previous, tableauRow: layout }
-    })
-  }, [])
+  const handleTableauRowLayout = useCallback(
+    (layout: LayoutRectangle) => mergeCardLayerLayout('tableauRow', layout),
+    [mergeCardLayerLayout]
+  )
 
   const handleTableauColumnLayout = useCallback(
     (columnIndex: number, layout: LayoutRectangle) => {
@@ -528,109 +505,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
 
   // Sets the stock button label, fading when the stock is empty.
   const drawLabel = state.stock.length ? 'Draw' : ''
-
-  // Parses inbound deep links to trigger the developer demo deal workflow.
-  const processDemoLink = useCallback(
-    (incomingUrl: string | null | undefined) => {
-      if (!incomingUrl) {
-        return
-      }
-      if (lastDemoLinkRef.current === incomingUrl) {
-        return
-      }
-
-      let parsed: URL
-      try {
-        parsed = new URL(incomingUrl)
-      } catch {
-        return
-      }
-
-      const host = parsed.host.toLowerCase()
-      const pathname = parsed.pathname.toLowerCase()
-      const demoParam =
-        parsed.searchParams.get('demo') ?? parsed.searchParams.get('demoGame')
-      const normalizedDemoParam = demoParam?.toLowerCase()
-      const demoRequestsPlaylist =
-        normalizedDemoParam === 'playlist' ||
-        normalizedDemoParam === 'autosolve-playlist' ||
-        normalizedDemoParam === 'autosolveplaylist'
-      const demoRequestsAutoSolve =
-        demoRequestsPlaylist ||
-        normalizedDemoParam === 'autosolve' ||
-        normalizedDemoParam === 'solve'
-      const demoRequestsAutoReveal =
-        demoRequestsAutoSolve ||
-        normalizedDemoParam === 'autoreveal' ||
-        normalizedDemoParam === 'auto'
-      const recordHistoryParam =
-        parsed.searchParams.get('recordHistory') ?? parsed.searchParams.get('history')
-      const nextRecordHistoryEnabled = parseOptionalBooleanParam(recordHistoryParam)
-
-      if (
-        host === 'demo-game' ||
-        pathname === '/demo-game' ||
-        pathname === '/demo' ||
-        demoParam === '1' ||
-        normalizedDemoParam === 'true' ||
-        demoRequestsAutoReveal
-      ) {
-        lastDemoLinkRef.current = incomingUrl
-        const autoParam =
-          parsed.searchParams.get('auto') ?? parsed.searchParams.get('autoreveal')
-        const solveParam =
-          parsed.searchParams.get('solve') ?? parsed.searchParams.get('autosolve')
-        const gameLimitParam =
-          parsed.searchParams.get('games') ??
-          parsed.searchParams.get('gameLimit') ??
-          parsed.searchParams.get('count')
-        const parsedGameLimit = Number(gameLimitParam ?? '')
-        const gameLimit =
-          Number.isInteger(parsedGameLimit) && parsedGameLimit > 0
-            ? parsedGameLimit
-            : undefined
-        const autoSolve =
-          demoRequestsAutoSolve ||
-          solveParam === '1' ||
-          solveParam?.toLowerCase() === 'true'
-        const autoReveal =
-          demoRequestsAutoReveal ||
-          autoSolve ||
-          autoParam === '1' ||
-          autoParam?.toLowerCase() === 'true'
-
-        if (!settingsState.developerMode) {
-          setDeveloperMode(true)
-        }
-
-        setTimeout(() => {
-          handleLaunchDemoGame({
-            autoReveal,
-            autoSolve,
-            force: true,
-            gameLimit,
-            recordHistory: nextRecordHistoryEnabled ?? undefined,
-          })
-        }, DEMO_AUTO_STEP_INTERVAL_MS)
-      }
-    },
-    [handleLaunchDemoGame, setDeveloperMode, settingsState.developerMode]
-  )
-
-  // Subscribes to demo deep links on mount and while the app is active.
-  useEffect(() => {
-    void Linking.getInitialURL().then((url) => {
-      processDemoLink(url)
-    })
-
-    const subscription = Linking.addEventListener('url', ({ url }) => {
-      processDemoLink(url)
-    })
-
-    return () => {
-      subscription.remove()
-    }
-  }, [processDemoLink])
 
   // Captures board dimensions for card metrics and celebration sizing.
   const handleBoardLayout = useCallback((event: LayoutChangeEvent) => {
@@ -883,7 +757,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     handleUndo,
   })
 
-  // Requirement PBI-13: persist state changes after hydration.
+  // Developer-mode log marker when the auto-complete queue engages.
   useEffect(() => {
     if (state.autoCompleteRuns > autoCompleteRunsRef.current) {
       devLog('log', '[Game] Auto-complete engaged', {

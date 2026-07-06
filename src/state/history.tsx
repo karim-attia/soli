@@ -118,7 +118,6 @@ type HistoryContextValue = {
   totalCount: number
   solvedCount: number
   incompleteCount: number
-  activeCount: number
   solvableStats: ReadonlyMap<string, SolvableHistoryStat>
   hasMore: boolean
   loadingMore: boolean
@@ -126,7 +125,6 @@ type HistoryContextValue = {
   recordResult: (input: RecordGameResultInput) => string // Task 10-6: returns entry ID
   updateEntry: (id: string, updates: UpdateEntryInput) => void // Task 10-6: update existing entry
   clearHistory: () => void
-  getEntryById: (id: string) => HistoryEntry | undefined
   // R3: repository-backed lookup of the single active row, for callers whose
   // in-memory page may not contain it (see useKlondikeHistoryEntry fallback).
   getActiveEntry: () => Promise<HistoryEntry | null>
@@ -328,11 +326,6 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
     queueRepositoryTask(clearHistoryEntries)
   }, [queueRepositoryTask])
 
-  const getEntryById = useCallback(
-    (id: string) => entries.find((entry) => entry.id === id),
-    [entries]
-  )
-
   const getActiveEntry = useCallback(async (): Promise<HistoryEntry | null> => {
     if (!isHistorySupported) {
       return null
@@ -383,7 +376,6 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
       totalCount: summary.totalCount,
       solvedCount: summary.solvedCount,
       incompleteCount: summary.incompleteCount,
-      activeCount: summary.activeCount,
       solvableStats,
       hasMore,
       loadingMore,
@@ -391,14 +383,12 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
       recordResult,
       updateEntry,
       clearHistory,
-      getEntryById,
       getActiveEntry,
     }),
     [
       clearHistory,
       entries,
       getActiveEntry,
-      getEntryById,
       hasMore,
       hydrated,
       loadMore,

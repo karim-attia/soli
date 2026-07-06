@@ -70,7 +70,6 @@
           }
         }
       ],
-      "expo-web-browser",
       [
         "expo-splash-screen",
         {
@@ -81,7 +80,8 @@
         }
       ],
       "expo-status-bar",
-      "expo-sqlite"
+      "expo-sqlite",
+      "./plugins/withBuildSpeedGradleProperties"
     ],
     "experiments": {
       "typedRoutes": true

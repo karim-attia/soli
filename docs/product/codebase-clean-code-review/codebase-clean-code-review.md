@@ -172,8 +172,41 @@ Legend: Impact = effect on mental-model simplicity / dead-weight removal. Effort
 | 19 | Prune unused variants in `app/feature-graphic.tsx` (1005 lines, dev-only) or move out of the route tree | app/ | Dead weight | Low | M |
 | 20 | Fix misplaced "PBI-13" comment on the auto-complete log effect; remove stale eslint-disable in `useUndoScrubber` | hooks | Polish | Low | S |
 
+## Implementation status (2026-07-06, second session)
+
+User decisions: #1/2/5–13/15–18/20 approved; #3 rejected ("hello" is intentional, see comment in `hello.tsx`); #4 was already done by the user's accessibility commit; #7 and #19 were already done by the user's A4/H1/H3 batch (H3 removed `saveGameState`; H1 moved feature-graphic to `src/dev/` behind `__DEV__`); #14 pending decision (see note below); #17 resolved as "no barrel".
+
+Between the review and implementation, the user landed the move-log-persistence feature and the A4/H1/H3 batch, so every item was re-verified against the new code before applying.
+
+- [x] #1 `app/modal.tsx` — already deleted by user (H1). Verified gone.
+- [x] #2 Implemented: `app/settings.tsx`/`app/history.tsx` implementations moved into `app/(tabs)/`, root re-export shims and root `Stack.Screen` entries deleted. Root stack now only contains `(tabs)` (comment left in `_layout.tsx`).
+- [x] #3 Rejected by user — `hello.tsx` now carries a "don't rename" comment.
+- [x] #4 Already done by user (toast stack fully removed, Provider comment documents it; "[Toast suppressed]" logs reworded). Verified: zero `@tamagui/toast` references, package not in package.json.
+- [x] #5 Implemented: deleted `hasUndoHistory`, `CARD_REFERENCE_METRICS`/`CARD_REFERENCE_RADIUS`, `STAT_VERTICAL_MARGIN`, `WIN_CELEBRATION_GLOW_TAIL_DELAY_MS`, `COLOR_TEXT_STRONG`, `getDeveloperLoggingEnabled`, `useStatisticsPreferences`, `HistoryRepository` type (comment notes the .web stub must mirror .native manually), 7 unused style keys in `cards/styles.ts`, unused `+not-found` styles.
+- [x] #6 Implemented: `shareSolvedGames` slice fully removed (state field, default, setter, context entry, merge handling). Old persisted payloads that still carry the flag are ignored naturally by the field-by-field merge — no special handling, no comment (per user). Origin: added in early release-polish commit `3997a2a` for a never-shipped sharing feature; no UI ever read it.
+- [x] #7 Already done by user (H3): `saveGameState` removed, `saveGameStateWithHistory(state, null)` is the single save path.
+- [x] #8 Implemented: `onFoundationArrival`/`onCardArrived` chain removed from `TopRow`, `FoundationPile`, and `useFoundationGlowAnimation` (comment notes why).
+- [x] #9 Implemented: `getEntryById` and `activeCount` removed from `HistoryContextValue`.
+- [x] #10 Implemented: `mergeCardLayerLayout(key, layout)` helper replaces four copies of the compare-then-merge pattern; foundation/column handlers keep their special shapes.
+- [x] #11 Implemented: `processDemoLink` + `Linking` subscription + `parseOptionalBooleanParam` moved verbatim into `useDemoGameLauncher` (no behavior change, aliases kept). `useKlondikeGame` shrank by ~120 lines.
+- [x] #12 Implemented: `computeTableauStackOffsets` and `computeWasteFanGeometry` in `cards/utils.ts`; `TableauSection` and `AbsoluteCardLayer` (both call sites) now share them.
+- [x] #13 Implemented: `klondike.ts` no longer redeclares `SUITS`/`RANKS`; `Suit`/`Rank` alias `DealSuit`/`DealRank` from `dealIdentity.ts` (single domain definition). `DemoDealCard` alias removed; `DemoReplayCard = Readonly<DealCard>`.
+- [x] #14 Decision: **keep the web surface** — the user renders the feature-graphic screen in a browser (`yarn web`) for store assets, which is much easier than a simulator. Cost is dev-side only (3 packages in node_modules, the `.web.ts` history stub to keep in sync, platform guards); zero native bundle/runtime impact since Metro resolves per platform and web-only modules never enter iOS/Android bundles.
+- [x] #15 Implemented: `expo-web-browser` removed from package.json and app.json plugins (zero imports; Tamagui `Anchor` uses RN `Linking` on native). Verify external links (About screen) on the next device smoke test.
+- [x] #16 Implemented: `scripts/compare-100 copy.md` deleted; `.test-artifacts/` added to `.gitignore`.
+- [x] #17 Implemented (user prefers no barrel): `cards/index.ts` deleted, `CelebrationTouchBlocker` imported directly.
+- [x] #18 Implemented: `setCelebrationState` in the launcher typed as `(state: null) => void` (only `any` in app code removed); `handleCelebrationComplete` dropped from celebration hook return; `useKlondikeTimer` returns void.
+- [x] #19 Already done by user (H1): feature-graphic lives in `src/dev/FeatureGraphicScreen.tsx` behind a `__DEV__` require, stripped from release bundles.
+- [x] #20 Implemented: misplaced "PBI-13" comment replaced; stale eslint-disable removed from `useUndoScrubber`.
+
+Verification: `yarn typecheck` clean, `yarn lint` clean, `yarn jest` 171/171 passed.
+
 Not recommended (looked at, deliberately leaving alone): splitting `klondike.ts` (coherent domain, pure, well-tested); the ref-heavy hook coordination in `useKlondikeGame` (documented perf rationale); `didGameShapeChange`'s 16 explicit comparisons; the 8 named settings setters; `FeltBackground`'s 120-view pattern (works, replace only if profiling says so).
 
 ## Overall assessment
 
 The codebase is in good shape: the layering (routes → session hook → pure engine → storage) is right, perf-sensitive code is unusually well-commented with decision rationale, and tests target the pure engine. The dirt is concentrated at the edges: starter-template leftovers (`modal`, `hello`, toast stack, `expo-web-browser`), a half-committed web story, and dead exports left behind by the absolute-card-layer and history refactors. Roughly items 1–9 + 15–16 are pure deletions (~zero risk); 10–13 are small refactors; 14 is the one real decision.
+
+## Testing
+
+Android release smoke test (2026-07-06, physical device A065, `yarn release` incl. prebuild — build+install ~40 s, mostly Gradle-cached): **all 10 smoke steps passed, zero crashes/JS errors in logcat.** Verified specifically against this batch: board renders correctly with the shared pile-math helpers (#12 — face-down half-spacing stacks, 3-card right-aligned waste fan); moved drawer routes (#2) — History ("Game History" header + entries) and Settings (all sections, toggle round-trip) both render and work; foundation auto-move still lands correctly with `onFoundationArrival` chain removed (#8 — glow pulse itself is too fast for still screenshots, but no errors and card lands correctly); invalid-move tap leaves state unchanged (wiggle fired, board intact); undo pill reverts moves; About-screen "open source" link opens GitHub in the external browser via RN `Linking` with `expo-web-browser` removed (#15); New Game deals a fresh board. Screenshots in `.test-artifacts/clean-code-smoke-android/` (gitignored).

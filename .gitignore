@@ -62,3 +62,6 @@ modules/**/ios/DerivedData
 *.jks
 .venv
 scripts/android-unlock-pattern.sh
+
+# Agent test-run artifacts (screenshots, build logs)
+.test-artifacts/

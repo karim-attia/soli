@@ -1,11 +1,9 @@
 import { computeDeckChecksum, encodeExactDealId, type DealCard } from './dealIdentity'
 
-type DemoDealCard = DealCard
-
 type DemoDealConfig = {
   tableau: Array<{
-    down: DemoDealCard[]
-    up: DemoDealCard[]
+    down: DealCard[]
+    up: DealCard[]
   }>
 }
 
@@ -90,7 +88,7 @@ export const DEMO_DEAL_CONFIG: DemoDealConfig = {
 
 // Stock order pairs with the tableau above so the demo auto-solve script can
 // reveal one predictable waste card at a time in Draw 1.
-export const DEMO_STOCK_ORDER: DemoDealCard[] = [
+export const DEMO_STOCK_ORDER: DealCard[] = [
   { suit: 'hearts', rank: 9 },
   { suit: 'hearts', rank: 10 },
   { suit: 'hearts', rank: 11 },

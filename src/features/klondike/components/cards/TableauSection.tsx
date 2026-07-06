@@ -14,8 +14,7 @@ import {
 import { getEmptyColumnLabel, getTableauColumnTestID } from './accessibility'
 import { EmptySlot } from './CardVisual'
 import { styles } from './styles'
-
-const FACE_DOWN_STACK_OFFSET_DIVISOR = 2
+import { computeTableauStackOffsets } from './utils'
 
 export type TableauSectionProps = {
   // Perf (A2): narrow state slices instead of the full GameState so React.memo can
@@ -101,16 +100,7 @@ export const TableauColumn = React.memo(
     disableInteractions,
     onColumnLayout,
   }: TableauColumnProps) => {
-    // Task 1-9: Keep face-up spacing (tap targets), but halve the visible spacing for face-down stacks.
-    const faceDownStackOffset = Math.round(
-      cardMetrics.stackOffset / FACE_DOWN_STACK_OFFSET_DIVISOR
-    )
-    let runningOffset = 0
-    const cardOffsets = column.map((card) => {
-      const offset = runningOffset
-      runningOffset += card.faceUp ? cardMetrics.stackOffset : faceDownStackOffset
-      return offset
-    })
+    const cardOffsets = computeTableauStackOffsets(column, cardMetrics.stackOffset)
     const columnHeight = column.length
       ? cardOffsets[cardOffsets.length - 1] + cardMetrics.height
       : cardMetrics.height

@@ -40,7 +40,6 @@ export type StatisticsPreferenceKey = keyof StatisticsPreferences
 export type SettingsState = {
   animations: AnimationPreferences
   drawCount: DrawCount
-  shareSolvedGames: boolean
   solvableGamesOnly: boolean
   autoUpEnabled: boolean
   developerMode: boolean
@@ -52,7 +51,6 @@ type SettingsContextValue = {
   setDrawCount: (drawCount: DrawCount) => void
   setGlobalAnimationsEnabled: (enabled: boolean) => void
   setAnimationPreference: (key: AnimationPreferenceKey, enabled: boolean) => void
-  setShareSolvedGames: (enabled: boolean) => void
   setSolvableGamesOnly: (enabled: boolean) => void
   setAutoUpEnabled: (enabled: boolean) => void
   setDeveloperMode: (enabled: boolean) => void
@@ -72,7 +70,6 @@ const DEFAULT_SETTINGS: SettingsState = {
     celebrations: true,
   },
   drawCount: DEFAULT_DRAW_COUNT,
-  shareSolvedGames: false,
   solvableGamesOnly: true,
   autoUpEnabled: true,
   developerMode: false,
@@ -222,14 +219,6 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     []
   )
 
-  const setShareSolvedGames = useCallback((enabled: boolean) => {
-    setState((previous) =>
-      previous.shareSolvedGames === enabled
-        ? previous
-        : { ...previous, shareSolvedGames: enabled }
-    )
-  }, [])
-
   const setSolvableGamesOnly = useCallback((enabled: boolean) => {
     setState((previous) =>
       previous.solvableGamesOnly === enabled
@@ -246,8 +235,9 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     )
   }, [])
 
+  // Developer logging is synced by the state.developerMode effect below (which also
+  // covers the hydrated-from-storage value), so no direct call here.
   const setDeveloperMode = useCallback((enabled: boolean) => {
-    setDeveloperLoggingEnabled(enabled)
     setState((previous) =>
       previous.developerMode === enabled
         ? previous
@@ -284,7 +274,6 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setDrawCount,
       setGlobalAnimationsEnabled,
       setAnimationPreference,
-      setShareSolvedGames,
       setSolvableGamesOnly,
       setAutoUpEnabled,
       setDeveloperMode,
@@ -295,7 +284,6 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setGlobalAnimationsEnabled,
       setStatisticsPreference,
       setAutoUpEnabled,
-      setShareSolvedGames,
       setSolvableGamesOnly,
       setDrawCount,
       setDeveloperMode,
@@ -336,14 +324,6 @@ export function useAnimationToggles(): AnimationPreferences {
   }, [animations])
 }
 
-export function useStatisticsPreferences(): StatisticsPreferences {
-  const {
-    state: { statistics },
-  } = useSettings()
-
-  return statistics
-}
-
 const mergeSettings = (
   current: SettingsState,
   incoming?: Partial<SettingsState>
@@ -372,7 +352,6 @@ const mergeSettings = (
       celebrations: getBoolean(animations.celebrations, current.animations.celebrations),
     },
     drawCount: normalizeDrawCount(incoming.drawCount),
-    shareSolvedGames: getBoolean(incoming.shareSolvedGames, current.shareSolvedGames),
     solvableGamesOnly: getBoolean(incoming.solvableGamesOnly, current.solvableGamesOnly),
     autoUpEnabled: getBoolean(incoming.autoUpEnabled, current.autoUpEnabled),
     developerMode: getBoolean(incoming.developerMode, current.developerMode),

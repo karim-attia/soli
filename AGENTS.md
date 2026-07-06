@@ -114,8 +114,8 @@ However, also test everything you do in a real environment (when it makes sense!
 Native: Use agent-device skill
 Web: Use Playwright with skill (but no need to test on web since the app is for native only, but it's an option.)
 
-iOS: Always run a clean build on the connected simulator. Make sure the build is finished before checking on the device.
 Android: Run "yarn release" and wait until the build is complete. Use scripts/android-unlock-pattern.sh script to unlock physical Android device if it's locked.
+iOS: Always run a clean build on the connected simulator. Make sure the build is finished before checking on the device.
 
 Never run two builds at the same time as otherwise the computer nearly crashes when running builds in parallel, e.g. iOS and Android in parallel. Also check if there are other processes running a build and kill them first. If there is already a build running, this is no excuse to not run the build and test on an outdated build. Kill the other build first, then build, then test.
 

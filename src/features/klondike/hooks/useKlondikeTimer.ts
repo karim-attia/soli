@@ -132,6 +132,4 @@ export const useKlondikeTimer = ({
       subscription.remove()
     }
   }, [])
-
-  return { pauseTimer, resumeTimerIfNeeded }
 }

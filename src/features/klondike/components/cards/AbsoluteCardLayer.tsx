@@ -14,11 +14,10 @@ import { useAnimationToggles } from '../../../../state/settings'
 import {
   CARD_ANIMATION_DURATION_MS,
   CARD_FLIP_HALF_DURATION_MS,
-  WASTE_FAN_MAX_OFFSET,
-  WASTE_FAN_OVERLAP_RATIO,
   WIGGLE_OFFSET_PX,
   WIGGLE_SEGMENT_DURATION_MS,
 } from '../../constants'
+import { computeTableauStackOffsets, computeWasteFanGeometry } from './utils'
 import type { CardMetrics, InvalidWiggleConfig } from '../../types'
 import {
   getCardTestID,
@@ -34,7 +33,6 @@ import {
 import { CardBack, CardVisual } from './CardVisual'
 import { styles as cardStyles } from './styles'
 
-const FACE_DOWN_STACK_OFFSET_DIVISOR = 2
 // Absolute-layer cards no longer sit inside pile-local animated wrappers, so use
 // a slightly stronger invalid feedback offset to keep the motion readable on device.
 const ABSOLUTE_LAYER_WIGGLE_OFFSET_PX = Math.max(8, WIGGLE_OFFSET_PX * 1.6)
@@ -155,15 +153,10 @@ const resolveWasteTapTarget = ({
     return null
   }
 
-  const overlap = Math.min(
-    cardMetrics.width * WASTE_FAN_OVERLAP_RATIO,
-    WASTE_FAN_MAX_OFFSET
-  )
-  const fanWidth = cardMetrics.width + overlap * (visibleWaste.length - 1)
-  const baseX = wastePosition.x + cardMetrics.width - fanWidth
+  const fan = computeWasteFanGeometry(visibleWaste.length, cardMetrics.width)
 
   return {
-    x: baseX + (visibleWaste.length - 1) * overlap,
+    x: wastePosition.x + fan.baseXOffset + (visibleWaste.length - 1) * fan.overlap,
     y: wastePosition.y,
     // The tap zone owns the waste's a11y node (the fan visuals stay unlabeled to
     // avoid duplicate focus targets), so it carries the top card's name.
@@ -219,17 +212,13 @@ const buildCardLayerItems = ({
   const visibleWaste = waste.slice(-3)
   const wastePosition = resolveTopRowPosition(layouts.topRow, layouts.waste)
   if (visibleWaste.length && wastePosition) {
-    const overlap = Math.min(
-      cardMetrics.width * WASTE_FAN_OVERLAP_RATIO,
-      WASTE_FAN_MAX_OFFSET
-    )
-    const fanWidth = cardMetrics.width + overlap * (visibleWaste.length - 1)
-    const baseX = wastePosition.x + cardMetrics.width - fanWidth
+    const fan = computeWasteFanGeometry(visibleWaste.length, cardMetrics.width)
+    const baseX = wastePosition.x + fan.baseXOffset
     visibleWaste.forEach((card, index) => {
       const isTop = index === visibleWaste.length - 1
       items.push({
         card,
-        x: baseX + index * overlap,
+        x: baseX + index * fan.overlap,
         y: wastePosition.y,
         zIndex: 300 + index,
         // Waste taps are owned by one stable slot target below. Keeping the
@@ -279,9 +268,6 @@ const buildCardLayerItems = ({
     })
   })
 
-  const faceDownStackOffset = Math.round(
-    cardMetrics.stackOffset / FACE_DOWN_STACK_OFFSET_DIVISOR
-  )
   tableau.forEach((column, columnIndex) => {
     const columnPosition = resolveTableauPosition(
       layouts.tableauRow,
@@ -291,14 +277,12 @@ const buildCardLayerItems = ({
       return
     }
 
-    let runningOffset = 0
+    const cardOffsets = computeTableauStackOffsets(column, cardMetrics.stackOffset)
     column.forEach((card, cardIndex) => {
-      const offset = runningOffset
-      runningOffset += card.faceUp ? cardMetrics.stackOffset : faceDownStackOffset
       items.push({
         card,
         x: columnPosition.x,
-        y: columnPosition.y + offset,
+        y: columnPosition.y + cardOffsets[cardIndex],
         zIndex: 1000 + columnIndex * 100 + cardIndex,
         press:
           card.faceUp && !interactionsLocked

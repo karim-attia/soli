@@ -27,7 +27,6 @@ export type FoundationPileProps = {
   isDroppable: boolean
   isSelected: boolean
   onPress: () => void
-  onCardArrived?: (cardId: string | null | undefined) => void
   disableInteractions?: boolean
   celebrationActive?: boolean
 }
@@ -39,7 +38,6 @@ export const FoundationPile = ({
   isDroppable,
   isSelected,
   onPress,
-  onCardArrived,
   disableInteractions = false,
   celebrationActive = false,
 }: FoundationPileProps) => {
@@ -47,7 +45,6 @@ export const FoundationPile = ({
     cards,
     cardMetrics,
     celebrationActive,
-    onCardArrived,
   })
 
   const hasCards = cards.length > 0

@@ -1,5 +1,4 @@
 import type { MoveLogEntry } from '../solitaire/klondike'
-import type { HistoryEntry } from '../state/history'
 
 export const HISTORY_PAGE_SIZE = 50
 
@@ -23,24 +22,7 @@ export type SolvableDealHistoryStats = {
   solves: number
 }
 
-export type HistoryRepository = {
-  readonly isHistorySupported: boolean
-  initializeHistoryRepository: () => Promise<void>
-  getHistoryPage: (limit: number, offset: number) => Promise<HistoryEntry[]>
-  getHistoryEntryById: (id: string) => Promise<HistoryEntry | null>
-  getActiveHistoryEntry: () => Promise<HistoryEntry | null>
-  getHistorySummary: () => Promise<HistorySummary>
-  getSolvableDealHistoryStats: () => Promise<SolvableDealHistoryStats[]>
-  insertHistoryEntry: (
-    entry: HistoryEntry,
-    moveLog?: HistoryEntryMoveLog | null
-  ) => Promise<void>
-  updateHistoryEntry: (
-    entry: HistoryEntry,
-    moveLog?: HistoryEntryMoveLog | null
-  ) => Promise<void>
-  getHistoryEntryMoveLog: (
-    id: string
-  ) => Promise<{ moveLogVersion: number; moveLog: MoveLogEntry[] } | null>
-  clearHistoryEntries: () => Promise<void>
-}
+// Note: a `HistoryRepository` interface used to live here as an (unenforced)
+// contract for the .native/.web split; it was never referenced, so it was removed
+// in the clean-code review. The web stub must still mirror the native module's
+// exports manually — typecheck catches missing exports at the import sites.

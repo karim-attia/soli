@@ -570,7 +570,6 @@ export const useCelebrationController = ({
     celebrationBindings,
     celebrationLabel,
     handleCelebrationAbort,
-    handleCelebrationComplete,
     handleWinningCardFlightSettled,
     clearCelebrationDialogTimer,
   }

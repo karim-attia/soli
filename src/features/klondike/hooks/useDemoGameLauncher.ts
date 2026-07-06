@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
+import type { Dispatch, MutableRefObject } from 'react'
+import { Linking } from 'react-native'
 import type { LayoutRectangle } from 'react-native'
 
 import {
@@ -30,7 +31,9 @@ type UseDemoGameLauncherOptions = {
   boardLockedRef: MutableRefObject<boolean>
   clearCelebrationDialogTimer: () => void
   recordCurrentGameResult: (options?: { solved?: boolean }) => void
-  setCelebrationState: Dispatch<SetStateAction<any>>
+  // The launcher only ever clears the celebration; narrow signature keeps this
+  // file free of the celebration hook's types.
+  setCelebrationState: (state: null) => void
   foundationLayoutsRef: MutableRefObject<Partial<Record<Suit, LayoutRectangle>>>
   topRowLayoutRef: MutableRefObject<LayoutRectangle | null>
   winCelebrationsRef: MutableRefObject<number>
@@ -63,6 +66,21 @@ export const DEMO_AUTO_STEP_INTERVAL_MS = 300
 const DEMO_PLAYLIST_POLL_INTERVAL_MS = 30
 const DEMO_PLAYLIST_ACTION_TIMEOUT_MS = 2500
 const DEMO_PLAYLIST_BETWEEN_GAMES_MS = 600
+
+const parseOptionalBooleanParam = (value: string | null): boolean | null => {
+  if (value === null) {
+    return null
+  }
+
+  const normalized = value.trim().toLowerCase()
+  if (['1', 'true', 'yes', 'on', 'enabled'].includes(normalized)) {
+    return true
+  }
+  if (['0', 'false', 'no', 'off', 'disabled'].includes(normalized)) {
+    return false
+  }
+  return null
+}
 
 export const useDemoGameLauncher = ({
   stateRef,
@@ -516,6 +534,113 @@ export const useDemoGameLauncher = ({
       setDeveloperMode,
     ]
   )
+
+  // --- Demo deep links (moved here from useKlondikeGame, clean-code review #11:
+  // all demo entry points live in this hook). Parses soli://demo-game style URLs
+  // and launches the matching demo mode.
+  const lastDemoLinkRef = useRef<string | null>(null)
+
+  const processDemoLink = useCallback(
+    (incomingUrl: string | null | undefined) => {
+      if (!incomingUrl) {
+        return
+      }
+      if (lastDemoLinkRef.current === incomingUrl) {
+        return
+      }
+
+      let parsed: URL
+      try {
+        parsed = new URL(incomingUrl)
+      } catch {
+        return
+      }
+
+      const host = parsed.host.toLowerCase()
+      const pathname = parsed.pathname.toLowerCase()
+      const demoParam =
+        parsed.searchParams.get('demo') ?? parsed.searchParams.get('demoGame')
+      const normalizedDemoParam = demoParam?.toLowerCase()
+      const demoRequestsPlaylist =
+        normalizedDemoParam === 'playlist' ||
+        normalizedDemoParam === 'autosolve-playlist' ||
+        normalizedDemoParam === 'autosolveplaylist'
+      const demoRequestsAutoSolve =
+        demoRequestsPlaylist ||
+        normalizedDemoParam === 'autosolve' ||
+        normalizedDemoParam === 'solve'
+      const demoRequestsAutoReveal =
+        demoRequestsAutoSolve ||
+        normalizedDemoParam === 'autoreveal' ||
+        normalizedDemoParam === 'auto'
+      const recordHistoryParam =
+        parsed.searchParams.get('recordHistory') ?? parsed.searchParams.get('history')
+      const nextRecordHistoryEnabled = parseOptionalBooleanParam(recordHistoryParam)
+
+      if (
+        host === 'demo-game' ||
+        pathname === '/demo-game' ||
+        pathname === '/demo' ||
+        demoParam === '1' ||
+        normalizedDemoParam === 'true' ||
+        demoRequestsAutoReveal
+      ) {
+        lastDemoLinkRef.current = incomingUrl
+        const autoParam =
+          parsed.searchParams.get('auto') ?? parsed.searchParams.get('autoreveal')
+        const solveParam =
+          parsed.searchParams.get('solve') ?? parsed.searchParams.get('autosolve')
+        const gameLimitParam =
+          parsed.searchParams.get('games') ??
+          parsed.searchParams.get('gameLimit') ??
+          parsed.searchParams.get('count')
+        const parsedGameLimit = Number(gameLimitParam ?? '')
+        const gameLimit =
+          Number.isInteger(parsedGameLimit) && parsedGameLimit > 0
+            ? parsedGameLimit
+            : undefined
+        const autoSolve =
+          demoRequestsAutoSolve ||
+          solveParam === '1' ||
+          solveParam?.toLowerCase() === 'true'
+        const autoReveal =
+          demoRequestsAutoReveal ||
+          autoSolve ||
+          autoParam === '1' ||
+          autoParam?.toLowerCase() === 'true'
+
+        if (!developerModeEnabled) {
+          setDeveloperMode(true)
+        }
+
+        setTimeout(() => {
+          handleLaunchDemoGame({
+            autoReveal,
+            autoSolve,
+            force: true,
+            gameLimit,
+            recordHistory: nextRecordHistoryEnabled ?? undefined,
+          })
+        }, DEMO_AUTO_STEP_INTERVAL_MS)
+      }
+    },
+    [developerModeEnabled, handleLaunchDemoGame, setDeveloperMode]
+  )
+
+  // Subscribes to demo deep links on mount and while the app is active.
+  useEffect(() => {
+    void Linking.getInitialURL().then((url) => {
+      processDemoLink(url)
+    })
+
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      processDemoLink(url)
+    })
+
+    return () => {
+      subscription.remove()
+    }
+  }, [processDemoLink])
 
   return { handleLaunchDemoGame }
 }

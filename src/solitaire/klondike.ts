@@ -6,6 +6,8 @@ import {
   decodeExactDealId,
   hasDrawCountInMask,
   type DealCard,
+  type DealRank,
+  type DealSuit,
 } from './dealIdentity'
 import { DEFAULT_DRAW_COUNT, normalizeDrawCount, type DrawCount } from './drawCount'
 import {
@@ -15,9 +17,10 @@ import {
   DEMO_STOCK_ORDER,
 } from './demoDeal'
 
-const SUITS = ['clubs', 'diamonds', 'hearts', 'spades'] as const
-const RANKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] as const
-
+// Display order for the foundation row (hearts first); the canonical deck order
+// (clubs → spades) lives in dealIdentity's DEAL_SUITS/DEAL_RANKS, which are also
+// the single domain definition Suit/Rank alias below (clean-code review #13:
+// klondike.ts used to redeclare identical SUITS/RANKS constants).
 export const FOUNDATION_SUIT_ORDER = ['hearts', 'diamonds', 'clubs', 'spades'] as const
 export const TABLEAU_COLUMN_COUNT = 7
 const MAX_AUTO_COMPLETE_ITERATIONS = 500
@@ -28,8 +31,8 @@ const TOTAL_CARDS_PER_SUIT = 13
 const RED_SUITS = new Set(['hearts', 'diamonds'])
 let deckInstanceCounter = 0
 
-export type Suit = (typeof SUITS)[number]
-export type Rank = (typeof RANKS)[number]
+export type Suit = DealSuit
+export type Rank = DealRank
 
 export const getCardStableId = (card: { suit: Suit; rank: Rank }): string =>
   `${card.suit}-${card.rank}`
@@ -581,8 +584,6 @@ export const findAutoMoveTargetWithTableauAdjacentFallback = (
 
   return null
 }
-
-export const hasUndoHistory = (state: GameState): boolean => state.history.length > 0
 
 const listDropTargets = (
   state: DropHintsInput,

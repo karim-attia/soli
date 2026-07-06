@@ -10,12 +10,11 @@ import {
   type Suit,
 } from './klondike'
 import type { DrawCount } from './drawCount'
-import type { ExactDealId } from './dealIdentity'
+import type { DealCard, ExactDealId } from './dealIdentity'
 
-export type DemoReplayCard = {
-  readonly suit: Suit
-  readonly rank: Rank
-}
+// Same shape as dealIdentity's DealCard (clean-code review #13: was a third
+// structural clone of {suit, rank}).
+export type DemoReplayCard = Readonly<DealCard>
 
 export type DemoReplayMoveSource =
   | { readonly type: 'waste' }

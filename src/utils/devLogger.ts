@@ -29,6 +29,4 @@ export const devLog = (level: DevLogLevel, ...args: unknown[]): void => {
   method(LOG_PREFIX, ...args)
 }
 
-export const getDeveloperLoggingEnabled = (): boolean => developerLoggingEnabled
-
 export type { DevLogLevel }

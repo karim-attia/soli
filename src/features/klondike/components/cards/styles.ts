@@ -33,12 +33,6 @@ export const styles = StyleSheet.create({
     backgroundColor: COLOR_CARD_FACE,
     overflow: 'hidden',
   },
-  cardFlipWrapper: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   faceDown: {
     backgroundColor: COLOR_CARD_BACK,
     borderWidth: 1,
@@ -108,18 +102,6 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  stockCardWrapper: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  stockLabel: {
-    position: 'relative',
-    zIndex: 5000,
-    textAlign: 'center',
-  },
   pilePressable: {
     opacity: 1,
   },
@@ -143,26 +125,11 @@ export const styles = StyleSheet.create({
     shadowRadius: 14,
     backgroundColor: FOUNDATION_GLOW_FILL_COLOR,
   },
-  foundationCard: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  foundationStackedCard: {
-    opacity: 0,
-  },
   foundationSymbol: {
     fontSize: 28,
     color: COLOR_FELT_TEXT_PRIMARY,
   },
-  wasteFanCardWrapper: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  hiddenCard: {
-    opacity: 0,
-  },
+  // Note: pile-local card wrapper styles (cardFlipWrapper, stockCardWrapper, ...)
+  // were removed in the clean-code review — card visuals render exclusively in
+  // AbsoluteCardLayer since the absolute-card refactor.
 })

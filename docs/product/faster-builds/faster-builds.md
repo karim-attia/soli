@@ -122,8 +122,13 @@ being tested (production-fidelity release variant on Android).
   to Wi-Fi adb port rotation; one 75s outlier from the degrading link (excluded).
 - [done] 2. Exported `ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a` in
   `run-android-release.sh` (overridable via pre-set env; Play builds keep all ABIs).
-- [ ] 3. Machine-level `~/.gradle/gradle.properties`: caching, configuration-cache, jvmargs 4g.
-  Verify one build passes with configuration cache; fall back to disabling if plugins complain.
+- [done] 3. Gradle settings: caching, configuration-cache (problems=warn), jvmargs -Xmx4g.
+  Verified: run 1 stored the config cache (5 non-fatal warnings), run 2 reused it — warm
+  loop 37.2s wall / Gradle 13s (vs ~39s / ~16s baseline) with a real JS rebundle and
+  verified phone installs. Initially machine-level (~/.gradle/gradle.properties); moved
+  in-repo per Karim's preference: config plugin `plugins/withBuildSpeedGradleProperties.js`
+  registered in app.json (verified via `expo config --type introspect`), current
+  android/gradle.properties synced manually, machine-level file deleted.
 - [ ] 4. ccache for Android + iOS (brew install, env launchers, expo-build-properties plugin).
 - [ ] 5. AGENTS.md: remove blanket iOS clean-build rule; add freshness-verification steps and
   "clean scoped native dirs only after native dep changes" guidance.
@@ -141,6 +146,12 @@ being tested (production-fidelity release variant on Android).
 
 - docs/product/faster-builds/faster-builds.md (created)
 - run-android-release.sh (single-ABI env override + benchmark comment)
+- plugins/withBuildSpeedGradleProperties.js (created — in-repo source of truth for Gradle
+  build-speed settings; note: these also apply to Play Store builds via build-android.sh,
+  which is fine — caching/config-cache only make them faster)
+- app.json (registered the plugin)
+- android/gradle.properties (manual sync until next prebuild; gitignored/generated)
+- ~/.gradle/gradle.properties (deleted — replaced by the in-repo plugin)
 
 ## Intermediary learnings
 
@@ -149,6 +160,34 @@ being tested (production-fidelity release variant on Android).
 - Stale-app incidents in repo history all trace to native-side changes or stale native build
   artifacts, not to incremental JS rebuilds; release builds embed the bundle, so a completed
   build+install cannot serve stale JS.
+- Configuration-cache caveat: the Expo/RN template runs 5 `node` resolution commands at
+  configuration time (android/app/build.gradle lines 12-20) that Gradle cannot track as
+  inputs. Consequence: after `yarn install` moves/upgrades packages, the cached configuration
+  may be stale. If Android builds behave oddly after dependency changes, run once with
+  `--no-configuration-cache` or delete `android/.gradle/configuration-cache/`.
+- Warm-loop floor with release variant is ~37s: ~13s Gradle (incl. Metro/hermesc bundling,
+  which runs as the Gradle task `createBundleReleaseJsAndAssets`), remaining ~24s is expo CLI
+  startup/config + adb discovery in run-android-release.sh + Wi-Fi install + launch — not
+  reachable by Gradle-side tuning.
+- Web research 2026-07-06 on further Metro/Gradle speedups: generic advice (parallel,
+  caching, jvmargs, ccache, single ABI, KSP) is either already applied or not applicable
+  (no kapt; app bundle is small so Metro worker tuning and NODE_OPTIONS heap are irrelevant).
+  Remaining levers for the ~24s non-Gradle part: (a) bypass the expo CLI wrapper — call
+  `./gradlew :app:assembleRelease` + `adb install -r` + `am start` directly from
+  run-android-release.sh, saving expo CLI startup/config/device-resolution overhead;
+  (b) USB instead of Wi-Fi adb (removes install-transfer time and the observed port-rotation
+  flakiness). Optional micro-win: android.enablePngCrunchInReleaseBuilds=false.
+- Bun vs Node (evaluated 2026-07-06): not a build-speed lever. Gradle hardcodes `node`
+  invocations in android/app/build.gradle (bundling, entry resolution), hermesc is a native
+  binary, install is adb — Bun would only shave ~1-2s of expo CLI boot. RN tooling still
+  requires Node (expo/expo#36100); Metro has issues with Bun's isolated linking
+  (expo/expo#41995); switching lockfiles would churn Yarn 4 + jest + EAS. Skipped.
+- Cold-build triggers (machine restart is NOT one — all caches are on disk; a restart only
+  costs a one-time Gradle daemon start of a few seconds): `expo prebuild --clean` (deletes
+  android/ incl. .cxx ninja state), native dependency version changes (reanimated/worklets/
+  expo-modules-core → C++ recompile), NDK/AGP/SDK upgrades, and the scoped native-dir cleanup
+  from the reanimated guide. Note: Gradle's build cache does not cover CMake/ninja C++ state
+  in .cxx — only ccache would. Decision: cold builds are rare here → ccache deprioritized.
 
 ## Identified issues
 
@@ -167,3 +206,10 @@ Key insight: the warm Gradle build is already fast (~17s); the warm loop is domi
 Metro/hermesc bundling + Wi-Fi install. So the *perceived* slow builds are cold builds
 (prebuild --clean, native dep changes) and iOS clean builds — which is where steps 3-6 aim.
 Wi-Fi adb is flaky under load (port rotation mid-benchmark cost one run).
+
+Gradle-settings verification 2026-07-06 (single ABI + new ~/.gradle/gradle.properties):
+
+| Run | Wall time | Gradle | Config cache | Install verified |
+|---|---|---|---|---|
+| 1 (stores cache) | 48.4s | 26s | stored, 5 non-fatal warnings | yes |
+| 2 (reuses cache) | 37.2s | 13s | reused | yes |

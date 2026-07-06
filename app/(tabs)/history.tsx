@@ -1,1 +1,688 @@
-export { default } from '../history'
+import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react'
+import { FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { useNavigation } from 'expo-router'
+import { Paragraph, Separator, Spinner, Text, XStack, YStack, useTheme } from 'tamagui'
+
+import { AppSheet } from '../../components/AppSheet'
+import {
+  HeaderMenuButton,
+  HEADER_MENU_LEADING_PADDING,
+} from '../../components/navigation/HeaderMenuButton'
+import {
+  type HistoryEntry,
+  type HistoryEntryStatus,
+  type HistoryPreviewCard,
+  type HistoryPreviewColumn,
+  useHistory,
+} from '../../src/state/history'
+import { devLog } from '../../src/utils/devLogger'
+import { formatElapsedDuration } from '../../src/utils/time'
+import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
+
+// PBI-17: Memoize to prevent re-renders during navigation
+function HistoryScreen() {
+  const navigation = useNavigation()
+  const openDrawer = useDrawerOpener()
+  // Pagination totals come from storage so the stats do not change as pages are loaded.
+  const {
+    entries,
+    totalCount,
+    solvedCount,
+    incompleteCount,
+    hydrated,
+    hasMore,
+    loadingMore,
+    loadMore,
+  } = useHistory()
+  const [selectedEntry, setSelectedEntry] = useState<HistoryEntry | null>(null)
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitle: 'Game History',
+      headerBackVisible: false,
+      headerLeft: () => <HeaderMenuButton onPress={openDrawer} />,
+      headerLeftContainerStyle: {
+        paddingLeft: HEADER_MENU_LEADING_PADDING,
+      },
+      headerRight: () => null,
+    })
+  }, [navigation, openDrawer])
+
+  const handleEndReached = useCallback(() => {
+    // The provider owns the in-flight state and prevents repeated end events from overlapping.
+    if (!hasMore || loadingMore) {
+      return
+    }
+
+    void loadMore()
+  }, [hasMore, loadMore, loadingMore])
+
+  const listHeader = useMemo(() => {
+    const stats: HistoryStat[] = [
+      { label: 'Games', value: totalCount, tone: 'neutral' },
+      { label: 'Solved', value: solvedCount, tone: 'success' },
+      { label: 'Incomplete', value: incompleteCount, tone: 'warning' },
+    ]
+
+    return (
+      <YStack gap="$4" px="$3" pt="$4" pb="$4">
+        <HistoryStatsRow stats={stats} />
+
+        <Separator />
+      </YStack>
+    )
+  }, [incompleteCount, solvedCount, totalCount])
+
+  return (
+    <>
+      <FlatList
+        data={entries}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
+          <EmptyHistory hydrated={hydrated} paddingHorizontal={24} paddingVertical={48} />
+        }
+        renderItem={({ item }) => (
+          <HistoryListItem entry={item} onPress={() => setSelectedEntry(item)} />
+        )}
+        ItemSeparatorComponent={ListSpacer}
+        ListFooterComponent={loadingMore ? LoadingFooter : null}
+        contentContainerStyle={{ paddingBottom: 64 }}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.4}
+      />
+
+      {selectedEntry ? (
+        <HistoryPreviewSheet
+          entry={selectedEntry}
+          onDismiss={() => setSelectedEntry(null)}
+        />
+      ) : null}
+    </>
+  )
+}
+
+type HistoryListItemProps = {
+  entry: HistoryEntry
+  onPress?: () => void
+}
+
+// Task 10-6: Map status to display labels and colors
+const STATUS_DISPLAY: Record<
+  HistoryEntryStatus,
+  { label: string; colorKey: 'green' | 'yellow' | 'blue' }
+> = {
+  solved: { label: 'Solved', colorKey: 'green' },
+  incomplete: { label: 'Incomplete', colorKey: 'yellow' },
+  active: { label: 'Active', colorKey: 'blue' },
+}
+
+const SOLVABLE_BADGE_LABEL = 'Solvable'
+
+const HistoryListItem = ({ entry, onPress }: HistoryListItemProps) => {
+  const theme = useTheme()
+  const statusDisplay = STATUS_DISPLAY[entry.status] ?? STATUS_DISPLAY.incomplete
+  const statusLabel = statusDisplay.label
+  const statusColor = useMemo(() => {
+    switch (statusDisplay.colorKey) {
+      case 'green':
+        return theme.green10?.val ?? '#15803d'
+      case 'blue':
+        return theme.blue10?.val ?? '#1d4ed8'
+      case 'yellow':
+      default:
+        return theme.yellow11?.val ?? '#854d0e'
+    }
+  }, [statusDisplay.colorKey, theme.blue10?.val, theme.green10?.val, theme.yellow11?.val])
+  // Task 10-6: Show "Started" for active/incomplete, "Finished" for solved
+  const timeLabel = useMemo(() => {
+    if (entry.status === 'solved' && entry.finishedAt) {
+      return `Finished ${formatFinishedAt(entry.finishedAt)}`
+    }
+    return `Started ${formatFinishedAt(entry.startedAt)}`
+  }, [entry.finishedAt, entry.startedAt, entry.status])
+  const metadata = useMemo(() => {
+    const segments = [timeLabel]
+    if (typeof entry.moves === 'number' && entry.moves >= 0) {
+      segments.push(`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`)
+    }
+    if (typeof entry.durationMs === 'number' && entry.durationMs >= 0) {
+      segments.push(`Time ${formatElapsedDuration(entry.durationMs)}`)
+    }
+    return segments.join(' · ')
+  }, [entry.durationMs, entry.moves, timeLabel])
+
+  const cardStyle = useMemo(
+    () => ({
+      padding: 14,
+      borderRadius: 16,
+      borderWidth: 0.5,
+      borderColor: theme.color4?.val ?? '#cbd5f5',
+    }),
+    [theme.color4?.val]
+  )
+
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={{ width: '100%' }}>
+      <YStack gap="$2" style={cardStyle} mx="$3" bg="$color3">
+        <XStack
+          gap="$2"
+          style={{ alignItems: 'center', justifyContent: 'space-between' }}
+        >
+          <Text fontSize={16} fontWeight="700" flex={1} numberOfLines={1}>
+            {entry.displayName}
+          </Text>
+          <Text
+            fontSize={14}
+            fontWeight="600"
+            style={{ color: statusColor, flexShrink: 0 }}
+          >
+            {statusLabel}
+          </Text>
+        </XStack>
+
+        <Paragraph color="$color10">{metadata}</Paragraph>
+
+        <XStack gap="$2" flexWrap="wrap">
+          <Badge label={`Draw ${entry.drawCount}`} tone="neutral" />
+          {entry.solvable ? <Badge label={SOLVABLE_BADGE_LABEL} tone="info" /> : null}
+        </XStack>
+      </YStack>
+    </Pressable>
+  )
+}
+
+const ListSpacer = () => <YStack height="$2" />
+
+const LoadingFooter = () => (
+  <YStack py="$3" style={{ alignItems: 'center' }}>
+    <Spinner size="small" color="$color10" />
+  </YStack>
+)
+
+const EmptyHistory = ({
+  hydrated,
+  paddingHorizontal,
+  paddingVertical,
+}: {
+  hydrated: boolean
+  paddingHorizontal: number
+  paddingVertical: number
+}) => (
+  <YStack gap="$3" style={{ paddingHorizontal, paddingVertical }}>
+    <Text fontSize={18} fontWeight="600">
+      {hydrated ? 'No games recorded yet' : 'Loading history…'}
+    </Text>
+    <Paragraph color="$color10">
+      {hydrated
+        ? 'Play a game of Klondike to start building your history. Completed games and their deals will appear here.'
+        : 'Please wait while we retrieve your recent games.'}
+    </Paragraph>
+  </YStack>
+)
+
+type BadgeProps = {
+  label: string
+  tone: 'success' | 'warning' | 'info' | 'neutral'
+}
+
+const Badge = ({ label, tone }: BadgeProps) => {
+  const theme = useTheme()
+  const { backgroundColor, textColor } = useMemo(() => {
+    switch (tone) {
+      case 'success':
+        return {
+          backgroundColor: theme.green4?.val ?? '#bbf7d0',
+          textColor: theme.green11?.val ?? '#166534',
+        }
+      case 'warning':
+        return {
+          backgroundColor: theme.yellow4?.val ?? '#fef3c7',
+          textColor: theme.yellow11?.val ?? '#854d0e',
+        }
+      case 'info':
+        return {
+          backgroundColor: theme.blue4?.val ?? '#bfdbfe',
+          textColor: theme.blue11?.val ?? '#1e3a8a',
+        }
+      default:
+        return {
+          backgroundColor: theme.color4?.val ?? '#e2e8f0',
+          textColor: theme.color11?.val ?? '#111827',
+        }
+    }
+  }, [
+    tone,
+    theme.blue11?.val,
+    theme.blue4?.val,
+    theme.color11?.val,
+    theme.color4?.val,
+    theme.green11?.val,
+    theme.green4?.val,
+    theme.yellow11?.val,
+    theme.yellow4?.val,
+  ])
+  const badgeStyle = useMemo(
+    () => ({
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 999,
+      backgroundColor,
+    }),
+    [backgroundColor]
+  )
+
+  return (
+    <YStack style={badgeStyle}>
+      <Text fontSize={12} fontWeight="600" style={{ color: textColor }}>
+        {label}
+      </Text>
+    </YStack>
+  )
+}
+
+const formatFinishedAt = (isoTimestamp: string | undefined) => {
+  if (!isoTimestamp) {
+    return 'just now'
+  }
+
+  try {
+    const timestamp = new Date(isoTimestamp)
+    if (Number.isNaN(timestamp.getTime())) {
+      return isoTimestamp
+    }
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(timestamp)
+  } catch (error) {
+    devLog('warn', '[history] Failed to format timestamp', error)
+    return isoTimestamp
+  }
+}
+
+type HistoryStat = {
+  label: string
+  value: number
+  tone: 'neutral' | 'success' | 'warning'
+}
+
+const HistoryStatsRow = ({ stats }: { stats: HistoryStat[] }) => (
+  <XStack gap="$3" flexWrap="wrap">
+    {stats.map((stat) => (
+      <HistoryStatTile key={stat.label} stat={stat} />
+    ))}
+  </XStack>
+)
+
+const HistoryStatTile = ({ stat }: { stat: HistoryStat }) => {
+  const theme = useTheme()
+  const { backgroundColor, borderColor, textColor } = useMemo(() => {
+    switch (stat.tone) {
+      case 'success':
+        return {
+          backgroundColor: theme.green3?.val ?? '#dcfce7',
+          borderColor: theme.green7?.val ?? '#15803d',
+          textColor: theme.green11?.val ?? '#14532d',
+        }
+      case 'warning':
+        return {
+          backgroundColor: theme.yellow3?.val ?? '#fef9c3',
+          borderColor: theme.yellow7?.val ?? '#a16207',
+          textColor: theme.yellow11?.val ?? '#713f12',
+        }
+      default:
+        return {
+          backgroundColor: theme.color3?.val ?? '#f1f5f9',
+          borderColor: theme.color7?.val ?? '#334155',
+          textColor: theme.color11?.val ?? '#0f172a',
+        }
+    }
+  }, [stat.tone, theme])
+
+  const tileStyle = useMemo(
+    () => ({
+      minWidth: 100,
+      flex: 1,
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      backgroundColor,
+      borderWidth: 1,
+      borderColor,
+    }),
+    [backgroundColor, borderColor]
+  )
+
+  return (
+    <YStack gap="$1" style={tileStyle}>
+      <Text fontSize={13} fontWeight="600" style={{ color: textColor, opacity: 0.8 }}>
+        {stat.label}
+      </Text>
+      <Text fontSize={24} fontWeight="800" style={{ color: textColor }}>
+        {stat.value}
+      </Text>
+    </YStack>
+  )
+}
+
+type HistoryPreviewSheetProps = {
+  entry: HistoryEntry
+  onDismiss: () => void
+}
+
+const PREVIEW_TABLEAU_COLUMN_COUNT = 7
+const PREVIEW_TABLEAU_GAP = 10
+const PREVIEW_COLUMN_MARGIN = PREVIEW_TABLEAU_GAP / 2
+const PREVIEW_BASE_CARD_WIDTH = 72
+const PREVIEW_BASE_CARD_HEIGHT = 102
+const PREVIEW_CARD_ASPECT_RATIO = PREVIEW_BASE_CARD_HEIGHT / PREVIEW_BASE_CARD_WIDTH
+const PREVIEW_BASE_STACK_OFFSET = 28
+const PREVIEW_MIN_CARD_WIDTH = 24
+const PREVIEW_MAX_CARD_WIDTH = 96
+const PREVIEW_COLOR_CARD_FACE = '#ffffff'
+const PREVIEW_COLOR_CARD_BACK = '#3b4d75'
+const PREVIEW_COLOR_CARD_BORDER = '#cbd5f5'
+const PREVIEW_COLOR_COLUMN_BORDER = '#d0d5dd'
+const PREVIEW_FACE_CARD_LABELS: Partial<Record<HistoryPreviewCard['rank'], string>> = {
+  1: 'A',
+  11: 'J',
+  12: 'Q',
+  13: 'K',
+}
+const PREVIEW_SUIT_SYMBOLS: Record<HistoryPreviewCard['suit'], string> = {
+  clubs: '♣',
+  diamonds: '♦',
+  hearts: '♥',
+  spades: '♠',
+}
+const PREVIEW_SUIT_COLORS: Record<HistoryPreviewCard['suit'], string> = {
+  clubs: '#111827',
+  spades: '#111827',
+  diamonds: '#c92a2a',
+  hearts: '#c92a2a',
+}
+
+const HistoryPreviewSheet = ({ entry, onDismiss }: HistoryPreviewSheetProps) => {
+  const { width } = useWindowDimensions()
+  // Expo's universal sheet supplies 16 dp/pt/px of horizontal content padding per side.
+  const contentWidth = Math.max(1, width - 32)
+  const metrics = useMemo(() => computePreviewMetrics(contentWidth), [contentWidth])
+
+  return (
+    <AppSheet isPresented onDismiss={onDismiss}>
+      <YStack gap="$3" width={contentWidth}>
+        <YStack gap="$1">
+          <Text fontSize={16} fontWeight="700">
+            {entry.displayName}
+          </Text>
+          <Paragraph color="$color10">
+            {entry.status === 'solved' && entry.finishedAt
+              ? `Finished ${formatFinishedAt(entry.finishedAt)}`
+              : `Started ${formatFinishedAt(entry.startedAt)}`}{' '}
+            · {STATUS_DISPLAY[entry.status]?.label ?? 'Unknown'}
+          </Paragraph>
+        </YStack>
+        <XStack gap="$2" flexWrap="wrap">
+          <Badge label={`Draw ${entry.drawCount}`} tone="neutral" />
+          {entry.solvable ? <Badge label={SOLVABLE_BADGE_LABEL} tone="info" /> : null}
+          {typeof entry.moves === 'number' && entry.moves >= 0 ? (
+            <Badge
+              label={`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`}
+              tone="neutral"
+            />
+          ) : null}
+          {typeof entry.durationMs === 'number' && entry.durationMs >= 0 ? (
+            <Badge label={formatElapsedDuration(entry.durationMs)} tone="info" />
+          ) : null}
+        </XStack>
+
+        <View style={previewStyles.boardShell} pointerEvents="none">
+          <View style={previewStyles.tableauRow}>
+            {entry.preview.tableau.map((column, index) => (
+              <PreviewColumn key={`col-${index}`} column={column} metrics={metrics} />
+            ))}
+          </View>
+        </View>
+      </YStack>
+    </AppSheet>
+  )
+}
+
+type PreviewMetrics = {
+  width: number
+  height: number
+  stackOffset: number
+  radius: number
+}
+
+const computePreviewMetrics = (availableWidth: number | null): PreviewMetrics => {
+  if (!availableWidth || availableWidth <= 0) {
+    return computePreviewMetrics(
+      PREVIEW_BASE_CARD_WIDTH * PREVIEW_TABLEAU_COLUMN_COUNT +
+        PREVIEW_TABLEAU_GAP * (PREVIEW_TABLEAU_COLUMN_COUNT - 1)
+    )
+  }
+
+  const totalGap = PREVIEW_TABLEAU_GAP * (PREVIEW_TABLEAU_COLUMN_COUNT - 1)
+  const widthAvailable = Math.max(
+    availableWidth - totalGap,
+    PREVIEW_MIN_CARD_WIDTH * PREVIEW_TABLEAU_COLUMN_COUNT
+  )
+  const rawWidth = widthAvailable / PREVIEW_TABLEAU_COLUMN_COUNT
+  const unclampedWidth = Math.max(Math.floor(rawWidth), PREVIEW_MIN_CARD_WIDTH)
+  const constrainedWidth = Math.min(
+    Math.max(unclampedWidth, PREVIEW_MIN_CARD_WIDTH),
+    PREVIEW_MAX_CARD_WIDTH
+  )
+  const height = Math.round(constrainedWidth * PREVIEW_CARD_ASPECT_RATIO)
+  const stackOffset = Math.max(
+    24,
+    Math.round(
+      constrainedWidth * (PREVIEW_BASE_STACK_OFFSET / PREVIEW_BASE_CARD_WIDTH + 0.12)
+    )
+  )
+  const radius = Math.max(6, Math.round(constrainedWidth * 0.12))
+
+  return {
+    width: constrainedWidth,
+    height,
+    stackOffset,
+    radius,
+  }
+}
+
+const PreviewColumn = ({
+  column,
+  metrics,
+}: {
+  column: HistoryPreviewColumn
+  metrics: PreviewMetrics
+}) => {
+  const totalCards = column.cards.length
+  const height = totalCards
+    ? metrics.height + (totalCards - 1) * metrics.stackOffset
+    : metrics.height
+
+  return (
+    <View
+      style={[
+        previewStyles.column,
+        {
+          width: metrics.width,
+          height,
+          marginHorizontal: PREVIEW_COLUMN_MARGIN,
+        },
+      ]}
+    >
+      {totalCards === 0 && <PreviewEmptySlot metrics={metrics} />}
+      {column.cards.map((card, index) =>
+        card.faceUp ? (
+          <PreviewCard
+            key={`${card.suit}-${card.rank}-${index}`}
+            card={card}
+            metrics={metrics}
+            top={index * metrics.stackOffset}
+          />
+        ) : (
+          <PreviewHiddenCard
+            key={`hidden-${index}`}
+            metrics={metrics}
+            top={index * metrics.stackOffset}
+          />
+        )
+      )}
+    </View>
+  )
+}
+
+const PreviewCard = ({
+  card,
+  metrics,
+  top,
+}: {
+  card: HistoryPreviewCard
+  metrics: PreviewMetrics
+  top: number
+}) => (
+  <View
+    style={[
+      previewStyles.cardBase,
+      previewStyles.faceUp,
+      {
+        width: metrics.width,
+        height: metrics.height,
+        borderRadius: metrics.radius,
+        top,
+      },
+    ]}
+  >
+    <Text
+      style={[previewStyles.cardCornerRank, { color: PREVIEW_SUIT_COLORS[card.suit] }]}
+      numberOfLines={1}
+      allowFontScaling={false}
+    >
+      {PREVIEW_FACE_CARD_LABELS[card.rank] ?? card.rank}
+    </Text>
+    <Text
+      style={[previewStyles.cardCornerSuit, { color: PREVIEW_SUIT_COLORS[card.suit] }]}
+      numberOfLines={1}
+      allowFontScaling={false}
+    >
+      {PREVIEW_SUIT_SYMBOLS[card.suit]}
+    </Text>
+    <Text
+      style={[previewStyles.cardSymbol, { color: PREVIEW_SUIT_COLORS[card.suit] }]}
+      numberOfLines={1}
+      allowFontScaling={false}
+    >
+      {PREVIEW_SUIT_SYMBOLS[card.suit]}
+    </Text>
+  </View>
+)
+
+const PreviewHiddenCard = ({
+  metrics,
+  top,
+}: {
+  metrics: PreviewMetrics
+  top: number
+}) => (
+  <View
+    style={[
+      previewStyles.cardBase,
+      previewStyles.faceDown,
+      {
+        width: metrics.width,
+        height: metrics.height,
+        borderRadius: metrics.radius,
+        top,
+      },
+    ]}
+  />
+)
+
+const PreviewEmptySlot = ({ metrics }: { metrics: PreviewMetrics }) => (
+  <View
+    style={[
+      previewStyles.emptySlot,
+      {
+        width: metrics.width,
+        height: metrics.height,
+        borderRadius: metrics.radius,
+      },
+    ]}
+  />
+)
+
+const previewStyles = StyleSheet.create({
+  boardShell: {
+    width: '100%',
+    alignSelf: 'stretch',
+    paddingHorizontal: PREVIEW_COLUMN_MARGIN,
+    paddingBottom: 16,
+    position: 'relative',
+  },
+  tableauRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    flexWrap: 'nowrap',
+  },
+  column: {
+    position: 'relative',
+    paddingBottom: 8,
+  },
+  cardBase: {
+    position: 'absolute',
+    shadowColor: 'rgba(0,0,0,0.15)',
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    justifyContent: 'center',
+    backgroundColor: PREVIEW_COLOR_CARD_FACE,
+    overflow: 'hidden',
+  },
+  faceUp: {
+    borderWidth: 1,
+    borderColor: PREVIEW_COLOR_CARD_BORDER,
+  },
+  faceDown: {
+    borderWidth: 1,
+    borderColor: PREVIEW_COLOR_CARD_BORDER,
+    backgroundColor: PREVIEW_COLOR_CARD_BACK,
+  },
+  emptySlot: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: PREVIEW_COLOR_COLUMN_BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  cardCornerRank: {
+    position: 'absolute',
+    top: -2,
+    left: 3,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  cardCornerSuit: {
+    position: 'absolute',
+    top: 0,
+    right: 3,
+    fontSize: 12,
+  },
+  cardSymbol: {
+    textAlign: 'center',
+    fontSize: 28,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+})
+
+// PBI-17: Memoize the entire screen component to prevent re-renders
+export default memo(HistoryScreen)

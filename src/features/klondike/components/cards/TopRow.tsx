@@ -64,7 +64,6 @@ export type TopRowProps = {
   onFoundationPress: (suit: Suit) => void
   cardMetrics: CardMetrics
   dropHints: DropHints
-  onFoundationArrival?: (cardId: string | null | undefined) => void
   interactionsLocked: boolean
   onTopRowLayout?: (layout: LayoutRectangle) => void
   onFoundationLayout?: (suit: Suit, layout: LayoutRectangle) => void
@@ -86,7 +85,6 @@ export const TopRow = React.memo(
     onFoundationPress,
     cardMetrics,
     dropHints,
-    onFoundationArrival,
     interactionsLocked,
     onTopRowLayout,
     onFoundationLayout,
@@ -157,7 +155,6 @@ export const TopRow = React.memo(
                   isDroppable={dropHints.foundations[suit]}
                   isSelected={selected?.source === 'foundation' && selected.suit === suit}
                   onPress={() => onFoundationPress(suit)}
-                  onCardArrived={onFoundationArrival}
                   disableInteractions={interactionsLocked}
                   celebrationActive={celebrationActive}
                 />

@@ -5,14 +5,7 @@ import type { Rank, Suit } from '../../solitaire/klondike'
 // Card dimensions and spacing
 export const CARD_REFERENCE_WIDTH = 48
 export const CARD_REFERENCE_HEIGHT = 68
-export const CARD_REFERENCE_RADIUS = 6
 export const CARD_REFERENCE_STACK_OFFSET = 24
-export const CARD_REFERENCE_METRICS = Object.freeze({
-  width: CARD_REFERENCE_WIDTH,
-  height: CARD_REFERENCE_HEIGHT,
-  stackOffset: CARD_REFERENCE_STACK_OFFSET,
-  radius: CARD_REFERENCE_RADIUS,
-})
 
 export const BASE_CARD_WIDTH = CARD_REFERENCE_WIDTH
 export const BASE_CARD_HEIGHT = CARD_REFERENCE_HEIGHT
@@ -26,7 +19,6 @@ export const BOARD_COLUMN_GAP = TABLEAU_GAP / 2
 export const BOARD_COLUMN_MARGIN = BOARD_COLUMN_GAP / 2
 export const STACK_PADDING = 8 // matches px="$2" in layout spacing
 export const EDGE_GUTTER = STACK_PADDING + COLUMN_MARGIN
-export const STAT_VERTICAL_MARGIN = EDGE_GUTTER
 export const MAX_CARD_WIDTH = 96
 export const MIN_CARD_WIDTH = 24
 
@@ -61,10 +53,6 @@ export const WIN_CELEBRATION_HANDOFF_DELAY_MS = Math.max(
   CARD_ANIMATION_DURATION_MS,
   FOUNDATION_GLOW_TOTAL_DURATION_MS
 )
-export const WIN_CELEBRATION_GLOW_TAIL_DELAY_MS = Math.max(
-  0,
-  FOUNDATION_GLOW_TOTAL_DURATION_MS - CARD_ANIMATION_DURATION_MS
-)
 export const WIN_CLEANUP_OUTLINE_FADE_DURATION_MS = 180
 export const FOUNDATION_FALLBACK_GAP = 16
 
@@ -78,7 +66,6 @@ export const COLOR_COLUMN_BORDER = '#d0d5dd'
 export const COLOR_COLUMN_SELECTED = 'rgba(147, 197, 253, 0.25)'
 export const COLOR_FOUNDATION_BORDER = '#94a3b8'
 export const COLOR_TEXT_MUTED = '#94a3b8'
-export const COLOR_TEXT_STRONG = '#1f2933'
 export const COLOR_FELT_LIGHT = '#6B8E5A'
 export const COLOR_FELT_DARK = '#4A5F3F'
 export const COLOR_FELT_TEXT_PRIMARY = '#f8fafc'
