@@ -150,11 +150,23 @@ const formatEntryTimeLabel = (entry: HistoryEntry) =>
     entry.status === 'solved' && entry.finishedAt ? entry.finishedAt : entry.startedAt
   )
 
-// Feedback round 2: draw count and solvability are plain text segments (no badges)
-// so the row has just two text styles: title + secondary.
-const formatEntryDetails = (entry: HistoryEntry): string => {
-  const segments: string[] = []
-  if (typeof entry.moves === 'number' && entry.moves >= 0) {
+// Feedback round 3: one metadata line whose segments wrap as whole units. Spaces
+// inside a segment are non-breaking and each "·" is glued to the previous segment,
+// so the only break opportunities are the regular spaces after a "·" — an
+// overflowing line moves whole sections down instead of splitting "80 moves" or
+// the date mid-way.
+const NBSP = '\u00A0'
+const joinWrappingSegments = (segments: string[]): string =>
+  segments.map((segment) => segment.split(' ').join(NBSP)).join(`${NBSP}· `)
+
+const formatEntryMetadata = (entry: HistoryEntry): string => {
+  const segments: string[] = [formatEntryTimeLabel(entry)]
+  // Product decision (round 3): active games show no moves (durationMs is already
+  // null for them) — the stored count only syncs at save points, so it would show a
+  // stale "0 moves" next to a live game. Reading the live count would couple this
+  // list to the game screen's reducer state, which isn't worth it.
+  const showMoves = entry.status !== 'active'
+  if (showMoves && typeof entry.moves === 'number' && entry.moves >= 0) {
     segments.push(`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`)
   }
   if (typeof entry.durationMs === 'number' && entry.durationMs >= 0) {
@@ -164,7 +176,7 @@ const formatEntryDetails = (entry: HistoryEntry): string => {
   if (entry.solvable) {
     segments.push('Solvable')
   }
-  return segments.join(' · ')
+  return joinWrappingSegments(segments)
 }
 
 // History-entries-cleanup B4: memoized so FlatList re-renders (pagination, sheet
@@ -200,12 +212,8 @@ const HistoryListItem = memo(({ entry, onSelect }: HistoryListItemProps) => {
           <StatusText status={entry.status} />
         </XStack>
 
-        {/* Feedback round 2: one shared secondary style for both metadata lines. */}
         <Paragraph color="$color10" fontSize={14}>
-          {formatEntryTimeLabel(entry)}
-        </Paragraph>
-        <Paragraph color="$color10" fontSize={14}>
-          {formatEntryDetails(entry)}
+          {formatEntryMetadata(entry)}
         </Paragraph>
       </YStack>
     </Pressable>
@@ -384,10 +392,8 @@ const HistoryPreviewSheet = ({ entry, onDismiss }: HistoryPreviewSheetProps) => 
             </Text>
             <StatusText status={entry.status} />
           </XStack>
-          {/* Feedback round 2: one plain metadata line, no badges (sheet is wide
-              enough; falls back to wrapping naturally if it ever overflows). */}
           <Paragraph color="$color10" fontSize={14}>
-            {`${formatEntryTimeLabel(entry)} · ${formatEntryDetails(entry)}`}
+            {formatEntryMetadata(entry)}
           </Paragraph>
         </YStack>
 

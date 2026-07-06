@@ -13,10 +13,12 @@ visually clean up sheet to start demo games. remove cancel option. question (no 
 
 ## Summary
 
-- Status: DONE. Steps 1–9 implemented and green (typecheck/lint/jest); step 10
-  (Android device smoke test) passed 2026-07-06 — playlist completed twice,
-  depth-3/2/1 probes logged, HUD verified on device incl. live "Undo ×3"
-  capture, sheet layout + swipe-down dismissal verified.
+- Status: DONE incl. round-3 device verification. Steps 1–9 implemented and
+  green (typecheck/lint/jest); step 10 (Android device smoke test) passed
+  2026-07-06 — playlist completed twice, depth-3/2/1 probes logged, HUD
+  verified on device incl. live "Undo ×3" capture, sheet layout + swipe-down
+  dismissal verified. Round 3 (post-simplification: "Game x/y" pill, no
+  subtitle) passed on-device 2026-07-06 evening — see Testing.
 - Simplification round after user review (2026-07-06):
   - Sheet: "Swipe down to close" subtitle removed again (clutter on an
     internal dev-only sheet).
@@ -405,6 +407,27 @@ NOT modified: `src/data/demoAutoSolvePlaylist.generated.ts`,
 - JS heap in the HUD grew 38 → 54 MB within game 1 and read 41 MB early in
   game 3 — consistent with the known pattern that the JS heap stays small
   while native PSS is the interesting number (follow-up 3).
+- Round-3 harness learnings (2026-07-06 evening):
+  - `adb logcat | grep -m1 <token> && touch trigger` does NOT work as a
+    logcat trigger on macOS — adb block-buffers stdout when piped, so the
+    match fires minutes late or never. Poll `adb logcat -d -s ReactNativeJS`
+    in a loop instead (dump mode flushes; ~0.3s per poll over adb-wifi).
+  - agent-device snapshots degraded to ~8s each mid-session (stale-daemon
+    warning); closing the session and reopening (fresh daemon) brought them
+    back to ~1s. Restart the daemon before any timing-sensitive snapshot
+    work.
+  - One deep-link relaunch produced no app logs at all: the device had dozed
+    (`mWakefulness=Dozing`) even with screen_off_timeout at 600000 — RN never
+    mounted with the screen off. Run the unlock script immediately before
+    firing timing-critical deep links, not just at session start.
+  - Catching the ~1s probe window with ~1s a11y snapshots works by starting a
+    back-to-back snapshot loop ~2.9s after the "Game 1/2 loaded" logcat line
+    (probe fires ~4.8s after load at ~38ms/step release-build pace) and
+    correlating each snapshot's start/end wallclock with the probe log line.
+    Note snapshots are not atomic: the tree walk spans ~25 playback steps, so
+    MOVES and card labels within one snapshot can come from slightly
+    different instants — correlate per-label against the fold reference, not
+    whole snapshots.
 
 ## Identified issues
 
@@ -480,21 +503,37 @@ adb-wifi, screenshots in `.test-artifacts/demo-sheet-undo-hud/`):
     options fully visible and unclipped, swipe-down dismissal still works
     (`demo-sheet-fit-fix.png`).
 
-Pending verification round 3 (2026-07-06 ~19:05, BLOCKED — device
-unreachable): code changed again after user feedback (sheet subtitle
-"Swipe down to close" removed; HUD simplified to a single "Game x/y" pill in
-the left half of the bottom dock, mirroring the Undo button's dimensions;
-launcher publishes once per game). Cheap tests green. The on-device check
-(`DEMO_GAME_LIMIT=2 yarn demo:auto-solve`, HUD pill screenshots, sheet
-re-check) could NOT run: the A065 dropped off adb-wifi — `adb devices` empty,
-`adb mdns services` advertised nothing for ~4 minutes even after an adb
-server restart, so Wireless debugging is off or the phone left the network.
-Re-enable Wireless debugging on the device, then rerun this round:
-- Pill reads exactly "Game 1/2" / "Game 2/2", bottom-left, same height/level
-  as the Undo button, small gap, no other text; gone after completion
-  (`hud-v2-*.png`).
-- Sheet: title "Run Demo", six options, NO subtitle, no Cancel, nothing
-  clipped (`demo-sheet-v3.png`); swipe-down dismisses.
+Verification round 3 (2026-07-06 ~21:10, device back on adb-wifi after Karim
+re-enabled Wireless debugging) — ALL PASSED (testing sub-agent, physical A065,
+fresh release build via `DEMO_GAME_LIMIT=2 yarn demo:auto-solve`, exit 0,
+build 19s warm):
+- HUD pill — PASS: reads exactly `Game 1/2` (burst frames 01/03) then
+  `Game 2/2` (frame 30), single dark pill in the LEFT half of the bottom
+  dock at the same level/height as the Undo button (right half), no other
+  text — no mode label, steps, JS heap, or elapsed time anywhere. Also
+  tree-visible: a11y snapshots show `[text] "Game 1/2"` directly adjacent to
+  `[button] "Undo"`. Gone after completion (`hud-v2-after-completion*.png`
+  and fresh post-deal board). Artifacts: `hud-v2-burst-01..45.png`,
+  `hud-v2-after-completion{,-2}.png` in `.test-artifacts/demo-sheet-undo-hud/`.
+- Probe logs — PASS, exact lines:
+  `[DemoPlaylist] Undo probe at game 1, step 116 (depth 3).`,
+  `[DemoPlaylist] Undo probe at game 1, step 227 (depth 1).`,
+  `[DemoPlaylist] Playlist completed (games=2).` (game 2 = playlist index 1,
+  odd → `undoProbes=0`, as designed).
+- Probe observability via a11y tree — best-effort PASS: a snapshot loop timed
+  from the game-load logcat line straddled the step-116 depth-3 probe (probe
+  line hit mid-snapshot-2 wallclock). Snap 1 (pre-probe) `Waste, King of
+  diamonds` = fold step 113; snap 2 (contains the probe) `Waste, Jack of
+  spades` + MOVES 115 = exactly the probe's undo anchor states (fold steps
+  114-116 all have J♠ on waste; depth-3 undo walks moveCount 116→113); snap 3
+  (post-probe) waste node gone = fold step 118 (recycle empties waste) with
+  foundations unchanged — playback resumed forward. Full snapshots with
+  wallclocks: `.test-artifacts/demo-sheet-undo-hud/probe-a11y-snaps.txt`.
+- Sheet — PASS: title "Run Demo", exactly SIX options (Old demo game / One
+  generated game / 5 / 10 / 20 generated games / Mid-game, scrubbed to
+  middle), NO subtitle, NO Cancel, nothing clipped; swipe-down on the drag
+  handle dismissed it back to the intact board (`demo-sheet-v3.png`,
+  `demo-sheet-v3-dismissed.png`).
 
 ## Follow-ups
 

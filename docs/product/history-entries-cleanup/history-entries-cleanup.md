@@ -25,6 +25,22 @@ On the main screen, I like the new date formatting. I don't think started od fin
 the badges on top right with status are too aggressive and colorful. i liked it better before. or any other idea? also solvable badge. btw same for in sheet
 ```
 
+```text
+should all this stuff go on the same line? like in sheet? btw: what happens on smaller screen sizes? is this just broken to next line?
+
+[about the mismatched-stats observation] -> about this: should we just not show moves on active games? we already dont show time. or should we show it from the game?
+```
+
+```text
+The genuinely mismatched stats on incomplete rows ("80 moves · 0:02") are the separate save-point sync issue and stay a follow-up.
+
+-> why do you think this is a sync issue? is this not just a test game that did 80 moves in 2s?
+
+hiding makes sense. thx. syncing is too much effort for what we get.
+
+is it possible to put all in same line but when line break, a whole section goes to next line. both in card and in sheet?
+```
+
 ## Summary
 
 Round 1 (steps 1–9) complete and iOS-simulator verified. Round 2 (feedback, steps
@@ -232,6 +248,28 @@ Round 2 (on-device feedback, Jul 6 2026):
     needed), new text-only UI confirmed live. All 5 round-2 checks PASS in light
     and dark mode; `r2-*` screenshots in
     `.test-artifacts/history-entries-cleanup/`. Details in Testing section.
+18. [done] Round 3: hide the moves segment for ACTIVE entries in
+    `formatEntryDetails` (durationMs is already null for them by design) — the
+    stored count only syncs at save points, so a live game showed a stale
+    "0 moves". Showing the live count was rejected: it would couple the history
+    list to the game screen's reducer state and only be correct while that screen
+    is mounted. Decision: list keeps its two metadata lines (a merged single line
+    would wrap at word boundaries whenever "Solvable" is present, even on 375 pt
+    screens); sheet keeps its single line (wide enough; worst case one word-boundary
+    wrap on very small devices). Trivial change — no native re-test; typecheck,
+    lint, jest (23 suites, 184 tests) pass.
+19. [done] Round 3b: merged date + details into ONE metadata line in both list
+    rows and sheet, with segment-wise wrapping via `joinWrappingSegments`:
+    spaces inside a segment become NBSP (`\u00A0`) and each "·" is glued to the
+    previous segment with an NBSP, so the only break opportunities are the
+    regular spaces after a "·" — overflow moves whole sections to the next line
+    (trailing "·" at the wrapped line end, never a leading one). Replaces the
+    separate `formatEntryDetails` with `formatEntryMetadata`. Also: the
+    "80 moves · 0:02" incomplete rows were re-assessed as REAL recordings of
+    automated demo/scrubber test games (80 moves in ~2 s), NOT a sync bug — the
+    only true save-point artifact was the active-row stale count, solved by
+    hiding moves on active rows (step 18). Sync follow-up dropped per user
+    ("syncing is too much effort for what we get"). typecheck, lint, jest pass.
 
 ## Plan: Files to modify
 
@@ -346,9 +384,9 @@ PASS. Screenshots (`.test-artifacts/history-entries-cleanup/`):
    mode list + sheet fine, light restored.
 
 Oddities (non-blocking): the history data now contains several duplicate
-`PZ6U-C26R` incomplete entries with odd stats (e.g. "80 moves · 0:02",
-"0 moves · 50:53"-style mismatches) — artifacts of earlier scrubber/demo test
-runs and the known save-point sync lag, unrelated to this UI change.
+`PZ6U-C26R` incomplete entries with odd stats (e.g. "80 moves · 0:02") —
+re-assessed in step 19: these are real recordings of automated demo/scrubber
+test games (80 fast moves in ~2 s), not a sync bug.
 
 ## Follow-ups
 

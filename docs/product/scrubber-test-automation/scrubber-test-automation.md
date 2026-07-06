@@ -713,6 +713,20 @@ Device-validation learnings (2026-07-06, C2 Android completion run):
    **RESULT 2026-07-06: PASSED** at index 80 (kill + relaunch restored the
    exact board; the subsequent single tap-undo stepping to the exact index-79
    board proves history depth survived the restart).
+5. **Re-verification on the probe-enabled build (2026-07-06 evening,
+   combined Android round with the demo-HUD story): ALL PASSED.** Fresh
+   release build (with multi-step undo probes + "Game x/y" HUD pill from
+   `demo-sheet-undo-probes-info-hud.md`), physical A065: cold-app root deep
+   link `soli://?demo=scrubbed` (force-stop first) → straight to the board,
+   all pinned index-40 labels exact (`Stock, 10 cards`, `Waste, Six of
+   hearts`, MOVES 80, tableau tops 7♦ 2♦ 2♠ 7♥ 5♣ 9♣ Q♣, `Clubs foundation,
+   Ace of clubs`); `gesture pan 801 2150 -339 0 1500` on the Undo button
+   landed EXACTLY on index 20 again (`Stock, 7 cards`, `Waste, Two of
+   spades`, MOVES 80) — the pan geometry is unaffected by the HUD pill now
+   sharing the bottom dock (Undo center unchanged at 801,2150); one tap-undo
+   → exactly index 19 (`Stock, 8 cards`, `Waste, Nine of diamonds`).
+   Screenshots `android-r3-01..03` in
+   `.test-artifacts/scrubber-test-automation/`.
 
 ## Follow-ups
 

@@ -156,6 +156,16 @@ Costs and risks:
   swipe reached the absolute end with the full `Win celebrations` row and rounded section
   bottom visible above the system area. Keep FieldGroup/SwiftUI Form-owned scrolling and
   do not add app-owned bottom padding for this screenshot state.
+- Bottom safe area (learned 2026-07-06): do NOT wrap `FieldGroup` in a bottom-edge
+  `SafeAreaView` on iOS. SwiftUI `Form` already applies the home-indicator inset inside
+  its own scroll content, so an outer inset double-applies and hard-cuts the scroll area
+  ~34pt above the screen bottom instead of letting content scroll under the home
+  indicator. On Android the inset IS needed: `FieldGroup` renders a Compose `LazyColumn`
+  with hardcoded 16dp `contentPadding` and no window-inset handling (the modifier
+  registry only has `imePadding`), so the nav-bar inset must live outside the scroll
+  view via `SafeAreaView edges={['bottom']}`. There is currently no way to put the
+  inset inside the Android scroll content: `contentPadding` is not exposed and a plain
+  spacer child would be wrapped into a synthetic section rendered as a card row.
 
 Implementation sequence:
 

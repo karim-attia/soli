@@ -1,6 +1,7 @@
 import { useLayoutEffect } from 'react'
 import { FieldGroup, Host, Switch } from '@expo/ui'
 import { useNavigation } from 'expo-router'
+import { Platform } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import {
@@ -46,7 +47,13 @@ export default function SettingsScreen() {
   }, [navigation, openDrawer])
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
+    // Bottom safe area is platform-specific: on iOS the SwiftUI Form behind FieldGroup
+    // handles the home-indicator inset inside its own scroll content (content scrolls
+    // edge-to-edge under it), so an outer inset would double up and cut the scroll area
+    // short. On Android the Compose LazyColumn behind FieldGroup has hardcoded 16dp
+    // contentPadding and no window-inset support (as of @expo/ui in SDK 57), so the
+    // inset must stay outside the scroll view.
+    <SafeAreaView edges={Platform.OS === 'ios' ? [] : ['bottom']} style={{ flex: 1 }}>
       <Host style={{ flex: 1 }}>
         <FieldGroup>
           <FieldGroup.Section title="New Games">
