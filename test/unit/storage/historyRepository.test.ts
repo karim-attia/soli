@@ -131,6 +131,11 @@ describe('historyRepository.native (v1 baseline schema + migration scaffold)', (
     expect(schemaSql).toContain("CHECK (status IN ('active', 'incomplete', 'solved'))")
     expect(schemaSql).toContain('CHECK (draw_count BETWEEN 1 AND 5)')
     expect(schemaSql).not.toContain('history_entries_exact_id')
+    // Final hardening round: STRICT typing, JSON validity, paired move-log nulls.
+    expect(schemaSql).toContain(') STRICT;')
+    expect(schemaSql).toContain('CHECK (json_valid(preview_json))')
+    expect(schemaSql).toContain('CHECK (moves_json IS NULL OR json_valid(moves_json))')
+    expect(schemaSql).toContain('CHECK ((moves_json IS NULL) = (move_log_version IS NULL))')
     expect(fake.getUserVersion()).toBe(1)
   })
 
@@ -283,6 +288,94 @@ describe('historyRepository.native (v1 baseline schema + migration scaffold)', (
     const pageQuery = (fake.database.getAllAsync.mock.calls[0] as [string])[0]
     expect(pageQuery).toContain('FROM history_entries')
     expect(pageQuery).not.toContain('moves_json')
+  })
+
+  // Negative constraint tests run the EXACT baseline DDL the repository executes
+  // (captured from the stub) inside a real SQLite engine (Node's built-in
+  // node:sqlite), so the STRICT/CHECK clauses are proven to reject bad writes —
+  // not just to be present as strings.
+  describe('baseline DDL rejects bad writes (real SQLite via node:sqlite)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { DatabaseSync } = require('node:sqlite') as {
+      DatabaseSync: new (path: string) => {
+        exec: (sql: string) => void
+        prepare: (sql: string) => { run: (...params: unknown[]) => unknown }
+        close: () => void
+      }
+    }
+
+    const validRow = {
+      id: 'row_1',
+      exact_id: 'E1_0',
+      deck_checksum: 'D1',
+      display_name: 'Game TEST',
+      started_at: '2026-07-07T10:00:00.000Z',
+      finished_at: null,
+      draw_count: 1,
+      move_count: 5,
+      duration_ms: 1_000,
+      preview_json: '{}',
+      status: 'incomplete',
+      moves_json: '[]',
+      move_log_version: 1,
+    }
+
+    const withBaselineDb = async (
+      work: (
+        insert: (overrides?: Partial<Record<keyof typeof validRow, unknown>>) => void
+      ) => void
+    ) => {
+      const fake = createFakeDatabase()
+      const repository = loadRepository(fake)
+      await repository.initializeHistoryRepository()
+      const schemaSql = fake.execCalls.find((sql) => sql.includes('CREATE TABLE'))!
+
+      const db = new DatabaseSync(':memory:')
+      try {
+        db.exec(schemaSql)
+        const columns = Object.keys(validRow)
+        const statement = db.prepare(
+          `INSERT INTO history_entries (${columns.join(', ')})
+           VALUES (${columns.map(() => '?').join(', ')})`
+        )
+        work((overrides = {}) => {
+          const row = { ...validRow, id: `row_${Math.random()}`, ...overrides }
+          statement.run(...Object.values(row))
+        })
+      } finally {
+        db.close()
+      }
+    }
+
+    it('accepts a valid row (sanity)', async () => {
+      await withBaselineDb((insert) => {
+        expect(() => insert()).not.toThrow()
+        expect(() => insert({ moves_json: null, move_log_version: null })).not.toThrow()
+      })
+    })
+
+    it('rejects mismatched moves_json/move_log_version null pairing', async () => {
+      await withBaselineDb((insert) => {
+        expect(() => insert({ move_log_version: null })).toThrow(/CHECK/)
+        expect(() => insert({ moves_json: null })).toThrow(/CHECK/)
+      })
+    })
+
+    it('rejects invalid JSON in preview_json and moves_json', async () => {
+      await withBaselineDb((insert) => {
+        expect(() => insert({ preview_json: 'not-json' })).toThrow(/CHECK/)
+        expect(() => insert({ moves_json: 'not-json' })).toThrow(/CHECK/)
+      })
+    })
+
+    it('rejects STRICT type violations and out-of-range values', async () => {
+      await withBaselineDb((insert) => {
+        expect(() => insert({ draw_count: 'three' })).toThrow(/cannot store TEXT value/)
+        expect(() => insert({ draw_count: 7 })).toThrow(/CHECK/)
+        expect(() => insert({ status: 'won' })).toThrow(/CHECK/)
+        expect(() => insert({ move_count: -1 })).toThrow(/CHECK/)
+      })
+    })
   })
 
   it('aggregates solvable-deal stats in SQL and merges draw-count groups per deal', async () => {

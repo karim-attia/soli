@@ -1228,12 +1228,27 @@ before the freeze. All in `src/storage/historyRepository.native.ts` unless noted
   instead of streaming every row into JS at startup. The solvable-catalog filter
   and the per-exactId merge stay in JS (the catalog is a bundled TS module);
   returned shape unchanged for `createSolvableStatsMap` in `state/history.tsx`.
+- [x] **Final hardening round (2026-07-07) — STRICT + integrity CHECKs.**
+  The baseline DDL (edited directly — still pre-release) gained: (1) `STRICT` on
+  `CREATE TABLE` so type-mismatched binds are rejected instead of silently
+  coerced — verified that no writer binds a boolean (the dropped `solved` column
+  was the only 1/0 bind; every remaining bind in `toInsertParams`/
+  `toUpdateParams`/`markOtherActiveRowsIncomplete` is a string, number, or null);
+  (2) `CHECK ((moves_json IS NULL) = (move_log_version IS NULL))` — the reader
+  (`getHistoryEntryMoveLog`) treats the pair as both-or-neither and
+  `toMoveLogParams` writes both-or-neither, so the DB now enforces the invariant;
+  (3) `CHECK (json_valid(preview_json))` and
+  `CHECK (moves_json IS NULL OR json_valid(moves_json))`. New negative tests run
+  the exact captured baseline DDL in a real SQLite engine (Node's built-in
+  `node:sqlite`) and prove each constraint rejects bad writes (mismatched paired
+  nulls, invalid JSON, TEXT into `draw_count`, out-of-range values).
 - [x] **Gates**: `yarn typecheck` ✓ `yarn lint` ✓ `yarn jest` ✓.
   Repository contract tests updated: v1 baseline assertions (CHECKs incl.
-  `BETWEEN 1 AND 5`, `move_count`, no `solved` column, no exact_id index),
-  scaffold tests (fresh 0 → creates at 1, at-1 → untouched, 2 → refused), and a
-  new SQL-aggregation test for the solvable stats (real catalog IDs, off-catalog
-  rows filtered). No device build (per instructions).
+  `BETWEEN 1 AND 5`, `move_count`, no `solved` column, no exact_id index, STRICT
+  + JSON/paired-null CHECKs), scaffold tests (fresh 0 → creates at 1, at-1 →
+  untouched, 2 → refused), a SQL-aggregation test for the solvable stats (real
+  catalog IDs, off-catalog rows filtered), and real-engine negative constraint
+  tests. No device build (per instructions).
 
 Files modified: `src/storage/historyRepository.native.ts` (FIX 1/2/3/5/C),
 `src/state/settings.tsx` (FIX 4), `src/features/klondike/hooks/useKlondikeGame.ts`

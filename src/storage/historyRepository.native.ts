@@ -32,6 +32,11 @@ const DATABASE_VERSION = 1
 //   (the serialized move log).
 // - No `(exact_id)` index: no query filters on exact_id (row lookups go by PK; the
 //   solvable-stats aggregate scans the whole table by design).
+// - STRICT: rejects type-mismatched binds instead of silently coercing them.
+//   Verified safe: no writer binds a boolean (the dropped `solved` column was the
+//   only candidate) — every bind is a string, number, or null.
+// - Paired-null CHECK on moves_json/move_log_version: getHistoryEntryMoveLog reads
+//   the pair as both-or-neither, so the DB enforces exactly that.
 const MIGRATIONS: ReadonlyArray<{ toVersion: number; sql: string }> = [
   {
     toVersion: 1,
@@ -46,11 +51,12 @@ const MIGRATIONS: ReadonlyArray<{ toVersion: number; sql: string }> = [
         draw_count INTEGER NOT NULL CHECK (draw_count BETWEEN 1 AND 5),
         move_count INTEGER CHECK (move_count >= 0),
         duration_ms INTEGER CHECK (duration_ms >= 0),
-        preview_json TEXT NOT NULL,
+        preview_json TEXT NOT NULL CHECK (json_valid(preview_json)),
         status TEXT NOT NULL CHECK (status IN ('active', 'incomplete', 'solved')),
-        moves_json TEXT,
-        move_log_version INTEGER
-      );
+        moves_json TEXT CHECK (moves_json IS NULL OR json_valid(moves_json)),
+        move_log_version INTEGER,
+        CHECK ((moves_json IS NULL) = (move_log_version IS NULL))
+      ) STRICT;
       CREATE INDEX history_entries_started_at
         ON history_entries(started_at DESC, id DESC);
       CREATE UNIQUE INDEX history_entries_one_active
