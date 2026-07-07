@@ -82,6 +82,7 @@ Fill in the following sections:
 - ## Testing
 - ## Follow-ups
   - Quick description, pros and cons, reasoning with trade-offs and a recommendation
+  - OK to only fill at end of turn, not when creating implementation plan
 
 # Implementation
 
@@ -122,7 +123,7 @@ However, also test everything you do in a real environment (when it makes sense!
 ## Commands
 
 - Cheap gates: `yarn typecheck` — `yarn lint` — `yarn jest`
-- Device build+run: `yarn ios` (simulator) / `yarn release` (Android phone) — flags and everything else: soli-testing skill
+- Device build+run: `yarn release` (Android phone) or `yarn ios` (simulator) — flags and everything else: soli-testing skill
 
 # External packages
 
