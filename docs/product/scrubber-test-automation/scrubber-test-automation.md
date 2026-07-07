@@ -654,6 +654,45 @@ Device-validation learnings (2026-07-06, C2 Android completion run):
   board with MOVES 80 — the moveLog's coalesced scrub entries survive the
   round-trip, not just the fixture's initial 40/40 split.
 
+Device-validation learnings (2026-07-06 late evening, Android full workout):
+
+- **Injected pans with < ~275 px horizontal travel silently no-op on this
+  device** (agent-device 0.18.3 `gesture pan`, both directions): +87, +117,
+  +174, +205, −87 all left the board unchanged (no pan, no fallback tap),
+  while every ≥275 px pan from a settled state worked. Operational recipe:
+  never compute a short drag for a small index delta — instead move the
+  START point along the track (the anchor formula anchors wherever the
+  finger lands, the Undo button spans x 540–1062 with hitSlop ±20) so the
+  travel stays ≥ ~275 px, e.g. target +41 steps → `pan 540 2150 292` rather
+  than `pan 801 2150 117`. One ambiguity: `pan 770 2150 275` failed twice
+  shortly after cold start — prefer start points ≤ 700 px for redo drags
+  until someone isolates start-x vs settle-time.
+- **Wait ≥2 s after a scrub and ~7 s after a cold-start deep link before the
+  next gesture, and verify labels after every pan (retry once)**: back-to-back
+  pans no-oped twice (`pan 801 2150 -522` fired ~4 s after a previous pan did
+  nothing; the identical retry 2 s later worked), and two right-pans fired
+  4-7 s after the deep link no-oped — consistent with the board-lock window
+  during hydrate/reveal and post-scrub re-render. The verify-and-retry-once
+  loop turned an ~80 % per-drag success rate into 100 % task success.
+- **±1 rounding jitter is real at 80 indices/track** (~8.7 px/index): the
+  same −522 command landed exactly 20 in one session and 19 in another;
+  mid-track redo drags landed +1 twice. Assert with a ±1 tolerance and
+  correct with a tap-undo, or target generously separated indices (the
+  Identified-issues mitigation, now empirically confirmed on Android too).
+- **A foreign automation loop hijacked the device mid-workout** (~22:41-22:45:
+  repeating tap-driven cycle: abort celebration → new deal → Demo sheet →
+  "Old demo game" → auto-solve win, every ~30 s, 8 cycles; zero raw
+  touchscreen events in `getevent`, so injected input, source unknown —
+  possibly another concurrent agent session). It overwrote the scrubbed
+  fixture and cost ~15 min of confused debugging until logcat showed
+  `demoMode:"old"` loads nobody requested. Learning: before attributing weird
+  device state to the app, grep logcat for demo/game loads you did not fire;
+  and only one automation stack should own the device at a time.
+- The device dozed twice more despite `screen_off_timeout` 600000 (likely
+  power-button/AOD behavior) — run the unlock script immediately before any
+  timing-critical step, and treat a black screencap + app stuck at
+  `Running "main"` as the doze signature (JS does not mount until wake).
+
 ## Identified issues
 
 - **Two XCTest automation stacks (agent-device + Appium/WDA) on one simulator
@@ -684,6 +723,44 @@ Device-validation learnings (2026-07-06, C2 Android completion run):
   60, 80). Status: open, calibrate in A3.
 - **Fixture drift if the playlist is regenerated**: the validating fold throws,
   unit test fails loudly. Status: mitigated by design.
+- **NEW (2026-07-06 Android workout): redo is unreachable from index 0 on
+  Android.** At index 0 `canUndo` is false and `GestureWrapper` sets
+  `accessibilityState={{ disabled: true }}` on the gesture target
+  (`UndoScrubber.tsx`); on Android RN maps that to the native view's
+  `enabled=false`, which drops ALL touch events — so the RNGH pan (which
+  deliberately does NOT check `canUndo`, redo-from-0 is a designed use case
+  per `computeScrubIndexFromAbsolute`'s rightSteps branch) never receives the
+  gesture. Verified: every injected pan AND raw `adb shell input swipe` from
+  index 0 no-ops, snapshot shows `[button] "Undo" [disabled]`; the identical
+  drags work from index ≥ 10, and iOS full-right-from-0 worked in C1 (iOS
+  `accessibilityState.disabled` is a11y-only, does not block touches). Impact:
+  a user who scrubs fully left on Android cannot scrub forward again (tap-redo
+  via cards still works, so not data loss).   Recommended fix (not applied in
+  the testing run): keep the a11y announcement but stop disabling the native
+  view — e.g. move the disabled state to `accessibilityValue`/label text, or
+  set `accessibilityState` only on iOS, or gate it on
+  `timelineRange === 0` instead of `!canUndo`.
+  Status: **RESOLVED 2026-07-06 late night** — Karim removed
+  `accessibilityState={{ disabled: !canUndo }}` from the `GestureWrapper`
+  (comment left in `UndoScrubber.tsx`); re-verified on-device after a fresh
+  `yarn release` (build 26 s, versionCode 13, installed 23:19):
+  - Full-left to index 0 (Stock 24, initial-deal tops), Undo pill still
+    visually dimmed; a11y node now reads plain `[button] "Undo"` (previously
+    `[button] "Undo" [disabled]`).
+  - **Redo from index 0 now works**: `gesture pan 540 2150 435 0 1500` landed
+    EXACTLY index 80 (`Stock, 13 cards`, `Waste, Ten of hearts`,
+    `Hearts foundation, Two of hearts`, column 2 empty, MOVES 80).
+  - Tap on Undo at index 0: still a safe no-op (no undo, no crash) — the
+    `canUndo` guard in `handleTapEnd` covers it.
+  - Tap-undo regression check at index 80 → exactly index 79 (`Stock, 13`,
+    `Waste, Six of clubs`).
+  - Screenshots `android-redofix-01-index0.png` /
+    `android-redofix-02-after-redo.png`.
+  - Accepted trade-off: TalkBack no longer announces the disabled state on
+    the resting Undo button (dim opacity is the only cue); revisit via
+    `accessibilityValue` if a11y polish becomes a story. iOS untested after
+    the fix (removal is a no-op for iOS touch handling — `accessibilityState`
+    never blocked touches there; C1 behavior unaffected by construction).
 
 ## Testing
 
@@ -722,11 +799,44 @@ Device-validation learnings (2026-07-06, C2 Android completion run):
    hearts`, MOVES 80, tableau tops 7♦ 2♦ 2♠ 7♥ 5♣ 9♣ Q♣, `Clubs foundation,
    Ace of clubs`); `gesture pan 801 2150 -339 0 1500` on the Undo button
    landed EXACTLY on index 20 again (`Stock, 7 cards`, `Waste, Two of
-   spades`, MOVES 80) — the pan geometry is unaffected by the HUD pill now
+   spades`, MOVES 80) — the    pan geometry is unaffected by the HUD pill now
    sharing the bottom dock (Undo center unchanged at 801,2150); one tap-undo
    → exactly index 19 (`Stock, 8 cards`, `Waste, Nine of diamonds`).
    Screenshots `android-r3-01..03` in
    `.test-artifacts/scrubber-test-automation/`.
+6. **Android full workout (scrubbed fixture), 2026-07-06 late evening —
+   PASSED with two significant new findings** (physical A065, same
+   probe-enabled release build; screenshots `android-workout-01..08` in
+   `.test-artifacts/scrubber-test-automation/`; per-index waste/stock
+   reference table generated by folding the fixture 0..80 — regenerate with a
+   throwaway jest test over `applyDemoReplayMoveForValidation` when needed):
+   - Cold-start deep link → index 40 exact (`Stock, 10 cards`, `Waste, Six of
+     hearts`, MOVES 80). ✓
+   - **Redo-direction pan (new)**: from anchor 40, `gesture pan 700 2150 275
+     0 1500` → index 80 EXACT (`Stock, 13 cards`, `Waste, Ten of hearts`,
+     `Hearts foundation, Two of hearts`); reproduced 3/3 once settled. From
+     anchor 10, `pan 540 2150 435` → 80 EXACT. ✓
+   - Full-left pan (`pan 801 2150 -696`) → index 0 EXACT (`Stock, 24 cards`,
+     waste node absent = empty, initial-deal tops 8♠ 2♦ 4♠ 7♦ 6♦ 9♣ Q♣,
+     MOVES 80 preserved). Reproduced 4/4. ✓
+   - Full-right from index 0: **IMPOSSIBLE on Android — real app finding, see
+     Identified issues** (Undo disabled at index 0 kills ALL touches on the
+     gesture wrapper; raw `input swipe` fails too; iOS was fine in C1 via
+     Appium). Full-right from any index ≥ ~10 with ≥275 px travel lands 80
+     exactly. ✓ (with caveat)
+   - Back-and-forth cycle: 80 → target 20 via `pan 801 2150 -522` landed 19
+     (−1; the same command landed 20 exactly in run 5 — rounding jitter at
+     ~8.7 px/index is ±1). 19 → target 60 via `pan 540 2150 292` landed 61
+     (+1; a second cycle run `pan 550 2150 286` from 19 also landed 61).
+     Undo-direction landings were exact in 6/7 drags; redo-direction landed
+     +1 in 2/2 mid-track cycles and exact in 3/3 full-right drags. ✓ (±1)
+   - Three tap-undos from 61: 60 (`Stock, 13`/`Waste, King of spades`) → 59
+     (`14`/`Six of clubs`) → 58 (`15`/`Ten of hearts`) — each exactly one
+     step, labels = fold reference. Reproduced twice (also 61→60→59→58 in
+     the first cycle run). ✓
+   - Kill + plain relaunch at index 58 → restored EXACT (`Stock, 15 cards`,
+     `Waste, Ten of hearts`, MOVES 80) — move-log replay including two pans
+     and three tap-undos after the last scrub. Verified twice this session. ✓
 
 ## Follow-ups
 

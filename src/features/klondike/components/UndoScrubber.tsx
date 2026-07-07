@@ -68,7 +68,12 @@ const GestureWrapper = React.memo(
           accessible
           accessibilityRole="button"
           accessibilityLabel="Undo"
-          accessibilityState={{ disabled: !canUndo }}
+          // No accessibilityState={{ disabled: !canUndo }} here: on Android it
+          // disables the NATIVE view, which drops all touches — the scrub pan
+          // (which deliberately ignores canUndo so redo works from index 0)
+          // then never fires, making redo unreachable after a full-left scrub.
+          // Found 2026-07-06 by the Android scrubber workout; dimmed opacity
+          // already conveys the disabled look.
           testID="undo"
         >
           <Undo2 size={20} color="#000" />
