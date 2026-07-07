@@ -17,6 +17,21 @@ const { spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 
+// Agent/CI shells (e.g. Cursor) export both NO_COLOR=1 and FORCE_COLOR=0,
+// which makes every Node child print "The 'NO_COLOR' env is ignored due to
+// the 'FORCE_COLOR' env being set" — ~12 lines of noise per build. Dropping
+// FORCE_COLOR alone is NOT enough: Metro's WorkerFarm.js hardcodes
+// FORCE_COLOR=1 into each of its 12 transform workers' env, so an inherited
+// NO_COLOR still triggers the warning per worker (verified 2026-07-07).
+// Dropping both restores Metro's universal default (workers colored, parent
+// auto-detects TTY) — the same behavior as any normal dev machine. Only done
+// when NO_COLOR is set, so a deliberate FORCE_COLOR=1 in a normal terminal
+// still forces color.
+if (process.env.NO_COLOR) {
+  delete process.env.FORCE_COLOR
+  delete process.env.NO_COLOR
+}
+
 const PACKAGE_NAME = 'ch.karimattia.soli'
 const APP_LOG_PREFIX = '[SoliDev]'
 const REPOSITORY_ROOT = path.resolve(__dirname, '..', '..')
@@ -618,6 +633,13 @@ const buildReleaseApk = async ({ logFilePath = createBuildLogFilePath() } = {}) 
   // docs/product/faster-builds/. Defaulted here (not in run-android-release.sh)
   // so demo builds get the single-ABI speedup too.
   process.env.ORG_GRADLE_PROJECT_reactNativeArchitectures ??= 'arm64-v8a'
+
+  // Bare gradlew means Expo CLI never sets NODE_ENV, so the
+  // :expo-constants:createExpoConfig task warns "NODE_ENV … was not specified"
+  // and env-file selection falls back to .env.local/.env only. This is a
+  // release build, so pin production (matches what `expo run:android
+  // --variant release` would set). ??= keeps a caller override possible.
+  process.env.NODE_ENV ??= 'production'
 
   fs.mkdirSync(path.dirname(logFilePath), { recursive: true })
   const logStream = fs.createWriteStream(logFilePath)

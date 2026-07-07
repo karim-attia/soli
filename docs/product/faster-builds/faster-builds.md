@@ -177,6 +177,11 @@ being tested (production-fidelity release variant on Android).
   run-android-release.sh, saving expo CLI startup/config/device-resolution overhead;
   (b) USB instead of Wi-Fi adb (removes install-transfer time and the observed port-rotation
   flakiness). Optional micro-win: android.enablePngCrunchInReleaseBuilds=false.
+- Kotlin version (evaluated 2026-07-07): 2.1.20, inherited from RN 0.86's version catalog —
+  the ecosystem norm. Already a K2-compiler release (the big compile-speed jump); Kotlin
+  compile tasks are skipped in the warm loop anyway. Do NOT override `kotlinVersion`:
+  Expo modules hard-errors on Kotlin >= 2.3.0 and prebuilt deps can hit metadata
+  incompatibilities. It upgrades automatically with Expo SDK/RN bumps (RN 0.87 → 2.2.0).
 - Bun vs Node (evaluated 2026-07-06): not a build-speed lever. Gradle hardcodes `node`
   invocations in android/app/build.gradle (bundling, entry resolution), hermesc is a native
   binary, install is adb — Bun would only shave ~1-2s of expo CLI boot. RN tooling still
