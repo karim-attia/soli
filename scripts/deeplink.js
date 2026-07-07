@@ -11,8 +11,10 @@
  * that deliberately lives only in .agents/skills/soli-testing/SKILL.md, so
  * per-link docs can't go stale in two places.
  *
- * Auto-target: booted iOS simulator if one exists, else the connected Android
- * device (Karim's typical case: no sim booted, phone plugged in → zero flags).
+ * Default target: the connected Android device (Karim's phone — his typical
+ * manual case, zero flags). Falls back to a booted iOS simulator when no adb
+ * device is connected; `--ios` forces the simulator (agents usually want this).
+ * 2026-07-07: flipped from sim-first to android-first per Karim.
  */
 
 const { spawnSync } = require('child_process')
@@ -115,6 +117,19 @@ const hasBootedSimulator = () => {
   return result.status === 0 && result.stdout.includes('(Booted)')
 }
 
+const listAndroidSerials = () => {
+  const result = run('adb', ['devices'])
+  if (result.status !== 0 || result.error) {
+    return []
+  }
+  return result.stdout
+    .split('\n')
+    .slice(1)
+    .map((line) => line.trim().split(/\s+/))
+    .filter((parts) => parts.length === 2 && parts[1] === 'device')
+    .map((parts) => parts[0])
+}
+
 const resolveAndroidSerial = (explicit) => {
   if (explicit) {
     return explicit
@@ -122,18 +137,9 @@ const resolveAndroidSerial = (explicit) => {
   if (process.env.ANDROID_SERIAL) {
     return process.env.ANDROID_SERIAL
   }
-  const result = run('adb', ['devices'])
-  if (result.status !== 0 || result.error) {
-    fail(`adb devices failed: ${(result.stderr || result.error?.message || '').trim()}`)
-  }
-  const serials = result.stdout
-    .split('\n')
-    .slice(1)
-    .map((line) => line.trim().split(/\s+/))
-    .filter((parts) => parts.length === 2 && parts[1] === 'device')
-    .map((parts) => parts[0])
+  const serials = listAndroidSerials()
   if (!serials.length) {
-    fail('No adb devices connected (and no booted iOS simulator).')
+    fail('No adb devices connected. Connect the phone, or use --ios for the simulator.')
   }
   if (serials.length > 1) {
     // Never guess between devices — one might be Karim's main phone.
@@ -150,7 +156,12 @@ const main = () => {
     options.retry && !baseUrl.includes('#')
       ? `${baseUrl}#retry-${Date.now()}`
       : baseUrl
-  const target = options.target ?? (hasBootedSimulator() ? 'ios' : 'android')
+  // Android-first: phone when connected, sim as fallback (see header comment).
+  const target =
+    options.target ??
+    (options.serial || process.env.ANDROID_SERIAL || listAndroidSerials().length
+      ? 'android'
+      : 'ios')
 
   if (target === 'android') {
     const serial = resolveAndroidSerial(options.serial)

@@ -57,7 +57,7 @@ Parsed by `processDemoLink()` in `src/features/klondike/hooks/useDemoGameLaunche
 
 Optional param `recordHistory=false` (alias `history`) disables reducer history snapshots on playlist runs. One param family per link (e.g. don't combine `set=` and `deal=` — the first matching family wins).
 
-Delivery — primary recipe (2026-07): `yarn deeplink` wraps the foot-guns (auto `#retry-<nonce>` against both dedup layers, sensible force-stop defaults, adb serial selection). Target auto-picks: booted iOS simulator if one exists, else the connected Android device; force with `--ios`/`--android` (`--serial <s>` when several adb devices).
+Delivery — primary recipe (2026-07): `yarn deeplink` wraps the foot-guns (auto `#retry-<nonce>` against both dedup layers, sensible force-stop defaults, adb serial selection). **Default target: the connected Android device** (Karim's phone — his manual zero-flag case); falls back to a booted iOS simulator when no adb device is connected. **Agents testing on the simulator should pass `--ios` explicitly** — the phone is usually connected, so relying on the fallback WILL hit the phone. `--serial <s>` when several adb devices.
 
 | Shortcut | Delivers | Cold default |
 |---|---|---|
