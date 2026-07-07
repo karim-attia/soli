@@ -641,7 +641,13 @@ const AbsoluteLayerCard = React.memo(
       {
         width: metrics.width,
         height: metrics.height,
-        zIndex: isSettling ? 10000 + item.zIndex : item.zIndex,
+        // Boost must include targetChangedBeforeEffect, not just isSettling: isSettling
+        // only flips in the post-commit effect, so the first committed frame(s) of a
+        // flight would otherwise carry the *destination* zIndex un-boosted. For moves to
+        // a lower z (tableau -> foundation, right column -> left column) that made the
+        // flight start behind other columns' cards, visible on slow devices/simulators.
+        zIndex:
+          isSettling || targetChangedBeforeEffect ? 10000 + item.zIndex : item.zIndex,
         transform: [
           { translateX },
           { translateY },
