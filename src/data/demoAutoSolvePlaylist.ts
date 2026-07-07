@@ -4,7 +4,7 @@ let cachedPlaylist: readonly DemoAutoSolvePlaylistEntry[] | null = null
 
 // The generated playlist is ~617KB of object literals used only by the hidden
 // developer demo. It must stay in the release bundle (demo mode is a runtime
-// toggle reachable via deep links and `yarn prod`), but a lazy require keeps its
+// toggle reachable via deep links and `yarn release --logs`), but a lazy require keeps its
 // evaluation off the normal startup path instead of relying on Metro's implicit
 // inline-requires behavior.
 export const getDemoAutoSolvePlaylist = (): readonly DemoAutoSolvePlaylistEntry[] => {

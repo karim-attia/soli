@@ -116,12 +116,10 @@ However, also test everything you do in a real environment (when it makes sense!
 Native: Use agent-device skill
 Web: Use Playwright with skill (but no need to test on web since the app is for native only, but it's an option.)
 
-Android: Run "yarn release" and wait until the build is complete. Use scripts/android-unlock-pattern.sh script to unlock physical Android device if it's locked.
-iOS: Always run a clean build on the connected simulator. Make sure the build is finished before checking on the device.
+Android: Run "yarn release" — it handles competing builds, locking, install verification, and app launch itself, then exits. "yarn release --logs" also streams filtered [SoliDev] logs until Ctrl+C. "yarn release --auto-solve" builds and auto-plays the demo playlist (DEMO_GAME_LIMIT=N limits games). Full Gradle log lands in .test-artifacts/builds/. Unlock a locked device with scripts/android-unlock-pattern.sh (safe on an unlocked phone — it exits without touching the screen).
+iOS: Run "yarn ios" — same handling as yarn release (competing builds, shared lock, install verification), builds Release to the simulator, then exits. Flags: --logs, --auto-solve, --debug (Metro dev build, lingers). Incremental by default; use a clean build (delete ios/ or --no-build-cache) only after native dependency changes.
 
-Never run two builds at the same time as otherwise the computer nearly crashes when running builds in parallel, e.g. iOS and Android in parallel. Also check if there are other processes running a build and kill them first. If there is already a build running, this is no excuse to not run the build and test on an outdated build. Kill the other build first, then build, then test.
-
-Check if the build was actually installed on the device or the device/emulator.
+Never start two builds in parallel (e.g. yarn ios and yarn release simultaneously) — the machine can't handle it. Both commands enforce this themselves via a shared lock (the second invocation fails fast).
 
 - The board exposes a full a11y tree — prefer it over coordinate taps. Android handle: labels/content-desc (e.g. "Seven of hearts, column 3", "Stock, 24 cards", "Face-down card, column N"). iOS handle: testIDs ("stock", "waste", "card-<suit>-<rank>", "foundation-<suit>"). Source of truth: src/features/klondike/components/cards/accessibility.ts.
 - agent-device: `snapshot -i` dedupes identical labels; use `snapshot --raw` to count face-down cards. `uiautomator dump` fails on this app (timer never idles).
@@ -130,8 +128,8 @@ Check if the build was actually installed on the device or the device/emulator.
 ## Commands
 
 - Typecheck: `yarn typecheck` — Lint: `yarn lint` — Tests: `yarn jest`
-- iOS build+run: `yarn ios` (connected simulator, clean build)
-- Android release: `yarn release`; unlock device: `scripts/android-unlock-pattern.sh`
+- iOS build+run: `yarn ios` (flags: `--logs`, `--auto-solve`, `--debug`; details in Testing)
+- Android release: `yarn release` (flags: `--logs`, `--auto-solve`; details in Testing) — unlock device: `scripts/android-unlock-pattern.sh`
 - iOS scrub drag: start `appium`, then `node scripts/ios-scrub.js --from N --max M --to T` (agent-device can't pan on iOS; Android pans natively; serialize with agent-device — see docs/external-package-guides/appium.md)
 
 # External packages

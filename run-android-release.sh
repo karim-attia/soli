@@ -2,17 +2,17 @@
 
 set -euo pipefail
 
+# Start-of-run timestamp so the Node entry's total-duration line includes this
+# script's discovery/pinning phase (macOS date has no %N — second resolution
+# is plenty for a total measured in minutes).
+export SOLI_RELEASE_START_EPOCH_MS="$(($(date +%s) * 1000))"
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${ROOT_DIR}/.env"
 
-# Local phone builds only need arm64-v8a. This env project property overrides the
-# 4-ABI default in android/gradle.properties (survives `expo prebuild --clean`) and
-# does NOT affect Play Store builds (build-android.sh keeps all ABIs).
-# Benchmarked 2026-07-06: warm loop 47.6s -> ~39s (install of 50MB vs 113MB APK);
-# cold builds skip ~75% of native C++ compilation. See docs/product/faster-builds/.
-export ORG_GRADLE_PROJECT_reactNativeArchitectures="${ORG_GRADLE_PROJECT_reactNativeArchitectures:-arm64-v8a}"
+# Note: the arm64-v8a ABI default moved into scripts/lib/build-tools.js
+# (buildReleaseApk) so demo builds get the single-ABI speedup too.
 BUILD_GRADLE_FILE="${ROOT_DIR}/android/app/build.gradle"
-EXPO_RELEASE_COMMAND=(yarn expo run:android --variant release)
 CONNECT_CANDIDATES=()
 DISCOVERED_STABLE_SERIAL=""
 REQUIRED_SIGNING_KEYS=(
@@ -192,7 +192,7 @@ EOF
             keyPassword 'android'
         }
         release {
-            // Keep release config valid for local debug workflows (e.g. `yarn android`).
+            // Keep release config valid for local debug workflows (e.g. `expo run:android`).
             storeFile file('debug.keystore')
             storePassword 'android'
             keyAlias 'androiddebugkey'
@@ -249,9 +249,9 @@ EOF
   ' "${BUILD_GRADLE_FILE}"
 
   file_after_patch="$(cat "${BUILD_GRADLE_FILE}")"
-  if [[ "${file_before_patch}" == "${file_after_patch}" ]]; then
-    echo "Android signing config already correct" >&2
-  else
+  # Only report when something changed — the "already correct" case is the
+  # happy-path norm and printing it added noise (output-cleanup round 2026-07).
+  if [[ "${file_before_patch}" != "${file_after_patch}" ]]; then
     echo "Repaired Android signing config" >&2
   fi
 }
@@ -347,6 +347,24 @@ collect_mdns_candidates() {
   fi
 }
 
+# Ask the device itself for its Wi-Fi IP (works for any transport, incl. mDNS
+# TLS aliases). Used by both alias-derived candidate discovery and tcpip pinning.
+resolve_device_wlan_ip() {
+  local adb_bin="$1"
+  local serial="$2"
+  local device_ip=""
+
+  device_ip="$("${adb_bin}" -s "${serial}" shell ip route 2>/dev/null | awk '/wlan0/ && /src/ {for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}')"
+  if [[ -z "${device_ip}" ]]; then
+    device_ip="$("${adb_bin}" -s "${serial}" shell ip addr show wlan0 2>/dev/null | awk '/inet / {split($2, parts, "/"); print parts[1]; exit}')"
+  fi
+
+  if [[ -z "${device_ip}" ]]; then
+    return 1
+  fi
+  echo "${device_ip}"
+}
+
 derive_candidate_from_alias_connection() {
   local adb_bin="$1"
   local server_pid=""
@@ -365,10 +383,7 @@ derive_candidate_from_alias_connection() {
     [[ "${line}" != *"_adb-tls-connect._tcp device "* ]] && continue
 
     alias_serial="${line%% device *}"
-    device_ip="$("${adb_bin}" -s "${alias_serial}" shell ip route 2>/dev/null | awk '/wlan0/ && /src/ {for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}')"
-    if [[ -z "${device_ip}" ]]; then
-      device_ip="$("${adb_bin}" -s "${alias_serial}" shell ip addr show wlan0 2>/dev/null | awk '/inet / {split($2, parts, "/"); print parts[1]; exit}')"
-    fi
+    device_ip="$(resolve_device_wlan_ip "${adb_bin}" "${alias_serial}" || true)"
 
     [[ -z "${device_ip}" ]] && continue
 
@@ -461,6 +476,67 @@ connect_candidates() {
   return 1
 }
 
+# Best-effort pin of the wireless adb connection to port 5555. mDNS-assigned
+# ports rotate across reconnects/reboots (killed benchmark runs before — see
+# docs/product/faster-builds/), while `adb connect <ip>:5555` stays deterministic.
+# Handles both rotating-port `ip:port` serials and mDNS TLS alias serials
+# (`adb-...._adb-tls-connect._tcp` — Karim's phone connects this way, so the
+# alias path is the one that actually fires day-to-day; added round 2 2026-07).
+# `adb tcpip 5555` restarts adbd and drops the live connection, hence the
+# reconnect loop below and the strict fallback: never fail the build because
+# pinning failed — keep the just-working original serial instead.
+pin_tcpip_port() {
+  local adb_bin="$1"
+  local serial="$2"
+  local ip=""
+  local pinned=""
+  local attempt=0
+
+  if [[ "${serial}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]]; then
+    if [[ "${serial}" == *":5555" ]]; then
+      echo "${serial}"
+      return 0
+    fi
+    ip="${serial%%:*}"
+  elif [[ "${serial}" == *"_adb-tls-connect._tcp"* ]]; then
+    ip="$(resolve_device_wlan_ip "${adb_bin}" "${serial}" || true)"
+    if [[ -z "${ip}" ]]; then
+      echo "Note: could not resolve device Wi-Fi IP; keeping serial ${serial}." >&2
+      echo "${serial}"
+      return 0
+    fi
+  else
+    # USB or emulator serial — nothing to pin.
+    echo "${serial}"
+    return 0
+  fi
+
+  pinned="${ip}:5555"
+
+  if ! "${adb_bin}" -s "${serial}" tcpip 5555 >/dev/null 2>&1; then
+    echo "Note: could not pin adb to port 5555; keeping serial ${serial}." >&2
+    echo "${serial}"
+    return 0
+  fi
+
+  for attempt in $(seq 1 10); do
+    "${adb_bin}" connect "${pinned}" >/dev/null 2>&1 || true
+    if [[ "$("${adb_bin}" -s "${pinned}" get-state 2>/dev/null || true)" == "device" ]]; then
+      echo "Pinned adb connection to ${pinned}." >&2
+      echo "${pinned}"
+      return 0
+    fi
+    sleep 1
+  done
+
+  # Pinning restarted adbd, so the original serial may be gone too — try to
+  # reconnect it once before giving up on this run's serial. (For alias serials
+  # newer adb versions accept the service name in `adb connect`; best-effort.)
+  "${adb_bin}" connect "${serial}" >/dev/null 2>&1 || true
+  echo "Note: pinning to ${pinned} failed after 10s; keeping serial ${serial}." >&2
+  echo "${serial}"
+}
+
 warn_if_short_screen_timeout() {
   local adb_bin="$1"
   local serial="$2"
@@ -520,6 +596,7 @@ main() {
   fi
 
   if [[ -n "${stable_serial}" ]]; then
+    stable_serial="$(pin_tcpip_port "${adb_bin}" "${stable_serial}")"
     export ANDROID_SERIAL="${stable_serial}"
   else
     echo "Error: no physical Android device is connected." >&2
@@ -529,7 +606,11 @@ main() {
   fi
 
   warn_if_short_screen_timeout "${adb_bin}" "${stable_serial}"
-  "${EXPO_RELEASE_COMMAND[@]}"
+  # exec (not a plain call) so no shell parent lingers after the Node entry
+  # exits; "$@" forwards --logs/--auto-solve. Bare gradlew replaced `expo run:android` here —
+  # autolinking + RN codegen run inside Gradle, so no expo codegen step is lost
+  # (see scripts/lib/build-tools.js).
+  exec node "${ROOT_DIR}/scripts/build-install-android.js" "$@"
 }
 
 main "$@"

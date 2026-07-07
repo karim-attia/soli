@@ -44,7 +44,7 @@ EOF
             keyPassword 'android'
         }
         release {
-            // Keep release config valid for local debug workflows (e.g. `yarn android`).
+            // Keep release config valid for local debug workflows (e.g. `expo run:android`).
             storeFile file('debug.keystore')
             storePassword 'android'
             keyAlias 'androiddebugkey'

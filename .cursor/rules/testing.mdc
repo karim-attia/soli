@@ -1,8 +1,7 @@
 ---
 alwaysApply: false
 ---
-you can launch the app and see logs by running `yarn demo:auto-solve`
-this runs 'run-demo-autosolve.js'
-it will emit a message if there is a connected device, just try it.
+you can launch the app and see logs by running `yarn release --logs`
+for an automated end-to-end game, run `DEMO_GAME_LIMIT=1 yarn release --auto-solve` (builds, installs, auto-plays the demo playlist, exits on completion)
 when analyzing an issue, you might want to add logs first with 'devLog' from 'src/utils/devLogger.ts' to see them
 this mostly makes sense when testing logical functionality
