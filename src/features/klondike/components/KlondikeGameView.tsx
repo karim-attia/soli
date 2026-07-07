@@ -30,6 +30,7 @@ export type KlondikeGameViewProps = {
   celebrationLabel: string | null
   celebrationBindings: CelebrationBindings
   onCelebrationAbort: () => void
+  onCelebrationBadgePress: () => void
   undoScrubProps: UndoScrubberProps
   absoluteCardLayerProps: AbsoluteCardLayerProps | null
 }
@@ -46,6 +47,7 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
   celebrationLabel,
   celebrationBindings,
   onCelebrationAbort,
+  onCelebrationBadgePress,
   undoScrubProps,
   absoluteCardLayerProps,
 }) => {
@@ -103,7 +105,12 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
           <CelebrationTouchBlocker onAbort={onCelebrationAbort} />
         ) : null}
 
-        {celebrationLabel ? <CelebrationDebugBadge label={celebrationLabel} /> : null}
+        {celebrationLabel ? (
+          <CelebrationDebugBadge
+            label={celebrationLabel}
+            onPress={onCelebrationBadgePress}
+          />
+        ) : null}
       </YStack>
 
       {/* Shared relative wrapper so the demo HUD (absolute, left half) aligns

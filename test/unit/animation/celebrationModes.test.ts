@@ -1,5 +1,5 @@
 import {
-  CELEBRATION_MODE_COUNT,
+  CELEBRATION_MODE_METADATA,
   computeCelebrationFrame,
   type CelebrationAssignment,
 } from '../../../src/animation/celebrationModes'
@@ -17,7 +17,7 @@ const buildAssignment = (index: number): CelebrationAssignment => ({
   baseX: 40 + (index % 4) * 70,
   baseY: 20,
   stackIndex: index % 13,
-  suitIndex: index % 4,
+  suitIndex: Math.floor(index / 13) % 4,
   // Deterministic pseudo-random seed spread over [0, 1).
   randomSeed: ((index * 37) % 100) / 100,
   index,
@@ -38,6 +38,16 @@ const frameAt = (modeId: number, assignment: CelebrationAssignment, progress: nu
   return frame
 }
 
+// Offscreen exemption: respawn-style modes (e.g. Card Rain) may teleport a card's
+// position, but only while it is fully outside the board bounds by >= 2 card sizes,
+// where the jump can never be seen. Only position assertions may be skipped under it;
+// rotation/scale/opacity/rawProgress must always stay continuous.
+const isFullyOffscreen = (pathX: number, pathY: number) =>
+  pathX + METRICS.width <= -2 * METRICS.width ||
+  pathX >= BOARD.width + 2 * METRICS.width ||
+  pathY + METRICS.height <= -2 * METRICS.height ||
+  pathY >= BOARD.height + 2 * METRICS.height
+
 describe('computeCelebrationFrame continuity', () => {
   // Half a frame at 60fps over the 60s celebration.
   const halfFrameProgress = 1 / (60 * 60 * 2)
@@ -51,8 +61,8 @@ describe('computeCelebrationFrame continuity', () => {
     expect(boundaryDelta).toBeLessThan(referenceDelta * 3 + slack)
   }
 
-  for (let modeId = 0; modeId < CELEBRATION_MODE_COUNT; modeId += 1) {
-    it(`mode ${modeId} has no jump at former cycle wrap boundaries`, () => {
+  for (const { id: modeId, name } of CELEBRATION_MODE_METADATA) {
+    it(`mode ${modeId} (${name}) has no jump at former cycle wrap boundaries`, () => {
       for (let cycle = 1; cycle <= Math.floor(SPEED_MULTIPLIER); cycle += 1) {
         const boundary = cycle / SPEED_MULTIPLIER
         for (const index of sampleIndices) {
@@ -61,16 +71,21 @@ describe('computeCelebrationFrame continuity', () => {
           const before = frameAt(modeId, assignment, boundary - halfFrameProgress)
           const after = frameAt(modeId, assignment, boundary + halfFrameProgress)
 
-          expectSmooth(
-            Math.abs(after.pathX - before.pathX),
-            Math.abs(before.pathX - ref.pathX),
-            2
-          )
-          expectSmooth(
-            Math.abs(after.pathY - before.pathY),
-            Math.abs(before.pathY - ref.pathY),
-            2
-          )
+          const bothOffscreen =
+            isFullyOffscreen(before.pathX, before.pathY) &&
+            isFullyOffscreen(after.pathX, after.pathY)
+          if (!bothOffscreen) {
+            expectSmooth(
+              Math.abs(after.pathX - before.pathX),
+              Math.abs(before.pathX - ref.pathX),
+              2
+            )
+            expectSmooth(
+              Math.abs(after.pathY - before.pathY),
+              Math.abs(before.pathY - ref.pathY),
+              2
+            )
+          }
           expectSmooth(
             Math.abs(after.rotation - before.rotation),
             Math.abs(before.rotation - ref.rotation),

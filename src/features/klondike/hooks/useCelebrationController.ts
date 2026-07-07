@@ -11,7 +11,7 @@ import {
 
 import {
   CELEBRATION_DURATION_MS,
-  CELEBRATION_MODE_COUNT,
+  CELEBRATION_MODE_METADATA,
   getCelebrationModeMetadata,
 } from '../../../animation/celebrationModes'
 import { FOUNDATION_SUIT_ORDER } from '../../../solitaire/klondike'
@@ -28,9 +28,9 @@ import type { CelebrationBindings, CardMetrics } from '../types'
 
 export type CelebrationCardConfig = {
   card: Card
-  suit: Suit
-  suitIndex: number
   stackIndex: number
+  // Ring index for Suit Orbits (mode 24); order comes from FOUNDATION_SUIT_ORDER.
+  suitIndex: number
   baseX: number
   baseY: number
   randomSeed: number
@@ -218,9 +218,8 @@ export const useCelebrationController = ({
         const cardOffsetY = stackIndex * (cardMetrics.height * 0.02)
         cards.push({
           card,
-          suit,
-          suitIndex,
           stackIndex,
+          suitIndex,
           baseX,
           baseY: baseY - cardOffsetY,
           randomSeed: Math.random(),
@@ -235,7 +234,12 @@ export const useCelebrationController = ({
     // Visual-only randomization for celebration timing/layering. This is not a
     // gameplay deck shuffle and cannot affect the exact deal ID.
     const shuffledCards = [...cards].sort(() => Math.random() - 0.5)
-    const modeId = Math.floor(Math.random() * CELEBRATION_MODE_COUNT)
+    // Pick a random metadata ENTRY (not a random 0..count integer) so mode ids stay
+    // stable even if entries are removed later — see the contract in celebrationModes.ts.
+    const modeId =
+      CELEBRATION_MODE_METADATA[
+        Math.floor(Math.random() * CELEBRATION_MODE_METADATA.length)
+      ].id
 
     return {
       modeId,
@@ -482,14 +486,32 @@ export const useCelebrationController = ({
     openCelebrationDialog,
   ])
 
+  // Dev tool (badge tap): jump to the next metadata entry, wrapping. Updating
+  // celebrationState re-triggers the effect above, which restarts the 60s progress run
+  // from 0 — acceptable for a dev-only mode-preview tool.
+  const cycleCelebrationMode = useCallback(() => {
+    setCelebrationState((current) => {
+      if (!current) {
+        return current
+      }
+      const currentEntryIndex = CELEBRATION_MODE_METADATA.findIndex(
+        (entry) => entry.id === current.modeId
+      )
+      const nextEntry =
+        CELEBRATION_MODE_METADATA[
+          (currentEntryIndex + 1) % CELEBRATION_MODE_METADATA.length
+        ]
+      return { ...current, modeId: nextEntry.id }
+    })
+  }, [])
+
   const celebrationLabel = useMemo(() => {
     if (!developerModeEnabled || !celebrationState) {
       return null
     }
     const metadata = getCelebrationModeMetadata(celebrationState.modeId)
-    const modeNumber = metadata ? metadata.id + 1 : celebrationState.modeId + 1
-    const padded = modeNumber.toString().padStart(2, '0')
-    return `Celebration ${padded} · ${metadata?.name ?? 'Unknown'}`
+    const padded = (metadata.id + 1).toString().padStart(2, '0')
+    return `Celebration ${padded} · ${metadata.name}`
   }, [celebrationState, developerModeEnabled])
 
   const celebrationQueuedThisRender =
@@ -569,6 +591,7 @@ export const useCelebrationController = ({
     setCelebrationState,
     celebrationBindings,
     celebrationLabel,
+    cycleCelebrationMode,
     handleCelebrationAbort,
     handleWinningCardFlightSettled,
     clearCelebrationDialogTimer,

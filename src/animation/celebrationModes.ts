@@ -16,7 +16,11 @@ export type CelebrationMetadata = {
   name: string
 }
 
-const CELEBRATION_MODE_METADATA: CelebrationMetadata[] = [
+// Stable-id contract: ids are permanent identifiers, NOT array indices. When a mode is
+// removed later, delete its metadata entry here and retire its switch case number in
+// computeCelebrationFrame — never renumber or reuse ids. Selection always picks a random
+// entry from this list (see useCelebrationController), so gaps in the id sequence are fine.
+export const CELEBRATION_MODE_METADATA: CelebrationMetadata[] = [
   { id: 0, name: 'Spiral Bloom' },
   { id: 1, name: 'Lissajous Weave' },
   { id: 2, name: 'Pendulum Cascade' },
@@ -37,10 +41,20 @@ const CELEBRATION_MODE_METADATA: CelebrationMetadata[] = [
   { id: 17, name: 'Clover Spin' },
   { id: 18, name: 'Horizon Arc' },
   { id: 19, name: 'Jitter Swarm' },
+  { id: 20, name: 'Fountain' },
+  { id: 21, name: 'Card Rain' },
+  { id: 22, name: 'Vortex' },
+  { id: 23, name: 'Infinity Loop' },
+  { id: 24, name: 'Suit Orbits' },
+  { id: 25, name: 'Flock' },
+  { id: 26, name: 'Shockwave' },
+  { id: 27, name: 'Galaxy' },
+  { id: 28, name: 'Big Bounce' },
+  { id: 29, name: 'Heartbeat' },
+  { id: 30, name: 'Diamond Drift' },
 ]
 
 export const CELEBRATION_DURATION_MS = 60_000
-export const CELEBRATION_MODE_COUNT = CELEBRATION_MODE_METADATA.length
 export const CELEBRATION_WOBBLE_FREQUENCY = 5.5
 export const TAU = Math.PI * 2
 
@@ -139,10 +153,9 @@ export function computeCelebrationFrame({
   let targetScale = 1
   let targetOpacity = 1
 
-  const mode =
-    ((modeId % CELEBRATION_MODE_COUNT) + CELEBRATION_MODE_COUNT) % CELEBRATION_MODE_COUNT
-
-  switch (mode) {
+  // Switch directly on the stable mode id (see CELEBRATION_MODE_METADATA); a retired or
+  // unknown id falls through to the default orbit instead of being remapped by modulo.
+  switch (modeId) {
     case 0: {
       const radius = boardRadius * (0.24 + 0.18 * Math.sin(thetaDouble))
       pathX =
@@ -347,6 +360,173 @@ export function computeCelebrationFrame({
       targetOpacity = 0.85 + 0.15 * Math.sin(theta * 4 + seed)
       break
     }
+    // Fountain: staggered parabolic jets from bottom-center. The arc starts and ends at
+    // the same offscreen y (parabola zeros at u=0/1), so the per-card cycle wrap is
+    // position-continuous by construction — no visible teleport.
+    case 20: {
+      const cardH = metrics.height
+      const u0 = rawProgress * (0.8 + 0.4 * seed) + seed * 7 + normalizedIndex
+      const u = u0 - Math.floor(u0)
+      const floorY = boardHeight + cardH * 3
+      const apex = boardHeight * (0.75 + 0.2 * seed) + cardH * 3
+      pathX =
+        centerX +
+        relativeIndex * metrics.width * 0.22 +
+        Math.sin(theta * 0.9 + seed * TAU) * metrics.width * 0.5
+      pathY = floorY - apex * 4 * u * (1 - u)
+      rotation = ((theta * (0.8 + 0.4 * seed) * 180) / Math.PI) * direction
+      targetScale = 1 + 0.05 * Math.sin(theta * 2 + seed)
+      break
+    }
+    // Card Rain: continuous fall with offscreen respawn. Fall span = board + 8 card
+    // heights so both wrap endpoints sit 4 card heights beyond an edge — a full 2 card
+    // heights of slack past the >= 2 card sizes offscreen exemption (samples taken a
+    // hair around the wrap must still qualify as fully offscreen), never visible.
+    case 21: {
+      const cardH = metrics.height
+      const span = boardHeight + cardH * 8
+      const u0 = rawProgress * (0.7 + 0.6 * seed) + seed * 3 + normalizedIndex
+      const u = u0 - Math.floor(u0)
+      pathX =
+        boardWidth * normalizedIndex -
+        metrics.width / 2 +
+        Math.sin(theta * 0.7 + seed * TAU) * metrics.width * 0.6
+      pathY = u * span - cardH * 4
+      rotation = ((theta * (0.15 + 0.2 * seed) * 180) / Math.PI) * direction
+      targetScale = 1 + 0.04 * Math.sin(theta * 1.3 + seed * TAU)
+      break
+    }
+    // Vortex: spiral whose radius breathes between ~0.05 and ~0.4 boardRadius; cards
+    // shrink toward the center for depth.
+    case 22: {
+      const angle = theta * 1.2 + normalizedIndex * TAU
+      const radius = boardRadius * (0.225 - 0.175 * Math.cos(theta * 0.35 + normalizedIndex * 2))
+      pathX = centerX + Math.cos(angle) * radius
+      pathY = centerY + Math.sin(angle) * radius
+      rotation = (angle * 180) / Math.PI
+      targetScale = 0.6 + 0.4 * (radius / (boardRadius * 0.4))
+      break
+    }
+    // Infinity Loop: figure-eight Lissajous train. Heading is approximated with a smooth
+    // sine mix — exact atan2 heading would wrap +-180deg and trip the continuity guard.
+    case 23: {
+      const phi = theta + normalizedIndex * TAU
+      pathX = centerX + Math.sin(phi) * boardRadius * 0.36
+      pathY = centerY + Math.sin(phi * 2) * boardRadius * 0.22
+      rotation = Math.cos(phi) * 45 + Math.cos(phi * 2) * 25
+      targetScale = 1 + 0.05 * Math.sin(phi * 2 + seed)
+      break
+    }
+    // Suit Orbits: four concentric rings, one per suit (uses suitIndex), 13 cards spaced
+    // per ring, alternating direction and slightly different angular speeds.
+    case 24: {
+      const suitIndex = assignment.suitIndex
+      const ringDirection = suitIndex % 2 === 0 ? 1 : -1
+      const radius = boardRadius * (0.14 + 0.075 * suitIndex)
+      const angle =
+        ringDirection * theta * (1 + suitIndex * 0.15) +
+        (assignment.stackIndex / FOUNDATION_STACK_MAX) * TAU
+      pathX = centerX + Math.cos(angle) * radius
+      pathY = centerY + Math.sin(angle) * radius
+      rotation = (angle * 180) / Math.PI
+      targetScale = 1 + 0.05 * Math.sin(theta * 2 + suitIndex)
+      break
+    }
+    // Flock: follow-the-leader swarm — every card samples the same leader path
+    // (incommensurate sine sum) at a lagged phase plus a small seeded offset.
+    case 25: {
+      const phi = theta - 0.05 * assignment.index
+      pathX =
+        centerX +
+        boardRadius * (0.26 * Math.sin(phi) + 0.14 * Math.sin(phi * 1.37 + 1.7)) +
+        (seed - 0.5) * metrics.width * 0.8
+      pathY =
+        centerY +
+        boardRadius * (0.2 * Math.cos(phi * 0.73 + 0.4) + 0.12 * Math.sin(phi * 1.19 + 3.1)) +
+        (seed - 0.5) * metrics.height * 0.6
+      rotation = Math.sin(phi * 1.37) * 40 + Math.cos(phi * 0.73) * 20
+      targetScale = 1 + 0.05 * Math.sin(phi * 2 + seed * TAU)
+      break
+    }
+    // Shockwave: loose grid + radial gaussian bump. The wave radius ping-pongs via a
+    // cosine (sweeps out and back) instead of a sawtooth reset, so it is continuous
+    // everywhere by construction.
+    case 26: {
+      const col = assignment.index % 8
+      const row = Math.floor(assignment.index / 8)
+      const gridX = centerX + (col - 3.5) * boardRadius * 0.11
+      const gridY = centerY + (row - 3) * boardRadius * 0.1
+      const dx = gridX - centerX
+      const dy = gridY - centerY
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      const waveRadius = boardRadius * 0.4 * (1 - Math.cos(theta * 0.8))
+      const sigma = boardRadius * 0.08
+      const bump = Math.exp(-((dist - waveRadius) * (dist - waveRadius)) / (2 * sigma * sigma))
+      // dist > 0 always: col offset is never 0 (col - 3.5) so no division-by-zero.
+      pathX = gridX + (dx / dist) * bump * metrics.width * 0.9
+      pathY = gridY + (dy / dist) * bump * metrics.height * 0.9
+      rotation = 8 * Math.sin(theta + seed * TAU) + bump * 25 * direction
+      targetScale = 1 + 0.25 * bump
+      break
+    }
+    // Galaxy: two-arm logarithmic spiral (arm by index parity) rotating slowly, with
+    // twinkle via small scale/opacity oscillation and a vertical squash for depth.
+    case 27: {
+      const armPhase = (assignment.index % 2) * Math.PI
+      const radius = boardRadius * 0.08 * Math.exp(1.6 * normalizedIndex)
+      const angle = armPhase + normalizedIndex * 4 + theta * 0.5
+      pathX = centerX + Math.cos(angle) * radius
+      pathY = centerY + Math.sin(angle) * radius * 0.75
+      rotation = (theta * 0.5 * 180) / Math.PI
+      targetScale = 1 + 0.06 * Math.sin(theta * 3 + seed * TAU)
+      targetOpacity = 0.85 + 0.15 * Math.sin(theta * 2.3 + seed * TAU)
+      break
+    }
+    // Big Bounce: fan of bouncing columns; |cos| gives the bounce (continuous, kinked
+    // velocity at the floor is fine) and a slow sine envelope decays/regrows the height.
+    case 28: {
+      const phase = seed * TAU + normalizedIndex * 2
+      const bounce = Math.abs(Math.cos(theta * 1.5 + phase))
+      const envelope = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(theta * 0.3 + seed * TAU))
+      const floorY = centerY + boardRadius * 0.3
+      pathX = centerX + relativeIndex * metrics.width * 0.25
+      pathY = floorY - boardRadius * (0.35 + 0.2 * seed) * bounce * envelope
+      rotation = 12 * Math.sin(theta * 3 + phase) * direction
+      targetScale = 1 + 0.05 * bounce
+      break
+    }
+    // Heartbeat: cards ride the classic parametric heart curve; the whole heart pulses in
+    // a double-thump rhythm (two narrow sin^8 bumps close together per beat period).
+    case 29: {
+      const t = normalizedIndex * TAU + theta * 0.15
+      const sinT = Math.sin(t)
+      const heartX = 16 * sinT * sinT * sinT
+      const heartY =
+        13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)
+      const heartScale = (boardRadius * 0.35) / 17
+      const thump =
+        Math.pow(Math.sin(theta), 8) + 0.7 * Math.pow(Math.sin(theta - 0.6), 8)
+      pathX = centerX + heartX * heartScale * (1 + 0.06 * thump)
+      // y flipped: the parametric heart is y-up, screen coords are y-down.
+      pathY = centerY - heartY * heartScale * (1 + 0.06 * thump)
+      rotation = Math.sin(theta * 0.8 + seed * TAU) * 20
+      targetScale = 1 + 0.12 * thump
+      break
+    }
+    // Diamond Drift: diamond outline via L1 mapping; cards drift along the perimeter
+    // while the whole diamond rotates slowly (0.2 turn per cycle-equivalent).
+    case 30: {
+      const phi = normalizedIndex * TAU + theta * 0.4
+      const denom = Math.abs(Math.cos(phi)) + Math.abs(Math.sin(phi))
+      const dx = ((boardRadius * 0.32) / denom) * Math.cos(phi)
+      const dy = ((boardRadius * 0.32) / denom) * Math.sin(phi)
+      const spin = theta * 0.2
+      pathX = centerX + dx * Math.cos(spin) - dy * Math.sin(spin)
+      pathY = centerY + dx * Math.sin(spin) + dy * Math.cos(spin)
+      rotation = (spin * 180) / Math.PI + Math.sin(theta + seed * TAU) * 10
+      targetScale = 1 + 0.04 * Math.sin(theta * 2 + normalizedIndex)
+      break
+    }
     default: {
       const radius = boardRadius * 0.25
       pathX = centerX + Math.cos(thetaSeed) * radius
@@ -371,7 +551,11 @@ export function computeCelebrationFrame({
 }
 
 export function getCelebrationModeMetadata(modeId: number): CelebrationMetadata {
-  const index =
-    ((modeId % CELEBRATION_MODE_COUNT) + CELEBRATION_MODE_COUNT) % CELEBRATION_MODE_COUNT
-  return CELEBRATION_MODE_METADATA[index]
+  // Lookup by stable id, not array index — ids may have gaps once modes get retired.
+  return (
+    CELEBRATION_MODE_METADATA.find((entry) => entry.id === modeId) ?? {
+      id: modeId,
+      name: 'Unknown',
+    }
+  )
 }

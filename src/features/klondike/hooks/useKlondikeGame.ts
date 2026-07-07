@@ -405,6 +405,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     setCelebrationState,
     celebrationBindings,
     celebrationLabel,
+    cycleCelebrationMode,
     handleCelebrationAbort,
     handleWinningCardFlightSettled,
     clearCelebrationDialogTimer,
@@ -881,6 +882,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     celebrationLabel,
     celebrationBindings,
     onCelebrationAbort: handleCelebrationAbort,
+    onCelebrationBadgePress: cycleCelebrationMode,
     undoScrubProps,
     absoluteCardLayerProps: {
       stock: state.stock,
