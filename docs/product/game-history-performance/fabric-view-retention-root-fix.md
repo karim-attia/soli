@@ -250,14 +250,20 @@ No new data fetching. Persistence still uses AsyncStorage for the active game an
 
 ## Identified issues
 
+> Resolution note (2026-07-07, Karim): the long-session slowdown/memory growth
+> tracked by the `[resolved 2026-07-07]` items below was fixed by the absolute
+> card layer refactor (commit 022c081, "absolute card layer -> no more memory
+> issues and lags after 10 games"). 20–100-game sessions are smooth now. The
+> original `[still-open]` text is kept unchanged as history.
+
 - [fixed-in-code] Fabric retains old native view states after repeated game-boundary churn: removed full-session remount and per-deal card ids.
 - [fixed-in-code] The keyed boundary causes a temporary board metric fallback and visible small-board flash: board state now stays mounted across New Game.
 - [fixed-in-code] Pure running-timer updates are not persisted as full active-game writes; this is now mostly defensive because the visual clock no longer dispatches through `GameState`.
 - [fixed-in-code] Old saved games may contain per-deal card ids that need normalization: load path normalizes logical card ids.
-- [still-open] The user still reproduced sluggishness after the root-fix build. The 2026-06-24 post-fix sample shows the app process at about `1,010 MB` total PSS with `327 MB` Native Heap PSS and `278 MB` Unknown PSS, while Java heap, SQLite, GPU memory, and currently attached views are not large enough to explain the issue.
-- [still-open] The post-fix sample's visible view tree is normal-sized: `371` Android `Views`, `363` attached views, and about `693 KB` of render nodes. That means the previous Fabric view-state hypothesis is incomplete or no longer the dominant owner in the installed release build.
-- [still-open] The current post-fix persisted log session `mqs7lol8-l8inn5` reached game index `2` before the sluggish capture. Timer-only persistence skipping worked (`skippedWriteCount=337`) and flight keys are stable logical card ids (`spades-11`, `clubs-6`, etc.), so the previous fix landed but did not eliminate the slowdown.
-- [still-open] Event-loop health worsened across games in the same process: game `1` had event-loop drift about p50 `189 ms` / p90 `295 ms`; game `2` rose to p50 `577 ms` / p90 `823 ms` / p99 `890 ms`. Persistence writes in game `2` were only p50 `42 ms` / p90 `80 ms`, so writes contribute but do not fully explain the roughly one-second stalls.
+- [resolved 2026-07-07] The user still reproduced sluggishness after the root-fix build. The 2026-06-24 post-fix sample shows the app process at about `1,010 MB` total PSS with `327 MB` Native Heap PSS and `278 MB` Unknown PSS, while Java heap, SQLite, GPU memory, and currently attached views are not large enough to explain the issue.
+- [resolved 2026-07-07] The post-fix sample's visible view tree is normal-sized: `371` Android `Views`, `363` attached views, and about `693 KB` of render nodes. That means the previous Fabric view-state hypothesis is incomplete or no longer the dominant owner in the installed release build.
+- [resolved 2026-07-07] The current post-fix persisted log session `mqs7lol8-l8inn5` reached game index `2` before the sluggish capture. Timer-only persistence skipping worked (`skippedWriteCount=337`) and flight keys are stable logical card ids (`spades-11`, `clubs-6`, etc.), so the previous fix landed but did not eliminate the slowdown.
+- [resolved 2026-07-07] Event-loop health worsened across games in the same process: game `1` had event-loop drift about p50 `189 ms` / p90 `295 ms`; game `2` rose to p50 `577 ms` / p90 `823 ms` / p99 `890 ms`. Persistence writes in game `2` were only p50 `42 ms` / p90 `80 ms`, so writes contribute but do not fully explain the roughly one-second stalls.
 - [implemented-a-b] The remaining one-second cadence pointed at the running timer path. The visual clock now ticks locally in `StatisticsHud`, while `useKlondikeTimer` only records start/stop boundaries. This preserves resume semantics without waking the full game reducer every second.
 - [fixed-in-code] Timer display ticking is now isolated to the small statistics badge; the game reducer records only timer start/stop boundaries. `TIMER_STOP` still folds elapsed wall-clock time into `elapsedMs`, and persisted running timers still recover elapsed time on load.
 - [verified-workaround] `yarn release` assembled the release APK successfully, then Expo hit `EMFILE: too many open files, watch` before completing its own install step. Installed the generated APK directly with ADB instead.
@@ -265,7 +271,7 @@ No new data fetching. Persistence still uses AsyncStorage for the active game an
 - [a-b-invalid] The first `cardFlights=false` variants did not actually disable card-flight work after cold start. Evidence: `flight.wait.summary` remained `immediate-ready`, not `immediate-disabled`, and `cards.summary` still reported thousands of `flightStarted` events.
 - [a-b-valid] Corrected `cardFlights=false` variants were captured after pre-saving card flights off. Evidence: `flight.wait.summary` changed to `immediate-disabled` and `cards.summary` reported `0` `flightStarted` events.
 - [a-b-valid] The `persistence=false` variants did disable active persistence writes during the playlist. Evidence: filtered perf logs had `0` `persistence.write.duration` events for the playlist games and `skip-dev-disabled` summaries.
-- [still-open] Disabling active persistence and card-flight movement did not stop the large native/unknown memory end state or late-game slowdown. The root cause is still outside completed history, active-game persistence, and normal card-flight movement alone.
+- [resolved 2026-07-07] Disabling active persistence and card-flight movement did not stop the large native/unknown memory end state or late-game slowdown. The root cause is still outside completed history, active-game persistence, and normal card-flight movement alone.
 - [recovered] ADB dropped offline during the first corrected card-flight-off rerun, then reappeared. The corrected `flights-off-corrected-10x` and `both-off-corrected-10x` samples were rerun and captured.
 - [a-b-invalid] The first `perf-off-10x` control was not a clean diagnostics-off sample because `perfDiagnostics=0` could be overwritten by AsyncStorage settings hydration on cold start. The deep-link handling is now hydration-safe for this flag too.
 - [a-b-valid] Corrected `perf-off-corrected-10x` still grew by about `+756 MB` PSS over 10 games, with Native Heap `+389 MB` and Unknown `+357 MB`, while SoliPerf JSON output was effectively absent. The observability logger is not the memory root cause.

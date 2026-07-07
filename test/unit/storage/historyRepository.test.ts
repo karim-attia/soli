@@ -2,6 +2,10 @@
 // (the expo-sqlite Jest mock is just `openDatabaseAsync`). We assert the SQL/params
 // the repository issues, not a real SQL engine — schema drift here is what device
 // smoke tests would otherwise catch late.
+import {
+  getSolvableDealsForDrawCount,
+  isExactDealSolvableForDrawCount,
+} from '../../../src/data/solvableDealsV2'
 import type { HistoryEntry } from '../../../src/state/history'
 
 type FakeDatabase = {
@@ -13,10 +17,11 @@ type FakeDatabase = {
   closeAsync: jest.Mock
 }
 
-const createFakeDatabase = () => {
+const createFakeDatabase = (initialUserVersion = 0) => {
   const execCalls: string[] = []
   const runCalls: Array<{ sql: string; params: unknown[] }> = []
-  let userVersion = 0
+  let userVersion = initialUserVersion
+  let allRows: unknown[] = []
   let moveLogRow: {
     moves_json: string | null
     move_log_version: number | null
@@ -39,7 +44,7 @@ const createFakeDatabase = () => {
       }
       return null
     }),
-    getAllAsync: jest.fn(async () => []),
+    getAllAsync: jest.fn(async () => allRows),
     runAsync: jest.fn(async (sql: string, params: unknown[] = []) => {
       runCalls.push({ sql, params })
     }),
@@ -63,6 +68,9 @@ const createFakeDatabase = () => {
       } | null
     ) => {
       moveLogRow = row
+    },
+    setAllRows: (rows: unknown[]) => {
+      allRows = rows
     },
   }
 }
@@ -104,8 +112,8 @@ const loadRepository = (fake: ReturnType<typeof createFakeDatabase>): Repository
   return repository!
 }
 
-describe('historyRepository.native (fresh v1 schema with move log columns)', () => {
-  it('creates the base table with moves_json and move_log_version (no migration path)', async () => {
+describe('historyRepository.native (v1 baseline schema + migration scaffold)', () => {
+  it('creates the frozen v1 baseline with CHECK constraints and no solved column', async () => {
     const fake = createFakeDatabase()
     const repository = loadRepository(fake)
 
@@ -115,7 +123,35 @@ describe('historyRepository.native (fresh v1 schema with move log columns)', () 
     expect(schemaSql).toBeDefined()
     expect(schemaSql).toContain('moves_json TEXT')
     expect(schemaSql).toContain('move_log_version INTEGER')
+    // 1.0 freeze fixes: moves → move_count rename, solved column dropped,
+    // invariants enforced in the DDL, unused exact_id index removed.
+    expect(schemaSql).toContain('move_count INTEGER')
+    expect(schemaSql).not.toMatch(/\bmoves INTEGER\b/)
+    expect(schemaSql).not.toContain('solved INTEGER')
+    expect(schemaSql).toContain("CHECK (status IN ('active', 'incomplete', 'solved'))")
+    expect(schemaSql).toContain('CHECK (draw_count BETWEEN 1 AND 5)')
+    expect(schemaSql).not.toContain('history_entries_exact_id')
     expect(fake.getUserVersion()).toBe(1)
+  })
+
+  it('leaves an up-to-date database untouched', async () => {
+    const fake = createFakeDatabase(1)
+    const repository = loadRepository(fake)
+
+    await repository.initializeHistoryRepository()
+
+    expect(fake.execCalls.find((sql) => sql.includes('CREATE TABLE'))).toBeUndefined()
+    expect(fake.getUserVersion()).toBe(1)
+  })
+
+  it('refuses to open a database written by a newer app version', async () => {
+    const fake = createFakeDatabase(2)
+    const repository = loadRepository(fake)
+
+    await expect(repository.initializeHistoryRepository()).rejects.toThrow(
+      'Unsupported history database version: 2'
+    )
+    expect(fake.database.closeAsync).toHaveBeenCalled()
   })
 
   it('writes moves_json and move_log_version on insert when a move log is provided', async () => {
@@ -152,7 +188,7 @@ describe('historyRepository.native (fresh v1 schema with move log columns)', () 
     expect(logUpdate).toBeDefined()
     expect(logUpdate!.sql).toContain('moves_json = ?')
     expect(logUpdate!.sql).toContain('move_log_version = ?')
-    // Params: 11 entry columns, moves_json, move_log_version, id.
+    // Params: 10 entry columns, moves_json, move_log_version, id.
     expect(logUpdate!.params.slice(-3)).toEqual([
       JSON.stringify(moveLog.entries),
       1,
@@ -247,5 +283,36 @@ describe('historyRepository.native (fresh v1 schema with move log columns)', () 
     const pageQuery = (fake.database.getAllAsync.mock.calls[0] as [string])[0]
     expect(pageQuery).toContain('FROM history_entries')
     expect(pageQuery).not.toContain('moves_json')
+  })
+
+  it('aggregates solvable-deal stats in SQL and merges draw-count groups per deal', async () => {
+    const fake = createFakeDatabase()
+    const repository = loadRepository(fake)
+    // Real catalog IDs so isExactDealSolvableForDrawCount keeps the rows. Pick a
+    // deal that is NOT solvable for every draw count so the filter case is real.
+    const deal = getSolvableDealsForDrawCount(1).find(
+      (candidate) => candidate.drawMask !== 0b11111
+    )
+    expect(deal).toBeDefined()
+    const solvableExactId = deal!.exactId
+    const unsolvableDrawCount = ([1, 2, 3, 4, 5] as const).find(
+      (drawCount) => !isExactDealSolvableForDrawCount(solvableExactId, drawCount)
+    )
+    fake.setAllRows([
+      { exact_id: solvableExactId, draw_count: 1, plays: 3, solves: 1 },
+      // Off-catalog draw count for the same deal must be filtered out.
+      { exact_id: solvableExactId, draw_count: unsolvableDrawCount, plays: 2, solves: 2 },
+      // Unknown deal must be filtered out entirely.
+      { exact_id: 'E_NOT_IN_CATALOG', draw_count: 1, plays: 5, solves: 5 },
+    ])
+
+    const stats = await repository.getSolvableDealHistoryStats()
+
+    const statsQuery = (fake.database.getAllAsync.mock.calls[0] as [string])[0]
+    expect(statsQuery).toContain('GROUP BY exact_id, draw_count')
+    expect(statsQuery).toContain('COUNT(*)')
+    // 1.0 freeze fix: exact_id is NOT NULL, the old filter was dead code.
+    expect(statsQuery).not.toContain('exact_id IS NOT NULL')
+    expect(stats).toEqual([{ exactId: solvableExactId, plays: 3, solves: 1 }])
   })
 })

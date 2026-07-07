@@ -5,7 +5,7 @@
 const { getDefaultConfig } = require('expo/metro-config')
 const { withTamagui } = require('@tamagui/metro-plugin')
 
-// Expo SDK 55 enables CSS and resolves .mjs files in its default Metro config.
+// Since Expo SDK 55, the default Metro config enables CSS and resolves .mjs files.
 const config = getDefaultConfig(__dirname)
 
 module.exports = withTamagui(config, {

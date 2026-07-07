@@ -310,6 +310,30 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     dispatch({ type: 'SET_AUTO_UP_ENABLED', enabled: autoUpEnabled })
   }, [autoUpEnabled, dispatch])
 
+  // Hook: pick the next solvable deal weighted by prior play history when needed.
+  // Defined before the persistence hook so startup fresh deals can use it too.
+  const selectNextSolvableDeal = useSolvableDealSelector(
+    solvableStats,
+    preferredDrawCount
+  )
+
+  // Single source for fresh deals (in-app New Game AND the persistence startup
+  // paths: first install, won-session cleanup, corrupted-save reset), so the
+  // "Solvable deals" setting is honored everywhere. Settings hydrate synchronously
+  // and the solvable catalog is a bundled import, so this is safe at any point
+  // during startup; history stats hydrate async and may still be empty on the
+  // startup paths — the selector then just picks an unplayed solvable deal
+  // (repeat-weighting is best-effort, the solvability guarantee is not).
+  const createFreshGameState = useCallback((): GameState => {
+    if (solvableGamesOnly) {
+      const solvableDeal = selectNextSolvableDeal()
+      if (solvableDeal) {
+        return createSolvableGameState(solvableDeal, preferredDrawCount)
+      }
+    }
+    return createInitialState(preferredDrawCount)
+  }, [preferredDrawCount, selectNextSolvableDeal, solvableGamesOnly])
+
   // Hook: hydrate and persist game state via expo-sqlite/kv-store once per relevant change.
   // Task 10-7: Persist the current history entry linkage across restarts.
   const storageHydrated = useKlondikePersistence({
@@ -318,7 +342,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     previousHasWonRef,
     currentGameEntryIdRef,
     autoUpEnabled,
-    preferredDrawCount,
+    createFreshState: createFreshGameState,
   })
 
   // Mirrors the latest reducer state into a ref for synchronous callbacks.
@@ -345,43 +369,16 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     dispatch,
   })
 
-  // Hook: pick the next solvable deal weighted by prior play history when needed.
-  const selectNextSolvableDeal = useSolvableDealSelector(
-    solvableStats,
-    preferredDrawCount
-  )
-
   // Deals a new game, respecting solvable-only settings and history bookkeeping.
   const dealNewGame = useCallback(() => {
-    const finishDeal = (nextState: GameState) => {
-      dispatch({ type: 'HYDRATE_STATE', state: nextState })
-      setDealResetKey((current) => current + 1)
-    }
-
-    if (solvableGamesOnly) {
-      const solvableDeal = selectNextSolvableDeal()
-      if (solvableDeal) {
-        const startedAt = new Date().toISOString()
-        const solvableState = createSolvableGameState(solvableDeal, preferredDrawCount)
-        recordStartedGame(solvableState, { startedAt })
-        finishDeal(solvableState)
-        return
-      }
-    }
-
     const startedAt = new Date().toISOString()
-    const nextState = createInitialState(preferredDrawCount)
+    const nextState = createFreshGameState()
     recordStartedGame(nextState, { startedAt })
+    dispatch({ type: 'HYDRATE_STATE', state: nextState })
     // Absolute-layer cards stay mounted across deals, so this narrow token resets
     // native animated positions without changing card identity for the whole deck.
-    finishDeal(nextState)
-  }, [
-    dispatch,
-    preferredDrawCount,
-    recordStartedGame,
-    selectNextSolvableDeal,
-    solvableGamesOnly,
-  ])
+    setDealResetKey((current) => current + 1)
+  }, [createFreshGameState, dispatch, recordStartedGame])
 
   // Hook: own the celebration animation lifecycle and bindings.
   const {

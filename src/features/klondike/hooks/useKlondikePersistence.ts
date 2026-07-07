@@ -7,12 +7,7 @@ import {
   loadGameState,
   saveGameStateWithHistory,
 } from '../../../storage/gamePersistence'
-import {
-  createInitialState,
-  type GameAction,
-  type GameState,
-} from '../../../solitaire/klondike'
-import type { DrawCount } from '../../../solitaire/drawCount'
+import type { GameAction, GameState } from '../../../solitaire/klondike'
 import { useHistory } from '../../../state/history'
 import { moveLogForGameRecord } from './useKlondikeHistoryEntry'
 
@@ -23,7 +18,11 @@ type UseKlondikePersistenceParams = {
   // Task 10-7: Persist linkage to the active history entry across restarts.
   currentGameEntryIdRef: React.MutableRefObject<string | null>
   autoUpEnabled: boolean
-  preferredDrawCount: DrawCount
+  // 1.0 fix (2026-07-07): fresh deals from THIS hook (first install, won-session
+  // cleanup, corrupted-save reset) previously bypassed the "Solvable deals" setting
+  // by calling createInitialState directly. The game hook now owns one fresh-deal
+  // factory (settings + solvable selector) shared with the in-app New Game path.
+  createFreshState: () => GameState
 }
 
 const PERSISTENCE_WRITE_DEBOUNCE_MS = 180
@@ -63,7 +62,7 @@ export const useKlondikePersistence = ({
   previousHasWonRef,
   currentGameEntryIdRef,
   autoUpEnabled,
-  preferredDrawCount,
+  createFreshState,
 }: UseKlondikePersistenceParams) => {
   const [storageHydrationComplete, setStorageHydrationComplete] = useState(false)
   // Review fix R6 (2026-07-06): both callbacks are referentially stable (their
@@ -74,8 +73,10 @@ export const useKlondikePersistence = ({
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const autoUpEnabledRef = useRef(autoUpEnabled)
   autoUpEnabledRef.current = autoUpEnabled
-  const preferredDrawCountRef = useRef(preferredDrawCount)
-  preferredDrawCountRef.current = preferredDrawCount
+  // Ref (not a dep) so the one-shot load effect never re-runs when the factory's
+  // identity changes (it depends on settings + async-hydrating solvable stats).
+  const createFreshStateRef = useRef(createFreshState)
+  createFreshStateRef.current = createFreshState
 
   // Settings hydrate synchronously (expo-sqlite/kv-store), so the preferred draw count
   // is already correct on mount and this effect can load the saved game right away.
@@ -88,7 +89,7 @@ export const useKlondikePersistence = ({
     const dispatchFreshGame = () => {
       dispatch({
         type: 'HYDRATE_STATE',
-        state: createInitialState(preferredDrawCountRef.current),
+        state: createFreshStateRef.current(),
         autoUpEnabled: autoUpEnabledRef.current,
       })
     }

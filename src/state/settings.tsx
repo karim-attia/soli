@@ -57,7 +57,10 @@ type SettingsContextValue = {
   setStatisticsPreference: (key: StatisticsPreferenceKey, enabled: boolean) => void
 }
 
-const STORAGE_KEY = '@soli/settings/v1'
+// Renamed from '@soli/settings/v1' at the 1.0 reset — the `@` was an AsyncStorage-era
+// relic; all kv keys now share the plain `soli/...` prefix. No dual-read fallback:
+// only pre-release test devices lose (re-defaultable) settings once.
+const STORAGE_KEY = 'soli/settings/v1'
 
 const DEFAULT_SETTINGS: SettingsState = {
   animations: {

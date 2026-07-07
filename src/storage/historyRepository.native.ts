@@ -14,12 +14,51 @@ export { HISTORY_PAGE_SIZE }
 
 export const isHistorySupported = true
 
-// Pre-release convention (2026-07-06, per Karim): no migrations before the first
-// App Store release. A schema change simply renames the DB file (abandoning the old
-// one) or wipes — the data only exists on Karim's two throwaway test devices. Once
-// this ships, schema changes need real migrations and a DATABASE_VERSION bump.
 const DATABASE_NAME = 'soli-history.db'
+// Version 1 is the frozen 1.0 baseline schema. Post-1.0 changes append MIGRATIONS
+// steps with toVersion >= 2 — never edit the baseline step again, and NEVER drop
+// user data in a migration after 1.0. (Pre-release test-device schemas were cleared
+// manually before the freeze, so the baseline can assume a clean slate at version 0.)
 const DATABASE_VERSION = 1
+
+// Ordered migration steps; each brings the schema *to* `toVersion` and runs in its
+// own exclusive transaction (the runner bumps PRAGMA user_version alongside it).
+//
+// 1.0 schema-freeze notes (2026-07-07):
+// - The `solved` 0/1 column was removed: it always duplicated `status = 'solved'`
+//   (every writer set both in lockstep). The JS HistoryEntry.solved boolean is now
+//   derived from status at read time.
+// - `moves` was renamed to `move_count` so it can't be confused with `moves_json`
+//   (the serialized move log).
+// - No `(exact_id)` index: no query filters on exact_id (row lookups go by PK; the
+//   solvable-stats aggregate scans the whole table by design).
+const MIGRATIONS: ReadonlyArray<{ toVersion: number; sql: string }> = [
+  {
+    toVersion: 1,
+    sql: `
+      CREATE TABLE history_entries (
+        id TEXT PRIMARY KEY NOT NULL,
+        exact_id TEXT NOT NULL,
+        deck_checksum TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        finished_at TEXT,
+        draw_count INTEGER NOT NULL CHECK (draw_count BETWEEN 1 AND 5),
+        move_count INTEGER CHECK (move_count >= 0),
+        duration_ms INTEGER CHECK (duration_ms >= 0),
+        preview_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('active', 'incomplete', 'solved')),
+        moves_json TEXT,
+        move_log_version INTEGER
+      );
+      CREATE INDEX history_entries_started_at
+        ON history_entries(started_at DESC, id DESC);
+      CREATE UNIQUE INDEX history_entries_one_active
+        ON history_entries(status)
+        WHERE status = 'active';
+    `,
+  },
+]
 
 type HistoryRow = {
   id: string
@@ -28,9 +67,8 @@ type HistoryRow = {
   display_name: string
   started_at: string
   finished_at: string | null
-  solved: number
   draw_count: number
-  moves: number | null
+  move_count: number | null
   duration_ms: number | null
   preview_json: string
   status: HistoryEntry['status']
@@ -46,7 +84,8 @@ type SummaryRow = {
 type SolvableStatsRow = {
   exact_id: string
   draw_count: number
-  solved: number
+  plays: number
+  solves: number
 }
 
 const INSERT_SQL = `
@@ -57,15 +96,14 @@ const INSERT_SQL = `
     display_name,
     started_at,
     finished_at,
-    solved,
     draw_count,
-    moves,
+    move_count,
     duration_ms,
     preview_json,
     status,
     moves_json,
     move_log_version
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 const UPDATE_COLUMNS_SQL = `
@@ -74,9 +112,8 @@ const UPDATE_COLUMNS_SQL = `
     display_name = ?,
     started_at = ?,
     finished_at = ?,
-    solved = ?,
     draw_count = ?,
-    moves = ?,
+    move_count = ?,
     duration_ms = ?,
     preview_json = ?,
     status = ?`
@@ -109,41 +146,24 @@ const openHistoryDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
     const versionRow = await database.getFirstAsync<{ user_version: number }>(
       'PRAGMA user_version'
     )
-    const currentVersion = versionRow?.user_version ?? 0
+    let currentVersion = versionRow?.user_version ?? 0
 
+    // A newer app may have written a schema this build doesn't understand;
+    // refuse to touch it rather than corrupt it.
     if (currentVersion > DATABASE_VERSION) {
       throw new Error(`Unsupported history database version: ${currentVersion}`)
     }
 
-    if (currentVersion < DATABASE_VERSION) {
+    for (const migration of MIGRATIONS) {
+      if (currentVersion >= migration.toVersion) {
+        continue
+      }
       await database.withExclusiveTransactionAsync(async (transaction) => {
-        await transaction.execAsync(`
-          CREATE TABLE IF NOT EXISTS history_entries (
-            id TEXT PRIMARY KEY NOT NULL,
-            exact_id TEXT NOT NULL,
-            deck_checksum TEXT NOT NULL,
-            display_name TEXT NOT NULL,
-            started_at TEXT NOT NULL,
-            finished_at TEXT,
-            solved INTEGER NOT NULL,
-            draw_count INTEGER NOT NULL,
-            moves INTEGER,
-            duration_ms INTEGER,
-            preview_json TEXT NOT NULL,
-            status TEXT NOT NULL,
-            moves_json TEXT,
-            move_log_version INTEGER
-          );
-          CREATE INDEX IF NOT EXISTS history_entries_started_at
-            ON history_entries(started_at DESC, id DESC);
-          CREATE INDEX IF NOT EXISTS history_entries_exact_id
-            ON history_entries(exact_id);
-          CREATE UNIQUE INDEX IF NOT EXISTS history_entries_one_active
-            ON history_entries(status)
-            WHERE status = 'active';
-          PRAGMA user_version = 1;
-        `)
+        await transaction.execAsync(
+          `${migration.sql}\nPRAGMA user_version = ${migration.toVersion};`
+        )
       })
+      currentVersion = migration.toVersion
     }
 
     return database
@@ -179,7 +199,6 @@ const toInsertParams = (
   entry.displayName,
   entry.startedAt,
   entry.finishedAt,
-  entry.solved ? 1 : 0,
   entry.drawCount,
   entry.moves,
   entry.durationMs,
@@ -194,7 +213,6 @@ const toUpdateParams = (entry: HistoryEntry): SQLite.SQLiteBindValue[] => [
   entry.displayName,
   entry.startedAt,
   entry.finishedAt,
-  entry.solved ? 1 : 0,
   entry.drawCount,
   entry.moves,
   entry.durationMs,
@@ -238,11 +256,12 @@ const toHistoryEntry = (row: HistoryRow): HistoryEntry => {
     displayName: row.display_name,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
-    solved: row.solved === 1,
+    // 1.0 freeze: the `solved` column was dropped; status is the single source.
+    solved: row.status === 'solved',
     solvable,
     drawCount,
     solvableForDrawCount: solvable ? drawCount : null,
-    moves: row.moves,
+    moves: row.move_count,
     durationMs: row.duration_ms,
     preview: parsePreview(row.preview_json),
     status: row.status,
@@ -258,9 +277,9 @@ const markOtherActiveRowsIncomplete = async (
 ): Promise<void> => {
   await transaction.runAsync(
     `UPDATE history_entries
-     SET status = ?, solved = ?, finished_at = ?
+     SET status = ?, finished_at = ?
      WHERE status = ? AND id <> ?`,
-    ['incomplete', 0, null, 'active', activeEntryId]
+    ['incomplete', null, 'active', activeEntryId]
   )
 }
 
@@ -281,9 +300,8 @@ export const getHistoryPage = async (
        display_name,
        started_at,
        finished_at,
-       solved,
        draw_count,
-       moves,
+       move_count,
        duration_ms,
        preview_json,
        status
@@ -306,9 +324,8 @@ export const getHistoryEntryById = async (id: string): Promise<HistoryEntry | nu
        display_name,
        started_at,
        finished_at,
-       solved,
        draw_count,
-       moves,
+       move_count,
        duration_ms,
        preview_json,
        status
@@ -332,9 +349,8 @@ export const getActiveHistoryEntry = async (): Promise<HistoryEntry | null> => {
        display_name,
        started_at,
        finished_at,
-       solved,
        draw_count,
-       moves,
+       move_count,
        duration_ms,
        preview_json,
        status
@@ -350,7 +366,7 @@ export const getHistorySummary = async (): Promise<HistorySummary> => {
   const row = await database.getFirstAsync<SummaryRow>(`
     SELECT
       COUNT(*) AS total_count,
-      COALESCE(SUM(CASE WHEN solved = 1 THEN 1 ELSE 0 END), 0) AS solved_count,
+      COALESCE(SUM(CASE WHEN status = 'solved' THEN 1 ELSE 0 END), 0) AS solved_count,
       COALESCE(
         SUM(CASE WHEN status = 'incomplete' THEN 1 ELSE 0 END),
         0
@@ -367,6 +383,9 @@ export const getHistorySummary = async (): Promise<HistorySummary> => {
   }
 }
 
+// Aggregation happens in SQL (one small row per deal/draw-count pair) instead of
+// streaming every history row into JS at startup. The solvable-catalog filter stays
+// in JS — the catalog is a bundled TS module, not a table.
 export const getSolvableDealHistoryStats = async (): Promise<
   SolvableDealHistoryStats[]
 > => {
@@ -375,9 +394,10 @@ export const getSolvableDealHistoryStats = async (): Promise<
     SELECT
       exact_id,
       draw_count,
-      solved
+      COUNT(*) AS plays,
+      SUM(CASE WHEN status = 'solved' THEN 1 ELSE 0 END) AS solves
     FROM history_entries
-    WHERE exact_id IS NOT NULL
+    GROUP BY exact_id, draw_count
   `)
 
   const stats = new Map<string, { plays: number; solves: number }>()
@@ -392,8 +412,8 @@ export const getSolvableDealHistoryStats = async (): Promise<
     }
 
     const current = stats.get(row.exact_id) ?? { plays: 0, solves: 0 }
-    current.plays += 1
-    current.solves += row.solved === 1 ? 1 : 0
+    current.plays += row.plays
+    current.solves += row.solves
     stats.set(row.exact_id, current)
   })
 

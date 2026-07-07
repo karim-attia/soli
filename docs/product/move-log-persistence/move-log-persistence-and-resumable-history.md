@@ -1160,3 +1160,85 @@ unit-covered (`klondike.autoUpSetting.test.ts`). Auto Up stayed ON the whole
 run; a natural auto-run was not reachable in a smoke-length random deal
 (requires an all-face-up tableau), so R2a's coalescing-near-auto-ready path
 rests on its failing-first unit test plus the depth-exact guard evidence above.
+
+## 1.0 schema freeze fixes (2026-07-07)
+
+Context: the app ships 1.0 soon and all user data stores are reset exactly once —
+now. After 1.0 the SQLite schema is frozen (changes = real migrations). No store
+release ever shipped the SQLite history DB (previous store builds used the removed
+AsyncStorage layer; those files are orphaned and never read); only Karim's test
+devices carry pre-1.0 SQLite DBs. A code review identified these fixes to land
+before the freeze. All in `src/storage/historyRepository.native.ts` unless noted.
+
+- [x] **FIX 1 — Drop the redundant `solved` column.** Verified before removal that
+  every reader/writer can use `status` instead: the summary query counted
+  `solved = 1` (→ `status = 'solved'`), the solvable-stats query read the column
+  (→ reads `status`), `markOtherActiveRowsIncomplete` wrote `solved = 0` alongside
+  `status = 'incomplete'`, and insert/update writers always set both in lockstep
+  (`recordCurrentGameResult`, R6 repair, `normalizeActiveEntries` — all pair
+  `solved` with the matching status; no writer can desync them). The JS
+  `HistoryEntry.solved` boolean stays (public entry type, used by tests/UI) and is
+  now derived from `status` at read time in `toHistoryEntry`.
+- [x] **FIX 2 — CHECK constraints in the frozen DDL.**
+  `status IN ('active','incomplete','solved')`, `draw_count BETWEEN 1 AND 5`
+  (correction round: the review's original `IN (1,3)` was wrong —
+  `DRAW_COUNT_OPTIONS = [1,2,3,4,5]`), plus cheap invariants `move_count >= 0`
+  and `duration_ms >= 0` (NULL passes a CHECK, so nullable columns are
+  unaffected). Nothing beyond that — previews/logs are JSON blobs validated in JS.
+- [x] **FIX 3 — Rename `moves` → `move_count`.** The old name sat next to
+  `moves_json` (the serialized move log) — a confusion trap. Renamed in the DDL and
+  every SQL string; the JS-side `HistoryEntry.moves` field name stays (renaming it
+  would ripple through UI/tests for no schema benefit — the point was the frozen
+  SQL surface).
+- [x] **FIX 4 — Unify KV key prefix** (`src/state/settings.tsx`).
+  `@soli/settings/v1` → `soli/settings/v1` (the `@` was an AsyncStorage-era relic;
+  other keys are `soli/klondike/v1`, `soli/ui/boardMetrics/v1`). No dual-read
+  fallback: reset-once, only test devices lose (re-defaultable) settings.
+- [x] **FIX 5 — Migration scaffold + one-time reset.** Ordered `MIGRATIONS` array
+  (each step brings the schema to `toVersion` in an exclusive transaction and
+  bumps `user_version`); the refuse-to-open-newer-versions guard is kept.
+  Correction round (per Karim): the baseline is `toVersion: 1` /
+  `DATABASE_VERSION = 1` (aesthetics), not 2 — the pre-release schema-collision
+  concern is moot because his test devices were cleared in between, so no device
+  sits at an old v1 schema. The DROP-before-CREATE was removed (it could only
+  ever run at version 0, where it was a no-op); the "never wipe user data in a
+  migration post-1.0" warning stays in the code comment. Post-1.0 changes append
+  steps with `toVersion >= 2`.
+- [x] **FIX 6 — Startup fresh deals honor the "Solvable deals" setting.**
+  Before: `dispatchFreshGame` in `useKlondikePersistence` always called
+  `createInitialState(preferredDrawCount)` — a fully random, possibly unsolvable
+  deal — on first install, won-session cleanup at startup, and corrupted-save
+  reset; only the in-app New Game path consulted the solvable-deal selector.
+  After: `useKlondikeGame` owns a single `createFreshGameState` factory (checks
+  `solvableGamesOnly`, then `selectNextSolvableDeal()` → `createSolvableGameState`,
+  falling back to `createInitialState`), used by BOTH `dealNewGame` and — passed as
+  a `createFreshState` param, held in a ref so the one-shot load effect never
+  re-runs — the persistence hook's `dispatchFreshGame`. Hydration order is safe:
+  settings hydrate synchronously (kv-store `getItemSync`) and the solvable catalog
+  is a bundled import, so both exist before any deal; history solvable-stats
+  hydrate async and may be empty on the startup paths, in which case the selector
+  simply picks an unplayed solvable deal (repeat-weighting is best-effort, the
+  solvability guarantee is not). The `preferredDrawCount` param of the persistence
+  hook became unused and was removed.
+- [x] **FIX C (correction round) — solvable-stats query cleanup.** Dropped the
+  unused `(exact_id)` index from the baseline DDL (no query filters on exact_id;
+  row lookups go by PK), removed the dead `WHERE exact_id IS NOT NULL` (column is
+  NOT NULL), and `getSolvableDealHistoryStats` now aggregates in SQL
+  (`GROUP BY exact_id, draw_count` with `COUNT(*)` + a `SUM(CASE …'solved'…)`)
+  instead of streaming every row into JS at startup. The solvable-catalog filter
+  and the per-exactId merge stay in JS (the catalog is a bundled TS module);
+  returned shape unchanged for `createSolvableStatsMap` in `state/history.tsx`.
+- [x] **Gates**: `yarn typecheck` ✓ `yarn lint` ✓ `yarn jest` ✓.
+  Repository contract tests updated: v1 baseline assertions (CHECKs incl.
+  `BETWEEN 1 AND 5`, `move_count`, no `solved` column, no exact_id index),
+  scaffold tests (fresh 0 → creates at 1, at-1 → untouched, 2 → refused), and a
+  new SQL-aggregation test for the solvable stats (real catalog IDs, off-catalog
+  rows filtered). No device build (per instructions).
+
+Files modified: `src/storage/historyRepository.native.ts` (FIX 1/2/3/5/C),
+`src/state/settings.tsx` (FIX 4), `src/features/klondike/hooks/useKlondikeGame.ts`
++ `useKlondikePersistence.ts` (FIX 6),
+`test/unit/storage/historyRepository.test.ts`. Correction round also marked the
+long-session slowdown items in
+`docs/product/game-history-performance/fabric-view-retention-root-fix.md` as
+resolved (absolute card layer refactor, commit 022c081).
