@@ -1,5 +1,10 @@
 # Demo Autosolve Playlist 20-Game Solved Demo Playlist
 
+> Note (2026-07-07): `scripts/run-demo-autosolve.js`, `yarn demo:auto-solve`, and
+> `yarn prod` mentioned below are superseded by `yarn release --auto-solve` /
+> `yarn ios --auto-solve` (`DEMO_GAME_LIMIT=N` limits games). The historical
+> content is kept as-is. Current recipes: `.agents/skills/soli-testing/SKILL.md`.
+
 ## User prompt
 
 ```text

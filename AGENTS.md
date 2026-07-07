@@ -5,10 +5,11 @@
 - Concept: The main thread orchestrates changes and hands off planning (with implementation plan), implementation and testing to a sub-agent. Reason: Save context and tokens on the main thread.
 - Sometimes, you're not working with an implementation plan for whatever reason. Also then keep implementing and testing only with sub-agents.
 - If it makes sense, please reply in a list or table, so I can easily reference to your statements in my reply.
-- Self-improvement: Introspect on runs. Propose an edit to AGENTS.md if 
-  - a rule in this file turned out to be wrong or caused friction during a run  
+- Self-improvement: Introspect on runs. Propose an edit to AGENTS.md if
+  - a rule in this file turned out to be wrong or caused friction during a run
   - spotted inefficiencies, errors, redundant tool calls, etc.
   - anything else based on your judgement
+- Treat every chat message from me as if I wrote "Does this makse sense?" at the end of the message -> call me out if something doesn't make sense or if there's better alternatives.
 
 ## About the codebase
 
@@ -34,7 +35,7 @@
 
 Fill in the following sections:
 
-- # [Feature Name] [Story Name]
+- # [Feature Title]
 - ## User prompt
   - Add all prompts from the chat 1:1 in here.
   ## Summary
@@ -47,7 +48,10 @@ Fill in the following sections:
   - Why is this nice and important?
 - ## Acceptance Criteria
   - What happens when we do what
-- ## Possible approaches incl. pros and cons
+- ## Possible approaches
+  - Include pros and cons
+  - Trade-offs
+  - Recommendations
 - ## Open questions to the user
   - Include possible answers including their pros and cons, reasoning with trade-offs and a recommendation
 - ## Dependencies
@@ -109,37 +113,25 @@ Context: I am Karim and I code this app. I regularly run AI agents (you) to get 
 
 Cheap tests first: yarn typecheck && yarn lint && yarn jest
 
-However, also test everything you do in a real environment (when it makes sense!). In order to save context, always use sub-agents to build and test. Use a timer while building to save some context so that you don't check up on the build every few seconds. Use efficient AI model for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Give the .md file (updated!) to the sub-agent for context. Also don't run two of these sub-agents in parallel if they will run a build. Reason: See below.
+However, also test everything you do in a real environment (when it makes sense!). In order to save context, always use sub-agents to build and test. Use a timer while building to save some context so that you don't check up on the build every few seconds. Use efficient AI model for the testing sub-agent. Give detailed testing instructions and get a detailed test report, though. Give the .md file (updated!) to the sub-agent for context. Never run two sub-agents in parallel if both will run a build (machine can't handle it; a shared lock makes the second fail fast) or both will drive the same device (one agent per device at a time).
 
-- Orchestrator: Run plausability check on testing results.
+- Orchestrator: Run plausability check on testing results. The orchestrator doesn't need to read the testing skill itself — delegate and point the testing sub-agent at it.
 
-Native: Use agent-device skill
-Web: Use Playwright with skill (but no need to test on web since the app is for native only, but it's an option.)
-
-Android: Run "yarn release" — it handles competing builds, locking, install verification, and app launch itself, then exits. "yarn release --logs" also streams filtered [SoliDev] logs until Ctrl+C. "yarn release --auto-solve" builds and auto-plays the demo playlist (DEMO_GAME_LIMIT=N limits games). Full Gradle log lands in .test-artifacts/builds/. Unlock a locked device with scripts/android-unlock-pattern.sh (safe on an unlocked phone — it exits without touching the screen).
-iOS: Run "yarn ios" — same handling as yarn release (competing builds, shared lock, install verification), builds Release to the simulator, then exits. Flags: --logs, --auto-solve, --debug (Metro dev build, lingers). Incremental by default; use a clean build (delete ios/ or --no-build-cache) only after native dependency changes.
-
-Never start two builds in parallel (e.g. yarn ios and yarn release simultaneously) — the machine can't handle it. Both commands enforce this themselves via a shared lock (the second invocation fails fast).
-
-Only one agent may drive a physical device at a time — the build lock covers builds only, not agent-device sessions. Check for active agent-device sessions before installing/launching on a device.
-
-- The board exposes a full a11y tree — prefer it over coordinate taps. Android handle: labels/content-desc (e.g. "Seven of hearts, column 3", "Stock, 24 cards", "Face-down card, column N"). iOS handle: testIDs ("stock", "waste", "card-<suit>-<rank>", "foundation-<suit>"). Source of truth: src/features/klondike/components/cards/accessibility.ts.
-- agent-device: `snapshot -i` dedupes identical labels; use `snapshot --raw` to count face-down cards. `uiautomator dump` fails on this app (timer never idles).
-
+**Any agent doing device testing must first read `.agents/skills/soli-testing/SKILL.md`** — the on-device testing cookbook (build/run commands and flags, a11y handles, demo deep links, fixtures, state resets, scrubber automation, troubleshooting). Recipes live there, not here.
 
 ## Commands
 
-- Typecheck: `yarn typecheck` — Lint: `yarn lint` — Tests: `yarn jest`
-- iOS build+run: `yarn ios` (flags: `--logs`, `--auto-solve`, `--debug`; details in Testing)
-- Android release: `yarn release` (flags: `--logs`, `--auto-solve`; details in Testing) — unlock device: `scripts/android-unlock-pattern.sh`
-- iOS scrub drag: start `appium`, then `node scripts/ios-scrub.js --from N --max M --to T` (agent-device can't pan on iOS; Android pans natively; serialize with agent-device — see docs/external-package-guides/appium.md)
+- Cheap gates: `yarn typecheck` — `yarn lint` — `yarn jest`
+- Device build+run: `yarn ios` (simulator) / `yarn release` (Android phone) — flags and everything else: soli-testing skill
 
 # External packages
 
 **External Package Research and Documentation**: For any proposed tasks that involve external packages, to avoid hallucinations, use the web to research the documentation first to ensure it's 100% clear how to use the API of the package. Then for each package, create or update a document in `docs/external-package-guides/` named `<package>.md` that contains a fresh cache of the information needed to use the API. It should be date-stamped and link to the original docs provided. This documents foundational assumptions about how to use the package, with example snippets.
 
 # AI models
+
 Exception today: Use Fable high for everything, both flagship and efficient.
- (high, xhigh, medium = reasoning)
+(high, xhigh, medium = reasoning)
+
 - Flagship: Anthropic Fable high, GPT 5.5 xhigh
 - Efficient: GPT 5.5 medium, Opus 4.8 medium. fallback: composer 2.5 (ignore! today: use Fable high for everything)

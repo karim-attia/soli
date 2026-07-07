@@ -1,7 +1,10 @@
 ---
 alwaysApply: false
 ---
-you can launch the app and see logs by running `yarn release --logs`
-for an automated end-to-end game, run `DEMO_GAME_LIMIT=1 yarn release --auto-solve` (builds, installs, auto-plays the demo playlist, exits on completion)
-when analyzing an issue, you might want to add logs first with 'devLog' from 'src/utils/devLogger.ts' to see them
-this mostly makes sense when testing logical functionality
+Before any device testing, read `.agents/skills/soli-testing/SKILL.md` — the on-device testing cookbook (build commands, demo deep links, fixtures, a11y handles, troubleshooting).
+
+Quick reference:
+- Android phone: `yarn release --logs` builds, installs, launches, and streams [SoliDev] logs.
+- iOS simulator: `yarn ios --logs` (same flow, Release build).
+- Automated end-to-end game: `DEMO_GAME_LIMIT=1 yarn release --auto-solve` (or `yarn ios --auto-solve`) — builds, auto-plays the demo playlist, exits on completion.
+- When analyzing an issue, add logs first with `devLog` from `src/utils/devLogger.ts` (only emitted with developer mode on; demo deep links enable it).

@@ -14,6 +14,13 @@ export type CelebrationAssignment = {
 export type CelebrationMetadata = {
   id: number
   name: string
+  // Motion-trail opt-in: the overlay renders `count` ghost copies per card, each
+  // evaluating the SAME frame function at progress lagged by (k+1) * gapMs. Works
+  // because every mode is a pure function of progress — no position history needed.
+  // Perf budget: per-frame Fabric updates scale with 52 × (count + 1) mounted views,
+  // so `count` dominates trail cost. Counts were lowered 2026-07-07 (Meteor 5→3,
+  // Cascade 4→3, Comet Halo 4→3, Galaxy 3→2) after lag reports on a phone.
+  trail?: { count: number; gapMs: number }
 }
 
 // Stable-id contract: ids are permanent identifiers, NOT array indices. When a mode is
@@ -31,6 +38,10 @@ export const CELEBRATION_MODE_METADATA: CelebrationMetadata[] = [
   { id: 7, name: 'Wave Loop' },
   { id: 8, name: 'Ring Cascade' },
   { id: 9, name: 'Drift Orbit' },
+  // NO trail on Comet Halo (tried 2026-07-07, reverted same day): like Galaxy, it keeps
+  // all 52 cards in a tight cluster, and translucent ghosts multiply overdraw where it is
+  // already deepest — measured 6fps on a budget phone. Rule of thumb: trails ONLY on
+  // modes that spread cards out (Cascade ran at baseline 51fps with 3 ghosts).
   { id: 10, name: 'Comet Halo' },
   { id: 11, name: 'Resonance Field' },
   { id: 12, name: 'Column Glide' },
@@ -48,10 +59,19 @@ export const CELEBRATION_MODE_METADATA: CelebrationMetadata[] = [
   { id: 24, name: 'Suit Orbits' },
   { id: 25, name: 'Flock' },
   { id: 26, name: 'Shockwave' },
+  // NO trail on Galaxy: the log spiral piles cards into a small center region, so ghosts
+  // multiply translucent overdraw exactly where it's already dozens of layers deep —
+  // measured 16fps with GPU stalls on a budget phone even with 2 ghosts and no opacity
+  // twinkle (Android perf test, Story 5, 2026-07-07). Trails belong on spread-out modes.
   { id: 27, name: 'Galaxy' },
   { id: 28, name: 'Big Bounce' },
   { id: 29, name: 'Heartbeat' },
   { id: 30, name: 'Diamond Drift' },
+  { id: 31, name: 'Classic Cascade', trail: { count: 3, gapMs: 80 } },
+  // Meteor sweeps the whole screen fast (full-screen dirty region every frame), so it
+  // is the most GPU-bound mode — 2 ghosts with a wider gap keeps the streak look at
+  // acceptable fps on budget phones (Android perf test, Story 5, 2026-07-07).
+  { id: 32, name: 'Meteor Shower', trail: { count: 2, gapMs: 75 } },
 ]
 
 export const CELEBRATION_DURATION_MS = 60_000
@@ -59,9 +79,11 @@ export const CELEBRATION_WOBBLE_FREQUENCY = 5.5
 export const TAU = Math.PI * 2
 
 const CELEBRATION_SPEED_MULTIPLIER = 10.4
-// PBI-28 follow-up: make celebration cards break out of stacked foundations immediately.
-const CELEBRATION_LAUNCH_INITIAL_PROGRESS = 0.08
-const CELEBRATION_LAUNCH_SPEED_MULTIPLIER = 32
+// PBI-28 follow-up: celebration cards must break out of stacked foundations immediately.
+// This used to be done with a 0.08 launch head start, but that rendered frame 1 already
+// ~22% toward the path — a visible one-frame snap off the piles. A steeper quint ease
+// from exactly 0 keeps the breakout fast (~29% eased after 100ms) AND position-continuous.
+const CELEBRATION_LAUNCH_SPEED_MULTIPLIER = 40
 const FOUNDATION_STACK_MAX = 13
 
 export type CelebrationFrameInput = {
@@ -86,9 +108,9 @@ export type CelebrationFrameResult = {
   stackFactor: number
 }
 
-const easeOutCubic = (t: number): number => {
+const easeOutQuint = (t: number): number => {
   'worklet'
-  return 1 - Math.pow(1 - t, 3)
+  return 1 - Math.pow(1 - t, 5)
 }
 
 /**
@@ -125,12 +147,9 @@ export function computeCelebrationFrame({
   const rawProgress = totalProgress
   const launchProgress = Math.min(
     1,
-    Math.max(
-      0,
-      CELEBRATION_LAUNCH_INITIAL_PROGRESS + progress * CELEBRATION_LAUNCH_SPEED_MULTIPLIER
-    )
+    Math.max(0, progress * CELEBRATION_LAUNCH_SPEED_MULTIPLIER)
   )
-  const launchEased = easeOutCubic(launchProgress)
+  const launchEased = easeOutQuint(launchProgress)
   const seed = assignment.randomSeed
   const relativeIndex = assignment.index - safeTotalCards / 2
   const normalizedIndex = (assignment.index + 1) / safeTotalCards
@@ -478,6 +497,10 @@ export function computeCelebrationFrame({
       pathX = centerX + Math.cos(angle) * radius
       pathY = centerY + Math.sin(angle) * radius * 0.75
       rotation = (theta * 0.5 * 180) / Math.PI
+      // Perf note (Android test, Story 5, 2026-07-07): this opacity twinkle was
+      // suspected in Galaxy's 16fps lag but measured innocent — removing it changed
+      // nothing; removing the trail ghosts fixed it (see the id-27 metadata comment).
+      // Twinkle on 52 opaque views is fine (old modes 13/15/19 do the same).
       targetScale = 1 + 0.06 * Math.sin(theta * 3 + seed * TAU)
       targetOpacity = 0.85 + 0.15 * Math.sin(theta * 2.3 + seed * TAU)
       break
@@ -525,6 +548,59 @@ export function computeCelebrationFrame({
       pathY = centerY + dx * Math.sin(spin) + dy * Math.cos(spin)
       rotation = (spin * 180) / Math.PI + Math.sin(theta + seed * TAU) * 10
       targetScale = 1 + 0.04 * Math.sin(theta * 2 + normalizedIndex)
+      break
+    }
+    // Classic Cascade: Windows-Solitaire homage. Continuity tricks:
+    // - cards hold exactly at baseX/baseY until their staggered launch via
+    //   tSince = max(0, ...) (position-continuous; the velocity kink at launch is fine);
+    // - per-bounce parabola h = 4·H·u·(1-u) with u = frac(ω·tSince) is continuous because
+    //   h = 0 at both ends of every bounce (H may change across the wrap without a jump);
+    // - the initial drop is a smooth offset from floor level back up to baseY that decays
+    //   quadratically after launch, so the bounce path starts exactly at baseY;
+    // - horizontal wrap span = board + 8 card widths, endpoints 4 card widths offscreen
+    //   (offscreen-teleport exemption, with slack per the Card Rain learning).
+    case 31: {
+      const cardW = metrics.width
+      const cardH = metrics.height
+      // 0.06 raw units ≈ 0.35 s between launches; the last card launches ~18 s in.
+      const tSince = Math.max(0, rawProgress - assignment.index * 0.06)
+      const floorY = boardHeight - cardH
+      const drop = Math.max(0, 1 - tSince / 0.35)
+      // Bounce height decays and regrows via a slow smooth envelope (Big Bounce pattern).
+      const envelope = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(TAU * tSince * 0.13 + seed * TAU))
+      const bounceHeight = boardHeight * (0.22 + 0.18 * seed) * envelope
+      const u0 = tSince * (3.5 + 1.5 * seed)
+      const u = u0 - Math.floor(u0)
+      const spanX = boardWidth + cardW * 8
+      const x0 = assignment.baseX + cardW * 4 + boardWidth * (0.45 + 0.35 * seed) * direction * tSince
+      const ux = x0 / spanX - Math.floor(x0 / spanX)
+      pathX = ux * spanX - cardW * 4
+      pathY = floorY - 4 * bounceHeight * u * (1 - u) - (floorY - assignment.baseY) * drop * drop
+      // No rotation/scale games: the classic cascade slides and bounces upright.
+      break
+    }
+    // Meteor Shower: fast diagonal streaks (upper-left → lower-right); the trail ghosts
+    // ARE the effect, so the path itself stays simple. x and y share ONE frac cycle, so
+    // both wrap simultaneously with endpoints 4 card sizes beyond both edges (offscreen
+    // exemption via the y axis even when the per-card x offset keeps x near the board).
+    case 32: {
+      const cardW = metrics.width
+      const cardH = metrics.height
+      const spanX = boardWidth + cardW * 8
+      const spanY = boardHeight + cardH * 8
+      const u0 = rawProgress * (1.4 + 0.9 * seed) + seed * 5 + normalizedIndex
+      const u = u0 - Math.floor(u0)
+      // Fixed per-card cross offset spreads the streak lanes; the sway keeps them alive.
+      const crossOffset = (seed - 0.5) * boardWidth * 0.9 + relativeIndex * cardW * 0.06
+      const sway = Math.sin(theta * 1.5 + seed * TAU) * cardW * 0.4
+      pathX = u * spanX - cardW * 4 + crossOffset + sway
+      pathY = u * spanY - cardH * 4
+      // Aligned with the (constant per board) travel diagonal, plus a FIXED per-card
+      // tilt instead of a per-frame oscillation: Meteor ran at 25fps on a budget phone
+      // with per-frame rotation+scale churn on 208 views; translate-only Cascade ran at
+      // baseline 51fps (Android perf test, Story 5, 2026-07-07). The sway in pathX keeps
+      // the streaks alive; trails carry the rest.
+      rotation = (Math.atan2(spanY, spanX) * 180) / Math.PI - 90 + (seed - 0.5) * 12
       break
     }
     default: {

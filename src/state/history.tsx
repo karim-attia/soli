@@ -29,6 +29,7 @@ import type {
   HistoryEntryMoveLog,
   HistorySummary,
 } from '../storage/historyRepository.types'
+import { clearSeededHistoryEntries, seedHistoryEntries } from '../storage/historySeeds'
 import { isExactDealSolvableForDrawCount } from '../data/solvableDealsV2'
 import { formatExactDealDisplayName } from '../solitaire/dealIdentity'
 import { devLog } from '../utils/devLogger'
@@ -125,6 +126,9 @@ type HistoryContextValue = {
   recordResult: (input: RecordGameResultInput) => string // Task 10-6: returns entry ID
   updateEntry: (id: string, updates: UpdateEntryInput) => void // Task 10-6: update existing entry
   clearHistory: () => void
+  // Dev-only testing hook (agent-testing-skill plan): seeds/clears additive
+  // `seed-` rows so History-tab scenarios are testable without playing games.
+  seedHistoryForTesting: (action: 'seed' | 'clear') => void
   // R3: repository-backed lookup of the single active row, for callers whose
   // in-memory page may not contain it (see useKlondikeHistoryEntry fallback).
   getActiveEntry: () => Promise<HistoryEntry | null>
@@ -326,6 +330,26 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
     queueRepositoryTask(clearHistoryEntries)
   }, [queueRepositoryTask])
 
+  // Runs through queueRepositoryTask so seeding serializes with live game writes
+  // (same ordering guarantee as recordResult/updateEntry), then reloads the full
+  // in-memory list so the History tab reflects the change without an app restart.
+  const seedHistoryForTesting = useCallback(
+    (action: 'seed' | 'clear') => {
+      if (!isHistorySupported) {
+        return
+      }
+      queueRepositoryTask(async () => {
+        if (action === 'clear') {
+          await clearSeededHistoryEntries()
+        } else {
+          await seedHistoryEntries()
+        }
+        await reconcileLoadedHistory()
+      })
+    },
+    [queueRepositoryTask, reconcileLoadedHistory]
+  )
+
   const getActiveEntry = useCallback(async (): Promise<HistoryEntry | null> => {
     if (!isHistorySupported) {
       return null
@@ -383,6 +407,7 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
       recordResult,
       updateEntry,
       clearHistory,
+      seedHistoryForTesting,
       getActiveEntry,
     }),
     [
@@ -394,6 +419,7 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
       loadMore,
       loadingMore,
       recordResult,
+      seedHistoryForTesting,
       solvableStats,
       summary,
       updateEntry,

@@ -1,6 +1,11 @@
 # React Native Jest Preset Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-07-07
+
+> Note (2026-07-07): the repo is now on Expo SDK 57 / `react-native@0.86.0` with
+> `@react-native/jest-preset@^0.86.0` (verified in `package.json`). The SDK 56 /
+> RN 0.85.3 versions below are historical; the guidance (keep the preset aligned
+> with the installed RN version, keep `jest-expo` as the Jest preset) still holds.
 
 ## Scope
 

@@ -518,3 +518,13 @@ export const clearHistoryEntries = async (): Promise<void> => {
   const database = await getDatabase()
   await database.runAsync('DELETE FROM history_entries', [])
 }
+
+// Dev-only support for history seeding (historySeeds.ts): deletes exactly the
+// rows whose id starts with the given prefix. Real gameplay rows use hist_* ids,
+// so a 'seed-' prefix can never touch them — that guarantee is what makes
+// seeding safe on Karim's real phone history. The only caller passes a constant
+// prefix without LIKE wildcards, so no ESCAPE clause is needed.
+export const deleteHistoryEntriesByIdPrefix = async (prefix: string): Promise<void> => {
+  const database = await getDatabase()
+  await database.runAsync("DELETE FROM history_entries WHERE id LIKE ? || '%'", [prefix])
+}

@@ -1,5 +1,10 @@
 # Demo Autosolve Playlist — Demo Sheet Cleanup, Back-and-Forth Undo Probes, Info HUD
 
+> Note (2026-07-07): `scripts/run-demo-autosolve.js`, `yarn demo:auto-solve`, and
+> `yarn prod` mentioned below are superseded by `yarn release --auto-solve` /
+> `yarn ios --auto-solve` (`DEMO_GAME_LIMIT=N` limits games). The historical
+> content is kept as-is. Current recipes: `.agents/skills/soli-testing/SKILL.md`.
+
 Follow-up story to
 `docs/product/demo-autosolve-playlist/20-game-solved-demo-playlist.md`.
 Read that plan first for the playlist/replay architecture; this story only builds

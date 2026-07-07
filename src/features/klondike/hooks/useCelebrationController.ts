@@ -14,6 +14,7 @@ import {
   CELEBRATION_MODE_METADATA,
   getCelebrationModeMetadata,
 } from '../../../animation/celebrationModes'
+import { DEAL_RANKS } from '../../../solitaire/dealIdentity'
 import { FOUNDATION_SUIT_ORDER } from '../../../solitaire/klondike'
 import { useAnimationToggles } from '../../../state/settings'
 import type { Card, GameState, Suit } from '../../../solitaire/klondike'
@@ -67,6 +68,20 @@ const CELEBRATION_HANDOFF_LOG_PREFIX = '[CelebrationHandoff]'
 type FoundationTopCardIds = Record<Suit, string | null>
 type CelebrationStartReason = 'flight_settled' | 'fallback'
 
+// Visual-only randomization for celebration timing/layering. This is not a
+// gameplay deck shuffle and cannot affect the exact deal ID. Fisher-Yates instead
+// of a random sort comparator (which is biased and engine-dependent).
+const shuffleCelebrationCards = (
+  cards: CelebrationCardConfig[]
+): CelebrationCardConfig[] => {
+  const shuffled = [...cards]
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
+}
+
 const buildFoundationTopCardIds = (
   foundations: GameState['foundations']
 ): FoundationTopCardIds => ({
@@ -116,6 +131,14 @@ export const useCelebrationController = ({
   const celebrationTotal = useSharedValue(0)
 
   const celebrationAbortRef = useRef(false)
+  // Dev-hold (Story 5): set by the first badge press (cycleCelebrationMode) and by
+  // previews. While set, the 30s new-game dialog is never scheduled and the 60s run
+  // loops instead of completing, so the developer stays in the celebration until
+  // tapping the animation (abort) or dealing a new game.
+  const celebrationHoldRef = useRef(false)
+  // Preview (Story 5): celebration started via the ?celebration deep link on an
+  // untouched game — abort must clean up + unlock WITHOUT the new-game dialog.
+  const celebrationPreviewRef = useRef(false)
   const celebrationDialogTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const celebrationDialogShownRef = useRef(false)
   const celebrationStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -191,6 +214,23 @@ export const useCelebrationController = ({
     openCelebrationDialog()
   }, [openCelebrationDialog, updateBoardLocked])
 
+  // Shared per-card launch-position math for real wins AND dev previews — one
+  // source of truth so preview cards start exactly where win cards would (Story 5).
+  const computeCelebrationCardBase = useCallback(
+    (suit: Suit, suitIndex: number, stackIndex: number) => {
+      const topLayout = topRowLayoutRef.current
+      const topOffsetX = topLayout?.x ?? 0
+      const topOffsetY = topLayout?.y ?? 0
+      const fallbackSpacing = cardMetrics.width + FOUNDATION_FALLBACK_GAP
+      const layout = foundationLayoutsRef.current[suit]
+      const baseX = topOffsetX + (layout?.x ?? suitIndex * fallbackSpacing)
+      const baseY =
+        topOffsetY + (layout?.y ?? 0) - stackIndex * (cardMetrics.height * 0.02)
+      return { baseX, baseY }
+    },
+    [cardMetrics.height, cardMetrics.width, foundationLayoutsRef, topRowLayoutRef]
+  )
+
   const buildCelebrationState = useCallback((): CelebrationState | null => {
     const boardWidthValue = boardLayout.width ?? 0
     const boardHeightValue = boardLayout.height ?? 0
@@ -199,29 +239,19 @@ export const useCelebrationController = ({
       return null
     }
 
-    const topLayout = topRowLayoutRef.current
-    const topOffsetX = topLayout?.x ?? 0
-    const topOffsetY = topLayout?.y ?? 0
-    const fallbackSpacing = cardMetrics.width + FOUNDATION_FALLBACK_GAP
     const cards: CelebrationCardConfig[] = []
 
     FOUNDATION_SUIT_ORDER.forEach((suit, suitIndex) => {
       const pile = state.foundations[suit]
-      if (!pile.length) {
-        return
-      }
-      const layout = foundationLayoutsRef.current[suit]
-      const baseX = topOffsetX + (layout?.x ?? suitIndex * fallbackSpacing)
-      const baseY = topOffsetY + (layout?.y ?? 0)
 
       pile.forEach((card, stackIndex) => {
-        const cardOffsetY = stackIndex * (cardMetrics.height * 0.02)
+        const { baseX, baseY } = computeCelebrationCardBase(suit, suitIndex, stackIndex)
         cards.push({
           card,
           stackIndex,
           suitIndex,
           baseX,
-          baseY: baseY - cardOffsetY,
+          baseY,
           randomSeed: Math.random(),
         })
       })
@@ -231,9 +261,6 @@ export const useCelebrationController = ({
       return null
     }
 
-    // Visual-only randomization for celebration timing/layering. This is not a
-    // gameplay deck shuffle and cannot affect the exact deal ID.
-    const shuffledCards = [...cards].sort(() => Math.random() - 0.5)
     // Pick a random metadata ENTRY (not a random 0..count integer) so mode ids stay
     // stable even if entries are removed later — see the contract in celebrationModes.ts.
     const modeId =
@@ -246,16 +273,13 @@ export const useCelebrationController = ({
       durationMs: CELEBRATION_DURATION_MS,
       boardWidth: boardWidthValue,
       boardHeight: boardHeightValue,
-      cards: shuffledCards,
+      cards: shuffleCelebrationCards(cards),
     }
   }, [
     boardLayout.height,
     boardLayout.width,
-    cardMetrics.height,
-    cardMetrics.width,
-    foundationLayoutsRef,
+    computeCelebrationCardBase,
     state.foundations,
-    topRowLayoutRef,
   ])
 
   const startPendingCelebration = useCallback(
@@ -304,6 +328,8 @@ export const useCelebrationController = ({
 
   const clearCelebrationAnimations = useCallback(() => {
     celebrationAbortRef.current = false
+    celebrationHoldRef.current = false
+    celebrationPreviewRef.current = false
     celebrationDialogShownRef.current = false
     pendingCelebrationActiveRef.current = false
     pendingCelebrationQueuedAtRef.current = null
@@ -333,8 +359,11 @@ export const useCelebrationController = ({
   ])
 
   const handleCelebrationAbort = useCallback(() => {
+    const wasPreview = celebrationPreviewRef.current
     celebrationAbortRef.current = true
-    devLog('info', '[Celebration] abort requested')
+    celebrationHoldRef.current = false
+    celebrationPreviewRef.current = false
+    devLog('info', '[Celebration] abort requested', { preview: wasPreview })
     runOnUI(() => {
       'worklet'
       celebrationActive.value = 0
@@ -343,7 +372,11 @@ export const useCelebrationController = ({
     clearCelebrationDialogTimer()
     updateBoardLocked(false)
     setCelebrationState(null)
-    openCelebrationDialog()
+    // Preview (deep link) overlays an untouched, unfinished game — dismiss back to
+    // it silently instead of offering the post-win "Deal Again" dialog.
+    if (!wasPreview) {
+      openCelebrationDialog()
+    }
   }, [
     celebrationActive,
     celebrationProgress,
@@ -444,25 +477,47 @@ export const useCelebrationController = ({
       mode: celebrationState.modeId,
     })
 
-    runOnUI(() => {
-      'worklet'
-      celebrationActive.value = 1
-      celebrationProgress.value = 0
-      celebrationProgress.value = withTiming(
-        1,
-        { duration: celebrationState.durationMs, easing: Easing.linear },
-        (finished) => {
-          if (finished && !celebrationAbortRef.current) {
-            runOnJS(handleCelebrationComplete)()
+    // Hoisted `function` declarations don't inherit the null-narrowing above, so
+    // capture the duration first. Mutual recursion (run ↔ finish) needs hoisting.
+    const durationMs = celebrationState.durationMs
+    function startProgressRun() {
+      runOnUI(() => {
+        'worklet'
+        celebrationActive.value = 1
+        celebrationProgress.value = 0
+        celebrationProgress.value = withTiming(
+          1,
+          { duration: durationMs, easing: Easing.linear },
+          (finished) => {
+            if (finished && !celebrationAbortRef.current) {
+              runOnJS(handleRunFinished)()
+            }
           }
-        }
-      )
-    })()
+        )
+      })()
+    }
 
-    celebrationDialogTimeoutRef.current = setTimeout(
-      openCelebrationDialog,
-      CELEBRATION_DIALOG_DELAY_MS
-    )
+    function handleRunFinished() {
+      if (celebrationHoldRef.current) {
+        // Dev-hold loop: restart the same 60s run instead of completing. The end
+        // fade plays and the cards relaunch from the foundations — intentional,
+        // it keeps the hold session alive indefinitely for mode inspection.
+        devLog('info', '[Celebration] dev-hold: restarting run')
+        startProgressRun()
+        return
+      }
+      handleCelebrationComplete()
+    }
+
+    startProgressRun()
+
+    // Dev-hold suppresses the 30s dialog entirely (not just per-cycle restarts).
+    if (!celebrationHoldRef.current) {
+      celebrationDialogTimeoutRef.current = setTimeout(
+        openCelebrationDialog,
+        CELEBRATION_DIALOG_DELAY_MS
+      )
+    }
 
     return () => {
       celebrationAbortRef.current = true
@@ -494,6 +549,10 @@ export const useCelebrationController = ({
       if (!current) {
         return current
       }
+      // First press "enters" dev-hold (Story 5): from here on, no 30s dialog and the
+      // 60s run loops until tap-on-animation (abort) or a new game. Set inside the
+      // updater so a stray press with no active celebration can't leave a stale hold.
+      celebrationHoldRef.current = true
       const currentEntryIndex = CELEBRATION_MODE_METADATA.findIndex(
         (entry) => entry.id === current.modeId
       )
@@ -504,6 +563,69 @@ export const useCelebrationController = ({
       return { ...current, modeId: nextEntry.id }
     })
   }, [])
+
+  // Dev deep link (?celebration=<id|random>, Story 5): show the full celebration
+  // overlay on ANY board without winning. Differences vs a real win: 52 synthetic
+  // cards (ids `preview-<suit>-<rank>` can never collide with board card ids — the
+  // overlay renders purely from this config), dev-hold is active from the start
+  // (no 30s dialog, endless loop), and abort returns to the untouched game
+  // without the new-game dialog (see handleCelebrationAbort).
+  const startCelebrationPreview = useCallback(
+    (modeId?: number) => {
+      const boardWidthValue = boardLayout.width ?? 0
+      const boardHeightValue = boardLayout.height ?? 0
+      if (!boardWidthValue || !boardHeightValue) {
+        devLog('warn', '[Celebration] preview skipped: board layout not ready')
+        return
+      }
+
+      const cards: CelebrationCardConfig[] = []
+      // Foundation slot layouts are measured on the slot VIEWS (present even when
+      // piles are empty), so preview base positions work mid-game too.
+      FOUNDATION_SUIT_ORDER.forEach((suit, suitIndex) => {
+        DEAL_RANKS.forEach((rank, stackIndex) => {
+          const { baseX, baseY } = computeCelebrationCardBase(
+            suit,
+            suitIndex,
+            stackIndex
+          )
+          cards.push({
+            card: { id: `preview-${suit}-${rank}`, suit, rank, faceUp: true },
+            stackIndex,
+            suitIndex,
+            baseX,
+            baseY,
+            randomSeed: Math.random(),
+          })
+        })
+      })
+
+      // A given id must exist in the metadata (stable-id contract); otherwise fall
+      // back to a random entry — same selection rule as a real win.
+      const resolvedModeId =
+        CELEBRATION_MODE_METADATA.find((entry) => entry.id === modeId)?.id ??
+        CELEBRATION_MODE_METADATA[
+          Math.floor(Math.random() * CELEBRATION_MODE_METADATA.length)
+        ].id
+
+      celebrationHoldRef.current = true
+      celebrationPreviewRef.current = true
+      updateBoardLocked(true)
+      setCelebrationState({
+        modeId: resolvedModeId,
+        durationMs: CELEBRATION_DURATION_MS,
+        boardWidth: boardWidthValue,
+        boardHeight: boardHeightValue,
+        cards: shuffleCelebrationCards(cards),
+      })
+    },
+    [
+      boardLayout.height,
+      boardLayout.width,
+      computeCelebrationCardBase,
+      updateBoardLocked,
+    ]
+  )
 
   const celebrationLabel = useMemo(() => {
     if (!developerModeEnabled || !celebrationState) {
@@ -592,6 +714,7 @@ export const useCelebrationController = ({
     celebrationBindings,
     celebrationLabel,
     cycleCelebrationMode,
+    startCelebrationPreview,
     handleCelebrationAbort,
     handleWinningCardFlightSettled,
     clearCelebrationDialogTimer,

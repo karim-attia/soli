@@ -3,6 +3,7 @@ import { Alert, LayoutChangeEvent, LayoutRectangle, useColorScheme } from 'react
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
+  createGameStateFromExactId,
   createInitialState,
   createSolvableGameState,
   findAutoMoveTargetWithTableauAdjacentFallback,
@@ -13,6 +14,8 @@ import {
   type Selection,
   type Suit,
 } from '../../../solitaire/klondike'
+import type { ExactDealId } from '../../../solitaire/dealIdentity'
+import type { DrawCount } from '../../../solitaire/drawCount'
 import { devLog } from '../../../utils/devLogger'
 import { clearGameState } from '../../../storage/gamePersistence'
 import { useHistory } from '../../../state/history'
@@ -100,6 +103,7 @@ export type UseKlondikeGameResult = {
   requestNewGame: RequestNewGameFn
   handleLaunchDemoGame: (options?: LaunchDemoGameOptions) => void
   resetUndoHintForTesting: () => void
+  seedHistoryForTesting: (action: 'seed' | 'clear') => void
   viewProps: KlondikeGameViewProps
 }
 
@@ -150,7 +154,15 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const colorScheme = useColorScheme()
   const feltBackground = colorScheme === 'dark' ? COLOR_FELT_DARK : COLOR_FELT_LIGHT
 
-  const { state: settingsState, setDeveloperMode } = useSettings()
+  // The extra setters are only forwarded to the demo launcher for the ?set= deep
+  // link (agent-testing-skill C1).
+  const {
+    state: settingsState,
+    setDeveloperMode,
+    setDrawCount,
+    setAutoUpEnabled,
+    setSolvableGamesOnly,
+  } = useSettings()
   const { showMoves, showTime } = settingsState.statistics
   const solvableGamesOnly = settingsState.solvableGamesOnly
   const preferredDrawCount = settingsState.drawCount
@@ -160,7 +172,8 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const animationToggles = useAnimationToggles()
   // Only solvable stats are read here; the history-entry lifecycle (rows, recording,
   // recovery) lives in useKlondikeHistoryEntry, which calls useHistory() itself.
-  const { solvableStats } = useHistory()
+  // seedHistoryForTesting is only forwarded to the demo launcher / demo sheet.
+  const { solvableStats, seedHistoryForTesting } = useHistory()
   const {
     master: animationsEnabled,
     invalidMoveWiggle: invalidWiggleEnabled,
@@ -384,9 +397,11 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   } = useUndoHint()
 
   // Deals a new game, respecting solvable-only settings and history bookkeeping.
-  const dealNewGame = useCallback(() => {
+  // stateOverride (agent-testing-skill C2): the ?deal= deep link supplies an exact
+  // deal instead of the solvable-selector state; all bookkeeping stays identical.
+  const dealNewGame = useCallback((stateOverride?: GameState) => {
     const startedAt = new Date().toISOString()
-    const nextState = createFreshGameState()
+    const nextState = stateOverride ?? createFreshGameState()
     recordStartedGame(nextState, { startedAt })
     dispatch({ type: 'HYDRATE_STATE', state: nextState })
     // Absolute-layer cards stay mounted across deals, so this narrow token resets
@@ -406,6 +421,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     celebrationBindings,
     celebrationLabel,
     cycleCelebrationMode,
+    startCelebrationPreview,
     handleCelebrationAbort,
     handleWinningCardFlightSettled,
     clearCelebrationDialogTimer,
@@ -457,6 +473,50 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     [dispatch, noteStreakBreak]
   )
 
+  // Shared "Deal Again" body: used by the requestNewGame confirmation dialog AND
+  // by the dev-only ?reset=game / ?deal= deep links, which skip the dialog on
+  // purpose (agent-testing-skill C2/C4). Defined before the demo launcher so the
+  // deep-link callbacks below can be passed in as props.
+  const performDealAgain = useCallback(
+    (options?: { stateOverride?: GameState; logContext?: Record<string, unknown> }) => {
+      // Task 10-6: Only record if game wasn't already won (winning already records)
+      if (!stateRef.current.hasWon) {
+        recordCurrentGameResult()
+      }
+      setCelebrationState(null)
+      foundationLayoutsRef.current = {}
+      topRowLayoutRef.current = null
+      winCelebrationsRef.current = 0
+      void clearGameState().catch((error) => {
+        devLog('warn', 'Failed to clear persisted game before new deal', error)
+      })
+      dealNewGame(options?.stateOverride)
+      updateBoardLocked(false)
+      devLog('log', '[Game] New game dealt', options?.logContext ?? {})
+    },
+    [dealNewGame, recordCurrentGameResult, setCelebrationState, updateBoardLocked]
+  )
+
+  // ?reset=game (agent-testing-skill C4): New Game without the UI confirmation.
+  const dealNewGameForTesting = useCallback(() => {
+    performDealAgain({ logContext: { reason: 'deepLink-reset' } })
+  }, [performDealAgain])
+
+  // ?deal=<exactId>&draw=N (agent-testing-skill C2): bug-report repro and
+  // hand-crafted scenario deals. The launcher validates the id before calling.
+  const startGameFromExactDeal = useCallback(
+    (exactId: ExactDealId, drawCount?: DrawCount) => {
+      performDealAgain({
+        stateOverride: createGameStateFromExactId(
+          exactId,
+          drawCount ?? preferredDrawCount
+        ),
+        logContext: { reason: 'deepLink-deal', exactId, drawCount },
+      })
+    },
+    [performDealAgain, preferredDrawCount]
+  )
+
   const { handleLaunchDemoGame } = useDemoGameLauncher({
     stateRef,
     dispatch,
@@ -476,6 +536,16 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     clearGameState,
     preferredDrawCount,
     autoUpEnabled,
+    seedHistoryForTesting,
+    setDrawCount,
+    setAutoUpEnabled,
+    setSolvableGamesOnly,
+    resetUndoHintForTesting,
+    dealNewGameForTesting,
+    startGameFromExactDeal,
+    // ?celebration= preview now lives in useCelebrationController (Story 5) —
+    // the old useKlondikeGame-local triggerCelebrationForTesting was removed.
+    startCelebrationPreview,
   })
 
   // Triggers the invalid-move wiggle animation for the provided selection.
@@ -591,20 +661,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         text: 'Deal Again',
         style: forced ? 'default' : 'destructive',
         onPress: () => {
-          // Task 10-6: Only record if game wasn't already won (winning already records)
-          if (!stateRef.current.hasWon) {
-            recordCurrentGameResult()
-          }
-          setCelebrationState(null)
-          foundationLayoutsRef.current = {}
-          topRowLayoutRef.current = null
-          winCelebrationsRef.current = 0
-          void clearGameState().catch((error) => {
-            devLog('warn', 'Failed to clear persisted game before new deal', error)
-          })
-          dealNewGame()
-          updateBoardLocked(false)
-          devLog('log', '[Game] New game dealt', { reason, forced })
+          performDealAgain({ logContext: { reason, forced } })
         },
       })
 
@@ -615,13 +672,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         { cancelable: !forced }
       )
     },
-    [
-      clearCelebrationDialogTimer,
-      dealNewGame,
-      recordCurrentGameResult,
-      setCelebrationState,
-      updateBoardLocked,
-    ]
+    [clearCelebrationDialogTimer, performDealAgain, updateBoardLocked]
   )
 
   // Keeps the new-game request ref synchronized with the latest callback.
@@ -909,6 +960,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     requestNewGame,
     handleLaunchDemoGame,
     resetUndoHintForTesting,
+    seedHistoryForTesting,
     viewProps,
   }
 }

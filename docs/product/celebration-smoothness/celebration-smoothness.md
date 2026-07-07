@@ -151,7 +151,163 @@ Implementation hints for tricky continuity spots (suggestions, not mandates):
 
 ## Anomaly resolution (2026-07-07, from user)
 
-The two one-time anomalies during the Story 2 smoke test (dialog after ~8 s, demo sheet opening spontaneously) were almost certainly the user tapping the simulator out of curiosity while the agent was driving. Not bugs. This also explains part of the test duration (agent investigating unexplained taps).
+The two one-time anomalies during the Story 2 smoke test (dialog after ~8 s, demo sheet opening spontaneously) were almost certainly the user tapping the simulator out of curiosity while the agent was driving. Not bugs. This also explains part of the test duration (agent investigating unexplained taps). Story 2 smoke test results are further below (after Story 3).
+
+---
+
+# Story 3: Trail ghosts + Classic Cascade + Meteor Shower (2026-07-07)
+
+## User prompt (Story 3)
+
+> then, let's try the classic cascade. and if doable maybe also another new mode with this new effect?
+
+## Design: trail ghosts via time-lagged evaluation
+
+Every celebration mode is a pure function of `progress`. Therefore a motion trail needs NO position history: ghost k of a card is simply `computeCelebrationFrame(progress - k * gap)` — the same worklet, evaluated at a lagged progress, rendered with decaying opacity below the real card. This makes trails a generic per-mode opt-in and keeps the whole system stateless.
+
+- `CelebrationMetadata` gains optional `trail?: { count: number; gapMs: number }`.
+- `CelebrationOverlayLayer`: when the active mode's metadata has `trail`, mount `count` ghost slots per card (52 × count extra views, ONLY while a trail mode is active — mounting keys off `celebrationState`, which re-renders once per celebration start/mode cycle anyway). Each ghost slot reuses the existing slot worklet with a `lagProgress` offset (gapMs / CELEBRATION_DURATION_MS · (k+1)), progress clamped ≥ 0 (at clamp, ghost coincides with the card at its base — invisible overlap, not a glitch).
+- Ghost styling: opacity multiplied by a decay (e.g. `0.45 · (1 - k / (count + 1))`), zIndex below the main card (e.g. `6000 + index - (k+1)`), optionally slightly smaller scale for depth.
+- Perf budget: start with count 4 / gap 70–90 ms (≈ 208 ghost views). If the device smoke test shows jank, reduce count — do not optimize further preemptively.
+
+## New modes (Story 3)
+
+Hard requirements: same as Story 2 (continuous functions of progress; offscreen-only teleports with ≥ 4 card sizes of slack — Card Rain learning; worklet-safe; no Math.random at frame time).
+
+| id | Name | Trail | Motion spec (guidance) |
+| -- | ---- | ----- | ---- |
+| 31 | Classic Cascade | count ~4, gap ~80 ms | Windows-Solitaire homage. Cards launch SEQUENTIALLY (stagger by `index`, e.g. ~0.35 s apart; before launch, hold exactly at `baseX/baseY` — position-continuous at launch, velocity jump is fine). After launch: constant horizontal velocity (direction + speed from seed/direction), vertical gravity bounce along the floor (`floorY = boardHeight - cardHeight`): per-bounce parabola `h = 4·H·u·(1-u)` with `u = frac(ω·tSinceLaunch)` — continuous because h=0 at both ends of every bounce; bounce height H decays and regrows via a slow smooth envelope (Big Bounce pattern). Horizontal offscreen wrap over a span ≥ board width + 8 card widths (endpoints ≥ 4 card widths beyond the edges). |
+| 32 | Meteor Shower | count ~5, gap ~55 ms | Fast diagonal streaks (upper-left → lower-right), per-card stagger and speed variation from seed; cards travel along the diagonal and wrap offscreen (same span rule along both axes); slight cross-drift sway; rotation aligned near the diagonal with small oscillation. The trail IS the effect — keep the path itself simple. |
+
+## Steps to implement (Story 3)
+
+- [x] `trail` config on `CelebrationMetadata`; overlay renders lagged ghost slots when active mode has trails (mount only during trail modes).
+- [x] Mode 31 Classic Cascade per spec (+ metadata with trail: count 4, gap 80 ms).
+- [x] Mode 32 Meteor Shower per spec (+ metadata with trail: count 5, gap 55 ms).
+- [x] Continuity test: new modes are covered automatically via `CELEBRATION_MODE_METADATA` iteration; ensure they pass (offscreen exemption applies to the wraps). No ghost-specific unit test needed (ghosts reuse the same frame function; rendering is device-smoke territory). (Passed unmodified, first run.)
+- [x] `yarn typecheck && yarn lint && yarn jest` green. (26 suites / 254 tests passed, 2026-07-07; includes 2 new mode continuity tests.)
+- [x] Lean device smoke test (testing sub-agent, tightly scoped): verify modes 31 + 32 render with visible trails, no crash, no obvious jank. 2 screenshots per mode, done. (Done 2026-07-07, both modes pass — see "Device smoke test (Story 3)" below.)
+
+## Files actually modified (Story 3)
+
+- `src/animation/celebrationModes.ts` — `trail?: { count, gapMs }` on `CelebrationMetadata` (+ comment explaining the lagged-evaluation trick), metadata entries 31/32, switch cases 31 (Classic Cascade) and 32 (Meteor Shower) with per-case continuity comments.
+- `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx` — `CelebrationOverlaySlot` parametrized with `zIndex` (now a prop instead of `6000 + index` in the worklet), optional `lagProgress` (progress offset, clamped ≥ 0 in the worklet) and `opacityMultiplier`; layer derives `trail` from `getCelebrationModeMetadata(celebrationState.modeId)` and mounts `count` ghost slots per card only while a trail mode is active; zIndex bands `6000 + slot * (count + 1) + …` so ghosts never interleave across cards (plain `6000 + slot` when no trail).
+
+## Intermediary learnings (Story 3)
+
+- Classic Cascade launch continuity: the bounce parabola starts at the floor (h = 0 at u = 0), but cards hold at `baseY` before launch. Bridging offset: `(floorY - baseY) * drop²` with `drop = max(0, 1 - tSince / 0.35)` — equals the full gap at launch (position-continuous) and decays smoothly to 0, reading as an accelerating first fall into the floor bounces.
+- The horizontal wrap needs no timing coordination with the initial drop: the teleport only happens when x reaches an endpoint 4 card widths offscreen, which is invisible regardless of what y is doing (the test's offscreen exemption is an OR across axes).
+- Theoretical flake considered and checked: if a bounce wrap (u = frac) fell exactly between the test's reference and boundary samples, fall/rise could cancel in the reference delta while the boundary delta stays full-slope. Didn't occur for the chosen constants — and the test is fully deterministic (fixed seeds/boundaries), so a pass is a stable pass.
+- Ghost lag clamping (`max(0, progress - lag)`) means ghosts sit exactly on top of the card during the first `gapMs · count` ms — invisible overlap, then the trail fans out naturally. No special-casing needed.
+- Meteor Shower keeps x and y on ONE shared `frac` cycle so both wrap in the same frame; the per-card x lane offset can keep x near the board at wrap time, but the y endpoints (±4 card heights offscreen) alone satisfy the exemption.
+
+## Device smoke test (Story 3) — 2026-07-07
+
+iOS simulator (iPhone 17 Pro), Release build via `yarn ios` (built+installed+launched in 58 s). Win via `soli:///?demo=autosolve&games=1`, modes reached by tapping the dev badge. Artifacts: `.test-artifacts/celebration-trail-modes/`.
+
+| id | Mode | Result |
+| -- | ---- | ------ |
+| 31 | Classic Cascade | Pass — cards bounce along the floor in staggered launches, 4 fading trail ghosts clearly visible behind each moving card, screenshots differ (`31-classic-cascade-{a,b}.png`) |
+| 32 | Meteor Shower | Pass — fast upper-left→lower-right diagonal streaks, long 5-ghost trails are the dominant visual, screenshots differ (`32-meteor-shower-{a,b}.png`) |
+
+- Jank (Meteor Shower, 312 animated views): observed ~5 s via 4 rapid captures (`32-meteor-jank-{1..4}.png`) — motion advanced substantially and coherently every frame, badge taps kept registering instantly, nothing frozen. No gross choppiness; note stills can't rule out subtle frame drops. No crash (app process alive after both runs).
+- Known Story 2 finding re-confirmed: the 30 s "Start a new game?" dialog interrupted the first Meteor Shower attempt (dialog is modal, badge unreachable); a fresh win + faster cycling avoided it. One anomaly not investigated (lean scope): after the first cold-start deep link the badge never appeared during 130 s of polling despite the game being won — possibly the agent-device `open` (attached after the deep link) relaunched the app mid-demo. Retry with `#retry-1` worked immediately.
+
+# Story 4: Polish batch — end fade, launch snap, Fisher-Yates, static zIndex, trail uplifts (2026-07-07)
+
+## User prompt (Story 4)
+
+> General improvement recommendations: do 2 and 4 and 5 if you think it makes sense. maybe also 1 if it's just a line or two. testing new animations meanwhile. should some existing animations also be uplifted with new options? as mentioned, they're all pretty much vibecoded and I am open to experimenting and making it cool.
+
+## Changes (all implemented directly — each is a few lines; done 2026-07-07, all tests green: 28 suites / 275 tests)
+
+- [x] Issue #1 (end fade): slot worklet multiplies opacity by `endFade = clamp((1 - progress) / 0.033)` — cards and their trail ghosts fade out together over the last ~2 s of the 60 s run instead of vanishing in one frame when `celebrationState` clears. Driven by the unlagged shared progress. (Abort via tap still hides instantly — user-initiated, fine.)
+- [x] Issue #2 (frame-1 launch snap): removed the 0.08 launch head start (`CELEBRATION_LAUNCH_INITIAL_PROGRESS`); launch now eases from exactly 0 with a steeper curve (easeOutQuint, speed multiplier 32→40). Breakout stays fast (~29% eased after 100 ms — comparable to the old head start) but frame 1 is position-continuous with the foundation piles. PBI-28's "break out immediately" intent preserved; comment updated in `celebrationModes.ts`.
+- [x] Issue #5 (biased shuffle): Fisher-Yates replaces `sort(() => Math.random() - 0.5)` in `buildCelebrationState`.
+- [x] Issue #6 (zIndex): now in the slot's static style (it became a constant prop in Story 3; the worklet no longer re-emits it every frame).
+- [x] Trail uplifts on existing modes: Comet Halo (10) `{count: 4, gapMs: 70}` — a comet finally has a tail; Galaxy (27) `{count: 3, gapMs: 90}` — star-streak spiral arms. One metadata line each; trivially revertable.
+
+## Files modified (Story 4)
+
+- `src/animation/celebrationModes.ts` (launch ease, trail metadata on 10/27)
+- `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx` (end fade, static zIndex)
+- `src/features/klondike/hooks/useCelebrationController.ts` (Fisher-Yates)
+
+Not device-tested (pure-math/one-liner changes; user is testing on simulator — NOTE: a rebuild is needed to see them).
+
+# Story 5: Perf check, dev-hold timers, celebration preview deep link (2026-07-07)
+
+## User prompt (Story 5)
+
+> the new celebrations are quite heavy on my phone. check pls. seems to be laggy.
+> classic cascade is cool. but not really close to windows classic cascade. just a comment for now.
+> when using new pressable to go through animations, each press should restart 30s and 60s timer so i stay in there and have time to see. or actually first press should disable those timers and stay in there until i click in the animation or start a new game.
+> can we already start these new animations programmatically? see other thread with skills? would maybe help here in testing as well btw.
+
+## Analysis
+
+- **Lag suspect:** trail modes mount 52 × (count+1) animated views (Meteor Shower: 312), each running the frame worklet + a Fabric props update every frame. The per-frame update volume is the likely bottleneck on a phone, not the trig. First mitigation: reduce ghost counts (Meteor 5→3, Cascade 4→3, Comet Halo 4→3, Galaxy 3→2 ⇒ worst case 312→208 views). Then MEASURE on the Android phone (`dumpsys gfxinfo` jank stats, trail mode vs non-trail mode vs old mode). Further options only if still janky: quantize ghost updates to ~30 Hz, cheaper ghost visuals.
+- **Windows-cascade fidelity (comment only, deferred):** the original paints permanent imprints (cards never erased); real fidelity needs a snapshot/canvas layer (the deferred Classic Cascade trails story), not more ghosts. Logged in Follow-ups.
+- **Timers:** user chose the second option — FIRST badge press disables both the 30 s dialog timer and the 60 s completion; stay in celebration until tapping the animation (abort) or starting a new game.
+- **Programmatic start:** not possible before this story (celebrations only trigger on a real win). Design: dev-only deep link `soli://?celebration=<id|random>` → celebration PREVIEW: synthetic 52-card foundation payload (suit/rank literals; foundation slot layouts exist even mid-game because they're measured on the slot views, not the piles), forced mode id, dev-hold behavior, and abort-dismisses-without-dialog. Game state untouched — preview overlays any board and returns to it cleanly.
+
+## Steps to implement (Story 5)
+
+- [x] Reduce trail ghost counts per above (comment the perf budget rationale). (Meteor 5→3, Cascade 4→3, Comet Halo 4→3, Galaxy 3→2; budget comment on `CelebrationMetadata.trail`.)
+- [x] Dev-hold: `cycleCelebrationMode` (first press) sets a hold ref → effect skips the 30 s dialog timer; 60 s run completion loops (restart progress: fade-out → relaunch, commented as intentional dev-loop) instead of completing. Cleared on abort/new game/state clear.
+- [x] `startCelebrationPreview(modeId?)` on the controller: synthetic cards (all 52, `preview-<suit>-<rank>` ids), base positions via the same math as `buildCelebrationState` (extracted `computeCelebrationCardBase` used by both), Fisher-Yates shuffle (extracted `shuffleCelebrationCards`, also shared), forced or random mode, sets hold+preview refs, locks board, sets state. No-op with devLog if board layout not ready.
+- [x] Abort during preview: cleanup + unlock WITHOUT opening the new-game dialog.
+- [x] Deep link `soli://?celebration=<id|random>` in `useDemoGameLauncher` (additive edit next to the seedHistory block — that file has another agent's unstaged WIP; minimal touch, no git operations), enabling dev mode like the other dev links; wire `startCelebrationPreview` through `useKlondikeGame`. (The link existed as C6 calling `triggerCelebrationForTesting` in `useKlondikeGame`; that duplicate was replaced by the controller-owned preview — see learnings.)
+- [x] `yarn typecheck && yarn lint && yarn jest` green. (28 suites / 275 tests, 2026-07-07 — identical counts to before Story 5.)
+- [x] Android phone test (lean): build `yarn release`, deep-link into modes, `dumpsys gfxinfo` jank comparison (trail vs non-trail vs old mode), verify dev-hold (no dialog >35 s), verify preview abort returns to the game without dialog. Report numbers. (Done 2026-07-07, orchestrator-driven after sub-agent interruptions — see "Android perf test (Story 5)" below.)
+
+## Android perf test (Story 5) — 2026-07-07
+
+Device: A065 (budget Android 16 phone, the one the lag was reported on). Method: `soli://?celebration=<id>#retry-N` preview deep links + `dumpsys gfxinfo ch.karimattia.soli reset` → 10 s in-mode → `dumpsys gfxinfo` dump. Raw outputs in `.test-artifacts/celebration-perf-android/`.
+
+Important calibration: on this device even OLD celebrations render ~45–50 fps with "Janky frames: 100%" — 52 animated views is simply this phone's ceiling, and gfxinfo's janky% is useless here. Compare frames-rendered-per-10 s instead.
+
+| Scenario | Views | fps (≈) | GPU 50th/90th |
+| -------- | ----- | ------- | ------------- |
+| Wave Loop 7 (old, baseline) | 52 | 50 | 9/11 ms |
+| Vortex 22 (new, no trail) | 52 | 45 | 9/10 ms |
+| Classic Cascade 31 (3 ghosts) | 208 | 51 | 9/10 ms |
+| Meteor Shower 32 — before / 2 ghosts | 208→156 | 25 → 32 | 14/21 → 12/14 ms |
+| Galaxy 27 — 2 ghosts / trail removed | 156→52 | 16 → 44 | 19/4950(!) → 9/11 ms |
+| Comet Halo 10 — 3 ghosts / trail removed | 208→52 | 6 → 43 | 24/4950(!) → 9/11 ms |
+
+### Root cause (measured, not guessed)
+
+- View COUNT alone is not the problem: Cascade runs 208 views at full baseline speed (translate-only, cards spread out or exactly coincident).
+- The killer is **translucent ghost overdraw on clustered modes**: Galaxy and Comet Halo keep all 52 cards in a tight cluster, so ghosts multiply alpha-blended layers exactly where depth is already worst → GPU stalls (90th percentile literally 4.95 s). Trails REMOVED from both (metadata comments explain; trivially re-addable for spread-out modes only).
+- Galaxy's per-frame opacity twinkle was suspected but measured INNOCENT (removing it: no change; removing trails: fixed). Twinkle restored as original.
+- Meteor Shower is inherently the heaviest (all cards + ghosts sweep the full screen every frame): per-frame rotation/scale oscillation removed (now fixed per-card tilt; translate-only like Cascade) and ghosts 3→2, gap 55→75 ms: 25→32 fps. Still below the ~45 fps device baseline — acceptable for a fast streak effect, but flagged for user judgement. Further options if wanted: 1 ghost, or halve meteor count (park odd-index cards offscreen).
+
+### Behavior checks (all pass)
+
+- Dev-hold: >60 s across preview modes, no "Start a new game?" dialog (`devhold-check.png` — badge label "Celebration 28 · Galaxy" visible, dialog absent).
+- Silent dismiss: tap on the animation returned to the untouched mid-game board, no dialog (`dismiss-check.png`).
+- Deep-link "instability" (user report): every link with a CHANGED URL fired reliably while the app was foregrounded ("Warning: Activity not started, intent delivered to running instance" is normal and harmless). The gotcha is URL dedupe — identical URLs are ignored; always append `#retry-N`/`#v2`. Documented in the soli-testing skill already.
+
+### Verdict
+
+Fixed. Trail modes now: Cascade 51 fps (= baseline), Meteor 32 fps (flagged), Galaxy/Comet back to ~44 fps non-trail baseline. New rule of thumb documented in the metadata comments: trails only on modes that spread cards out.
+
+## Files actually modified (Story 5)
+
+- `src/animation/celebrationModes.ts` — trail counts lowered (10: 4→3, 27: 3→2, 31: 4→3, 32: 5→3); perf-budget comment on the `trail` field (per-frame Fabric updates scale with 52 × (count+1) views).
+- `src/features/klondike/hooks/useCelebrationController.ts` — `celebrationHoldRef` + `celebrationPreviewRef`; module-level `shuffleCelebrationCards` and hook-level `computeCelebrationCardBase` (shared win/preview position math); run effect starts via a local `startProgressRun`/`handleRunFinished` pair (hold → endless dev loop, no 30 s dialog); `startCelebrationPreview(modeId?)`; `handleCelebrationAbort` skips the new-game dialog for previews; both refs reset in `clearCelebrationAnimations`/abort.
+- `src/features/klondike/hooks/useKlondikeGame.ts` — removed the old `triggerCelebrationForTesting` (superseded by the controller preview); passes `startCelebrationPreview` to the demo launcher; dropped now-unused imports (`FOUNDATION_SUIT_ORDER`, `DEAL_RANKS`, `CELEBRATION_DURATION_MS`, `FOUNDATION_FALLBACK_GAP`, `CelebrationCardConfig`).
+- `src/features/klondike/hooks/useDemoGameLauncher.ts` — `?celebration=` block now calls the new `startCelebrationPreview` launcher option (undefined = random); option type + destructure renamed from `triggerCelebrationForTesting`. Minimal touch; the file's unrelated seedHistory WIP untouched.
+- `src/animation/celebrationModes.ts` (again, post-measurement, orchestrator-direct) — trails REMOVED from Comet Halo (10) and Galaxy (27) (clustered modes: ghost overdraw → 6/16 fps); Meteor Shower (32) to 2 ghosts / 75 ms gap and per-frame rotation+scale oscillation replaced with a fixed per-card tilt (25→32 fps); Galaxy's opacity twinkle restored (measured innocent). All rationale in inline comments.
+
+## Intermediary learnings (Story 5)
+
+- A `?celebration=` deep link already existed (agent-testing-skill C6) with a full synthetic-payload builder (`triggerCelebrationForTesting`) inside `useKlondikeGame` — deliberately placed there to avoid touching the controller while celebration work was in flight. Story 5 moves it into the controller (where hold/preview refs live) and deletes the duplicate; net behavior change vs C6: dev-hold from the start (no 30 s dialog, endless loop), abort returns to the game silently, and position/shuffle math is shared with the real win path instead of copied.
+- TypeScript does not carry null-narrowing into hoisted `function` declarations: `celebrationState.durationMs` errored inside `startProgressRun` despite the effect's early return, so the duration is captured into a const before the mutually recursive run/finish pair.
+- `cycleCelebrationMode` sets the hold ref inside the `setCelebrationState` updater, so a badge press with no active celebration can't leave a stale hold behind.
+- Sanity check (task 5): cycling while in preview keeps working — the run effect only touches `celebrationAbortRef`/`celebrationDialogShownRef`; hold/preview refs are reset exclusively in `clearCelebrationAnimations` (state → null) and `handleCelebrationAbort`.
+- The soli-testing skill (`.agents/skills/soli-testing/SKILL.md`, currently another agent's WIP) already documents `?celebration=<modeId|random>` including the 30 s dialog / 60 s run caveats — those caveats are now obsolete for the preview path (dev-hold suppresses both) and the skill should be updated once its WIP lands.
 
 ## Device smoke test (Story 2) — 2026-07-07
 

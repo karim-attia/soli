@@ -55,6 +55,14 @@ export default function TabOneScreen() {
     sessionControls?.resetUndoHintForTesting()
   }, [sessionControls])
 
+  const handleSeedHistory = useCallback(
+    (action: 'seed' | 'clear') => {
+      setDemoChoiceVisible(false)
+      sessionControls?.seedHistoryForTesting(action)
+    },
+    [sessionControls]
+  )
+
   const closeDemoChoice = useCallback(() => {
     setDemoChoiceVisible(false)
   }, [])
@@ -108,6 +116,7 @@ export default function TabOneScreen() {
         onDismiss={closeDemoChoice}
         onSelect={handleDemoChoice}
         onResetUndoHint={handleResetUndoHint}
+        onSeedHistory={handleSeedHistory}
       />
     </>
   )
@@ -118,6 +127,7 @@ type DemoChoiceSheetProps = {
   onDismiss: () => void
   onSelect: (options: LaunchDemoGameOptions) => void
   onResetUndoHint: () => void
+  onSeedHistory: (action: 'seed' | 'clear') => void
 }
 
 const DemoChoiceSheet = ({
@@ -125,6 +135,7 @@ const DemoChoiceSheet = ({
   onDismiss,
   onSelect,
   onResetUndoHint,
+  onSeedHistory,
 }: DemoChoiceSheetProps) => {
   return (
     <AppSheet isPresented={isPresented} onDismiss={onDismiss}>
@@ -174,6 +185,15 @@ const DemoChoiceSheet = ({
             action is harmless and this sheet is dev-only. */}
         <Button size="$3" onPress={onResetUndoHint}>
           Reset undo hint
+        </Button>
+        {/* Dev-only history seeding (agent-testing-skill plan): additive `seed-`
+            rows for History-tab/stats testing, reversible via the clear entry.
+            Real history rows are never modified — this is Karim's main phone. */}
+        <Button size="$3" onPress={() => onSeedHistory('seed')}>
+          Seed history
+        </Button>
+        <Button size="$3" onPress={() => onSeedHistory('clear')}>
+          Clear seeded history
         </Button>
       </YStack>
     </AppSheet>

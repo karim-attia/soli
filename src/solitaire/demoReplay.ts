@@ -222,12 +222,57 @@ const describeGameCard = (card: { suit: Suit; rank: Rank } | null | undefined): 
 export const SCRUBBED_DEMO_STEPS = 80
 export const SCRUBBED_DEMO_SCRUB_INDEX = 40
 
+// All deterministic fixtures below fold playlist entry 0 (`default-0-draw-1`).
+const getReplayFixtureEntry = (): DemoAutoSolvePlaylistEntry => {
+  const entry = getDemoAutoSolvePlaylist()[0]
+  if (!entry) {
+    throw new Error('Demo auto-solve playlist is empty.')
+  }
+  return entry
+}
+
+// Shared fold for the fixtures below (agent-testing-skill C5: generalized instead
+// of duplicated). Every folded move goes through applyDemoReplayMoveForValidation
+// on purpose — it THROWS on mismatch, so a future playlist regeneration cannot
+// silently change a fixture.
+const foldReplayFixture = (
+  entry: DemoAutoSolvePlaylistEntry,
+  steps: number
+): GameState => {
+  let state = createDemoReplayGameState(entry)
+  for (const move of entry.moves.slice(0, steps)) {
+    state = applyDemoReplayMoveForValidation(state, move)
+  }
+  return state
+}
+
+const clampInt = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(Math.round(value), min), max)
+
+// C5: deep links pass arbitrary integers; clamp them to the fixture's real bounds
+// instead of throwing. Pure (the launcher devLogs when `clamped` is true).
+// Defaults stay SCRUBBED_DEMO_STEPS/SCRUBBED_DEMO_SCRUB_INDEX so the pinned card
+// assertions in demoReplay.scrubbed.test.ts (and device tests copying its labels)
+// remain valid.
+export const resolveScrubbedDemoOptions = (options?: {
+  steps?: number
+  scrubIndex?: number
+}): { steps: number; scrubIndex: number; clamped: boolean } => {
+  const maxSteps = getReplayFixtureEntry().moves.length
+  const requestedSteps = options?.steps ?? SCRUBBED_DEMO_STEPS
+  const steps = clampInt(requestedSteps, 1, maxSteps)
+  const requestedScrubIndex = options?.scrubIndex ?? SCRUBBED_DEMO_SCRUB_INDEX
+  const scrubIndex = clampInt(requestedScrubIndex, 0, steps)
+  return {
+    steps,
+    scrubIndex,
+    clamped: steps !== requestedSteps || scrubIndex !== requestedScrubIndex,
+  }
+}
+
 // Deterministic mid-game state for scrubber/undo/redo device tests: same deal
 // (playlist entry `default-0-draw-1`), same board, same labels on every launch,
 // so tests can assert exact cards and the readout "position 40 of 80".
-// The fold goes through applyDemoReplayMoveForValidation on purpose — each move
-// is validated against the expected card and THROWS on mismatch, so a future
-// playlist regeneration cannot silently change this fixture.
 // Because the fold runs the real reducer, the state carries a real exactId and
 // a populated moveLog → the move-log persistence path replays it after
 // kill/relaunch with full undo/redo depths (acceptance criterion 6).
@@ -237,19 +282,41 @@ export const createScrubbedMidGameState = (options?: {
 }): GameState => {
   const steps = options?.steps ?? SCRUBBED_DEMO_STEPS
   const scrubIndex = options?.scrubIndex ?? SCRUBBED_DEMO_SCRUB_INDEX
-  const entry = getDemoAutoSolvePlaylist()[0]
-  if (!entry) {
-    throw new Error('Demo auto-solve playlist is empty.')
-  }
+  const entry = getReplayFixtureEntry()
   if (steps > entry.moves.length) {
+    // Still throws (not clamps) on out-of-range direct calls: only reachable on
+    // fixture drift; deep links clamp via resolveScrubbedDemoOptions first.
     throw new Error(
       `Scrubbed demo needs ${steps} steps but playlist entry ${entry.id} has ${entry.moves.length}.`
     )
   }
 
-  let state = createDemoReplayGameState(entry)
-  for (const move of entry.moves.slice(0, steps)) {
-    state = applyDemoReplayMoveForValidation(state, move)
-  }
+  const state = foldReplayFixture(entry, steps)
   return klondikeReducer(state, { type: 'SCRUB_TO_INDEX', index: scrubIndex })
+}
+
+// --- "Near win" fixture (agent-testing-skill C5) ---
+export const NEARWIN_DEMO_DEFAULT_MOVES_LEFT = 1
+
+// Clamp the ?demo=nearwin&left=N param: at least 1 move left (0 would be an
+// already-won board — the point is a REAL manually-played win), at most the full
+// solution (= fresh replay board).
+export const resolveNearWinMovesLeft = (
+  movesLeft?: number
+): { movesLeft: number; clamped: boolean } => {
+  const maxMoves = getReplayFixtureEntry().moves.length
+  const requested = movesLeft ?? NEARWIN_DEMO_DEFAULT_MOVES_LEFT
+  const resolved = clampInt(requested, 1, maxMoves)
+  return { movesLeft: resolved, clamped: resolved !== requested }
+}
+
+// Replays the playlist solution to `movesLeft` primitive steps before completion,
+// Auto Up off (inherited from createDemoReplayGameState) — an agent then plays the
+// final move(s) manually and gets a real win + celebration end-to-end.
+export const createNearWinGameState = (
+  movesLeft: number = NEARWIN_DEMO_DEFAULT_MOVES_LEFT
+): GameState => {
+  const entry = getReplayFixtureEntry()
+  const { movesLeft: resolved } = resolveNearWinMovesLeft(movesLeft)
+  return foldReplayFixture(entry, entry.moves.length - resolved)
 }

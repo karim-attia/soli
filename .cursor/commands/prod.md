@@ -1,27 +1,24 @@
 # Production Build for Connected Device
 
-Build and install a production/release version of the app on a connected Android device.
+Build and install a production/release version of the app.
 
-## Prerequisites
-- Android device connected via USB with USB debugging enabled
-- ADB installed and configured
-- Device authorized for development
+## Commands
 
-## Command
 ```bash
-npx expo run:android --variant release
+# Android physical phone (Release APK; handles adb discovery, signing, lock, install verification, launch):
+yarn release
+
+# iOS simulator (Release):
+yarn ios
 ```
 
-## What it does
-- Builds the app in release/production mode (minified, optimized)
-- Generates a signed APK
-- Installs the APK directly on the connected device
-- Launches the app automatically
+Both exit after launch. Flags: `--logs` (stream [SoliDev] logs), `--auto-solve` (run the demo playlist; `DEMO_GAME_LIMIT=N` limits games). `yarn ios` also has `--debug` (Metro dev build, lingers).
 
-## Alternative Commands
-- For iOS (if iPhone connected): `npx expo run:ios --configuration Release`
-- To build without installing: `npx expo build:android`
-- For development build: `npx expo run:android` (no --variant flag)
+## Notes
 
-## Verification
-Check device connection: `adb devices`
+- Never run `yarn release` and `yarn ios` in parallel — a shared lock (`/tmp/soli-build.lock`) makes the second fail fast.
+- Full build logs in `.test-artifacts/builds/`.
+- Testing recipes: `.agents/skills/soli-testing/SKILL.md`.
+
+<!-- 2026-07-07: replaced the stale `npx expo run:android --variant release` recipe —
+     yarn release/yarn ios are the supported build entry points (fcdea28). -->

@@ -10,12 +10,18 @@ import {
   type Selection,
   type Suit,
 } from '../../../solitaire/klondike'
-import type { DrawCount } from '../../../solitaire/drawCount'
+import { isDrawCount, type DrawCount } from '../../../solitaire/drawCount'
+import { isExactDealId, parseExactDealId } from '../../../solitaire/dealIdentity'
+import type { ExactDealId } from '../../../solitaire/dealIdentity'
+import { CELEBRATION_MODE_METADATA } from '../../../animation/celebrationModes'
 import {
   createDemoReplayGameState,
+  createNearWinGameState,
   createScrubbedMidGameState,
   getDemoUndoProbePlan,
   resolveDemoReplayAction,
+  resolveNearWinMovesLeft,
+  resolveScrubbedDemoOptions,
   type DemoAutoSolvePlaylistEntry,
 } from '../../../solitaire/demoReplay'
 import { getDemoAutoSolvePlaylist } from '../../../data/demoAutoSolvePlaylist'
@@ -23,7 +29,7 @@ import { setDemoProgress } from '../state/demoProgressStore'
 import { devLog } from '../../../utils/devLogger'
 
 type DispatchGameActionFn = (action: GameAction) => void
-export type DemoLaunchMode = 'old' | 'single' | 'playlist' | 'scrubbed'
+export type DemoLaunchMode = 'old' | 'single' | 'playlist' | 'scrubbed' | 'nearwin'
 
 type UseDemoGameLauncherOptions = {
   stateRef: MutableRefObject<GameState>
@@ -49,6 +55,21 @@ type UseDemoGameLauncherOptions = {
   clearGameState: () => Promise<void>
   preferredDrawCount: DrawCount
   autoUpEnabled: boolean
+  // Dev-only history seeding (agent-testing-skill plan): owned by HistoryProvider
+  // so seed/clear also refreshes the in-memory History tab state.
+  seedHistoryForTesting: (action: 'seed' | 'clear') => void
+  // Workstream C hooks (agent-testing-skill): narrow callbacks owned by their
+  // home hooks (settings context / useUndoHint / useKlondikeGame), forwarded so
+  // the matching deep links stay parseable in one place.
+  setDrawCount: (drawCount: DrawCount) => void
+  setAutoUpEnabled: (enabled: boolean) => void
+  setSolvableGamesOnly: (enabled: boolean) => void
+  resetUndoHintForTesting: () => void
+  dealNewGameForTesting: () => void
+  startGameFromExactDeal: (exactId: ExactDealId, drawCount?: DrawCount) => void
+  // Story 5 (celebration-smoothness): controller-owned preview (dev-hold, silent
+  // abort back to the untouched game). Undefined modeId = random mode.
+  startCelebrationPreview: (modeId?: number) => void
 }
 
 export type LaunchDemoGameOptions = {
@@ -58,6 +79,11 @@ export type LaunchDemoGameOptions = {
   demoMode?: DemoLaunchMode
   gameLimit?: number
   recordHistory?: boolean
+  // C5: parameterized fixtures. Undefined keeps the pinned defaults (80/40 and
+  // 1 move left) that demoReplay tests + device-test card labels rely on.
+  scrubbedSteps?: number
+  scrubbedScrubIndex?: number
+  nearWinMovesLeft?: number
 }
 
 type DemoPlaylistRunOptions = {
@@ -86,6 +112,64 @@ const parseOptionalBooleanParam = (value: string | null): boolean | null => {
   return null
 }
 
+// Absent or non-numeric params fall back to undefined (→ fixture defaults);
+// Number('') would silently be 0, hence the explicit empty check.
+const parseOptionalIntParam = (value: string | null): number | undefined => {
+  if (value === null || value.trim() === '') {
+    return undefined
+  }
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+// C1 (?set=drawCount:3,autoUp:off,solvableOnly:on): pure parser, exported for
+// unit tests. Unknown keys/values land in ignoredPairs (the caller devLogs them
+// and applies the rest).
+export type SettingsLinkUpdates = {
+  drawCount?: DrawCount
+  autoUp?: boolean
+  solvableOnly?: boolean
+  ignoredPairs: string[]
+}
+
+export const parseSettingsLinkParam = (raw: string): SettingsLinkUpdates => {
+  const updates: SettingsLinkUpdates = { ignoredPairs: [] }
+
+  raw.split(',').forEach((pair) => {
+    const trimmed = pair.trim()
+    if (!trimmed) {
+      return
+    }
+    const separatorIndex = trimmed.indexOf(':')
+    const key = (separatorIndex < 0 ? trimmed : trimmed.slice(0, separatorIndex))
+      .trim()
+      .toLowerCase()
+    const value = separatorIndex < 0 ? null : trimmed.slice(separatorIndex + 1).trim()
+
+    if (key === 'drawcount') {
+      const parsed = Number(value ?? '')
+      if (value && isDrawCount(parsed)) {
+        updates.drawCount = parsed
+        return
+      }
+    } else if (key === 'autoup' || key === 'solvableonly') {
+      const parsed = parseOptionalBooleanParam(value)
+      if (parsed !== null) {
+        if (key === 'autoup') {
+          updates.autoUp = parsed
+        } else {
+          updates.solvableOnly = parsed
+        }
+        return
+      }
+    }
+
+    updates.ignoredPairs.push(trimmed)
+  })
+
+  return updates
+}
+
 export const useDemoGameLauncher = ({
   stateRef,
   dispatch,
@@ -105,6 +189,14 @@ export const useDemoGameLauncher = ({
   clearGameState,
   preferredDrawCount,
   autoUpEnabled,
+  seedHistoryForTesting,
+  setDrawCount,
+  setAutoUpEnabled,
+  setSolvableGamesOnly,
+  resetUndoHintForTesting,
+  dealNewGameForTesting,
+  startGameFromExactDeal,
+  startCelebrationPreview,
 }: UseDemoGameLauncherOptions) => {
   const playlistRunIdRef = useRef(0)
   const playlistTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([])
@@ -576,21 +668,30 @@ export const useDemoGameLauncher = ({
       clearPlaylistTimers()
       demoPlaybackActiveRef.current = false
 
-      if (demoMode === 'scrubbed') {
-        // Deterministic "far game, scrubbed to middle" fixture for scrubber/
-        // undo/redo tests (scrubber-test-automation): 40 undos + 40 redos
-        // available, exact same board every launch. Auto Up stays OFF so no
-        // auto-queue mutates depths underneath a test's assertions.
-        let scrubbedState: GameState
+      if (demoMode === 'scrubbed' || demoMode === 'nearwin') {
+        // Deterministic replay fixtures, both with Auto Up OFF:
+        // - scrubbed (scrubber-test-automation): "far game, scrubbed to middle",
+        //   40 undos + 40 redos by default, exact same board every launch; no
+        //   auto-queue mutates depths underneath a test's assertions.
+        // - nearwin (agent-testing-skill C5): solution replayed to N moves before
+        //   completion, so an agent plays the final move(s) manually and gets a
+        //   REAL win + celebration end-to-end.
+        let fixtureState: GameState
         try {
-          scrubbedState = createScrubbedMidGameState()
+          fixtureState =
+            demoMode === 'nearwin'
+              ? createNearWinGameState(options?.nearWinMovesLeft)
+              : createScrubbedMidGameState({
+                  steps: options?.scrubbedSteps,
+                  scrubIndex: options?.scrubbedScrubIndex,
+                })
         } catch (error) {
           // Only reachable on fixture drift (regenerated playlist); fail loudly
           // instead of hydrating a corrupt board.
-          devLog('error', `[Demo] Scrubbed mid-game fixture failed: ${String(error)}`)
+          devLog('error', `[Demo] ${demoMode} fixture failed: ${String(error)}`)
           return
         }
-        dispatch({ type: 'HYDRATE_STATE', state: scrubbedState, autoUpEnabled: false })
+        dispatch({ type: 'HYDRATE_STATE', state: fixtureState, autoUpEnabled: false })
 
         devLog(
           'info',
@@ -598,9 +699,9 @@ export const useDemoGameLauncher = ({
         )
 
         // Same pattern as the other branches: drop the previous persisted game;
-        // the debounced save then persists the hydrated scrubbed state.
+        // the debounced save then persists the hydrated fixture state.
         void clearGameState().catch((error) => {
-          console.warn('Failed to clear persisted game before scrubbed demo', error)
+          console.warn('Failed to clear persisted game before demo fixture', error)
         })
         return
       }
@@ -661,6 +762,149 @@ export const useDemoGameLauncher = ({
         return
       }
 
+      // soli://?seedHistory=default|clear — dev-only history seeding (terminal-
+      // drivable, same dev-gate/force behavior as the demo links below). Handled
+      // before the demo-game branch: a seed link is not a game launch.
+      const seedHistoryParam = parsed.searchParams.get('seedHistory')?.toLowerCase()
+      if (seedHistoryParam === 'default' || seedHistoryParam === 'clear') {
+        lastDemoLinkRef.current = incomingUrl
+        if (!developerModeEnabled) {
+          setDeveloperMode(true)
+        }
+        devLog('info', `[Demo] Seed history link (${seedHistoryParam}).`)
+        seedHistoryForTesting(seedHistoryParam === 'clear' ? 'clear' : 'seed')
+        return
+      }
+
+      // --- Workstream C test hooks (agent-testing-skill) --- one param family
+      // per link; all dev-gate/force + dedup like the demo links below.
+
+      // C1: soli://?set=drawCount:3,autoUp:off,solvableOnly:on — settings via
+      // deep link. Unknown keys/values are devLogged and skipped; the rest apply.
+      const setParam = parsed.searchParams.get('set')
+      if (setParam) {
+        lastDemoLinkRef.current = incomingUrl
+        if (!developerModeEnabled) {
+          setDeveloperMode(true)
+        }
+        const updates = parseSettingsLinkParam(setParam)
+        updates.ignoredPairs.forEach((pair) => {
+          devLog('warn', `[Demo] Settings link: ignored unknown pair "${pair}".`)
+        })
+        if (updates.drawCount !== undefined) {
+          setDrawCount(updates.drawCount)
+        }
+        if (updates.autoUp !== undefined) {
+          setAutoUpEnabled(updates.autoUp)
+        }
+        if (updates.solvableOnly !== undefined) {
+          setSolvableGamesOnly(updates.solvableOnly)
+        }
+        devLog('info', '[Demo] Settings link applied', {
+          drawCount: updates.drawCount,
+          autoUp: updates.autoUp,
+          solvableOnly: updates.solvableOnly,
+        })
+        return
+      }
+
+      // C3/C4: soli://?reset=undoHint|game. Deliberately NO ?reset=all — settings
+      // are settable via ?set=, seeded history has its own clear link, and bulk
+      // destruction stays a manual act (protects Karim's real phone history).
+      const resetParam = parsed.searchParams.get('reset')?.toLowerCase()
+      if (resetParam) {
+        lastDemoLinkRef.current = incomingUrl
+        if (!developerModeEnabled) {
+          setDeveloperMode(true)
+        }
+        if (resetParam === 'undohint') {
+          devLog('info', '[Demo] Reset link: undo hint.')
+          resetUndoHintForTesting()
+        } else if (resetParam === 'game') {
+          devLog('info', '[Demo] Reset link: dealing a fresh game.')
+          // Same settle delay as the demo launches below (cold-start deep links
+          // arrive before the first deal/persistence pass finishes).
+          setTimeout(() => {
+            dealNewGameForTesting()
+          }, DEMO_AUTO_STEP_INTERVAL_MS)
+        } else {
+          devLog('warn', `[Demo] Reset link: unknown target "${resetParam}".`)
+        }
+        return
+      }
+
+      // C2: soli://?deal=<exactId>&draw=N — start a new game from an exact deal
+      // (bug-report repro, hand-crafted scenario deals). Invalid id → devLog + ignore.
+      const dealParam = parsed.searchParams.get('deal')
+      if (dealParam) {
+        lastDemoLinkRef.current = incomingUrl
+        if (!developerModeEnabled) {
+          setDeveloperMode(true)
+        }
+        try {
+          // parseExactDealId covers prefix, base36 payload, and permutation range.
+          parseExactDealId(dealParam)
+        } catch (error) {
+          devLog('warn', `[Demo] Deal link: invalid exact id: ${String(error)}`)
+          return
+        }
+        if (!isExactDealId(dealParam)) {
+          return
+        }
+        const drawRaw = parsed.searchParams.get('draw')
+        const drawParsed = parseOptionalIntParam(drawRaw)
+        let drawCount: DrawCount | undefined
+        if (isDrawCount(drawParsed)) {
+          drawCount = drawParsed
+        } else if (drawRaw !== null) {
+          devLog(
+            'warn',
+            `[Demo] Deal link: invalid draw "${drawRaw}", using current setting.`
+          )
+        }
+        devLog('info', `[Demo] Deal link: starting ${dealParam}`, {
+          draw: drawCount ?? 'current setting',
+        })
+        setTimeout(() => {
+          startGameFromExactDeal(dealParam, drawCount)
+        }, DEMO_AUTO_STEP_INTERVAL_MS)
+        return
+      }
+
+      // C6: soli://?celebration=<modeId|random> — celebration PREVIEW on the current
+      // board without winning (Story 5: dev-hold, abort returns to the game without
+      // a dialog). Unknown mode → devLog + ignore. Not a game launch.
+      const celebrationParam = parsed.searchParams.get('celebration')?.toLowerCase()
+      if (celebrationParam) {
+        lastDemoLinkRef.current = incomingUrl
+        if (!developerModeEnabled) {
+          setDeveloperMode(true)
+        }
+        const wantsRandom = celebrationParam === 'random'
+        const metadata = wantsRandom
+          ? undefined
+          : CELEBRATION_MODE_METADATA.find(
+              (entry) => entry.id === Number(celebrationParam)
+            )
+        if (!wantsRandom && !metadata) {
+          devLog('warn', `[Demo] Celebration link: unknown mode "${celebrationParam}".`)
+          return
+        }
+        devLog(
+          'info',
+          `[Demo] Celebration link: ${
+            metadata ? `mode ${metadata.id} (${metadata.name})` : 'random mode'
+          }.`
+        )
+        // Settle delay also gives the just-enabled dev mode a render pass so the
+        // mode badge/label is up when the overlay appears.
+        setTimeout(() => {
+          // Undefined = random pick inside the controller (same rule as a real win).
+          startCelebrationPreview(metadata?.id)
+        }, DEMO_AUTO_STEP_INTERVAL_MS)
+        return
+      }
+
       const host = parsed.host.toLowerCase()
       const pathname = parsed.pathname.toLowerCase()
       const demoParam =
@@ -681,6 +925,8 @@ export const useDemoGameLauncher = ({
       // soli://demo-game?demo=scrubbed → deterministic mid-game state; lets
       // automated tests enter the scrubbed fixture with zero UI taps.
       const demoRequestsScrubbed = normalizedDemoParam === 'scrubbed'
+      // soli://?demo=nearwin&left=N → solution replayed to N moves before the win.
+      const demoRequestsNearWin = normalizedDemoParam === 'nearwin'
       const recordHistoryParam =
         parsed.searchParams.get('recordHistory') ?? parsed.searchParams.get('history')
       const nextRecordHistoryEnabled = parseOptionalBooleanParam(recordHistoryParam)
@@ -692,7 +938,8 @@ export const useDemoGameLauncher = ({
         demoParam === '1' ||
         normalizedDemoParam === 'true' ||
         demoRequestsAutoReveal ||
-        demoRequestsScrubbed
+        demoRequestsScrubbed ||
+        demoRequestsNearWin
       ) {
         lastDemoLinkRef.current = incomingUrl
 
@@ -700,8 +947,49 @@ export const useDemoGameLauncher = ({
           if (!developerModeEnabled) {
             setDeveloperMode(true)
           }
+          // C5: optional &steps=S&scrub=K, clamped to the fixture's real bounds.
+          // Without params this stays the pinned 80/40 fixture.
+          const resolved = resolveScrubbedDemoOptions({
+            steps: parseOptionalIntParam(parsed.searchParams.get('steps')),
+            scrubIndex: parseOptionalIntParam(parsed.searchParams.get('scrub')),
+          })
+          if (resolved.clamped) {
+            devLog(
+              'warn',
+              `[Demo] Scrubbed link params clamped to steps=${resolved.steps}, scrub=${resolved.scrubIndex}.`
+            )
+          }
           setTimeout(() => {
-            handleLaunchDemoGame({ demoMode: 'scrubbed', force: true })
+            handleLaunchDemoGame({
+              demoMode: 'scrubbed',
+              force: true,
+              scrubbedSteps: resolved.steps,
+              scrubbedScrubIndex: resolved.scrubIndex,
+            })
+          }, DEMO_AUTO_STEP_INTERVAL_MS)
+          return
+        }
+
+        if (demoRequestsNearWin) {
+          if (!developerModeEnabled) {
+            setDeveloperMode(true)
+          }
+          // C5: optional &left=N (default 1), clamped to [1, solution length].
+          const resolved = resolveNearWinMovesLeft(
+            parseOptionalIntParam(parsed.searchParams.get('left'))
+          )
+          if (resolved.clamped) {
+            devLog(
+              'warn',
+              `[Demo] Nearwin link param clamped to left=${resolved.movesLeft}.`
+            )
+          }
+          setTimeout(() => {
+            handleLaunchDemoGame({
+              demoMode: 'nearwin',
+              force: true,
+              nearWinMovesLeft: resolved.movesLeft,
+            })
           }, DEMO_AUTO_STEP_INTERVAL_MS)
           return
         }
@@ -744,14 +1032,40 @@ export const useDemoGameLauncher = ({
         }, DEMO_AUTO_STEP_INTERVAL_MS)
       }
     },
-    [developerModeEnabled, handleLaunchDemoGame, setDeveloperMode]
+    [
+      dealNewGameForTesting,
+      developerModeEnabled,
+      handleLaunchDemoGame,
+      resetUndoHintForTesting,
+      seedHistoryForTesting,
+      setAutoUpEnabled,
+      setDeveloperMode,
+      setDrawCount,
+      setSolvableGamesOnly,
+      startGameFromExactDeal,
+      startCelebrationPreview,
+    ]
   )
+
+  // The cold-start URL must be consumed exactly ONCE, independent of the
+  // single-slot lastDemoLinkRef dedup: this effect re-runs whenever
+  // processDemoLink's identity changes (e.g. dev mode flips, settings change),
+  // getInitialURL() keeps returning the same cold-start URL for the whole app
+  // process, and by then lastDemoLinkRef may hold a NEWER link — so the stale
+  // initial URL would fire again and stomp it (V3 device smoke 2026-07-07:
+  // a ?set=drawCount:3 cold start replayed over a later ?set=drawCount:1).
+  const initialUrlConsumedRef = useRef(false)
 
   // Subscribes to demo deep links on mount and while the app is active.
   useEffect(() => {
-    void Linking.getInitialURL().then((url) => {
-      processDemoLink(url)
-    })
+    if (!initialUrlConsumedRef.current) {
+      // Marked consumed before the async resolution on purpose: a second effect
+      // run during the pending promise must not schedule a second read.
+      initialUrlConsumedRef.current = true
+      void Linking.getInitialURL().then((url) => {
+        processDemoLink(url)
+      })
+    }
 
     const subscription = Linking.addEventListener('url', ({ url }) => {
       processDemoLink(url)

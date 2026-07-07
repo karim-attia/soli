@@ -50,3 +50,5 @@ export const getHistoryEntryMoveLog = async (
 ): Promise<{ moveLogVersion: number; moveLog: MoveLogEntry[] } | null> => null
 
 export const clearHistoryEntries = async (): Promise<void> => {}
+
+export const deleteHistoryEntriesByIdPrefix = async (_prefix: string): Promise<void> => {}

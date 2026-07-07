@@ -53,13 +53,18 @@ The sections below are the definitive combined notes for this package or tool. K
   - Lets multiple coding agents use one managed installation flow.
 
 ## Core commands used in this task
+
+Note (2026-07-07): examples updated from `npx -y agent-device` to `yarn agent-device` —
+the CLI is pinned in devDependencies and must be invoked through yarn (see
+"Repository-controlled CLI" above).
+
 - Discover Android targets:
-  - `npx -y agent-device devices --platform android --json`
+  - `yarn agent-device devices --platform android --json`
 - Launch/relaunch the app on explicit device:
-  - `npx -y agent-device open ch.karimattia.soli --platform android --serial 192.168.1.12:37635 --relaunch --json`
+  - `yarn agent-device open ch.karimattia.soli --platform android --serial 192.168.1.12:37635 --relaunch --json`
 - Capture UI state:
-  - `npx -y agent-device snapshot -i --platform android --serial 192.168.1.12:37635 --json`
-  - `npx -y agent-device screenshot .agents/skills/agent-device-after-fix.png --platform android --serial 192.168.1.12:37635 --json`
+  - `yarn agent-device snapshot -i --platform android --serial 192.168.1.12:37635 --json`
+  - `yarn agent-device screenshot .agents/skills/agent-device-after-fix.png --platform android --serial 192.168.1.12:37635 --json`
 
 ## Notes for this repository
 - When mDNS device names include spaces/parentheses, prefer direct TCP serials from `adb connect` (for example `192.168.1.12:37635`) to avoid selector truncation in downstream tooling.

@@ -5,6 +5,7 @@ import {
   applyDemoReplayMoveForValidation,
   createDemoReplayGameState,
   createScrubbedMidGameState,
+  resolveScrubbedDemoOptions,
 } from '../../../src/solitaire/demoReplay'
 import { klondikeReducer } from '../../../src/solitaire/klondike'
 import { boardSignature } from '../../../src/storage/gamePersistence'
@@ -57,6 +58,14 @@ describe('createScrubbedMidGameState', () => {
     ])
   })
 
+  it('supports custom steps/scrub params (agent-testing-skill C5)', () => {
+    const custom = createScrubbedMidGameState({ steps: 20, scrubIndex: 5 })
+    expect(custom.history).toHaveLength(5)
+    expect(custom.future).toHaveLength(15)
+    expect(custom.moveCount).toBe(20)
+    expect(custom.autoUpEnabled).toBe(false)
+  })
+
   it('scrubs back to the fold end: SCRUB_TO_INDEX 80 restores the step-80 board', () => {
     const entry = getDemoAutoSolvePlaylist()[0]
     if (!entry) {
@@ -77,6 +86,59 @@ describe('createScrubbedMidGameState', () => {
     expect(redone.waste[redone.waste.length - 1]).toMatchObject({
       suit: 'hearts',
       rank: 10,
+    })
+  })
+})
+
+// Deep-link param clamping for ?demo=scrubbed&steps=S&scrub=K (agent-testing-skill C5).
+describe('resolveScrubbedDemoOptions', () => {
+  const maxSteps = getDemoAutoSolvePlaylist()[0]!.moves.length
+
+  it('keeps the pinned 80/40 defaults when no params are given', () => {
+    expect(resolveScrubbedDemoOptions()).toEqual({
+      steps: SCRUBBED_DEMO_STEPS,
+      scrubIndex: SCRUBBED_DEMO_SCRUB_INDEX,
+      clamped: false,
+    })
+  })
+
+  it('passes valid params through unclamped', () => {
+    expect(resolveScrubbedDemoOptions({ steps: 20, scrubIndex: 5 })).toEqual({
+      steps: 20,
+      scrubIndex: 5,
+      clamped: false,
+    })
+  })
+
+  it('clamps steps to the fixture entry length', () => {
+    const resolved = resolveScrubbedDemoOptions({ steps: maxSteps + 100 })
+    expect(resolved.steps).toBe(maxSteps)
+    expect(resolved.clamped).toBe(true)
+  })
+
+  it('clamps scrub index into [0, steps]', () => {
+    expect(resolveScrubbedDemoOptions({ steps: 10, scrubIndex: 99 })).toEqual({
+      steps: 10,
+      scrubIndex: 10,
+      clamped: true,
+    })
+    expect(resolveScrubbedDemoOptions({ steps: 10, scrubIndex: -4 })).toEqual({
+      steps: 10,
+      scrubIndex: 0,
+      clamped: true,
+    })
+  })
+
+  it('clamps steps up to at least 1 and rounds non-integers', () => {
+    expect(resolveScrubbedDemoOptions({ steps: -5, scrubIndex: 0 })).toEqual({
+      steps: 1,
+      scrubIndex: 0,
+      clamped: true,
+    })
+    expect(resolveScrubbedDemoOptions({ steps: 12.6, scrubIndex: 3.2 })).toEqual({
+      steps: 13,
+      scrubIndex: 3,
+      clamped: true,
     })
   })
 })
