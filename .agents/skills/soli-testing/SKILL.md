@@ -11,8 +11,9 @@ Single source of truth for testing Soli on devices/simulators. Package/bundle id
 
 1. **Cheap gates first, always**: `yarn typecheck && yarn lint && yarn jest`.
 2. **Platform**:
-   - **iOS simulator (`yarn ios`) = safe default.** Drive by testIDs. Zero risk to Karim's phone/history. Full wipes allowed (`xcrun simctl uninstall`).
-   - **Android physical phone (`yarn release`) = only when Android-specific behavior matters.** Drive by a11y labels. Phone pans natively (scrubber works without Appium). It is Karim's MAIN phone — see the data guardrail in section 4.
+   - **Order: Android FIRST when the phone is available** (connected, unlocked, not owned by another agent session), then iOS. If Android surfaces issues, STOP and report them to the orchestrator before starting the iOS pass — fixing first and re-testing once beats discovering the same bug twice (2026-07-08, Karim: "makes iteration loop much faster").
+   - **Android physical phone (`yarn release`)**: drive by a11y labels. Phone pans natively (scrubber works without Appium). It is Karim's MAIN phone — see the data guardrail in section 4.
+   - **iOS simulator (`yarn ios`)**: drive by testIDs. Zero risk to Karim's phone/history, so full wipes are allowed (`xcrun simctl uninstall`) — use the sim alone when the phone is unavailable or the test needs destructive resets.
    - Web: not a target (native-only app). Playwright would work but is almost never worth it.
 3. **Fixture**:
    - Fresh deal: default app launch (`soli:///`).
