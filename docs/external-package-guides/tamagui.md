@@ -1,6 +1,6 @@
 # Tamagui Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-07-07
 
 ## Scope
 
@@ -40,6 +40,19 @@ Cache the Tamagui 2 package and API facts required by the Soli migration.
 - https://registry.npmjs.org/tamagui/latest
 - https://registry.npmjs.org/@tamagui%2Fconfig/latest
 - https://registry.npmjs.org/@tamagui%2Flucide-icons-2/latest
+
+## Refresh check (2026-07-07)
+
+Status: Soli bumped the whole Tamagui package set from `2.2.0` to `2.4.2` (see
+docs/product/tamagui-2-upgrade/tamagui-2-4-2-bump.md).
+
+- npm latest dist-tag is `2.4.2` (published 2026-07-06); `2.4.1` was 2026-07-04.
+- `2.4.1` items relevant to Soli: fix for stale RNGH taps on native press events
+  (#4024), numeric `fontSize` now applies as a literal size in getFontSized
+  (was token-snapped), native "unset" style values no longer crash and clear
+  earlier-set keys. The compiler `$group-*`/`$theme-*` CSS extraction feature is
+  web-only.
+- No breaking changes 2.2 → 2.4.x; config v5 unchanged.
 
 ## Refresh check (2026-07-03)
 
