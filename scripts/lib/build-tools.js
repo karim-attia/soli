@@ -567,11 +567,14 @@ const createBuildLogFilePath = (suffix = '') => {
 
 // --- Build-duration store: seeds the progress bar with a real estimate from
 // past builds instead of a fixed default. JSON keyed by build kind
-// ("android-release", "ios-release", ...), last 5 durations per key. The LAST
-// duration is used as the estimate (best predictor of the current warm/cold
-// state; the tracker grows its estimate dynamically when exceeded, so a cold
-// build after a warm one just grows). Lives in gitignored .test-artifacts/ —
-// history vanishing on `git clean` is fine, the fallback takes over.
+// ("android-release", "ios-release", ...), last 5 durations per key. The MAX
+// of the stored durations is used as the estimate: builds alternate between
+// fast no-change runs (~2-7s) and real builds (~30s+), and seeding with the
+// last run made a real build show "remaining 00:03" that kept growing
+// (Karim's round-5 complaint). Overestimating is the benign direction — the
+// bar just completes early. A cold outlier ages out after 5 runs. Lives in
+// gitignored .test-artifacts/ — history vanishing on `git clean` is fine,
+// the fallback takes over.
 const BUILD_DURATIONS_PATH = path.join(BUILD_LOG_DIRECTORY, 'durations.json')
 const BUILD_DURATIONS_KEEP = 5
 
@@ -587,8 +590,10 @@ const readBuildDurations = () => {
 
 const getExpectedBuildDuration = (key, fallbackMs) => {
   const durations = readBuildDurations()[key]
-  const last = Array.isArray(durations) ? durations[durations.length - 1] : null
-  return Number.isFinite(last) && last > 0 ? last : fallbackMs
+  const valid = (Array.isArray(durations) ? durations : []).filter(
+    (value) => Number.isFinite(value) && value > 0
+  )
+  return valid.length ? Math.max(...valid) : fallbackMs
 }
 
 const recordBuildDuration = (key, durationMs) => {
@@ -792,10 +797,16 @@ const parseConnectedDeviceLines = (stdout) =>
 
 const ensureDevice = async () => {
   const { stdout } = await runCommand('adb', ['devices'], { capture: true })
-  const connectedDevices = parseConnectedDeviceLines(stdout)
+  // Physical devices only — same policy as run-android-release.sh's discovery
+  // (release QA must never silently land on an emulator and look like a
+  // successful phone validation). This fallback only runs when the Node entry
+  // is invoked directly without the shell script's discovery.
+  const connectedDevices = parseConnectedDeviceLines(stdout).filter(
+    ({ serial }) => !serial.startsWith('emulator-')
+  )
   if (!connectedDevices.length) {
     throw new Error(
-      'No Android device detected. Connect a device or start an emulator, then enable USB debugging (adb devices).'
+      'No physical Android device detected (emulators are ignored). Connect a device and enable USB/Wireless debugging (adb devices).'
     )
   }
   const connectedDeviceDescriptions = connectedDevices

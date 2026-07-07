@@ -121,6 +121,8 @@ iOS: Run "yarn ios" — same handling as yarn release (competing builds, shared 
 
 Never start two builds in parallel (e.g. yarn ios and yarn release simultaneously) — the machine can't handle it. Both commands enforce this themselves via a shared lock (the second invocation fails fast).
 
+Only one agent may drive a physical device at a time — the build lock covers builds only, not agent-device sessions. Check for active agent-device sessions before installing/launching on a device.
+
 - The board exposes a full a11y tree — prefer it over coordinate taps. Android handle: labels/content-desc (e.g. "Seven of hearts, column 3", "Stock, 24 cards", "Face-down card, column N"). iOS handle: testIDs ("stock", "waste", "card-<suit>-<rank>", "foundation-<suit>"). Source of truth: src/features/klondike/components/cards/accessibility.ts.
 - agent-device: `snapshot -i` dedupes identical labels; use `snapshot --raw` to count face-down cards. `uiautomator dump` fails on this app (timer never idles).
 

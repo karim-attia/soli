@@ -50,6 +50,11 @@ export default function TabOneScreen() {
     [sessionControls]
   )
 
+  const handleResetUndoHint = useCallback(() => {
+    setDemoChoiceVisible(false)
+    sessionControls?.resetUndoHintForTesting()
+  }, [sessionControls])
+
   const closeDemoChoice = useCallback(() => {
     setDemoChoiceVisible(false)
   }, [])
@@ -102,6 +107,7 @@ export default function TabOneScreen() {
         isPresented={demoChoiceVisible}
         onDismiss={closeDemoChoice}
         onSelect={handleDemoChoice}
+        onResetUndoHint={handleResetUndoHint}
       />
     </>
   )
@@ -111,9 +117,15 @@ type DemoChoiceSheetProps = {
   isPresented: boolean
   onDismiss: () => void
   onSelect: (options: LaunchDemoGameOptions) => void
+  onResetUndoHint: () => void
 }
 
-const DemoChoiceSheet = ({ isPresented, onDismiss, onSelect }: DemoChoiceSheetProps) => {
+const DemoChoiceSheet = ({
+  isPresented,
+  onDismiss,
+  onSelect,
+  onResetUndoHint,
+}: DemoChoiceSheetProps) => {
   return (
     <AppSheet isPresented={isPresented} onDismiss={onDismiss}>
       {/* No Cancel button on purpose: the @expo/ui BottomSheet is natively
@@ -155,6 +167,13 @@ const DemoChoiceSheet = ({ isPresented, onDismiss, onSelect }: DemoChoiceSheetPr
             40 redos available for scrubber/undo/redo testing. */}
         <Button size="$3" onPress={() => onSelect({ demoMode: 'scrubbed' })}>
           Mid-game, scrubbed to middle
+        </Button>
+        {/* Manual-testing reset for the undo-scrubber hint (undo-scrubber-hint plan):
+            sets lifetime past the >50 gate + hintsRemaining back to 3, so a 10-tap
+            undo streak immediately shows hint 1. No confirmation on purpose — the
+            action is harmless and this sheet is dev-only. */}
+        <Button size="$3" onPress={onResetUndoHint}>
+          Reset undo hint
         </Button>
       </YStack>
     </AppSheet>

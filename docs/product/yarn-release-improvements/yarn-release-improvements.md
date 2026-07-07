@@ -1046,3 +1046,29 @@ this device's Android version decides which lines exist):
 - `scripts/android-unlock-pattern.sh` (is_awake helper + already-unlocked guard;
   wake keyevent now conditional on the dozing state)
 - `docs/product/yarn-release-improvements/yarn-release-improvements.md` (this file)
+
+# Round 5 — estimate seeding fix + emulator policy in ensureDevice
+
+Done 2026-07-07 (small, done directly by the orchestrator).
+
+## User prompt (Round 5)
+
+> android had an expectations in seconds now after running it for a while. can you check why?
+> question: does it every try to start on emulator or only on physical device?
+
+## Changes
+
+- [x] **Estimate seeding uses MAX of stored durations, not the last one.**
+  Cause of the seconds-long estimate: builds alternate between fast no-change
+  runs (~2-7s) and real builds (~30s+); seeding with the LAST duration made a
+  real build start at "remaining 00:03" and keep growing. Max of the last 5 is
+  the benign direction (bar completes early on fast builds); cold outliers age
+  out of the 5-entry window. (`getExpectedBuildDuration` in
+  scripts/lib/build-tools.js.)
+- [x] **`ensureDevice()` now ignores `emulator-*` serials** — same
+  physical-only policy as run-android-release.sh's discovery. Through
+  `yarn release` the emulator was already impossible (shell discovery skips
+  emulators and errors out rather than falling back); the Node-side
+  `ensureDevice` fallback (direct `node scripts/build-install-android.js`
+  invocation) previously picked `connectedDevices[0]`, which could have been
+  an emulator. Now the whole Android path is physical-device-only.

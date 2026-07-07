@@ -17,6 +17,7 @@ import {
   UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING,
   UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING,
 } from '../constants'
+import { UndoHintBubble } from './UndoHintBubble'
 
 export type UndoScrubberProps = {
   visible: boolean
@@ -29,6 +30,8 @@ export type UndoScrubberProps = {
   gesture: GestureType
   canUndo: boolean
   onTrackMetrics: (metrics: { left: number; right: number }) => void
+  // One-time undo-scrubber discovery hint (undo-scrubber-hint plan).
+  hintVisible: boolean
 }
 
 const AnimatedView = createAnimatedComponent(View)
@@ -36,6 +39,10 @@ const SCRUBBER_THUMB_SIZE = 20
 const SCRUBBER_THUMB_RADIUS = SCRUBBER_THUMB_SIZE / 2
 const SCRUBBER_HIDDEN_SCALE = 0.985
 const SCRUBBER_TRANSITION = { duration: 140 } as const
+// Undo button height: 14px vertical padding ×2 + 20px icon (styles.undoButton). Used
+// to anchor the hint bubble just above the button without measuring it — the button
+// geometry is static per layout.
+const UNDO_BUTTON_HEIGHT = 48
 
 // Keep the native gesture target isolated from board-preview commits. Only stable gesture,
 // shared-value, and undo-availability changes should update this subtree.
@@ -96,6 +103,7 @@ export const UndoScrubber = React.memo(
     gesture,
     canUndo,
     onTrackMetrics,
+    hintVisible,
   }: UndoScrubberProps) => {
     const trackRef = useRef<View>(null)
     const trackWidth = useSharedValue(0)
@@ -217,6 +225,12 @@ export const UndoScrubber = React.memo(
             </View>
           </View>
         </AnimatedView>
+        {/* Hint disappears together with the whole dock on win/celebration (this
+          component returns null above), so no extra hiding logic is needed here. */}
+        <UndoHintBubble
+          visible={hintVisible}
+          bottom={bottomDockOffset + UNDO_BUTTON_HEIGHT + 8}
+        />
         <GestureWrapper gesture={gesture} scrubActive={scrubActive} canUndo={canUndo} />
       </View>
     )

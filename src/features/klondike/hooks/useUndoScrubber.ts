@@ -14,6 +14,13 @@ type UseUndoScrubberOptions = {
   safeArea: { left: number; right: number }
   dispatch: React.Dispatch<GameAction>
   handleUndo: () => void
+  // Fired once when a scrub session starts (pan accepted). Used by the undo-hint
+  // feature to break the consecutive-undo streak (a visible hint stays on purpose).
+  onScrubBegin?: () => void
+  // Fired once when a scrub session ends; `changed` is true iff the session ended at
+  // a different history index than it started (a "successful" scrub). Used by the
+  // undo-hint feature to consume a remaining hint from proven scrubber users.
+  onScrubEnd?: (changed: boolean) => void
 }
 
 type ScrubOrigin = {
@@ -151,6 +158,8 @@ export const useUndoScrubber = ({
   safeArea,
   dispatch,
   handleUndo,
+  onScrubBegin,
+  onScrubEnd,
 }: UseUndoScrubberOptions) => {
   const hasUndo = state.history.length > 0
   const timelineRange = state.history.length + state.future.length
@@ -285,11 +294,23 @@ export const useUndoScrubber = ({
     [dispatch]
   )
 
+  // Ref pattern (like handleUndoRef below): keeps beginScrubSession stable even if
+  // the caller passes an unstable onScrubBegin/onScrubEnd.
+  const onScrubBeginRef = useRef(onScrubBegin)
+  onScrubBeginRef.current = onScrubBegin
+  const onScrubEndRef = useRef(onScrubEnd)
+  onScrubEndRef.current = onScrubEnd
+  // Anchor index of the current scrub session so finishScrubSession can tell whether
+  // the scrub actually moved the timeline (undo-hint "successful scrub" detection).
+  const scrubStartIndexRef = useRef(0)
+
   const beginScrubSession = useCallback(
     (pointer: number) => {
       cancelScheduledScrub()
       lastDispatchedScrubIndexRef.current = pointer
+      scrubStartIndexRef.current = pointer
       setIsScrubbing(true)
+      onScrubBeginRef.current?.()
     },
     [cancelScheduledScrub]
   )
@@ -298,6 +319,9 @@ export const useUndoScrubber = ({
     (finalIndex: number) => {
       scheduleScrubDispatch(finalIndex)
       setIsScrubbing(false)
+      // Single-fire: onEnd/onFinalize both route here but are guarded by
+      // isScrubbingShared, so a session reports its outcome exactly once.
+      onScrubEndRef.current?.(finalIndex !== scrubStartIndexRef.current)
     },
     [scheduleScrubDispatch]
   )

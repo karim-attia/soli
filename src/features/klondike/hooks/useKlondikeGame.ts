@@ -28,6 +28,7 @@ import { EMPTY_INVALID_WIGGLE, type InvalidWiggleConfig } from '../types'
 import { computeCardMetrics } from '../utils/cardMetrics'
 import { useKlondikeTimer } from './useKlondikeTimer'
 import { useKlondikePersistence } from './useKlondikePersistence'
+import { useUndoHint } from './useUndoHint'
 import { useKlondikeHistoryEntry } from './useKlondikeHistoryEntry'
 import { useSolvableDealSelector } from './useSolvableDealSelector'
 import { useCelebrationController } from './useCelebrationController'
@@ -98,6 +99,7 @@ export type UseKlondikeGameResult = {
   developerModeEnabled: boolean
   requestNewGame: RequestNewGameFn
   handleLaunchDemoGame: (options?: LaunchDemoGameOptions) => void
+  resetUndoHintForTesting: () => void
   viewProps: KlondikeGameViewProps
 }
 
@@ -369,6 +371,18 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     dispatch,
   })
 
+  // Undo-scrubber discovery hint (undo-scrubber-hint plan). All callbacks are
+  // stable, so wiring them into dealNewGame/dispatchGameAction/handleUndo below
+  // doesn't destabilize those callbacks' identities.
+  const {
+    undoHintVisible,
+    noteUndoSuccess,
+    noteStreakBreak,
+    noteScrubEnd,
+    noteNewDeal,
+    resetUndoHintForTesting,
+  } = useUndoHint()
+
   // Deals a new game, respecting solvable-only settings and history bookkeeping.
   const dealNewGame = useCallback(() => {
     const startedAt = new Date().toISOString()
@@ -378,7 +392,11 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     // Absolute-layer cards stay mounted across deals, so this narrow token resets
     // native animated positions without changing card identity for the whole deck.
     setDealResetKey((current) => current + 1)
-  }, [createFreshGameState, dispatch, recordStartedGame])
+    // A fresh deal is a hard context switch; a consecutive-undo streak can't span it,
+    // and the hint's per-deal flags (shown / scrub-consumed) reset here.
+    noteStreakBreak()
+    noteNewDeal()
+  }, [createFreshGameState, dispatch, noteNewDeal, noteStreakBreak, recordStartedGame])
 
   // Hook: own the celebration animation lifecycle and bindings.
   const {
@@ -426,9 +444,16 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       if (boardLockedRef.current) {
         return
       }
+      if (action.type !== 'UNDO') {
+        // Any other game action (draw, move, selection, auto-queue advance) ends a
+        // consecutive-undo streak. TIMER_* actions bypass dispatchGameAction (raw
+        // dispatch in useKlondikeTimer/useKlondikeHistoryEntry), so timer ticks
+        // correctly do NOT reset the streak.
+        noteStreakBreak()
+      }
       dispatch(action)
     },
-    [dispatch]
+    [dispatch, noteStreakBreak]
   )
 
   const { handleLaunchDemoGame } = useDemoGameLauncher({
@@ -523,12 +548,25 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Initiates an undo action when the board is unlocked and history exists.
   const handleUndo = useCallback(() => {
     const current = stateRef.current
-    if (!current.history.length) {
-      notifyInvalidMove()
+    if (!current.history.length || boardLockedRef.current) {
+      // Failed undo taps break the streak too — the user isn't walking back through
+      // history right now. (dispatchGameAction would silently drop the action while
+      // locked, so mirror its guard here for correct counting.)
+      noteStreakBreak()
+      if (!current.history.length) {
+        notifyInvalidMove()
+      }
       return
     }
+    // Hint counters: only tap-undos count. Scrub steps dispatch SCRUB_TO_INDEX via raw
+    // dispatch and never reach handleUndo. Demo playback also bypasses handleUndo
+    // (useDemoGameLauncher dispatches UNDO directly), so the demoPlaybackActiveRef
+    // check is purely defensive against future call sites.
+    if (!demoPlaybackActiveRef.current) {
+      noteUndoSuccess()
+    }
     dispatchGameAction({ type: 'UNDO' })
-  }, [dispatchGameAction, notifyInvalidMove])
+  }, [dispatchGameAction, noteStreakBreak, noteUndoSuccess, notifyInvalidMove])
 
   // Presents a confirmation dialog and seeds state for a newly dealt game.
   const requestNewGame = useCallback<RequestNewGameFn>(
@@ -747,6 +785,12 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     safeArea: { left: safeArea.left, right: safeArea.right },
     dispatch,
     handleUndo,
+    // Scrubbing proves the user knows the feature: break the streak the moment a
+    // scrub session begins (a visible hint deliberately stays — see noteStreakBreak);
+    // a successful scrub (ended at a different timeline index) consumes one
+    // remaining hint.
+    onScrubBegin: noteStreakBreak,
+    onScrubEnd: noteScrubEnd,
   })
 
   // Developer-mode log marker when the auto-complete queue engages.
@@ -822,6 +866,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     gesture: undoScrubGesture,
     canUndo,
     onTrackMetrics: handleTrackMetrics,
+    hintVisible: undoHintVisible,
   }
 
   const viewProps: KlondikeGameViewProps = {
@@ -861,6 +906,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     developerModeEnabled,
     requestNewGame,
     handleLaunchDemoGame,
+    resetUndoHintForTesting,
     viewProps,
   }
 }

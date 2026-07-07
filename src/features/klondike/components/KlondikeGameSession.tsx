@@ -11,6 +11,7 @@ export type KlondikeGameSessionControls = {
   developerModeEnabled: boolean
   requestNewGame: RequestNewGameFn
   handleLaunchDemoGame: (options?: LaunchDemoGameOptions) => void
+  resetUndoHintForTesting: () => void
 }
 
 type KlondikeGameSessionProps = {
@@ -18,20 +19,32 @@ type KlondikeGameSessionProps = {
 }
 
 export const KlondikeGameSession = ({ onControlsChange }: KlondikeGameSessionProps) => {
-  const { developerModeEnabled, requestNewGame, handleLaunchDemoGame, viewProps } =
-    useKlondikeGame()
+  const {
+    developerModeEnabled,
+    requestNewGame,
+    handleLaunchDemoGame,
+    resetUndoHintForTesting,
+    viewProps,
+  } = useKlondikeGame()
 
   useEffect(() => {
     onControlsChange({
       developerModeEnabled,
       requestNewGame,
       handleLaunchDemoGame,
+      resetUndoHintForTesting,
     })
 
     return () => {
       onControlsChange(null)
     }
-  }, [developerModeEnabled, handleLaunchDemoGame, onControlsChange, requestNewGame])
+  }, [
+    developerModeEnabled,
+    handleLaunchDemoGame,
+    onControlsChange,
+    requestNewGame,
+    resetUndoHintForTesting,
+  ])
 
   return <KlondikeGameView {...viewProps} />
 }
