@@ -18,8 +18,12 @@
  */
 
 const { spawnSync } = require('child_process')
+const fs = require('fs')
+const path = require('path')
 
 const PACKAGE_NAME = 'ch.karimattia.soli'
+const UNLOCK_SCRIPT = path.join(__dirname, 'android-unlock-pattern.sh')
+const ANDROID_READY_SCRIPT = path.join(__dirname, 'android-ready.sh')
 const USAGE =
   "Usage: yarn deeplink <shortcut|'<soli:// url>'> [args] [--cold|--warm] [--ios|--android] [--serial <s>] [--no-retry]\n" +
   'Shortcuts: celebration [modeId] · scrubtest [steps] [scrub] · nearwin [left] · seedhistory [clear]'
@@ -63,7 +67,7 @@ const parseArgs = () => {
   const options = {
     positionals: [],
     cold: null, // null = use shortcut default (raw URLs default to warm)
-    target: null, // null = auto (booted sim > android device)
+    target: null, // null = auto (android device > booted sim; see header)
     serial: null,
     retry: true,
   }
@@ -137,9 +141,19 @@ const resolveAndroidSerial = (explicit) => {
   if (process.env.ANDROID_SERIAL) {
     return process.env.ANDROID_SERIAL
   }
-  const serials = listAndroidSerials()
+  let serials = listAndroidSerials()
   if (!serials.length) {
-    fail('No adb devices connected. Connect the phone, or use --ios for the simulator.')
+    // Self-heal: android-ready.sh reconnects wireless adb (same bounded
+    // discovery as yarn release), pins to :5555, wakes, and unlocks; inherit
+    // stdio so its progress lines reach the caller.
+    console.log('[deeplink] No adb device connected — running scripts/android-ready.sh...')
+    const ready = spawnSync(ANDROID_READY_SCRIPT, [], { stdio: 'inherit' })
+    if (ready.status === 0) {
+      serials = listAndroidSerials()
+    }
+    if (!serials.length) {
+      fail('No adb device reachable even after android-ready.sh. Use --ios for the simulator.')
+    }
   }
   if (serials.length > 1) {
     // Never guess between devices — one might be Karim's main phone.
@@ -165,6 +179,14 @@ const main = () => {
 
   if (target === 'android') {
     const serial = resolveAndroidSerial(options.serial)
+    // Cheap preflight so links land on a usable screen: wake (harmless key
+    // event) + unlock via the local-only pattern script (gitignored; safe
+    // no-op when already unlocked). The reconnect loop only runs in the
+    // no-device path above (android-ready.sh) — the connected path stays fast.
+    run('adb', ['-s', serial, 'shell', 'input', 'keyevent', 'KEYCODE_WAKEUP'])
+    if (fs.existsSync(UNLOCK_SCRIPT)) {
+      run(UNLOCK_SCRIPT, ['--serial', serial])
+    }
     if (cold) {
       run('adb', ['-s', serial, 'shell', 'am', 'force-stop', PACKAGE_NAME])
     }
