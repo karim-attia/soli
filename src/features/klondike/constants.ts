@@ -54,7 +54,6 @@ export const WIN_CELEBRATION_HANDOFF_DELAY_MS = Math.max(
   FOUNDATION_GLOW_TOTAL_DURATION_MS
 )
 export const WIN_CLEANUP_OUTLINE_FADE_DURATION_MS = 180
-export const FOUNDATION_FALLBACK_GAP = 16
 
 // Colour palette
 export const COLOR_CARD_FACE = '#ffffff'

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { Dispatch, MutableRefObject } from 'react'
 import { Linking } from 'react-native'
-import type { LayoutRectangle } from 'react-native'
 
 import {
   createDemoGameState,
@@ -43,8 +42,6 @@ type UseDemoGameLauncherOptions = {
   // The launcher only ever clears the celebration; narrow signature keeps this
   // file free of the celebration hook's types.
   setCelebrationState: (state: null) => void
-  foundationLayoutsRef: MutableRefObject<Partial<Record<Suit, LayoutRectangle>>>
-  topRowLayoutRef: MutableRefObject<LayoutRectangle | null>
   winCelebrationsRef: MutableRefObject<number>
   // Detaches the live game from its active history row before the demo replaces it.
   // Narrow callback (owned by useKlondikeHistoryEntry) instead of the raw entry-id
@@ -180,8 +177,6 @@ export const useDemoGameLauncher = ({
   clearCelebrationDialogTimer,
   recordCurrentGameResult,
   setCelebrationState,
-  foundationLayoutsRef,
-  topRowLayoutRef,
   winCelebrationsRef,
   clearCurrentGameEntryLink,
   demoPlaybackActiveRef,
@@ -224,20 +219,24 @@ export const useDemoGameLauncher = ({
     }
   }, [clearPlaylistTimers])
 
+  // Foundation/top-row layout refs are deliberately NOT cleared here (alignment
+  // root-cause story, 2026-07-08): they are geometry measurements, not game state.
+  // onLayout only re-fires when a view's frame actually CHANGES, and a new deal /
+  // demo game keeps the board geometry identical — so clearing the refs left them
+  // empty for the rest of the app process and every later celebration rendered at
+  // synthetic fallback positions (piles flush left, wrong spacing; that fallback
+  // has since been removed — empty refs now refuse to start the celebration). Real
+  // geometry changes still overwrite the refs via onLayout.
   const resetDemoRuntimeState = useCallback(() => {
     clearCelebrationDialogTimer()
     setCelebrationState(null)
-    foundationLayoutsRef.current = {}
-    topRowLayoutRef.current = null
     winCelebrationsRef.current = 0
     clearCurrentGameEntryLink()
     updateBoardLocked(false)
   }, [
     clearCelebrationDialogTimer,
     clearCurrentGameEntryLink,
-    foundationLayoutsRef,
     setCelebrationState,
-    topRowLayoutRef,
     updateBoardLocked,
     winCelebrationsRef,
   ])

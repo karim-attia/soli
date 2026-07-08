@@ -431,7 +431,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     animationsEnabled,
     celebrationAnimationsEnabled,
     boardLayout,
-    cardMetrics,
     foundationLayoutsRef,
     topRowLayoutRef,
     updateBoardLocked,
@@ -484,8 +483,12 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         recordCurrentGameResult()
       }
       setCelebrationState(null)
-      foundationLayoutsRef.current = {}
-      topRowLayoutRef.current = null
+      // Foundation/top-row layout refs deliberately NOT cleared (alignment
+      // root-cause story, 2026-07-08): a new deal keeps the board geometry, so
+      // onLayout never re-fires and cleared refs would stay empty for the rest of
+      // the app process — every later celebration then rendered at synthetic
+      // fallback positions (no left gutter, too-wide spacing; the fallback has
+      // since been removed — empty refs now refuse to start the celebration).
       winCelebrationsRef.current = 0
       void clearGameState().catch((error) => {
         devLog('warn', 'Failed to clear persisted game before new deal', error)
@@ -527,8 +530,6 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     clearCelebrationDialogTimer,
     recordCurrentGameResult,
     setCelebrationState,
-    foundationLayoutsRef,
-    topRowLayoutRef,
     winCelebrationsRef,
     clearCurrentGameEntryLink,
     demoPlaybackActiveRef,

@@ -32,6 +32,7 @@
   "dependencies": {
     "@expo/material-symbols": "^0.1.1",
     "@expo/ui": "~57.0.3",
+    "@shopify/react-native-skia": "2.6.2",
     "@tamagui/colors": "2.4.2",
     "@tamagui/config": "2.4.2",
     "@tamagui/font-inter": "2.4.2",

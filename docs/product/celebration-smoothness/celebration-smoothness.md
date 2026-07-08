@@ -291,7 +291,26 @@ Important calibration: on this device even OLD celebrations render ~45–50 fps 
 
 ### Verdict
 
-Fixed. Trail modes now: Cascade 51 fps (= baseline), Meteor 32 fps (flagged), Galaxy/Comet back to ~44 fps non-trail baseline. New rule of thumb documented in the metadata comments: trails only on modes that spread cards out.
+Fixed within the current architecture. Trail modes now: Cascade 51 fps (= baseline), Meteor 32 fps (flagged), Galaxy/Comet back to ~44 fps non-trail baseline. New rule of thumb documented in the metadata comments: trails only on modes that spread cards out.
+
+## Architecture proposal (2026-07-07, after user follow-up): Skia Atlas celebration renderer
+
+User reports after the fixes: modes 31/32 load noticeably slower, start <30 fps, phone gets warm; asks if <60 fps is acceptable and for a completely different approach.
+
+Diagnosis of the remaining issues (all one root cause — per-view architecture):
+- Slow load/start of 31/32: celebration start synchronously mounts 156–208 extra `CardVisual` trees (~8–10 native views each ⇒ ~1,500–2,000 native views) — a mount storm, then first-seconds fps suffers while layout settles.
+- ~45–50 fps ceiling even for old modes on the A065: 52+ Reanimated views each pushing a Fabric props update every frame saturates the UI/render thread.
+- Warmth: 60 s of saturated UI thread + render pipeline at max refresh.
+
+Proposed rewrite of the RENDERING layer only (all 33 modes' math reused verbatim — `computeCelebrationFrame` is already a pure worklet):
+- `@shopify/react-native-skia` Atlas API: rasterize the 52 card faces ONCE into a texture atlas at celebration start; one `useFrameCallback` worklet loops the cards (and trail ghosts) writing position/rotation/scale into typed `RSXform` buffers; ONE GPU draw call per frame regardless of sprite count (52 or 5,000). Per-sprite alpha via the colors buffer + `modulate` blend (white ⇒ texture unchanged, alpha fades). Requires new arch (we're on Expo 57/RN 0.86 — fine); Expo-compatible per Shopify/Expo docs (2026-07 research; needs a package guide per AGENTS before implementation).
+- What it fixes: mount storm gone (no views to mount), start fps, steady fps way above the current ceiling, heat (one draw call vs hundreds of Fabric updates), and trail cost becomes ~free.
+- What it unlocks: TRUE Windows Classic Cascade (persistent offscreen surface that is never cleared — real imprints, the deferred Story 3 item), unlimited ghosts, confetti/particles alongside cards, shader effects (motion blur, glow).
+- Scope: new dependency; rewrite of `CelebrationOverlayLayer` rendering; card-face rasterization strategy (draw simple card faces in Skia directly, or snapshot existing `CardVisual`s once via `makeImageFromView`); keep the view-based renderer during transition behind the metadata/celebrationState switch if desired.
+
+Cheaper interim alternatives considered: pre-rasterized card Images in the current view architecture (fixes mount storm only), celebration frame-rate cap at ~30–40 Hz (fixes heat, compromises smoothness), adaptive ghost count (complexity for little). Lottie/pre-baked (loses live cards) and expo-gl/three (overkill vs Skia) rejected.
+
+Status: APPROVED by user 2026-07-07 ("lets try skia, yes"). Work continues in `docs/product/celebration-skia-atlas/celebration-skia-atlas.md` (implementation plan + package guide `docs/external-package-guides/react-native-skia.md`).
 
 ## Files actually modified (Story 5)
 

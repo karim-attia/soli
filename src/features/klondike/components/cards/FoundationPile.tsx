@@ -51,7 +51,12 @@ export const FoundationPile = ({
   const topCard = cards[cards.length - 1]
   // Absolute-card mode makes this pile structural: card visuals live in
   // `AbsoluteCardLayer`, while this outline only marks truly empty foundations.
-  const showEmptyOutline = !topCard
+  // Hidden during celebrations (outline-hiding story, user 2026-07-08): the
+  // celebration overlay owns the foundation area, and on a FRESH board (empty
+  // foundations — e.g. a `yarn celebration` preview) these dashed outlines showed
+  // through the transparent celebration canvas. Real wins were never affected
+  // (their foundations hold cards → no outline), so this changes nothing there.
+  const showEmptyOutline = !topCard && !celebrationActive
   const borderColor = isDroppable
     ? COLOR_DROP_BORDER
     : isSelected
@@ -95,7 +100,9 @@ export const FoundationPile = ({
           glowStyle,
         ]}
       />
-      {!topCard ? (
+      {/* Suit glyph follows the outline's visibility (hidden during celebrations
+          too — it showed through the overlay the same way). */}
+      {showEmptyOutline ? (
         <Text
           style={[
             styles.foundationSymbol,

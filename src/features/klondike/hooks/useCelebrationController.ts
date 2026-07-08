@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LayoutRectangle } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   Easing,
   cancelAnimation,
@@ -21,11 +22,10 @@ import type { Card, GameState, Suit } from '../../../solitaire/klondike'
 import { devLog } from '../../../utils/devLogger'
 import {
   CARD_ANIMATION_DURATION_MS,
-  FOUNDATION_FALLBACK_GAP,
   FOUNDATION_GLOW_TOTAL_DURATION_MS,
   WIN_CELEBRATION_HANDOFF_DELAY_MS,
 } from '../constants'
-import type { CelebrationBindings, CardMetrics } from '../types'
+import type { CelebrationBindings } from '../types'
 
 export type CelebrationCardConfig = {
   card: Card
@@ -42,6 +42,15 @@ export type CelebrationState = {
   durationMs: number
   boardWidth: number
   boardHeight: number
+  // Visible floor for resting/bouncing modes: boardHeight − bottom safe-area inset.
+  // Needed because the undo dock unmounts during celebrations, growing the board to
+  // (nearly) the window bottom — without it cards settle inside the Android nav bar
+  // (renderer-polish story, user decision 2026-07-08). Cascade-fixes story: this
+  // value depends on WHEN the board was measured (mid-game previews capture the
+  // pre-grow board → higher floor), so the overlay overrides it with the
+  // deterministic window-derived floor once its measureInWindow resolves — this
+  // field only bridges the first ~1 frame.
+  floorY: number
   cards: CelebrationCardConfig[]
 }
 
@@ -51,7 +60,6 @@ type UseCelebrationControllerParams = {
   animationsEnabled: boolean
   celebrationAnimationsEnabled: boolean
   boardLayout: { width: number | null; height: number | null }
-  cardMetrics: CardMetrics
   foundationLayoutsRef: React.MutableRefObject<Partial<Record<Suit, LayoutRectangle>>>
   topRowLayoutRef: React.MutableRefObject<LayoutRectangle | null>
   updateBoardLocked: (locked: boolean) => void
@@ -111,7 +119,6 @@ export const useCelebrationController = ({
   animationsEnabled,
   celebrationAnimationsEnabled,
   boardLayout,
-  cardMetrics,
   foundationLayoutsRef,
   topRowLayoutRef,
   updateBoardLocked,
@@ -124,11 +131,17 @@ export const useCelebrationController = ({
   const celebrationProgress = useSharedValue(0)
   const celebrationActive = useSharedValue(0)
   const celebrationMode = useSharedValue(0)
-  const celebrationBoard = useSharedValue<{ width: number; height: number }>({
+  const celebrationBoard = useSharedValue<{
+    width: number
+    height: number
+    floorY: number
+  }>({
     width: 0,
     height: 0,
+    floorY: 0,
   })
   const celebrationTotal = useSharedValue(0)
+  const safeAreaInsets = useSafeAreaInsets()
 
   const celebrationAbortRef = useRef(false)
   // Dev-hold (Story 5): set by the first badge press (cycleCelebrationMode) and by
@@ -216,19 +229,37 @@ export const useCelebrationController = ({
 
   // Shared per-card launch-position math for real wins AND dev previews — one
   // source of truth so preview cards start exactly where win cards would (Story 5).
+  // All 13 cards of a pile share EXACTLY one position (flat stack, like the real
+  // foundation). The original Nov-2025 celebration subtracted stackIndex·2%·cardH
+  // here as a vertical fan — a depth cue for the then-shuffled draw order. With
+  // rank-sorted draw order + the one-visible-card pile rule (cascade-fixes story)
+  // the fan only produced drift: staggered modes 31/33 showed each successor card
+  // ~2%·cardH lower, the visible pile top crept down through the run, and mode 33's
+  // repeat-pass King arrived 24%·cardH above the departed Ace (pile-stability story,
+  // user 2026-07-08). Do not reintroduce a per-stackIndex offset.
+  // No synthetic fallback (fallback-removal story, user 2026-07-08): this used to
+  // fall back to suitIndex·(cardW + FOUNDATION_FALLBACK_GAP) from a {0,0} origin
+  // when the layout refs were empty — plausible-but-WRONG positions that masked the
+  // ref-clearing alignment bug for days. The refs can only be empty before the
+  // first-ever board onLayout, which no real celebration path can hit (winning or
+  // even opening the preview deep link requires a laid-out board). If they ARE
+  // empty, something upstream is broken — refuse to start and warn loudly instead
+  // of rendering misaligned piles.
   const computeCelebrationCardBase = useCallback(
-    (suit: Suit, suitIndex: number, stackIndex: number) => {
+    (suit: Suit) => {
       const topLayout = topRowLayoutRef.current
-      const topOffsetX = topLayout?.x ?? 0
-      const topOffsetY = topLayout?.y ?? 0
-      const fallbackSpacing = cardMetrics.width + FOUNDATION_FALLBACK_GAP
       const layout = foundationLayoutsRef.current[suit]
-      const baseX = topOffsetX + (layout?.x ?? suitIndex * fallbackSpacing)
-      const baseY =
-        topOffsetY + (layout?.y ?? 0) - stackIndex * (cardMetrics.height * 0.02)
-      return { baseX, baseY }
+      if (!topLayout || !layout) {
+        devLog(
+          'warn',
+          '[Celebration] MISSING FOUNDATION LAYOUT — celebration not started',
+          { suit, hasTopRowLayout: Boolean(topLayout) }
+        )
+        return null
+      }
+      return { baseX: topLayout.x + layout.x, baseY: topLayout.y + layout.y }
     },
-    [cardMetrics.height, cardMetrics.width, foundationLayoutsRef, topRowLayoutRef]
+    [foundationLayoutsRef, topRowLayoutRef]
   )
 
   const buildCelebrationState = useCallback((): CelebrationState | null => {
@@ -241,21 +272,26 @@ export const useCelebrationController = ({
 
     const cards: CelebrationCardConfig[] = []
 
-    FOUNDATION_SUIT_ORDER.forEach((suit, suitIndex) => {
+    for (let suitIndex = 0; suitIndex < FOUNDATION_SUIT_ORDER.length; suitIndex += 1) {
+      const suit = FOUNDATION_SUIT_ORDER[suitIndex]
       const pile = state.foundations[suit]
 
+      const base = computeCelebrationCardBase(suit)
+      if (!base) {
+        // Fail loudly instead of guessing positions (see computeCelebrationCardBase).
+        return null
+      }
       pile.forEach((card, stackIndex) => {
-        const { baseX, baseY } = computeCelebrationCardBase(suit, suitIndex, stackIndex)
         cards.push({
           card,
           stackIndex,
           suitIndex,
-          baseX,
-          baseY,
+          baseX: base.baseX,
+          baseY: base.baseY,
           randomSeed: Math.random(),
         })
       })
-    })
+    }
 
     if (!cards.length) {
       return null
@@ -273,12 +309,14 @@ export const useCelebrationController = ({
       durationMs: CELEBRATION_DURATION_MS,
       boardWidth: boardWidthValue,
       boardHeight: boardHeightValue,
+      floorY: boardHeightValue - safeAreaInsets.bottom,
       cards: shuffleCelebrationCards(cards),
     }
   }, [
     boardLayout.height,
     boardLayout.width,
     computeCelebrationCardBase,
+    safeAreaInsets.bottom,
     state.foundations,
   ])
 
@@ -338,7 +376,7 @@ export const useCelebrationController = ({
     setCelebrationPending(false)
     celebrationTotal.value = 0
     celebrationMode.value = 0
-    celebrationBoard.value = { width: 0, height: 0 }
+    celebrationBoard.value = { width: 0, height: 0, floorY: 0 }
     runOnUI(() => {
       'worklet'
       celebrationActive.value = 0
@@ -470,6 +508,7 @@ export const useCelebrationController = ({
     celebrationBoard.value = {
       width: celebrationState.boardWidth,
       height: celebrationState.boardHeight,
+      floorY: celebrationState.floorY,
     }
 
     devLog('info', '[Celebration] start', {
@@ -582,23 +621,28 @@ export const useCelebrationController = ({
       const cards: CelebrationCardConfig[] = []
       // Foundation slot layouts are measured on the slot VIEWS (present even when
       // piles are empty), so preview base positions work mid-game too.
-      FOUNDATION_SUIT_ORDER.forEach((suit, suitIndex) => {
+      for (
+        let suitIndex = 0;
+        suitIndex < FOUNDATION_SUIT_ORDER.length;
+        suitIndex += 1
+      ) {
+        const suit = FOUNDATION_SUIT_ORDER[suitIndex]
+        const base = computeCelebrationCardBase(suit)
+        if (!base) {
+          // Fail loudly instead of guessing positions (see computeCelebrationCardBase).
+          return
+        }
         DEAL_RANKS.forEach((rank, stackIndex) => {
-          const { baseX, baseY } = computeCelebrationCardBase(
-            suit,
-            suitIndex,
-            stackIndex
-          )
           cards.push({
             card: { id: `preview-${suit}-${rank}`, suit, rank, faceUp: true },
             stackIndex,
             suitIndex,
-            baseX,
-            baseY,
+            baseX: base.baseX,
+            baseY: base.baseY,
             randomSeed: Math.random(),
           })
         })
-      })
+      }
 
       // A given id must exist in the metadata (stable-id contract); otherwise fall
       // back to a random entry — same selection rule as a real win.
@@ -616,6 +660,7 @@ export const useCelebrationController = ({
         durationMs: CELEBRATION_DURATION_MS,
         boardWidth: boardWidthValue,
         boardHeight: boardHeightValue,
+        floorY: boardHeightValue - safeAreaInsets.bottom,
         cards: shuffleCelebrationCards(cards),
       })
     },
@@ -623,6 +668,7 @@ export const useCelebrationController = ({
       boardLayout.height,
       boardLayout.width,
       computeCelebrationCardBase,
+      safeAreaInsets.bottom,
       updateBoardLocked,
     ]
   )
@@ -632,7 +678,10 @@ export const useCelebrationController = ({
       return null
     }
     const metadata = getCelebrationModeMetadata(celebrationState.modeId)
-    const padded = (metadata.id + 1).toString().padStart(2, '0')
+    // Show the REAL 0-based stable id (fixed 2026-07-08): the old `id + 1` display
+    // made the badge disagree with the `soli://?celebration=<id>` deep link and
+    // confused device testing.
+    const padded = metadata.id.toString().padStart(2, '0')
     return `Celebration ${padded} · ${metadata.name}`
   }, [celebrationState, developerModeEnabled])
 
