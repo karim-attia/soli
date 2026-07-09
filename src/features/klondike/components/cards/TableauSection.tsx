@@ -26,6 +26,7 @@ export type TableauSectionProps = {
   dropHints: DropHints
   interactionsLocked: boolean
   celebrationPending?: boolean
+  celebrationActive?: boolean
   onTableauRowLayout?: (layout: LayoutRectangle) => void
   onTableauColumnLayout?: (columnIndex: number, layout: LayoutRectangle) => void
 }
@@ -39,6 +40,7 @@ export const TableauSection = React.memo(
     dropHints,
     interactionsLocked,
     celebrationPending = false,
+    celebrationActive = false,
     onTableauRowLayout,
     onTableauColumnLayout,
   }: TableauSectionProps) => {
@@ -63,6 +65,7 @@ export const TableauSection = React.memo(
             }
             isLastColumn={columnIndex === tableau.length - 1}
             showWinCleanup={showWinCleanup}
+            celebrationActive={celebrationActive}
             cardMetrics={cardMetrics}
             isDroppable={dropHints.tableau[columnIndex]}
             disableInteractions={interactionsLocked}
@@ -82,6 +85,7 @@ export type TableauColumnProps = {
   isSelected: boolean
   isLastColumn: boolean
   showWinCleanup: boolean
+  celebrationActive: boolean
   cardMetrics: CardMetrics
   isDroppable: boolean
   disableInteractions: boolean
@@ -95,6 +99,7 @@ export const TableauColumn = React.memo(
     isSelected,
     isLastColumn,
     showWinCleanup,
+    celebrationActive,
     cardMetrics,
     isDroppable,
     disableInteractions,
@@ -136,7 +141,13 @@ export const TableauColumn = React.memo(
         pointerEvents={disableInteractions ? 'none' : 'auto'}
       >
         {/* Task 28-2: Fade empty tableau outlines after the visual win handoff, instead of unmounting them in one frame. */}
-        {isEmpty ? (
+        {/* Empty-placeholder audit rule (outline-audit story, user 2026-07-09): the
+            dashed empty-column outline showed through the transparent celebration
+            canvas on previews (the user's screenshot caught the rightmost column).
+            Hidden while a celebration is active — instant conditional render (no
+            fade) so abort restores it in the same commit. The column View keeps its
+            explicit height, so layout/measurements are unaffected. */}
+        {isEmpty && !celebrationActive ? (
           <EmptySlot
             highlight={isDroppable}
             hidden={showWinCleanup}

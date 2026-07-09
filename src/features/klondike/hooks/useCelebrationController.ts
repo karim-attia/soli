@@ -128,6 +128,17 @@ export const useCelebrationController = ({
 }: UseCelebrationControllerParams) => {
   const [celebrationState, setCelebrationState] = useState<CelebrationState | null>(null)
   const [celebrationPending, setCelebrationPending] = useState(false)
+  // Overlay first-frame gate (outline-audit/flicker story, user 2026-07-09): true once
+  // the mounted overlay's atlas texture is ready (CelebrationOverlayLayer fires
+  // onOverlayReady). The REAL board cards (AbsoluteCardLayer) hide on
+  // `celebrationState && celebrationOverlayReady` instead of celebrationState alone —
+  // hiding them earlier left the foundation area empty for the frames the async atlas
+  // rasterization takes (visible flicker at celebration start). During the short
+  // overlap both real and Skia cards render at the SAME positions (alignment story),
+  // so the handoff is pixel-continuous. Reset in clearCelebrationAnimations (runs on
+  // end AND abort) — the un-hide itself needs no signal: state → null flips the gate
+  // false in the same commit that unmounts the overlay.
+  const [celebrationOverlayReady, setCelebrationOverlayReady] = useState(false)
   const celebrationProgress = useSharedValue(0)
   const celebrationActive = useSharedValue(0)
   const celebrationMode = useSharedValue(0)
@@ -374,6 +385,7 @@ export const useCelebrationController = ({
     pendingWinningCardIdRef.current = null
     pendingWinningCardSettledRef.current = false
     setCelebrationPending(false)
+    setCelebrationOverlayReady(false)
     celebrationTotal.value = 0
     celebrationMode.value = 0
     celebrationBoard.value = { width: 0, height: 0, floorY: 0 }
@@ -396,17 +408,26 @@ export const useCelebrationController = ({
     clearCelebrationStartTimer,
   ])
 
+  // JS-side receiver for the overlay's texture-ready signal (runOnJS from the
+  // overlay's launchAnchor reaction — see CelebrationOverlayLayer.onOverlayReady).
+  const handleCelebrationOverlayReady = useCallback(() => {
+    setCelebrationOverlayReady(true)
+  }, [])
+
   const handleCelebrationAbort = useCallback(() => {
     const wasPreview = celebrationPreviewRef.current
     celebrationAbortRef.current = true
     celebrationHoldRef.current = false
     celebrationPreviewRef.current = false
     devLog('info', '[Celebration] abort requested', { preview: wasPreview })
-    runOnUI(() => {
-      'worklet'
-      celebrationActive.value = 0
-      cancelAnimation(celebrationProgress)
-    })()
+    // Deliberately NO eager runOnUI(active = 0) here (outline-audit/flicker story,
+    // user 2026-07-09): hiding the sprites on the UI thread runs 1-2 frames BEFORE
+    // the React commit that unmounts the overlay and restores the board — device
+    // frame captures showed an empty board in between (same flicker class as the
+    // start transition). Letting the celebrationState effect cleanup set active = 0
+    // at unmount makes abort a single-commit swap: Skia cards out and real board
+    // back in the same frame. abortRef above already blocks the withTiming finish
+    // callback for the 1-2 frames progress keeps running.
     clearCelebrationDialogTimer()
     updateBoardLocked(false)
     setCelebrationState(null)
@@ -415,13 +436,7 @@ export const useCelebrationController = ({
     if (!wasPreview) {
       openCelebrationDialog()
     }
-  }, [
-    celebrationActive,
-    celebrationProgress,
-    clearCelebrationDialogTimer,
-    openCelebrationDialog,
-    updateBoardLocked,
-  ])
+  }, [clearCelebrationDialogTimer, openCelebrationDialog, updateBoardLocked])
 
   const scheduleCelebrationStart = useCallback(
     (delayMs: number, reason: CelebrationStartReason) => {
@@ -759,12 +774,14 @@ export const useCelebrationController = ({
   return {
     celebrationState,
     celebrationPending: effectiveCelebrationPending,
+    celebrationOverlayReady,
     setCelebrationState,
     celebrationBindings,
     celebrationLabel,
     cycleCelebrationMode,
     startCelebrationPreview,
     handleCelebrationAbort,
+    handleCelebrationOverlayReady,
     handleWinningCardFlightSettled,
     clearCelebrationDialogTimer,
   }

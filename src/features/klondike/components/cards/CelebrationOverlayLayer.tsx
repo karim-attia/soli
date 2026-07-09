@@ -24,7 +24,12 @@ import type {
   SkSurface,
 } from '@shopify/react-native-skia'
 import type { SharedValue } from 'react-native-reanimated'
-import { useAnimatedReaction, useDerivedValue, useSharedValue } from 'react-native-reanimated'
+import {
+  runOnJS,
+  useAnimatedReaction,
+  useDerivedValue,
+  useSharedValue,
+} from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
@@ -33,15 +38,16 @@ import {
   CELEBRATION_LAUNCH_SPEED_MULTIPLIER,
   CELEBRATION_SPEED_MULTIPLIER,
   CELEBRATION_WOBBLE_FREQUENCY,
-  IMPRINT_FLIGHT_SPAN_RAW,
   IMPRINT_LAUNCH_INTERVAL_RAW,
   IMPRINT_RETURN_RAW,
-  SPIRO_STAMP_INTERVAL_RAW,
   TAU,
   computeCelebrationFrame,
   easeOutQuint,
   getCelebrationModeMetadata,
   getImprintLaunchOrder,
+  getImprintStampCount,
+  getImprintStampRaw,
+  getImprintStreamCount,
   type CelebrationAssignment,
 } from '../../../../animation/celebrationModes'
 import {
@@ -107,30 +113,25 @@ const deriveCardScale = (metrics: CardMetrics) => {
 const ATLAS_COLUMNS = 13
 const ATLAS_GUTTER = 1
 
-// Cascade Imprint (mode 33): the permanent Windows-style imprints are stamped ONCE
-// each onto an accumulating offscreen Skia surface (CascadeImprintLayer below) and
-// displayed as a single <Image> under the live Atlas — approach B of the imprint
-// story, adopted in polish round 2 (2026-07-08). The previous approach (imprints as
-// extra frozen Atlas sprites) was abandoned after reading the 2.6.2 source: the
-// Canvas container re-marshals EVERY shared-value prop on EVERY tick (applyUpdates in
-// cpp/api/recorder/JsiRecorder.h runs all stored conversion functions with no
-// per-variable dirty tracking, triggered by Container.native.ts's single mapper), so
-// a 52×111-sprite buffer costs ~5.7k JSI host-object unwraps per tick even when
-// nothing in it changed — that marshalling (plus GPU-rasterizing thousands of
-// shadow-padded quads per frame) capped the mode at ~31-41 fps. With the surface,
-// per-tick cost is 52 live sprites + an O(1) image handle.
-// 110 samples per card ≈ one stamp per ~8 ms of flight (user preferred the denser
-// 110-sample intermediary look; density is now nearly free since each stamp is drawn
-// exactly once).
-const IMPRINT_MODE_ID = 33
-const IMPRINT_SAMPLES_PER_CARD = 110
+// Imprint surface: permanent stamps drawn ONCE each onto an accumulating offscreen
+// Skia surface (CascadeImprintLayer below) and displayed as a single <Image> under
+// the live Atlas — approach B of the imprint story, adopted in polish round 2
+// (2026-07-08). The previous approach (imprints as extra frozen Atlas sprites) was
+// abandoned after reading the 2.6.2 source: the Canvas container re-marshals EVERY
+// shared-value prop on EVERY tick (applyUpdates in cpp/api/recorder/JsiRecorder.h
+// runs all stored conversion functions with no per-variable dirty tracking,
+// triggered by Container.native.ts's single mapper), so a 52×111-sprite buffer
+// costs ~5.7k JSI host-object unwraps per tick even when nothing in it changed —
+// that marshalling (plus GPU-rasterizing thousands of shadow-padded quads per
+// frame) capped mode 33 at ~31-41 fps. With the surface, per-tick cost is 52 live
+// sprites + an O(1) image handle.
+// Ten-crazy-modes story (2026-07-08): which modes stamp, and WHEN, is now fully
+// metadata/schedule-driven — `metadata.imprint` mounts the layer, and the exported
+// getImprintStampCount/Raw/StreamCount schedules (celebrationModes.ts, next to the
+// mode math they must agree with) drive one generic write-once stamp loop. Only the
+// mode-33 'cascade' policy keeps bespoke renderer behavior (pile reveals + launch-
+// window live-card visibility).
 const AVALANCHE_MODE_ID = 31
-// Spirograph (mode 36, alignment/wild-imprint story 2026-07-08): second consumer of
-// the imprint surface. Unlike 33 there are no staggered launches — all 52 cards fly
-// the whole run and stamp on an absolute lattice (one stamp per card per
-// SPIRO_STAMP_INTERVAL_RAW), and stamps are ROTATED/SCALED (canvas transform per
-// stamp) since the mode rolls its cards. No pile reveals (no waiting piles).
-const SPIRO_MODE_ID = 36
 // Same-pile launch spacing in mode 33: launch order cycles the suits, so a card's
 // pile predecessor launches exactly 4 intervals before it. Used by the imprint
 // layer's pile-reveal schedule (pile-stability story, 2026-07-08 — mode 33's waiting
@@ -152,12 +153,19 @@ type CelebrationOverlayLayerProps = {
   celebrationState: CelebrationState | null
   celebrationBindings: CelebrationBindings
   cardMetrics: CardMetrics
+  // Fired once per mount when the atlas texture is ready — i.e. the overlay's first
+  // visible frame can actually draw (outline-audit/flicker story, user 2026-07-09).
+  // The controller uses it to keep the REAL board cards mounted until then; hiding
+  // them on celebrationState alone left the foundation area EMPTY for the few frames
+  // the async atlas rasterization takes (visible flicker at celebration start).
+  onOverlayReady?: () => void
 }
 
 export const CelebrationOverlayLayer = ({
   celebrationState,
   celebrationBindings,
   cardMetrics,
+  onOverlayReady,
 }: CelebrationOverlayLayerProps) => {
   // Mounting contract (design decision 8): null state ⇒ no Canvas mounted. Unmounting
   // the inner component releases the Canvas surface and drops the atlas texture. The
@@ -170,6 +178,7 @@ export const CelebrationOverlayLayer = ({
       state={celebrationState}
       bindings={celebrationBindings}
       metrics={cardMetrics}
+      onOverlayReady={onOverlayReady}
     />
   )
 }
@@ -178,9 +187,15 @@ type CelebrationAtlasProps = {
   state: CelebrationState
   bindings: CelebrationBindings
   metrics: CardMetrics
+  onOverlayReady?: () => void
 }
 
-const CelebrationAtlas = ({ state, bindings, metrics }: CelebrationAtlasProps) => {
+const CelebrationAtlas = ({
+  state,
+  bindings,
+  metrics,
+  onOverlayReady,
+}: CelebrationAtlasProps) => {
   // Full-window canvas (renderer-polish story, user 2026-07-08): a Skia Canvas clips at
   // its bounds, so an absoluteFill canvas cut cards off at the board container's top
   // edge (the old Animated.Views overflowed freely). Fix: measure the overlay's offset
@@ -373,11 +388,14 @@ const CelebrationAtlas = ({ state, bindings, metrics }: CelebrationAtlasProps) =
   // constant, like the trail config: state.modeId changes on badge cycle → re-render
   // → the mapper worklets re-register with the new value.
   const wobbleScale = metadata.wobble === false ? 0 : 1
-  // Cascade Imprint renders its permanent stamps via CascadeImprintLayer (see the
-  // IMPRINT_MODE_ID comment); the Atlas only ever draws the 52 live cards for it.
-  const isImprintMode = state.modeId === IMPRINT_MODE_ID
-  const isSpiroMode = state.modeId === SPIRO_MODE_ID
-  const usesImprintSurface = isImprintMode || isSpiroMode
+  // Imprint modes render their permanent stamps via CascadeImprintLayer (see the
+  // comment on AVALANCHE_MODE_ID above); the Atlas only ever draws the live cards.
+  // 'cascade' = mode 33's bespoke Windows behavior; every other policy shares the
+  // generic schedule-driven path.
+  const imprintConfig = metadata.imprint
+  const usesImprintSurface = imprintConfig != null
+  const isCascadeImprint = imprintConfig?.policy === 'cascade'
+  const isGenericImprint = usesImprintSurface && !isCascadeImprint
   const perSlot = trailCount + 1
   const spriteCount = state.cards.length * perSlot
 
@@ -522,7 +540,17 @@ const CelebrationAtlas = ({ state, bindings, metrics }: CelebrationAtlasProps) =
       if (!current.ready) {
         return
       }
-      if (launchAnchor.value < 0 || current.progress < (previous?.progress ?? 0)) {
+      if (launchAnchor.value < 0) {
+        launchAnchor.value = current.progress
+        // First texture-ready of this mount: the overlay can draw from here on, so
+        // tell the controller the board-side hide may engage (flicker story — see
+        // the onOverlayReady prop comment). Deliberately NOT re-fired on progress
+        // wraps (dev-hold restarts / badge cycles): the overlay stays mounted, the
+        // board cards are already hidden.
+        if (onOverlayReady) {
+          runOnJS(onOverlayReady)()
+        }
+      } else if (current.progress < (previous?.progress ?? 0)) {
         launchAnchor.value = current.progress
       }
     }
@@ -669,7 +697,7 @@ const CelebrationAtlas = ({ state, bindings, metrics }: CelebrationAtlasProps) =
     // Full alpha × endFade; the launch fade (0.5 + 0.5·eased) stays deliberately
     // skipped — a translucent live card over opaque stamps looked wrong (observed
     // on device 2026-07-08). Windows cards were opaque anyway.
-    if (isImprintMode) {
+    if (isCascadeImprint) {
       const rawNow = bindings.progress.value * CELEBRATION_SPEED_MULTIPLIER
       const rel = rawNow - getImprintLaunchOrder(assignment) * IMPRINT_LAUNCH_INTERVAL_RAW
       let visible = false
@@ -681,14 +709,6 @@ const CelebrationAtlas = ({ state, bindings, metrics }: CelebrationAtlasProps) =
         visible = tSince <= IMPRINT_RETURN_RAW
       }
       val[3] = visible ? endFade : 0
-      return
-    }
-
-    // Spirograph live cards: always in flight, full alpha over the opaque engraving
-    // (same reasoning as mode 33 — a translucent live card over opaque stamps reads
-    // wrong, and the stamps must reproduce exactly what the live card showed).
-    if (isSpiroMode) {
-      val[3] = endFade
       return
     }
 
@@ -739,10 +759,15 @@ const CelebrationAtlas = ({ state, bindings, metrics }: CelebrationAtlasProps) =
       return
     }
     const clampedOpacity = frame.targetOpacity < 0 ? 0 : frame.targetOpacity
-    val[3] =
-      Math.min(1, clampedOpacity * (0.5 + 0.5 * launchEased)) *
-      opacityMultiplier *
-      endFade
+    // Generic (non-cascade) imprint modes skip the launch fade like mode 33 does —
+    // a translucent live card over its own opaque stamps reads wrong — but KEEP the
+    // path opacity (Fireworks' ember fades, You-Win's letter-gap dips) and the
+    // ghost multipliers (Fireworks has trails).
+    val[3] = isGenericImprint
+      ? Math.min(1, clampedOpacity) * opacityMultiplier * endFade
+      : Math.min(1, clampedOpacity * (0.5 + 0.5 * launchEased)) *
+        opacityMultiplier *
+        endFade
   })
 
   return (
@@ -769,11 +794,14 @@ const CelebrationAtlas = ({ state, bindings, metrics }: CelebrationAtlasProps) =
         pointerEvents="none"
       >
         {/* Imprint surface renders BEFORE the Atlas → under the live cards, and is
-            only mounted for the imprint modes (33/36) so every other mode keeps zero
-            extra mappers. */}
+            only mounted for imprint modes (metadata.imprint) so every other mode
+            keeps zero extra mappers. */}
         {usesImprintSurface ? (
           <CascadeImprintLayer
             modeId={state.modeId}
+            isCascade={isCascadeImprint}
+            stampAlpha={imprintConfig?.alpha ?? 1}
+            launchStamps={imprintConfig?.launchStamps === true}
             bindings={bindings}
             texture={texture}
             assignments={assignments}
@@ -806,8 +834,15 @@ const CelebrationAtlas = ({ state, bindings, metrics }: CelebrationAtlasProps) =
 }
 
 type CascadeImprintLayerProps = {
-  // IMPRINT_MODE_ID (33) or SPIRO_MODE_ID (36) — see the SPIRO_MODE_ID comment.
   modeId: number
+  // metadata.imprint.policy === 'cascade' (mode 33): pile reveals + early blended
+  // stamps preserved; every other policy runs the generic schedule loop.
+  isCascade: boolean
+  // metadata.imprint.alpha — stamp paint alpha (Fireworks' faint burst marks).
+  stampAlpha: number
+  // metadata.imprint.launchStamps — ink launch-blend stamps too (Spirograph's
+  // messy pile→orbit transit streaks; see the metadata comment).
+  launchStamps: boolean
   bindings: CelebrationBindings
   texture: SharedValue<SkImage | null>
   assignments: CelebrationAssignment[]
@@ -828,14 +863,16 @@ type CascadeImprintLayerProps = {
   windowHeight: number
 }
 
-// Imprint surface (approach B, see the IMPRINT_MODE_ID comment), shared by modes 33
-// and 36: a persistent offscreen surface accumulates every stamp exactly once; the
-// snapshot is displayed as ONE <Image> under the live Atlas. Stamp kinds: FLIGHT
-// imprints (a card's frame frozen at a deterministic sample progress — mode 33: per-
-// launch flight windows; mode 36: absolute lattice) and, mode 33 only, PILE REVEALS
-// (the waiting pile top painted at base when its predecessor launches — pile-
-// stability story 2026-07-08, so tracers paint over the piles like the real Windows
-// framebuffer). All are deterministic, so drawing each once is enough.
+// Imprint surface (approach B, see the comment on AVALANCHE_MODE_ID), shared by all
+// imprint modes: a persistent offscreen surface accumulates every stamp exactly
+// once; the snapshot is displayed as ONE <Image> under the live Atlas. Stamp kinds:
+// SCHEDULED imprints (a card's frame frozen at a deterministic stamp time — the
+// getImprintStampCount/Raw schedules in celebrationModes.ts, e.g. mode 33's flight
+// windows, path lattices for 36/38/43/46, wall-impact/rest/burst events for
+// 37/45/39) and, cascade policy only, PILE REVEALS (the waiting pile top painted at
+// base when its predecessor launches — pile-stability story 2026-07-08, so tracers
+// paint over the piles like the real Windows framebuffer). All are deterministic,
+// so drawing each once is enough.
 //
 // Stamp crop (alignment/wild-imprint story, user 2026-07-08 "shadows get really
 // strong after many cards"): stamps draw only the FACE of the atlas cell — src
@@ -848,6 +885,9 @@ type CascadeImprintLayerProps = {
 // mode 33 passes rotation 0 / scale 1 through the same path.
 const CascadeImprintLayer = ({
   modeId,
+  isCascade,
+  stampAlpha,
+  launchStamps,
   bindings,
   texture,
   assignments,
@@ -866,8 +906,10 @@ const CascadeImprintLayer = ({
   windowWidth,
   windowHeight,
 }: CascadeImprintLayerProps) => {
-  const isSpiro = modeId === SPIRO_MODE_ID
   const imprintImage = useSharedValue<SkImage | null>(null)
+  // Independent event streams per card (Pinball stamps x-wall and y-wall impacts
+  // on two separate monotonic counters; every other mode has one stream).
+  const streamCount = getImprintStreamCount(modeId)
 
   // Launch-order → slot lookup for the pile-reveal schedule (pile-stability story):
   // reveal events must be drawn CHRONOLOGICALLY (all cards of a pile share one cell,
@@ -893,14 +935,21 @@ const CascadeImprintLayer = ({
     () => ({
       surface: null as SkSurface | null,
       paint: null as SkPaint | null,
-      stamped: assignments.map(() => 0),
+      // One write-once counter per (slot, stream) — flat slot·streamCount layout.
+      // modeId is a dep because streamCount depends on it (badge cycle 36→37 must
+      // re-size the array, not just reset the UI copy).
+      stamped: new Array<number>(assignments.length * streamCount).fill(0),
       // Global pile-reveal counter (cumulative across passes, chronological order —
       // see slotByLaunchOrder).
       revealedCount: 0,
       lastProgress: -1,
       lastTexture: null as SkImage | null,
+      // Snapshot throttle (2026-07-09, mode-46 perf headroom): see the snapshot
+      // comment at the bottom of the reaction.
+      tick: 0,
+      snapshotDirty: false,
     }),
-    [assignments]
+    [assignments, streamCount]
   )
 
   useAnimatedReaction(
@@ -931,6 +980,9 @@ const CascadeImprintLayer = ({
           return
         }
         stampState.paint = Skia.Paint()
+        // Per-mode stamp alpha (metadata.imprint.alpha): Fireworks' burst marks
+        // are deliberately FAINT (0.3) — full-alpha would be indistinguishable ink.
+        stampState.paint.setAlphaf(stampAlpha)
       }
       const surface = stampState.surface
       const canvas = surface.getCanvas()
@@ -949,11 +1001,6 @@ const CascadeImprintLayer = ({
       stampState.lastTexture = atlas
 
       const rawProgress = progress * CELEBRATION_SPEED_MULTIPLIER
-      // Launch cadence wraps modulo the deck (seamless repeat, cascade-fixes story):
-      // sample indices count CUMULATIVELY across passes — sample m = pass ⌊m/S⌋,
-      // within-pass sample m mod S — so second-pass stamps land over the first pass's
-      // bands and stampState.stamped keeps its monotonic write-once semantics.
-      const cycle = totalCards * IMPRINT_LAUNCH_INTERVAL_RAW
       const anchor = Math.max(0, launchAnchor.value)
       const paint = stampState.paint!
       const faceWidth = cellWidth - 2 * shadowMargin
@@ -1007,8 +1054,8 @@ const CascadeImprintLayer = ({
         changed = true
       }
 
-      // Pile reveals (pile-stability story, 2026-07-08; mode 33 only — Spirograph
-      // has no waiting piles): paint each newly revealed waiting card at its pile
+      // Pile reveals (pile-stability story, 2026-07-08; cascade policy only — the
+      // other imprint modes have no waiting piles): paint each reveal at its pile
       // position INTO the surface — the Windows painter's algorithm (the stamp
       // covers tracers crossing the cell; later flights paint over it again).
       // Reveal m (m = launchOrder + pass·deck, chronological) is due GAP before that
@@ -1018,7 +1065,7 @@ const CascadeImprintLayer = ({
       // times are uniform in m: due(m) = (m − GAP/interval)·interval, so the due
       // count is closed-form. Drawn BEFORE this tick's flight imprints (a reveal
       // chronologically precedes samples frozen after it).
-      if (!isSpiro) {
+      if (isCascade) {
         const revealTarget =
           Math.floor(
             rawProgress / IMPRINT_LAUNCH_INTERVAL_RAW +
@@ -1037,100 +1084,101 @@ const CascadeImprintLayer = ({
         stampState.revealedCount = revealTarget
       }
 
+      // Generic write-once stamp loop (ten-crazy-modes story): the schedules in
+      // celebrationModes.ts answer "how many stamps are due" (monotonic count) and
+      // "at which raw time does stamp n fire" per (card, stream) — this loop just
+      // replays them (typically 0–2 NEW stamps per tick per card) and draws the
+      // mode frame frozen at each stamp time. Cumulative counts survive the
+      // seamless-repeat passes (33) and periodic events (37/39/45) for free.
       for (let slot = 0; slot < assignments.length; slot += 1) {
         const assignment = assignments[slot]
-        // Samples frozen so far, in closed form. Mode 33: per-launch flight windows
-        // (within a pass, sample j freezes at launchStart + pass·cycle +
-        // (j+1)/SAMPLES · FLIGHT_SPAN). Mode 36: absolute lattice — every card
-        // stamps at (j+1)·SPIRO_STAMP_INTERVAL_RAW for the whole run. Typically 0–2
-        // NEW stamps per tick either way.
-        const launchStart = isSpiro
-          ? 0
-          : getImprintLaunchOrder(assignment) * IMPRINT_LAUNCH_INTERVAL_RAW
-        let target = 0
-        if (isSpiro) {
-          target = Math.max(0, Math.floor(rawProgress / SPIRO_STAMP_INTERVAL_RAW))
-        } else {
-          const rel = rawProgress - launchStart
-          if (rel >= 0) {
-            const pass = Math.floor(rel / cycle)
-            const tIn = rel - pass * cycle
-            target =
-              pass * IMPRINT_SAMPLES_PER_CARD +
-              Math.min(
-                IMPRINT_SAMPLES_PER_CARD,
-                Math.max(
-                  0,
-                  Math.floor(
-                    (tIn / IMPRINT_FLIGHT_SPAN_RAW) * IMPRINT_SAMPLES_PER_CARD
-                  )
-                )
-              )
-          }
-        }
-        let next = stampState.stamped[slot]
-        if (target <= next) {
-          continue
-        }
-        for (; next < target; next += 1) {
-          let frozenProgress = 0
-          if (isSpiro) {
-            frozenProgress =
-              ((next + 1) * SPIRO_STAMP_INTERVAL_RAW) / CELEBRATION_SPEED_MULTIPLIER
-          } else {
-            const samplePass = Math.floor(next / IMPRINT_SAMPLES_PER_CARD)
-            const sampleIndex = next - samplePass * IMPRINT_SAMPLES_PER_CARD
-            frozenProgress =
-              (launchStart +
-                samplePass * cycle +
-                ((sampleIndex + 1) / IMPRINT_SAMPLES_PER_CARD) *
-                  IMPRINT_FLIGHT_SPAN_RAW) /
-              CELEBRATION_SPEED_MULTIPLIER
-          }
-          const frame = computeCelebrationFrame({
+        for (let stream = 0; stream < streamCount; stream += 1) {
+          const target = getImprintStampCount(
             modeId,
             assignment,
-            metrics: { width: cardWidth, height: cardHeight },
-            board,
+            rawProgress,
             totalCards,
-            progress: frozenProgress,
-          })
-          if (!frame) {
+            stream
+          )
+          const key = slot * streamCount + stream
+          let next = stampState.stamped[key]
+          if (target <= next) {
             continue
           }
-          // Same ANCHORED launch blend as the live Atlas sprite (frame.launchEased is
-          // ignored there too — see the launchAnchor comment); no wobble (both modes
-          // opt out). Stamps must reproduce exactly what the live card showed —
-          // including mode 36's rotation/scale, blended like the transform worklet.
-          const launchEased = easeOutQuint(
-            Math.min(
-              1,
-              Math.max(
-                0,
-                (frozenProgress - anchor) * CELEBRATION_LAUNCH_SPEED_MULTIPLIER
-              )
+          for (; next < target; next += 1) {
+            const frozenProgress =
+              getImprintStampRaw(modeId, assignment, next, totalCards, stream) /
+              CELEBRATION_SPEED_MULTIPLIER
+            const frame = computeCelebrationFrame({
+              modeId,
+              assignment,
+              metrics: { width: cardWidth, height: cardHeight },
+              board,
+              totalCards,
+              progress: frozenProgress,
+            })
+            if (!frame) {
+              continue
+            }
+            // Same ANCHORED launch blend as the live Atlas sprite
+            // (frame.launchEased is ignored there too — see the launchAnchor
+            // comment); no wobble (imprint modes opt out). Stamps must reproduce
+            // exactly what the live card showed — including rotation/scale,
+            // blended like the transform worklet.
+            const launchBlendArg =
+              (frozenProgress - anchor) * CELEBRATION_LAUNCH_SPEED_MULTIPLIER
+            // Non-cascade modes SKIP (but count) stamps until the launch blend
+            // has saturated: a blended stamp would ink a base→path lerp position
+            // (fatal for You-Win's message, stray ink for the others). Cascade 33
+            // keeps its blended early-fall stamps — that dense band at the pile is
+            // part of its authentic look (verified on device, pile-stability
+            // story). launchStamps (Spirograph 36) opts back IN: the blended
+            // pile→orbit transit streaks are the messy start the user asked to
+            // restore (full-review culling story, 2026-07-09).
+            if (!isCascade && !launchStamps && launchBlendArg < 1) {
+              continue
+            }
+            // Pen-up skip (You Win): path samples with a dipped opacity are
+            // counted but not inked — letter gaps stay clean (0.98 keeps stray
+            // tails at gap entries under ~3 dp). Never trips for modes whose
+            // targetOpacity is constant 1 (33/36/37/38/45/46); Fireworks' stamp
+            // time lands at full ember opacity by design.
+            if (frame.targetOpacity < 0.98) {
+              continue
+            }
+            const launchEased = easeOutQuint(
+              Math.min(1, Math.max(0, launchBlendArg))
             )
-          )
-          const translateX =
-            assignment.baseX * (1 - launchEased) + frame.pathX * launchEased
-          const translateY =
-            assignment.baseY * (1 - launchEased) + frame.pathY * launchEased
-          stampFace(
-            slot,
-            translateX,
-            translateY,
-            frame.rotation * launchEased,
-            1 + (frame.targetScale - 1) * launchEased
-          )
+            const translateX =
+              assignment.baseX * (1 - launchEased) + frame.pathX * launchEased
+            const translateY =
+              assignment.baseY * (1 - launchEased) + frame.pathY * launchEased
+            stampFace(
+              slot,
+              translateX,
+              translateY,
+              frame.rotation * launchEased,
+              1 + (frame.targetScale - 1) * launchEased
+            )
+          }
+          stampState.stamped[key] = next
         }
-        stampState.stamped[slot] = next
       }
       if (changed) {
         surface.flush()
-        // Snapshot is copy-on-write: the next stamp write costs one surface blit.
-        // Only taken on stamp frames — between flights (and after the deck is done)
-        // this whole reaction is bookkeeping-only.
+        stampState.snapshotDirty = true
+      }
+      // Snapshot every 2nd tick (2026-07-09, the "snapshot every Nth stamp frame"
+      // follow-up from the Spirograph story): makeImageSnapshot is copy-on-write, so
+      // every-frame stampers (36/38/43/46) paid one full-surface blit per frame —
+      // measured as the elevated 90th-pct frame time (36: 13→20 ms; 46 ~107 fps).
+      // Halving the snapshot rate trades ≤1 tick (~8 ms) of lag on the NEWEST stamps
+      // — invisible, the live card covers its own fresh ink. Bursty modes are
+      // unaffected (dirty flag: a pending snapshot fires on the next tick at most).
+      stampState.tick += 1
+      if (stampState.snapshotDirty && stampState.tick % 2 === 0) {
         imprintImage.value = surface.makeImageSnapshot()
+        stampState.snapshotDirty = false
       }
     }
   )

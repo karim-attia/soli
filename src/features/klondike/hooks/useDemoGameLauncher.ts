@@ -81,6 +81,10 @@ export type LaunchDemoGameOptions = {
   scrubbedSteps?: number
   scrubbedScrubIndex?: number
   nearWinMovesLeft?: number
+  // Screenshot mode (store-screenshots round 2, named per Karim): suppresses the
+  // force-launch dev-mode auto-enable below so a &screenshot=1 deep link leaves
+  // developer mode OFF (no Demo header button in store shots).
+  screenshotMode?: boolean
 }
 
 type DemoPlaylistRunOptions = {
@@ -630,7 +634,9 @@ export const useDemoGameLauncher = ({
       if (!developerModeEnabled && !forceLaunch) {
         return
       }
-      if (forceLaunch && !developerModeEnabled) {
+      // Screenshot mode keeps dev mode off even on force launches (deep links);
+      // the link handler already forced it off before calling us.
+      if (forceLaunch && !developerModeEnabled && !options?.screenshotMode) {
         setDeveloperMode(true)
       }
       if (boardLockedRef.current && !forceLaunch) {
@@ -761,15 +767,27 @@ export const useDemoGameLauncher = ({
         return
       }
 
+      // Screenshot mode (store-screenshots round 2, named per Karim): &screenshot=1
+      // on ANY demo link runs the link as usual but forces developer mode OFF
+      // instead of ON — no Demo header button, no celebration debug badge (both
+      // gate on the setting), so agents can capture store shots without toggling
+      // dev mode in Settings after every link. Trade-off: dev mode also gates
+      // devLog, so screenshot-mode links log nothing — accepted, screenshot
+      // sessions don't need logs.
+      const screenshotMode =
+        parseOptionalBooleanParam(parsed.searchParams.get('screenshot')) === true
+      // setDeveloperMode no-ops on unchanged values, so calling it per link is fine.
+      const applyLinkDeveloperMode = () => {
+        setDeveloperMode(!screenshotMode)
+      }
+
       // soli://?seedHistory=default|clear — dev-only history seeding (terminal-
       // drivable, same dev-gate/force behavior as the demo links below). Handled
       // before the demo-game branch: a seed link is not a game launch.
       const seedHistoryParam = parsed.searchParams.get('seedHistory')?.toLowerCase()
       if (seedHistoryParam === 'default' || seedHistoryParam === 'clear') {
         lastDemoLinkRef.current = incomingUrl
-        if (!developerModeEnabled) {
-          setDeveloperMode(true)
-        }
+        applyLinkDeveloperMode()
         devLog('info', `[Demo] Seed history link (${seedHistoryParam}).`)
         seedHistoryForTesting(seedHistoryParam === 'clear' ? 'clear' : 'seed')
         return
@@ -783,9 +801,7 @@ export const useDemoGameLauncher = ({
       const setParam = parsed.searchParams.get('set')
       if (setParam) {
         lastDemoLinkRef.current = incomingUrl
-        if (!developerModeEnabled) {
-          setDeveloperMode(true)
-        }
+        applyLinkDeveloperMode()
         const updates = parseSettingsLinkParam(setParam)
         updates.ignoredPairs.forEach((pair) => {
           devLog('warn', `[Demo] Settings link: ignored unknown pair "${pair}".`)
@@ -813,9 +829,7 @@ export const useDemoGameLauncher = ({
       const resetParam = parsed.searchParams.get('reset')?.toLowerCase()
       if (resetParam) {
         lastDemoLinkRef.current = incomingUrl
-        if (!developerModeEnabled) {
-          setDeveloperMode(true)
-        }
+        applyLinkDeveloperMode()
         if (resetParam === 'undohint') {
           devLog('info', '[Demo] Reset link: undo hint.')
           resetUndoHintForTesting()
@@ -837,9 +851,7 @@ export const useDemoGameLauncher = ({
       const dealParam = parsed.searchParams.get('deal')
       if (dealParam) {
         lastDemoLinkRef.current = incomingUrl
-        if (!developerModeEnabled) {
-          setDeveloperMode(true)
-        }
+        applyLinkDeveloperMode()
         try {
           // parseExactDealId covers prefix, base36 payload, and permutation range.
           parseExactDealId(dealParam)
@@ -876,9 +888,7 @@ export const useDemoGameLauncher = ({
       const celebrationParam = parsed.searchParams.get('celebration')?.toLowerCase()
       if (celebrationParam) {
         lastDemoLinkRef.current = incomingUrl
-        if (!developerModeEnabled) {
-          setDeveloperMode(true)
-        }
+        applyLinkDeveloperMode()
         const wantsRandom = celebrationParam === 'random'
         const metadata = wantsRandom
           ? undefined
@@ -895,8 +905,11 @@ export const useDemoGameLauncher = ({
             metadata ? `mode ${metadata.id} (${metadata.name})` : 'random mode'
           }.`
         )
-        // Settle delay also gives the just-enabled dev mode a render pass so the
-        // mode badge/label is up when the overlay appears.
+        // Settle delay also gives the just-toggled dev mode a render pass so the
+        // mode badge/label is up (or, in screenshot mode, gone — the badge gates
+        // on the dev-mode setting) when the overlay appears. Dev-hold looping and
+        // tap-to-dismiss don't depend on dev mode, so screenshot-mode previews
+        // still loop indefinitely for capture at leisure.
         setTimeout(() => {
           // Undefined = random pick inside the controller (same rule as a real win).
           startCelebrationPreview(metadata?.id)
@@ -943,9 +956,7 @@ export const useDemoGameLauncher = ({
         lastDemoLinkRef.current = incomingUrl
 
         if (demoRequestsScrubbed) {
-          if (!developerModeEnabled) {
-            setDeveloperMode(true)
-          }
+          applyLinkDeveloperMode()
           // C5: optional &steps=S&scrub=K, clamped to the fixture's real bounds.
           // Without params this stays the pinned 80/40 fixture.
           const resolved = resolveScrubbedDemoOptions({
@@ -962,6 +973,7 @@ export const useDemoGameLauncher = ({
             handleLaunchDemoGame({
               demoMode: 'scrubbed',
               force: true,
+              screenshotMode,
               scrubbedSteps: resolved.steps,
               scrubbedScrubIndex: resolved.scrubIndex,
             })
@@ -970,9 +982,7 @@ export const useDemoGameLauncher = ({
         }
 
         if (demoRequestsNearWin) {
-          if (!developerModeEnabled) {
-            setDeveloperMode(true)
-          }
+          applyLinkDeveloperMode()
           // C5: optional &left=N (default 1), clamped to [1, solution length].
           const resolved = resolveNearWinMovesLeft(
             parseOptionalIntParam(parsed.searchParams.get('left'))
@@ -987,6 +997,7 @@ export const useDemoGameLauncher = ({
             handleLaunchDemoGame({
               demoMode: 'nearwin',
               force: true,
+              screenshotMode,
               nearWinMovesLeft: resolved.movesLeft,
             })
           }, DEMO_AUTO_STEP_INTERVAL_MS)
@@ -1016,15 +1027,14 @@ export const useDemoGameLauncher = ({
           autoParam === '1' ||
           autoParam?.toLowerCase() === 'true'
 
-        if (!developerModeEnabled) {
-          setDeveloperMode(true)
-        }
+        applyLinkDeveloperMode()
 
         setTimeout(() => {
           handleLaunchDemoGame({
             autoReveal,
             autoSolve,
             force: true,
+            screenshotMode,
             gameLimit,
             recordHistory: nextRecordHistoryEnabled ?? undefined,
           })
@@ -1033,7 +1043,6 @@ export const useDemoGameLauncher = ({
     },
     [
       dealNewGameForTesting,
-      developerModeEnabled,
       handleLaunchDemoGame,
       resetUndoHintForTesting,
       seedHistoryForTesting,

@@ -1061,3 +1061,518 @@ Follow-up round on the alignment story. Three orchestrator-decided fixes: (1) th
 
 - OPTIONAL: re-run the iOS-substituted checks (mode 33, real-win, log sanity) on the A065 once it is back on WiFi — the build is already installed, only deep links needed. Low value (platform-independent logic, Android-specific halves already passed) — recommend skipping unless paranoid.
 - The trail-ghost white-on-white perceptual note (learnings): if trails should read over white card faces too, a subtle ghost tint or border would help — cosmetic, not requested, recommend leaving as is.
+
+---
+
+# Story: ten crazy modes 37–46
+
+Status: DEVICE-TESTED 2026-07-09 on the A065 — all ten NEW modes (37–46) pass their design-intent checks; ONE regression FAIL: mode 33 Cascade Imprint crashed the app (worklet TypeError). RESOLVED same day — the 33 crash is FIXED and 42 re-tuned to 117–119 fps in the follow-up story "mode-33 crash fix + Warp Drive/Kaleidoscope perf" below.
+
+## User prompt
+
+> implement all
+
+(In response to the assistant's 10-mode suggestion table, reproduced here 1:1:)
+
+| Id | Name | Concept |
+|----|------|---------|
+| 37 | Pinball | Cards ricochet off all four screen edges at wild angles; imprint stamped ONLY at each wall-impact point — walls accumulate impact marks over 60 s |
+| 38 | Pollock | Cards tumble chaotically (rotation + scale variation) stamping imprints at random rotations/scales along their paths — action painting |
+| 39 | Fireworks | Volleys launch up from the bottom and burst into 13-card suit-colored shells with long trails; faint imprints linger at burst points |
+| 40 | Black Hole | Cards spiral into a slowly wandering center, shrinking + accelerating as they approach, vanish at the core, re-emerge from screen edges |
+| 41 | Dominoes | Cards line up in rows standing "upright", then topple in a traveling wave — rotation about the BOTTOM EDGE (express as center rotation + compensating center-position arc around the bottom-edge pivot — pure math, NO renderer anchor change), re-stand, topple the other way |
+| 42 | Warp Drive | Hyperspace: cards streak radially outward from a center with maxed trails; every ~8 s a "jump" — new random center (teleport allowed ONLY via fully-offscreen transit or continuous re-aim; continuity test must pass) |
+| 43 | You Win | Cards fly along letter strokes stamping imprints that spell a short message (e.g. "YOU WIN!" over two lines, or "WIN!" — pick what fits a portrait board legibly; define stroke polylines in normalized coords, cards traverse strokes stamping densely) — message assembles over the run |
+| 44 | Solar System | Four suit "planets" (face cards) on elliptical orbits around a pulsing central cluster, number cards as moons orbiting their suit's planet — hierarchical orbits, trails on planets |
+| 45 | Gravity Flip | Cards bounce on the dock-aware floor; every ~8 s gravity inverts and they fall UP to the ceiling and bounce there; stamps an imprint at each floor/ceiling rest |
+| 46 | Kaleidoscope | 13 cards fly one 90° wedge; the other three wedges show the SAME motion mirrored/rotated 4-fold (assign 13 cards per wedge running identical wedge-local math with reflected transforms); imprints build a symmetric mandala |
+
+## Summary
+
+All ten modes (ids 37–46) implemented 2026-07-08 as `computeCelebrationFrame` cases + appended metadata (stable-id contract kept). The imprint surface was generalized from the hardcoded 33/36 pair to a metadata-driven per-mode config: `metadata.imprint = { policy: 'cascade' | 'path' | 'events', alpha? }` decides surface mounting and stamp paint alpha, and two exported worklet schedule functions (`getImprintStampCount` / `getImprintStampRaw`, plus `getImprintStreamCount` for pinball's two wall-impact streams) give every imprint mode a closed-form write-once stamp schedule — mode 33's flight-window sampler and 36's lattice moved into the same schedule switch, so the renderer now has ONE generic stamp loop (pile reveals stay cascade-only). Six new modes stamp (37 events, 38 path, 39 events faint, 43 path, 45 events, 46 path); all schedules are deterministic from progress, so loop-restart clear / abort / end-fade machinery is inherited unchanged. Continuity suite passes UNWEAKENED (289 tests, +10). Cheap gates green. Device test = next subagent.
+
+## Per-mode design notes (as implemented)
+
+| Id | Name | Design | Imprint | Trail | Wobble |
+|----|------|--------|---------|-------|--------|
+| 37 | Pinball | Two independent per-card triangle waves (ping-pong x and y at incommensurate frequencies) = straight diagonals reflecting off all four edges; bottom wall is the dock-aware floor. Impact times are the integer lattice of each tri-wave argument — shared between mode math and stamp schedule via `pinballParams` | events (2 streams: x walls, y walls), stamp exactly at each reflection | — | off |
+| 38 | Pollock | Per-card incommensurate 2-tone sine sums cover the whole canvas; fast seeded spin (direction alternating) + deep scale oscillation 0.25–0.85 | path lattice every 0.02 raw (~3.8 stamps/frame) → rotated/scaled splatter | — | off |
+| 39 | Fireworks | 4 shells = suits, staggered quarter-cycle (burst every ~3.2 s): eased ascent from below-screen to a per-cycle hashed burst point, then 13-card radial burst with quadratic droop that carries every card fully offscreen bottom before the cycle wraps (offscreen exemption). Smoothstep fades at both cycle ends | events: 1 faint stamp (alpha 0.3) per card per cycle at u=0.34 (small ring around the burst point) | 6×60 ms | off |
+| 40 | Black Hole | Slowly wandering hole center; per-card cycle: fly in from a FIXED per-card offscreen edge anchor, spiral in with radius (1−w)^1.4 and cubically accelerating angle, shrink to 0.25 and fade out at the core, then invisible smoothstep transit back to the SAME edge anchor — cycle wrap is position-continuous (no teleport at all), re-emergence reads as "from the edges" | — | — | on |
+| 41 | Dominoes | 4 rows × 13 columns of half-scale cards (rank-order layout = draw order, so fallen overlaps layer consistently); global cycle: rightward topple wave → re-stand wave → leftward topple (bottom-LEFT corner pivot) → re-stand, all clamped smoothsteps, φ exactly 0 at the cycle wrap. Bottom-edge pivot done as center rotation + compensating center arc c = c0 + v − R(φ)v around the scaled bottom corner (v = s·(±w/2, h/2)) — pure math, renderer anchor untouched | — | — | off |
+| 42 | Warp Drive | Per-card fixed radial direction from a jump center; radius r: accelerating outward power curve to 1.15·boardHeight (offscreen for every direction) for 70 % of the cycle, then an invisible eased return to r=0 — wrap continuous (r=0 both sides). Center: per-epoch (1.4 raw ≈ 8 s) hash target, CONTINUOUS smoothstep re-aim over the last 0.18 raw — the permitted "continuous re-aim" teleport | — | 10×50 ms (maxed, 572 sprites) | on |
+| 43 | You Win | "YOU" / "WIN!" over two lines as normalized stroke polylines (module-level table, arc-length parametrized with 2× y-weight for portrait aspect), CLOSED into a loop by a final pen-up connector; a card TRAIN (phases clustered over 18% of the loop) sweeps it at 0.2 laps/raw (lap ≈ 29 s — SPEED-CAPPED, see learnings); pen-up connectors between glyphs carry a smoothstep opacity dip to 0 — live cards fade across gaps and the stamp loop skips samples with targetOpacity < 0.98, so ink lands only on strokes. Upright, scale 0.34 | path lattice every 0.008 raw (~9 stamps/frame, message inked over ≈ one lap ≈ 29 s, then re-inked) | — | off |
+| 44 | Solar System | Kings = 4 planets on tilted precession-free ellipses (per-suit radii/speeds/directions); Aces = pulsing 4-card core cluster; ranks 2–J = 11 moons per suit on per-rank radii/speeds/directions around their planet (hierarchical: moon pos = planet pos + orbit). Kings-on-top draw order puts planets above their moons | — | 2×80 ms (mode-wide — see deviations) | off |
+| 45 | Gravity Flip | Per-card lane; gravity epochs of 1.4 raw ≈ 8 s: closed-form fall (per-card delay + fall time) from the previous rest plane to the other plane, geometric-restitution bounces (k ≤ 0.65 so rest is guaranteed before the epoch ends), then rest — epoch boundaries are position-continuous by construction. Floor = dock-aware visible floor, ceiling = board top | events: 1 stamp per card per epoch at the rest moment (alternating floor/ceiling marks) | — | off |
+| 46 | Kaleidoscope | Wedge = suit; wedge-local motion depends ONLY on stackIndex (identical across wedges): polar Lissajous inside the 90° wedge + local spin. Odd wedges REFLECT across their start axis (angle and spin negated — true kaleidoscope D4 symmetry; the card face itself can't be mirrored, negated spin is the standard approximation), then rotate by wedge·90° + slow global precession | path lattice every 0.012 raw (~6 stamps/frame) → 4-fold symmetric mandala | — | off |
+
+Deviations from the table: 44's trails are mode-wide (planets AND moons get 2 short ghosts) — the trail config is per-mode in the renderer; per-card ghosts would need renderer surgery, and short moon trails read fine. 39's "long trails" are 6×60 ms (not literally maxed — 42 owns the max). Everything else is as specced.
+
+## Imprint config generalization
+
+- `CelebrationMetadata.imprint?: { policy: 'cascade' | 'path' | 'events'; alpha?: number }` — presence mounts the imprint surface (`CascadeImprintLayer`); `alpha` is the stamp paint alpha (39 uses 0.3 for faint burst marks). 33 = cascade (keeps its bespoke pile reveals + live-card visibility windows), 36/38/43/46 = path, 37/39/45 = events.
+- Schedules live NEXT TO the mode math in `celebrationModes.ts` (they share per-card constants via `pinballParams`/`gravityFlipParams`): `getImprintStampCount(modeId, assignment, rawProgress, totalCards, stream)` = cumulative stamps due (monotonic), `getImprintStampRaw(modeId, assignment, n, totalCards, stream)` = raw time of stamp n, `getImprintStreamCount(modeId)` = independent event streams per card (2 for pinball's x/y walls, else 1). Mode 33's flight-window sampler and 36's lattice were MOVED into this switch verbatim — the renderer's stamp loop is now one generic per-slot/per-stream write-once loop.
+- Stamp skip rules (renderer loop, counted but not drawn): (a) `frame.targetOpacity < 0.98` — how 43's pen-up connectors stay un-inked without any renderer-side path knowledge; (b) non-cascade stamps whose anchored launch blend has not saturated — a blended stamp would ink a base→path lerp position (fatal for 43's message, stray ink elsewhere). Cascade 33 keeps its blended early-fall stamps (part of its authentic pile band, device-verified in the pile-stability story). Side effect: mode 36 no longer inks its first ~0.26 raw (~1.5 s) of blended mandala start — negligible/cleaner, flagged for the device run.
+- Budgets: 38 ≈ 3.8, 43 ≈ 9.4, 46 ≈ 6.3 stamps/frame at 120 Hz (same class as 36's ~7.5 — every-frame surface snapshots, watch the 90th-pct frame time); 37 ≈ 0.4, 45 ≈ 0.05, 39 ≈ 0.03 stamps/frame (bursty). All far under the 52/frame ceiling. Loop-restart catch-up redraws everything in one pass (existing 33/36 behavior).
+
+## Steps to implement
+
+- [x] 1. Add this story section (before coding). DONE.
+- [x] 2. `celebrationModes.ts`: metadata 37–46 (+ imprint field, imprint entries for 33/36), constants + shared param helpers, WIN stroke table, schedule exports, cases 37–46. DONE.
+- [x] 3. `CelebrationOverlayLayer.tsx`: metadata-driven imprint mounting, generic schedule-driven stamp loop (streams + paint alpha + opacity threshold), colors-worklet generalization (non-cascade imprint modes render live cards at full path opacity, no launch fade — same reasoning as 33/36). DONE.
+- [x] 4. Cheap gates: `yarn typecheck && yarn lint && yarn jest` (continuity suite UNWEAKENED, auto-extends to 289). DONE — green.
+- [x] 5. Update this story (files, learnings, testing handoff). DONE.
+- [x] 6. Device verification (SEPARATE testing subagent — not this run): see "Testing handoff". DONE 2026-07-09 on the A065 — all 10 new modes pass; mode 33 regression CRASH found (see Identified issues); perf flag on 42 (and mildly 46).
+
+## Plan: Files to modify
+
+- `src/animation/celebrationModes.ts` (metadata + cases + schedules)
+- `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx` (imprint generalization)
+- This plan doc.
+
+## Files actually modified
+
+- `src/animation/celebrationModes.ts` — `imprint` metadata field + entries (33 cascade, 36 path, new modes per table); metadata ids 37–46 appended; constants (`FIREWORK_CYCLE_RAW`, `GRAVITY_FLIP_EPOCH_RAW`, lattice intervals); helpers `fract`/`smooth01`/`pinballParams`/`gravityFlipParams`; WIN stroke-path table (module-level, built once); schedule exports `getImprintStreamCount`/`getImprintStampCount`/`getImprintStampRaw` (33's sampler + 36's lattice moved in verbatim); cases 37–46.
+- `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx` — imprint mounting/policy/alpha from metadata; `CascadeImprintLayer` stamp loop generalized to schedule functions + per-card streams + paint alpha + `targetOpacity < 0.9` skip; colors worklet: non-cascade imprint modes use path opacity × endFade (launch fade dropped, ghost multipliers kept for 39); `SPIRO_MODE_ID`/`IMPRINT_SAMPLES_PER_CARD`/inline samplers deleted.
+- This plan doc. NOT the unit test (auto-covers the new modes), NOT controller/types/KlondikeGameView.
+
+## Intermediary learnings
+
+- Zero-derivative junctions are the cheap way to pass `expectSmooth`: every opacity/scale/position phase transition in the new modes uses smoothstep (derivative 0 at both ends), so the boundary-vs-reference delta ratio stays bounded even when a test sample lands exactly on a junction. Piecewise-LINEAR ramps are risky: a sample straddling a plateau→ramp kink has reference delta ≈ 0 and the slack is only 2 dp / 0.01.
+- **The one continuity failure of the round (mode 43, first cut)**: polyline junctions kink each axis's velocity — an axis can move ~0 before a junction (reference delta ≈ 0) and ~1 dp per half-frame after it, and at ping-pong speed 0.4 that overshot the 2 dp slack. Fix: the path is CLOSED into a loop (final pen-up connector back to the first stroke, so plain `fract()` traversal is position-continuous at its wrap) and the sweep speed capped at 0.2 laps/raw ≈ 1.4 dp per half-frame window. The speed cap is documented in the case — do not raise it without re-deriving.
+- The "same edge anchor for exit and re-entry" trick (mode 40) makes a vanish/re-emerge cycle fully position-continuous — no offscreen exemption needed at all. Cheaper to reason about than lattice-tuned wrap times.
+- Event schedules must derive from the SAME per-card constants as the mode math — putting both in `celebrationModes.ts` and sharing tiny param worklets (`pinballParams`, `gravityFlipParams`) removes the drift risk that renderer-side duplication would have.
+- Mode 41's pivot math: with the renderer rotating about the sprite CENTER, rotation about a bottom corner is center' = pivot + R(φ)·(center − pivot) = center + v − R(φ)v with v = center→pivot; at φ=0 the offset vanishes, so pivot switches (right corner vs left corner) are free while standing.
+- 46's mirror is conjugation: reflect the wedge-LOCAL vector across the wedge start axis (negate local angle), then rotate by the wedge transform. Card spin must be negated on mirrored wedges too or the stamps break symmetry.
+- `getImprintStampCount` counting for phase-offset periodic events (39): first valid cycle index m0 = ceil(offset − u_stamp) and count = floor(raw/T + offset − u_stamp) − m0 + 1 — clamped at 0 — is the closed form that stays exact across suit phase offsets.
+
+## Identified issues
+
+- None during implementation (gates green). Watch-list for the device run: every-frame snapshot cost when 38/43/46 stamp continuously (36 precedent: ~122 fps but 90th-pct frame time ~20 ms); 42's 572 sprites + 10-ghost overdraw; 39's burst clustering (13 cards + 6 ghosts near one point).
+- **FIXED (2026-07-09, follow-up story below) — mode 33 Cascade Imprint CRASHED on device (regression, found 2026-07-09 device run)**: `soli://?celebration=33` killed the app within ~1 s of the overlay mounting. Crash-buffer stack (reproduced twice, deterministic): `com.facebook.jni.CppException: undefined is not a function — TypeError at celebrationModesTs7 (:1:461) at CelebrationOverlayLayerTsx6 at useAnimatedReaction`. Almost certainly the imprint-config generalization: `getImprintStampCount` case 33 calls `getImprintLaunchOrder`, which is now defined AFTER the schedule functions in `celebrationModes.ts` (line ~589 vs ~477) — Reanimated worklet closures capture other worklets by reference at build time, and a hoisting/closure-ordering gap leaves the reference `undefined` on the UI runtime (typecheck/jest can't catch this; JS-thread tests call the plain function which hoists fine). Modes 36–46 all share the same schedule switch and do NOT crash — only the 33 path (the only case calling another worklet defined later in the file). NOT fixed in the testing run per rules. Fix candidate: move `getImprintLaunchOrder` above `getImprintStampCount` (or inline it) and re-verify 33 on device.
+- Perf: mode 42 Warp Drive misses the 110 fps bar — ~93–101 fps effective, 20–31 % modern janky, 90th pct 24–25 ms (confirmed by re-measure). 46 Kaleidoscope is borderline: ~107–109 fps, 90th pct 17–19 ms. Everything else ≥ 113 fps. See perf table in "Testing".
+
+## Testing
+
+- Cheap gates 2026-07-08: `yarn typecheck` + `yarn lint` + `yarn jest` green — 28 suites / 289 tests (+10: modes 37–46 join the continuity suite automatically); `test/unit/animation/celebrationModes.test.ts` untouched.
+
+### Device run 2026-07-09 (A065, physical, versionCode 13 fresh install; artifacts in `.test-artifacts/celebration-crazy-modes-android/`)
+
+Per-mode verdicts (badge label correct on all; abort instant on 37 + 42; no crash on ANY new mode):
+
+| Id | Mode | Verdict | Notes | Key screenshots |
+|----|------|---------|-------|-----------------|
+| 37 | Pinball | PASS | Straight diagonals, reflections at all 4 edges (bottom = visible floor); marks accumulate ON the walls only — center stays clean; abort instant | `37-mid-25s.png`, `37-late-50s.png` |
+| 38 | Pollock | PASS | Chaotic tumble, rotated/scaled stamps; dense collage by 25 s but NO white-blob saturation at 50 s (card faces keep structure); loop restart at ~65 s cleared the surface | `38-late-50s.png`, `38-loop-65s.png` |
+| 39 | Fireworks | PASS | Volleys rise from bottom with trails, 13-card suit-colored radial bursts, faint ring imprints linger at burst points, bursts move per cycle; celebration feel: good | `39-early-8s.png`, `39-late-50s.png` |
+| 40 | Black Hole | PASS | Spiral-in with shrink+fade at core, re-entry from edges; no mid-screen pops seen across 4 samples over ~40 s; look is sparse (~15–20 cards visible — rest in invisible transit), by design | `40-early-6s.png`, `40-mid2-30s.png` |
+| 41 | Dominoes | PASS | THE bottom-pivot check passes: tilting cards keep their bottom corner on the row baseline, fallen cards rest flat on the line, overlapping like real dominoes; wave travels, re-stands, reverses; rows rock-still between waves | `41-burst-2.png`, `41-burst-4.png`, `41-burst-6.png` |
+| 42 | Warp Drive | PASS (visual) / FLAG (perf) | Radial streaks with long trails; jump = continuous re-aim, no teleports seen; perf below bar (see table) | `42-early-5s.png`, `42-jump-13s.png` |
+| 43 | You Win | PASS | Money check: "YOU WIN!" fully legible by 30 s (partial but recognizable at 15 s), holds through 45 s; no ink on pen-up gaps; re-ink cycle visible at 55 s/70 s (message clears at lap wrap and rebuilds — see note below) | `43-15s.png`, `43-30s.png`, `43-45s.png` |
+| 44 | Solar System | PASS (with note) | Hierarchy reads: King planets with moon swarms tracking them, pulsing Ace core, trails on planets; composition sits low-center and moons hug planets tightly — reads as blobs at times (polish candidate, not a defect) | `44-early-6s.png`, `44-late-35s.png` |
+| 45 | Gravity Flip | PASS | Floor rest above the dock, gravity inversion to ceiling rest ~every 8 s, imprint rows build on BOTH planes; loop restart at ~67 s cleared imprints | `45-flip-12s.png`, `45-mid-25s.png`, `45-late-50s.png`, `45-loop-67s.png` |
+| 46 | Kaleidoscope | PASS (visual) / borderline perf | Clean 4-fold symmetric motion, mandala builds symmetric, loop restart cleared + rebuilt | `46-mid-25s.png`, `46-late-50s.png`, `46-loop-66s.png` |
+| 0 | Spiral Bloom (control) | PASS | Regression fine | `00-regression.png` |
+| 31 | Avalanche | PASS | Regression fine | `31-regression.png` |
+| 33 | Cascade Imprint | **FAIL — CRASH** | App dies ~1 s after overlay mount, reproduced 2×; worklet TypeError in the schedule switch (see Identified issues) | `33-regression.png` (home screen after crash), crash stack in plan |
+| 36 | Spirograph | PASS | Mandala unaffected (intentional diff: first ~1.5 s of blended stamps no longer inked — not noticeable) | `36-regression-20s.png` |
+
+Note on 43: the message does NOT stay permanently — the stamp surface follows the ~29 s lap cycle, so at ~55 s (start of lap 2 re-ink) only partial letters exist until it rebuilds. Message is complete and legible from ~29 s to ~50 s of each minute-long hold. Judged acceptable (dev-hold loops forever; a real win shows ~60 s = one full legible window), flagged for the user's culling/tuning decision.
+
+Perf (gfxinfo reset → 10 s → dump, release build; fps = frames/10 s; bar = 110 fps):
+
+| Mode | Frames/10 s | Modern janky % | 90th pct | 95th pct | GPU 90th/95th | Verdict |
+|------|-------------|----------------|----------|----------|----------------|---------|
+| 0 (control) | 1225 | 0.00 % | 11 ms | 11 ms | 4/4 ms | OK |
+| 37 Pinball | 1258 | 0.00 % | 13 ms | 13 ms | 4/5 ms | OK |
+| 38 Pollock | 1132 | 6.98 % | 13 ms | 19 ms | 5/5 ms | OK (densest stamper — fine) |
+| 39 Fireworks | 1211 | 0.17 % | 12 ms | 13 ms | 5/5 ms | OK |
+| 42 Warp Drive | 1009 / 932 (re-run) | 20.2 % / 31.0 % | 24/25 ms | 25/26 ms | 6/6 ms | **FLAG < 110 fps** |
+| 43 You Win | 1140 | 6.93 % | 15 ms | 15 ms | 5/5 ms | OK |
+| 46 Kaleidoscope | 1087 / 1067 (re-run) | 11.4 % / 13.5 % | 17/19 ms | 19/20 ms | 4/5 ms | Borderline (~107 fps) |
+
+(Legacy janky % is inflated on this 120 Hz panel for all modes incl. mode 0 — modern janky is the comparable number. 42's cost is the 572 sprites × 10 ghosts overdraw as predicted in the watch-list.)
+
+## Testing handoff (device subagent)
+
+Read `.agents/skills/soli-testing/SKILL.md` first. `soli://?celebration=<id>#retry-N` on the A065; badge label should read `Celebration <id> · <name>` per the table. Per mode:
+
+1. **37 Pinball**: cards fly straight diagonals, reflect off left/right/top edges and the VISIBLE floor (above the nav dock); an imprint mark appears exactly at each wall contact and ONLY there (no mid-flight ink); marks accumulate along all four walls over 60 s. Loop restart clears the marks; abort instant. Perf window at ~45 s.
+2. **38 Pollock**: cards tumble/spin at varied sizes; opaque rotated/scaled card stamps splatter across the whole canvas along their paths; by ~40 s the board reads as an action painting. PERF WINDOW REQUIRED (~40 s; every-frame stamping — compare against 36's ~122 fps / 20 ms 90th).
+3. **39 Fireworks**: volleys rise from below the bottom edge every ~3 s, burst into a 13-card radial shell with visible 6-ghost trails, embers droop and fall offscreen; a FAINT ring mark lingers at each burst point; bursts land at different positions each cycle.
+4. **40 Black Hole**: cards spiral into a slowly drifting center, speeding up and shrinking, fade out at the core, and later fly back in from the screen edges. No mid-screen pops (watch several cycles).
+5. **41 Dominoes**: four rows of touching half-size upright cards; a wave topples them rightward (each card hinging about its bottom edge, landing on its neighbor), they re-stand in a wave, then topple leftward. Wave repeats ~every 15 s; formation must be rock-still between waves (wobble off).
+6. **42 Warp Drive**: dense hyperspace starfield — long-tailed streaks accelerating radially outward; every ~8 s the radiant sweeps to a new position (continuous swoop, not a hard cut). PERF WINDOW REQUIRED (572 sprites, 10 ghosts — the new sprite max alongside 35).
+7. **43 You Win**: a train of small upright cards traces letter strokes; "YOU" / "WIN!" inks in over ~29 s (one lap) and stays; NO ink on the gaps between letters (cards visibly fade crossing gaps, incl. the long "!"→"Y" loop connector); message legible on the portrait board. Perf window (~30 s, every-frame stamping).
+8. **44 Solar System**: four large King "planets" on elliptical orbits with short trails, small number cards circling each planet (moons follow their planet), four Aces pulsing at the center. Hierarchy must read (moons track planets).
+9. **45 Gravity Flip**: cards drop to the visible floor, bounce with decaying bounces, rest; ~every 8 s they fall UP to the top edge and bounce/rest there; one mark stamped at each rest (rows of marks build along floor AND ceiling).
+10. **46 Kaleidoscope**: all four quadrants show the same swirling motion mirrored/rotated (4-fold symmetry, mirror-symmetric across wedge boundaries); the stamped mandala grows over 60 s and is symmetric. Perf window (~40 s, every-frame stamping).
+11. **Cross-mode sanity**: badge cycle 36→37→…→46→0 wraps; abort instant on an imprint mode (37/43) and a trail mode (42); dev-hold loop past 60 s on 43 + 46 (imprints clear, message/mandala rebuilds); modes 33/36 unaffected (regression: their samplers moved into the shared schedule functions — verify 33's Kings-first cascade + pile reveals look exactly as before; 36's mandala has ONE known intentional diff: the first ~1.5 s of blended stamps are no longer inked, see the stamp-skip learning).
+12. **Perf priorities**: 42 (sprite max), 38/43/46 (every-frame stamping), 39 (burst cluster + ghosts). Expect ≥110 fps; flag 90th-pct frame times well above ~20 ms.
+
+## Follow-ups
+
+- ~~FIX REQUIRED — mode 33 crash~~ DONE 2026-07-09 (follow-up story below): `getImprintLaunchOrder` reordered above the schedules, device-verified.
+- ~~Mode 42 perf~~ DONE 2026-07-09 (follow-up story below): 7 ghosts / 55 ms + smaller streak scale → 117–119 fps.
+- Mode 44 composition polish (optional): orbits cluster low-center and moons hug their planets; widening planet radii/moon radii spread would make the orrery read instantly. Low effort, medium payoff.
+- Mode 43 message persistence (user judgement): message fully legible ~29–50 s each lap, then clears for the ~10 s re-ink. If "stays up" matters more than the re-ink theater, freeze stamping after lap 1 (skip counts past one lap). Wait for culling decision first.
+- Learnings for the skill/AGENTS: crash-buffer check (`adb logcat -d -b crash`) after each mode sweep caught a crash that main-buffer FATAL grep missed on the first pass — worth keeping in the testing recipe.
+
+---
+
+# Story: mode-33 crash fix + Warp Drive/Kaleidoscope perf (2026-07-09)
+
+## User prompt
+
+> Task 1 — Fix the mode 33 crash (regression, top priority) […] Task 2 — Warp Drive (42) perf: tune to ≥110 fps while keeping the hyperspace look […] Task 3 — Kaleidoscope (46) borderline (~107 fps): cheap headroom only if obvious.
+
+## Summary
+
+Mode-33 crash root cause CONFIRMED and fixed by reordering: `getImprintLaunchOrder` moved ABOVE `getImprintStampCount`/`getImprintStampRaw` in `celebrationModes.ts` (worklet closures snapshot later-defined `const` worklets as `undefined` — see learnings). 42 detuned (10→7 ghosts / 50→55 ms, scale 0.5–1.4 → 0.42–1.1). 46 (+ all every-frame stampers) got the documented snapshot-every-2nd-tick throttle in `CascadeImprintLayer`. Cheap gates green (289 tests, continuity unweakened). DEVICE-VERIFIED 2026-07-09 on the A065 (fresh versionCode-13 install): 33 runs 100 s dev-hold with NO crash (imprints/badge-cycle/abort all normal); 42 now **117–119 fps** (was 93–101, bar 110) and still reads as hyperspace; 46 unchanged ~107–110 fps (throttle gave no measurable win — accepted, zero GPU stalls, no visible jank); regression 36/38/45 clean.
+
+## Root cause (Task 1, confirmed by code reading; device verification below)
+
+- `getImprintStampCount` case 33 (and `getImprintStampRaw` case 33) call `getImprintLaunchOrder`, which was defined ~110 lines LATER in the file. The worklets babel plugin snapshots a worklet's closure when its `const` initializer executes at module init; a later-defined `const` is still uninitialized then (TDZ → `var` → `undefined`) and the UI-runtime copy keeps `undefined` forever. First UI-thread call = `TypeError: undefined is not a function` inside `useAnimatedReaction` — exactly the crash-buffer stack. JS-thread calls (jest/typecheck) resolve at call time and never see it.
+- Only mode 33 hit it: it is the only schedule case calling another file-level worklet defined later. Full call-graph grep of both files after the fix: every worklet callee is now defined above its callers (fract/smooth01/pingPong01/pinballParams/gravityFlipParams → schedules → easeOutQuint → computeCelebrationFrame); the overlay's worklets are all inline and only call imports (always initialized first). Inline WORKLET ORDERING RULE comment left above `getImprintLaunchOrder`.
+
+## Steps to implement
+
+- [x] 1. Fix 33: move `getImprintLaunchOrder` above the schedule functions + ordering-rule comment. DONE.
+- [x] 2. Grep both files for other later-defined worklet callees — none found. DONE.
+- [x] 3. 42 perf: trail 10×50 ms → 7×55 ms (572→416 sprites, tail ~385 ms) + streak scale 0.5–1.4 → 0.42–1.1 (~35% less fill in the radial convergence). DONE.
+- [x] 4. 46 perf: snapshot-every-2nd-tick throttle in the imprint reaction (the documented "snapshot every Nth stamp frame" follow-up from the Spirograph story; ≤1 tick lag on newest stamps, benefits 36/38/43 too). DONE.
+- [x] 5. Cheap gates: green 2026-07-09 (28 suites / 289 tests, continuity suite unweakened).
+- [x] 6. Device verification on A065 (this run): 33 full 70 s no-crash + badge cycle + abort; 42 gfxinfo ≥110 fps + hyperspace look; 46 gfxinfo + visual; regression 36/38/45. Artifacts → `.test-artifacts/celebration-33-crash-fix/`. DONE — see Testing.
+
+## Files actually modified
+
+- `src/animation/celebrationModes.ts` — `getImprintLaunchOrder` reordered above the schedules (+ WORKLET ORDERING RULE comment); 42 metadata trail 7×55 ms; case 42 scale detune.
+- `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx` — `CascadeImprintLayer` snapshot throttle (tick/snapshotDirty in stampState, snapshot every 2nd tick).
+- This plan doc.
+
+## Intermediary learnings
+
+- **Worklet closure ordering**: a file-level worklet that calls another file-level worklet must be defined AFTER its callee. The babel plugin captures the closure when the `const` initializer runs; later-defined consts serialize as `undefined` into the UI runtime and stay that way. Invisible to typecheck/lint/jest — deterministic on-device crash. Rule documented inline at `getImprintLaunchOrder`.
+- **Snapshot-every-2nd-tick gave NO measurable fps win** on the every-frame stampers (46 ≈ 107–110 both before and after; 36 measured ~105 today vs mode-0 control at 122.6 — control matches yesterday, so the comparison holds). The bottleneck is evidently the per-frame stamp drawing + UI-thread reaction work, not the copy-on-write snapshot blit. Kept anyway: visual-neutral (≤1 tick lag on the newest stamps, mandala verified normal on device), halves snapshot memory traffic, and it's the documented follow-up — but don't expect it to buy fps headroom for a future heavier mode.
+
+## Testing
+
+- Cheap gates 2026-07-09 (after all three changes): `yarn typecheck` + `yarn lint` + `yarn jest` green — 28 suites / 289 tests, continuity suite unweakened.
+
+### Device run 2026-07-09 (A065 physical, 192.168.1.12:5555, fresh versionCode-13 install 00:46; artifacts in `.test-artifacts/celebration-33-crash-fix/`)
+
+| Check | Verdict | Evidence |
+|-------|---------|----------|
+| 33 crash fix | **PASS** — 100 s dev-hold (fired 2×), app alive throughout, crash buffer EMPTY (was: deterministic death ~1 s after mount) | `01-mode33-30s.png` (dense bounce tracers, Kings-first), `02-mode33-75s-loop.png` |
+| 33 badge cycle | PASS — badge tap 33→34 (Meteor Storm runs, imprint surface cleared), deep-link back to 33 = fresh mount (the crash path) runs clean | `03-badge-cycle-34.png`, `04-back-to-33.png` |
+| 33 abort | PASS — instant dismiss to the untouched board on tap | `05-abort.png` |
+| 42 perf | **PASS ≥110** — 1171 / 1193 frames per 10 s (~117–119 fps), modern janky 3.6 %/2.6 %, 90th pct 16/13 ms, GPU 90th 4 ms (was 93–101 fps, 20–31 % janky, 90th 24–26 ms) | `gfxinfo-42-run1/2.txt` |
+| 42 visual | PASS — radial streaks with solid ghost tails still read as hyperspace; jump re-aim swoop visible, no teleports | `06-mode42-12s.png`, `07-mode42-jump.png` |
+| 46 perf | ~107–110 fps (1074 / 1103 per 10 s), 90th 17–18 ms, GPU 90th 4–5 ms, 0 stalls — throttle no measurable win, ACCEPTED (no visible jank) | `gfxinfo-46-run1/2.txt` |
+| 46 visual | PASS — symmetric mandala builds normally with the snapshot throttle | `08-mode46-42s.png` |
+| Regression 36 | PASS — mandala + rolling cards normal ~20 s; perf window ~105 fps / 90th 18–19 ms (`gfxinfo-36*.txt`, see learnings) | `09-mode36-20s.png` |
+| Regression 38 | PASS — dense Pollock collage normal ~20 s | `10-mode38-20s.png` |
+| Regression 45 | PASS — cards resting on ceiling with floor imprint row at ~20 s (post-flip state correct) | `11-mode45-20s.png` |
+| Control | mode 0 = 1226 frames/10 s (122.6 fps) — matches yesterday's 1225, so cross-day fps numbers are comparable | `gfxinfo-0-control.txt` |
+
+## Follow-ups
+
+- Every-frame stampers (36/38/43/46) sit ~105–113 fps with the snapshot cost now ruled out. If any of them ever needs the full 120: thin the stamp LATTICE (e.g. 46's 0.012 → 0.02 raw = fewer, slightly sparser mandala dots) or batch the per-stamp save/clipRRect/restore. Not recommended now — zero GPU stalls and no visible jank at 107+.
+- A lint rule or unit test that catches "worklet calls a later-defined file-level worklet" would make this crash class impossible; cheapest version is a jest test that `runOnUI`-invokes each exported schedule function once. Medium effort, only worth it if the file keeps growing.
+
+---
+
+# Story: full-review culling + tuning batch (2026-07-09)
+
+Status: IN PROGRESS — story added before coding.
+
+## User prompt (full voice-review transcript, 1:1)
+
+> "Hey, did you also change number 36, which is the Spirograph? Before the imprint started directly, which was kind of messy but also kind of cool, and now I think starts cleanly at the circle I like the messiness from before. The pinball is kind of cool, let's leave it like this. Maybe it could be a tiny bit faster. This is thirty-seven. 38 The Pollock es Wild, it's fun Let's leave it like this, the fireworks. I think is really cool. Maybe one comment, the fireworks could go a little higher up. Right now they're on like sixty percent of the screen height, which doesn't give that much fireworks vibes, but it's it's really cool. Yeah. The black hole is also kind of cool. Maybe the black hole could be done with even more cards at the same time. I think there's just a subset of cards usually visible on the, on the screen could give it even a bit more a vibe. The cards already start quite small, ones they're visible on the screen. not sure maybe we could adjust that, but like tiny, tiny, tiny little bit. The dominos are cool number forty-one. One thing, the card on the very left and the very right fall kind of out of the screen, which is a, a bit of a pity. maybe we could fix that. The warp drive. It's really cool. Also here, maybe the cards could be like 10% larger, really a small amount, but it's really cool. The UWIN Could be a little bit faster, maybe, but it's really cool, it works quite well. The problem is the why, so the first letter of the "You Win," the left part of the top part doesn't draw in the beginning, it only draws in the end, which is kind of a bit weird. And after the end, so the last thing, I assume this should be an exclamation mark, there it's, this exclamation mark doesn't really work, it's kind of a full line Maybe I can actually add a screenshot afterwards. Let me do that so this, this gets more clear, I think. This will get quite clear with a screenshot. Just a second while I'm waiting for the screenshot. Then the solar system is interesting But I think like the Different planet systems are a bit too close to each other, like in a real solar system, like the differences between our, our vast, and now they're even kind of overlapping. I guess that please, please make that work a bit better. I'll also add a screenshot here of the solar system. Then the gravity flip is quite cool. I'm not sure the cards need to stick on the top or on bottom because it's like actually just one card I think here these we can remove which would make it also a bit better. Then the kaleidoscope is quite similar to the Spirograph this one is also kinda clean, so if we restore the Spirograph we can keep this as is, but I mean, it's very similar, but I think it's fine. The zero, the spiral bloom, is still cool, let's leave it as is. The list you choose with Is kind of one of the more simpler ones, we can leave it as is, but later I think we'll remove some of the more boring ones. The pendulum cascade, I'm not so sure, it's very similar to the Lissajous wave, just horizontal instead of vertical. Number three, the Orbit Carousel is really cool, but one thing, there's like in the circle, like in one area, it doesn't close. I also, I will also attach a screenshot that would be cool to close, I think. It's a bit distracting that it doesn't close. The ellipse drift number four is a bit boring, let's remove that. Number five is cool. Number six is cool. The wave loop Kind of similar as like the others that I said are a bit boring, let's remove this. The Ring Cascade is really cool. The drift orbit. It's kinda cool. The comet halo is somewhat similar, but it's a bit more special, so let's keep this. The resonance field is also very similar as the other couples that I mentioned, let's remove this, that was number eleven. Number twelve, the column glide. Let's keep this, this is funny. The Aurora Twist is But also Not completely symmetric when it's a circle, I just tried to take a screenshot. let's have a look at this as well. The wave sweep number fourteen is very similar again, let's remove this. The constellation vault is very similar to two others that are kind of a circle, and not super special, let's remove this, this was number fifteen. Pulse orbit also very similar, number sixteen, let's remove. The clover spoon is cool. Horizon arc number eighteen, let's also remove them, very similar to the ones, it's just like a group of cards moving around. The chitter's worm is kind of a circle. That's kinda fast. Honestly, it's very similar to the other circles. Let's remove this. Let's maybe also note the others that are just a circle but yeah, let's remove this for now. the fountain number twenty is really cool. Card number is cool number twenty-one. The Vortex isn't super cool or special, to be honest, but it's kind of unique, so, I mean, we can keep it for now. Infinite Loop is fine. Suit Orbits is cool. The flock is kind of boring, it's also just like cards following each other. Maybe if you have like an idea how to make this much cooler, maybe otherwise let's remove this. The Shockwave number 26 is cool. Galaxy is a potentially interesting concept, but it's not that cool. Please improve it somehow. The big bounce is cool The heartbeat, please improve something about it. I mean, it's fine, but like, I'm sure it could be a bit, bit pop a bit more. The diamond drift, CMS heartbeat. Avalanche is amazing. Meteor Shower is amazing, Cascade Imprint is pretty good, Meteor Storm is amazing, Shooting Stars is amazing. Spirograph, we already talked about it, now we're once around. please make a table with everything that I just mentioned. A couple of comments, maybe also summarize some things for me, so because I don't have a perfect overview, but I think I gave you like the full rundown of the things. We wanna have, make it like with multiple columns, make it, give one column the number, one column the name, one column what it is, and a little bit behavior, one column what I said and then one column kind of your comment, and maybe also a little bit of a classification with, I don't know, keywords, like it's a circle, it's card following each other, it's like imprints, whatever, like comes to your mind. Amazing, thank you very much."
+
+## Summary
+
+All decision-table rows implemented and device-verified on the A065 (2026-07-09).
+8 generic-circle modes retired (roster now 39, badge cycle + graceful deep-link
+fail verified), Spirograph's messy launch stamps restored via a new
+`imprint.launchStamps` metadata flag, all 9 tunings + the 13 investigation landed
+(3's ring provably closes, 13 rebuilt as an even ring, 43's stroke order/"!"
+fixed via connector-start train phasing + glyph rework, 44 separated into
+quadrant systems), and all 4 improves shipped (25 got the murmuration rework +
+one device tuning iteration). Gates green (281 tests); perf 42/40 at the 120 Hz
+ceiling (~122/127 fps, bar 110). Artifacts:
+`.test-artifacts/celebration-culling-batch/`.
+
+## Partial-state assessment (resumed run, 2026-07-09)
+
+The previous subagent was interrupted BEFORE writing any code for this story: the
+~950-line uncommitted diff on `celebrationModes.ts` / `CelebrationOverlayLayer.tsx`
+is entirely the two PRIOR stories' work (ten-crazy-modes 37–46 + the imprint-schedule
+generalization, and the mode-33 crash fix + Warp Drive 10→7-ghost/scale detune +
+snapshot-every-2nd-tick throttle), which sit uncommitted since the last commit
+("package upgrades") predates them. Every decision-table row was still unimplemented;
+all rows were implemented fresh in this run. The prior work was kept untouched and
+the new imprint-config generalization was USED (the 36 restore is a `launchStamps`
+metadata flag instead of renderer surgery — cheaper than the pre-generalization
+design would have been).
+
+## Decision table (orchestrator-approved)
+
+| Id | Mode | Decision | Detail |
+|----|------|----------|--------|
+| 4 | Ellipse Drift | REMOVE | Generic circle |
+| 7 | Wave Loop | REMOVE | Generic circle |
+| 11 | Resonance Field | REMOVE | Generic circle |
+| 14 | Wave Sweep | REMOVE | Generic circle |
+| 15 | Constellation Waltz | REMOVE | Generic circle |
+| 16 | Pulse Orbit | REMOVE | Generic circle |
+| 18 | Horizon Arc | REMOVE | Generic circle |
+| 19 | Jitter Swarm | REMOVE | Generic circle |
+| 36 | Spirograph | RESTORE | Stamp from frame 0 again (messy launch-transit stamps the user liked; the imprint-schedule generalization's launch-blend skip deferred stamping ~1.5 s). 46 Kaleidoscope stays clean. |
+| 37 | Pinball | TUNE | ~15% faster overall |
+| 39 | Fireworks | TUNE | Bursts in the upper third (were peaking ~60% height) |
+| 40 | Black Hole | TUNE | More cards visible simultaneously; slightly larger at re-entry (+10-15% entry scale) |
+| 41 | Dominoes | TUNE | Clamp row layout so leftmost/rightmost cards stay on screen when toppled |
+| 42 | Warp Drive | TUNE | Cards ~10% larger (0.42–1.1 → ~0.46–1.21); re-measure perf (bar 110 fps, was 117–119) |
+| 43 | You Win | TUNE | (a) faster lap; (b) natural stroke order (Y's strokes were drawn out of order — each letter completes before the next); (c) "!" must be bar + GAP + dot (rendered as one full line) |
+| 44 | Solar System | TUNE | Spread the four suit systems clearly apart; center the composition |
+| 45 | Gravity Flip | TUNE | REMOVE rest imprints entirely — pure bounce mode |
+| 3 | Orbit Carousel | FIX | Ring has a persistent gap — distribute cards uniformly in TIME along the warped orbit so the ring closes |
+| 13 | Aurora Twist | INVESTIGATE | Circular phase not fully symmetric — find asymmetry, fix if clear, else document |
+| 27 | Galaxy | IMPROVE | "Interesting concept, not that cool" — bolder core/arm contrast, keep trails |
+| 29 | Heartbeat | IMPROVE | Beat-synchronized pop (lub-dub), keep heart unmistakable |
+| 30 | Diamond Drift | IMPROVE | Garbled "CMS heartbeat" read as "same as Heartbeat" → GENTLE pulse treatment, keep clearly a diamond |
+| 25 | Flock | IMPROVE-OR-FLAG | ONE bold murmuration rework (sub-flocks split/re-merge, coordinated turns); honest verdict — user removes if not clearly cooler |
+
+Keep as-is (explicitly or implicitly): 0, 1, 2, 5, 6, 8, 9, 10, 12, 17, 20, 21, 22, 23, 24, 26, 28, 31, 32, 33, 34, 35, 38, 46.
+
+## Steps to implement
+
+- [x] 1. Add this story section (before coding). DONE (interrupted run).
+- [x] 2. Removals: delete metadata entries + switch cases for 4/7/11/14/15/16/18/19; tombstone comment listing retired ids; verify graceful deep-link failure + badge cycling (metadata-driven). DONE — metadata + cases deleted, tombstone above `CELEBRATION_MODE_METADATA` + retired-case note in the switch. Deep-link fail is the pre-existing metadata-lookup miss (devLog "unknown mode" + ignore) — device-verified below.
+- [x] 3. Restore 36: stamp from frame 0 (launch transit included). DONE via `imprint.launchStamps` metadata opt-in (36 only) — the generic stamp loop's launch-blend skip now has a per-mode bypass instead of a blanket rule.
+- [x] 4. Tunings: 37 (params ×1.15), 39 (bursts 0.08–0.28 board height), 40 (spiral phase 0.62→0.74 + scale floor +12%), 41 (row inset = topple reach), 42 (scale 0.46–1.21), 43 (faster lap 1.65 dp-budget + connector-start train phasing + "!" bar/gap/dot + N-gap), 44 (quadrant-anchored systems), 45 (imprints removed), 3 (uniform-in-time closed ring) + 13 (even-ring rebuild). DONE.
+- [x] 5. Improves: 27 (bright core vs tapering arms), 29 (52 bpm lub-dub pop), 30 (gentle sin⁴ pulse), 25 (murmuration: 4 sub-flocks, cohesion-gated split/re-merge, lagged-trajectory coordinated turns). DONE.
+- [x] 6. Cheap gates: `yarn typecheck && yarn lint && yarn jest` — GREEN (28 suites, 281 tests; continuity suite auto-shrank by the 8 removed modes).
+- [x] 7. Device verification on A065 (artifacts → `.test-artifacts/celebration-culling-batch/`): removed-id sweep + deep-link graceful fail, 36 messy start, each tuning vs intent, improve before/after verdicts, perf on 42 + 40. DONE — full verdict tables in Testing below; one tuning iteration used (Flock 25).
+- [x] 8. Update this story (files, learnings, results, honest verdicts). DONE.
+
+## Plan: Files to modify
+
+- `src/animation/celebrationModes.ts` (removals, tunings, improves, stroke table)
+- `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx` (36 stamp-from-launch restore)
+- This plan doc.
+
+## Files actually modified
+
+- `src/animation/celebrationModes.ts` — tombstone + 8 metadata entries and 8 switch
+  cases deleted; `imprint.launchStamps` metadata field; 36 opts in; tunings 37/39/
+  40/41/42/45; case 3 uniform-in-time ring; case 13 even-ring rebuild; case 43 "!"
+  glyph + layout + WIN_PHASE0/WIN_TRAIN_SPAN/WIN_SPEED train phasing; case 44
+  quadrant rework; improves 25/27/29/30. Stamp schedules: case 45 removed.
+- `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx` —
+  `launchStamps` prop threaded to `CascadeImprintLayer`; launch-blend stamp skip
+  gains the per-mode bypass.
+- This plan doc.
+
+## Intermediary learnings
+
+- The interrupted run had written only the story section, no code (see assessment).
+- Mode 3's ring gap root cause: `seed * TAU` in the angle gave RANDOM angular
+  card spacing on a shared warped orbit — the warp then compressed the random
+  spacing into a persistent hole. Uniform time offsets whose chain span (2/3) is
+  an integer multiple of the warp period (1/3) provably close the ring.
+- Mode 13's lumpy ring: same class of bug — seed-based angle/radius/shimmer
+  phases. Any per-card phase term on a closed curve must be an integer multiple
+  of the card's uniform angular phase or the curve won't close cleanly.
+- Mode 43's missing Y stroke: the path STARTED at the Y's first stroke, so the
+  train traversed it inside the launch blend where the stamp loop (correctly)
+  skips blended ink — the stroke only inked a full lap later. Fix = park the
+  train on the closing pen-up connector at raw 0 (WIN_PHASE0), not a stamp-loop
+  change.
+- Mode 43's old speed comment claimed 0.2 laps/raw ≈ 1.4 dp/window; the actual
+  path total (7.58 weighted units) makes it 1.75 dp. WIN_SPEED now derives from
+  the dp budget directly (1.65/total → 1.91 dp < 2 dp cap), so layout edits can't
+  silently break the continuity margin again.
+
+## Identified issues
+
+- Flock 25 v1 (first murmuration cut) never visibly split on device — cohesion
+  cycle too slow (~26 s) and divergence amplitude drowned in the flock's own
+  scatter. FIXED same run (the one allowed tuning iteration): cycle ~13 s,
+  divergence biased to the portrait y axis. v2 verified.
+- Not fixed here (pre-existing, other agents' WIP): none of the gate failures
+  predicted for other agents' files materialized — gates were fully green.
+
+## Testing
+
+All on the A065 (Android release, fresh install verified, versionCode 13).
+Artifacts in `.test-artifacts/celebration-culling-batch/`.
+
+**Removals + roster (PASS)**
+
+- Badge cycle from mode 0: exactly 39 labels, in metadata order, wrapping back
+  to `Celebration 00 · Spiral Bloom`; no removed name (4/7/11/14/15/16/18/19
+  absent), no crash. Log: `badge-cycle.txt`.
+- `soli://?celebration=4#retry-N` → devLog `[Demo] Celebration link: unknown
+  mode "4".`, link ignored, running preview untouched, no crash
+  (`36-removed-id-4-graceful.png`).
+
+**Screenshot-driven fixes (user framing reproduced)**
+
+| Mode | Verdict | Evidence (before = user screenshot) |
+|---|---|---|
+| 3 Orbit Carousel | PASS — chain fully closed, even spacing; the closed loop reads as a rotating 2-lobe rosette (radius breath completes exactly 2 periods over the chain), no gap anywhere | `01-mode3-ring-8s.png`, `02-mode3-ring-15s.png` |
+| 13 Aurora Twist | PASS — even wreath, no bunching/overlap seam; shimmer + breath preserved | `03-mode13-8s.png`, `04-mode13-14s.png` |
+| 43 You Win | PASS — at 15 s "YOU" is complete INCLUDING the Y's top-left diagonal, W in progress (natural left-to-right stroke order); at 35 s full "YOU WIN!" with "!" as bar + clear gap + dot, clearly separated from N | `05-mode43-15s.png`, `06-mode43-35s.png` |
+| 44 Solar System | PASS — four suit systems clearly separated in their quadrants, aces pulsing centrally, moons on visibly distinct rings; composition centered | `07-mode44-6s.png`, `08-mode44-14s.png` |
+
+**Restore + tunings**
+
+| Mode | Verdict | Evidence |
+|---|---|---|
+| 36 Spirograph | PASS — dense messy launch-transit streaks visible at 2.5 s; mandala builds on top | `09-mode36-2.5s.png`, `10-mode36-10s.png` |
+| 37 Pinball | PASS — ×1.15 params live; wall impact marks on all four edges | `22-mode37-8s.png` |
+| 39 Fireworks | PASS — bursts peak in the upper third (burst points 0.08–0.28 board height) | `11-mode39-6s.png`, `12-mode39-11s.png` |
+| 40 Black Hole | PASS — ~17–20 cards visible at once (spiral phase 74% of cycle) and larger entries | `13-mode40-8s.png`, `14-mode40-13s.png` |
+| 41 Dominoes | PASS — leftmost/rightmost cards stay fully on screen through both topple directions | `15/16/17-mode41-*.png` |
+| 42 Warp Drive | PASS — +10% scale visible, streaks intact | `18-mode42-5s.png` |
+| 45 Gravity Flip | PASS — pure bounce; no rest imprints on floor or ceiling | `20-mode45-10s.png`, `21-mode45-18s.png` |
+
+**Improves (honest verdicts)**
+
+| Mode | Verdict | Evidence |
+|---|---|---|
+| 27 Galaxy | Clearly better — bright dense core of big cards + arms tapering into small dim trail-smeared cards; nucleus+arms read is unmistakable | `23/24-mode27-*.png` |
+| 29 Heartbeat | Better — 1-second-apart shots show the whole heart mid-pop (scale kick 0.3, ~52 bpm lub-dub); heart shape unmistakable | `25/26-mode29-*.png` |
+| 30 Diamond Drift | Good — still clearly a diamond, now with a soft distinct pulse; deliberately calmer than Heartbeat | `27-mode30-7s.png` |
+| 25 Flock | HONEST CALL: improved but not spectacular in stills. v2 shows the flock stretching into strings and sub-groups peeling off/re-merging (vs v1's static blob), and coordinated turns propagate down the strings in motion. Whether it's "clearly cooler" enough to keep needs the user's live look — stills undersell motion. If it doesn't convince live, remove it as pre-agreed. | `32/33/34/35-mode25v2-*.png` (v1: `28–31-mode25-*.png`) |
+
+**Perf (gfxinfo, 10 s, bar 110 fps)**
+
+| Mode | Frames/10 s | Janky | 50th/90th/99th | GPU 90th | Verdict |
+|---|---|---|---|---|---|
+| 42 Warp Drive (post +10% scale) | 1219 (~122 fps) | 0.74% | 12/13/16 ms | 5 ms | PASS — at the 120 Hz ceiling, headroom intact |
+| 40 Black Hole (more cards) | 1269 (~127 fps) | 0.00% | 12/13/14 ms | 5 ms | PASS |
+
+No outliers → no confirm re-measure needed.
+
+**Gates**: `yarn typecheck && yarn lint && yarn jest` GREEN (28 suites, 281
+tests; continuity suite = 39 modes).
+
+---
+
+# Story: empty-slot outline audit + celebration-start flicker
+
+Status: DONE 2026-07-09 — implemented + device-verified on the A065 (fresh builds 16:37 and 17:09, install verified both times). Gates green (28 suites / 281 tests). One fix iteration used: the frame-by-frame abort check exposed a PRE-EXISTING abort-side flicker (eager UI-thread sprite hide ran 1–2 frames before the board restore) — fixed and re-verified.
+
+## User prompt
+
+> while this runs, 2 things: remember when i complained that the foundation has outlines? same thing happened to just outline of most right column and to outline of stock. super weird! investigate with subagent what happened here and fix. where else could this happen? (i do think it was just when triggering yarn celebration via terminal, so not thaaat bad) #2: when starting a celeration, the foundation stacks from the game now quickly disappear just before the skia animation starts. i assume that you hide them somehow when the animation starts. but like this, the timing is off and it flickers, because they (rightly so) appear at the exact same place shortly after when the animation starts and fly from there
+
+(Screenshot evidence: during a Gravity Flip preview the STOCK's dashed outline with the recycle icon and the empty rightmost tableau column's dashed outline are visible top-right — `Screenshot_20260709-154146` in the chat assets.)
+
+## Summary
+
+Task 1 (outline audit): the FoundationPile-only fix from the earlier story is now applied to every empty-state placeholder — TopRow's stock slot (dashed recycle/empty CardBack, the user's screenshot), TopRow's waste `EmptySlot`, and every tableau column's `EmptySlot` hide while a celebration is active via same-size spacers / conditional renders (layout stays stable, abort restores everything in the same commit). Device-verified on the exact repro (near-win board: recycle outline + 7 empty columns; fresh board: foundation + waste outlines): zero dashes during celebrations, all placeholders back instantly on abort. Task 2 (start flicker): confirmed mechanism — `AbsoluteCardLayer` unmounted the real cards the moment `celebrationState` was set while the Skia overlay still waited on async atlas rasterization. Fixed by gating the board-side hide on a new overlay texture-ready signal (`onOverlayReady` fired from the existing `launchAnchor` reaction → controller-owned `celebrationOverlayReady` state); frame-by-frame device capture of a real win shows the four Kings continuously until the Skia frame takes over at the same positions — no empty-foundation frame. Bonus find (frame analysis of the abort): abort had its own 2-frame empty-board flicker from an eager `runOnUI(active = 0)` in `handleCelebrationAbort` running ahead of the React commit — removed (the effect-cleanup hide at unmount makes abort a single-commit swap), re-verified: celebration → full board in ONE frame.
+
+## Description
+
+Follow-up on the "remove layout fallback, hide slot outlines, launch-order z" story: that fix hid ONLY `FoundationPile`'s empty-slot outline during celebrations, but the same "render a dashed placeholder when the real pile is empty" pattern exists for the stock, the waste, and every tableau column — all show through the transparent celebration canvas on mid-game/fresh-board previews (real wins are mostly unaffected: full foundations, and the win-cleanup fade hides stock/waste/tableau placeholders). Task 1 audits every empty-state visual and applies the same `celebrationActive` hide everywhere.
+
+Task 2 is a start-transition flicker on the REAL win path: the board unmounts the real foundation cards (`AbsoluteCardLayer` returns no items) the moment `celebrationState` is set, but the Skia overlay's first visible frame waits for the async atlas rasterization (`useTexture` + async font load) — a beat where the foundation area is EMPTY, then the Skia cards appear at the exact same spot and launch. Fix: keep the real cards mounted until the overlay's texture is actually ready (the same signal that anchors the launch blend), so the handoff is pixel-continuous.
+
+## Root causes (investigated)
+
+1. **Outlines (Task 1)**: `TopRow`'s stock slot renders `CardBack` variant `recycle`/`empty` (dashed outline + recycle icon — the user's screenshot) and its waste slot renders `EmptySlot` when the waste is empty; `TableauColumn` renders `EmptySlot` when a column is empty (the screenshot's second outline — the empty rightmost column sits directly below the stock). None of them knew about celebrations. They ARE hidden on real wins via the win-cleanup fade (`showWinCleanup = hasWon && !celebrationPending`), which is why only previews (hasWon false) show the bug — exactly the user's "just when triggering yarn celebration" observation.
+2. **Flicker (Task 2)**: `useKlondikeGame` passes `celebrationActive: Boolean(celebrationState)` to `AbsoluteCardLayer`, which returns zero items → all real cards unmount on the render that sets the celebration state. The Skia overlay mounts on the same render, but its Atlas can only draw once `useTexture` has rasterized the 52-cell atlas (plus async font arrival) — typically a few frames later (the exact gap the cascade-fixes story measured when it introduced the `launchAnchor` texture-ready anchor). Between the two: empty foundation area = the flicker.
+
+## Audit table (Task 1)
+
+| Component | Empty-state visual | Had the bug? | Fix |
+|---|---|---|---|
+| `FoundationPile` | dashed outline + muted suit glyph | Fixed in the earlier story | (already) `showEmptyOutline = !topCard && !celebrationActive` |
+| `TopRow` stock slot | `CardBack` variant `recycle` (dashed + recycle icon) / `empty` (dashed) | YES — user screenshot | render the invisible `stockContainer` spacer while `celebrationActive` (keeps slot layout + measurements) |
+| `TopRow` waste slot | `EmptySlot` (dashed) when waste empty | YES | render the card-sized spacer while `celebrationActive` |
+| `TableauColumn` | `EmptySlot` (dashed) when column empty | YES — user screenshot (rightmost column) | new `celebrationActive` prop; skip `EmptySlot` while active |
+| `BoardPreview` (history sheet) | `EmptySlot` | NO — off-board sheet UI, never under the celebration canvas | none |
+| `FeatureGraphicScreen` (dev) | dashed frame | NO — dev-only store-graphic screen | none |
+
+All hides are instant conditional renders (FoundationPile pattern), so abort restores every placeholder in the same commit that clears `celebrationState`. Trade-off noted inline: during real-win celebrations this instant hide supersedes the Task 28-2 win-cleanup FADE of the same placeholders (fade starts on the same render); invisible in practice and required for instant abort-restore.
+
+## Mechanism + fix (Task 2)
+
+- Overlay: a `useAnimatedReaction` on `texture.value !== null` fires `runOnJS(onOverlayReady)` once when the atlas texture lands (same moment `launchAnchor` anchors the launch blend → Skia cards render AT the foundations from their first frame).
+- Controller: owns `celebrationOverlayReady` React state + `handleCelebrationOverlayReady`; reset to false in `clearCelebrationAnimations` (runs when `celebrationState` → null, i.e. end AND abort).
+- `useKlondikeGame`: `absoluteCardLayerProps.celebrationActive` becomes `Boolean(celebrationState) && celebrationOverlayReady` — real cards stay mounted until the overlay is actually rendering. Reverse transition unchanged: state → null flips the gate false in the same commit that unmounts the overlay, so real cards are back at the same frame.
+- The outline hides (Task 1) and all other `celebrationActive` consumers stay gated on `Boolean(celebrationState)` directly — no continuity contract there (nothing replaces the outlines), and it matches the FoundationPile precedent.
+- Overlap note: for a few frames both real cards AND Skia cards render at the same position (Skia launch fade starts at 0.5 alpha over the real card — reads as a solid card). That replaces the empty-area gap; pixel positions are identical since the alignment story.
+
+## Steps to implement
+
+- [x] 1. Add this story section (before coding). DONE.
+- [x] 2. Task 1: TopRow stock spacer + waste spacer, TableauSection/TableauColumn `celebrationActive` prop, wiring in `useKlondikeGame` (`tableauProps`). DONE.
+- [x] 3. Task 2: overlay `onOverlayReady` (texture-ready runOnJS), controller `celebrationOverlayReady` state + reset, `useKlondikeGame` gate, `KlondikeGameView` threading. DONE.
+- [x] 4. Cheap gates: `yarn typecheck && yarn lint && yarn jest`. DONE — green, 28 suites / 281 tests.
+- [x] 5. Device verification (A065) → `.test-artifacts/celebration-outline-flicker/`. DONE — all checks PASS (see Device test results); the abort frame check found + fixed a pre-existing abort flicker (one rebuild + re-verify iteration).
+- [x] 6. Update this story (summary, files, learnings, results). DONE.
+
+## Plan: Files to modify
+
+- `src/features/klondike/components/cards/TopRow.tsx` (stock + waste placeholder hides)
+- `src/features/klondike/components/cards/TableauSection.tsx` (column EmptySlot hide)
+- `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx` (texture-ready → onOverlayReady)
+- `src/features/klondike/hooks/useCelebrationController.ts` (overlay-ready state)
+- `src/features/klondike/components/KlondikeGameView.tsx` (prop threading)
+- `src/features/klondike/hooks/useKlondikeGame.ts` (MINIMAL — other agents have WIP here: tableauProps.celebrationActive, the AbsoluteCardLayer gate, callback threading)
+- This plan doc.
+
+## Files actually modified
+
+- `src/features/klondike/components/cards/TopRow.tsx` — stock slot renders the invisible `stockContainer` spacer instead of the recycle/empty `CardBack` while `celebrationActive`; waste slot renders the card-sized spacer instead of `EmptySlot` while `celebrationActive`.
+- `src/features/klondike/components/cards/TableauSection.tsx` — new `celebrationActive` prop on section + column; empty-column `EmptySlot` skipped while active.
+- `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx` — optional `onOverlayReady` prop, fired via `runOnJS` from the existing `launchAnchor` texture-ready reaction (exactly once per mount — the first-anchor branch; progress-wrap re-anchors do NOT refire).
+- `src/features/klondike/hooks/useCelebrationController.ts` — `celebrationOverlayReady` state + `handleCelebrationOverlayReady`; reset in `clearCelebrationAnimations` (covers end and abort); both returned.
+- `src/features/klondike/components/KlondikeGameView.tsx` — `onCelebrationOverlayReady` prop threaded to the overlay.
+- `src/features/klondike/hooks/useKlondikeGame.ts` — MINIMAL (other agents' WIP file): destructure the two new controller values, `tableauProps.celebrationActive`, `absoluteCardLayerProps.celebrationActive` gated on `Boolean(celebrationState) && celebrationOverlayReady`, `onCelebrationOverlayReady` in viewProps.
+- `src/features/klondike/hooks/useCelebrationController.ts` (iteration): eager `runOnUI(active = 0)` removed from `handleCelebrationAbort` — the abort-side flicker fix (see learnings).
+- This plan doc.
+
+## Intermediary learnings
+
+- The nearwin fixture is the perfect outline repro: empty stock (recycle outline), all 7 columns empty, waste holding the final K — the exact board class in the user's screenshot. Fresh boards cover the waste + foundation placeholders (a fresh deal auto-draws one card, so the waste EmptySlot needs a full draw-through + recycle to appear).
+- `adb shell input tap` is unusable while `screenrecord` runs alongside a 120 fps celebration: injections got delayed 10+ s (two recordings showed the tap landing only after the clip ended). `yarn agent-device click <x> <y>` injects promptly under the same load — use it for any recorded-interaction capture.
+- **Abort had its own 2-frame flicker (found by the frame capture, then fixed):** `handleCelebrationAbort` ran an eager `runOnUI(active = 0)` that hid all Skia sprites 1–2 frames BEFORE the React commit unmounting the overlay/restoring the board — device frames showed a fully empty board in between. Fix: drop the eager hide; the `celebrationState` effect cleanup sets `active = 0` at unmount, making abort a single-commit swap. The natural 60 s completion never had this problem (end fade reaches alpha 0 before the unmount).
+- The win→celebration handoff is pixel-continuous on device: frame captures show the four real Kings until the Skia frame takes over with kings at the same spots (brief brightness bump from the sprite shadows/underlays overlapping), then the cards animate away. No empty-foundation frame (per-frame luma scan of the foundation row: card-level values until the cards legitimately fly off).
+
+## Identified issues
+
+- Abort-side 2-frame empty-board flicker (pre-existing, exposed by the frame-by-frame check) — FIXED, see learnings; re-verified on device after rebuild.
+
+## Testing
+
+- Cheap gates 2026-07-09: `yarn typecheck` + `yarn lint` + `yarn jest` green (28 suites / 281 tests) — after the initial implementation AND after the abort-fix iteration. None of the predicted other-agent-WIP failures materialized.
+
+## Device test results (A065, 2026-07-09)
+
+Two fresh `yarn release` builds (16:37 initial, 17:09 after the abort fix; install verified via lastUpdateTime both times). Artifacts: `.test-artifacts/celebration-outline-flicker/`.
+
+| # | Check | Verdict | Evidence |
+|---|-------|---------|----------|
+| 1 | User-screenshot repro baseline (near-win board: stock recycle outline + 7 empty-column outlines idle) | reproduced | `00-nearwin-baseline.png` |
+| 2 | Mode 45 preview on that board: NO dashed outlines (stock recycle icon included) | PASS — zero dashes at 2 s and 4 s | `01-mode45-2s.png`, `02-mode45-4s.png` |
+| 3 | Abort → all placeholders back instantly | PASS — recycle outline + 7 column outlines restored, board untouched | `03-after-abort.png` |
+| 4 | Fresh-board preview (foundation outlines): no dashes during, restored after | PASS | `04-fresh-baseline.png`, `05-fresh-mode45-2s.png`, `06-fresh-after-abort.png` |
+| 5 | Empty-waste preview (waste EmptySlot — needed a full draw-through + recycle to produce): no dashes during, restored after | PASS | `07-emptywaste-baseline.png`, `08-emptywaste-mode45.png`, `09-emptywaste-after-abort.png` |
+| 6 | Win→celebration start, frame-by-frame (real win: nearwin + winning tap on waste K♠, screenrecord ~49 fps effective) | PASS — foundation-row luma scan + frame stack: four real Kings every frame until the Skia frame takes over with Kings at the same spots (2-frame brightness bump from overlapping sprite shadows), then cards animate away; NO empty-foundation frame | `win-transition.mp4`, `overview-2fps.png`, `transition-crops-8.2-10.6.png`, `handoff-stack-36-42.png` |
+| 7 | Abort transition, frame-by-frame — FIRST build | FAIL → fixed: 2 frames of fully EMPTY board between sprite hide and board restore (eager `runOnUI(active=0)` in the abort handler, pre-existing) | `abort4-lastframes-stack.png` (middle frame = empty board) |
+| 8 | Abort transition, frame-by-frame — FIXED build | PASS — single-frame swap: full imprint field in frame N, complete restored board (outlines included) in frame N+1; luma scan shows no empty frame | `abort-transition-fixed.mp4`, `abort-fixed-lastframes.png` |
+| 9 | Regression: idle boards show placeholders as usual | PASS — outlines present when not celebrating on near-win and fresh boards | `00`, `04`, `17`, `19` |
+| 10 | Celebration sanity on fixed build (mode 45 + mode 0 run + abort) | PASS | `16-newbuild-mode45.png`, `18-newbuild-mode0.png`, `17/19-newbuild-*.png` |
+
+Learnings for future testers: `adb shell input tap` gets delayed 10+ s while screenrecord runs alongside a celebration (two wasted clips) — `yarn agent-device click <x> <y>` injects promptly under the same load. A real win via nearwin + one a11y-guided tap is far easier to co-time with a recording than an autosolve run.
+
+## Follow-ups
+
+- The brief real+Skia card overlap at start (~2 frames, both at identical positions) reads as a small brightness bump because the Skia sprite's baked shadow lands on top of the real card. Invisible at speed; if it ever bothers, delay the launch-anchor by one frame after onOverlayReady. Recommend leaving as is.
+- The overlay-ready gate leaves real cards mounted if the atlas texture somehow never lands (defensive fail-safe: board stays visible instead of empty). No action needed.

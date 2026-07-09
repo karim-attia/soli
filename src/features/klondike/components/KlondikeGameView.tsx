@@ -31,6 +31,7 @@ export type KlondikeGameViewProps = {
   celebrationBindings: CelebrationBindings
   onCelebrationAbort: () => void
   onCelebrationBadgePress: () => void
+  onCelebrationOverlayReady: () => void
   undoScrubProps: UndoScrubberProps
   absoluteCardLayerProps: AbsoluteCardLayerProps | null
 }
@@ -48,6 +49,7 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
   celebrationBindings,
   onCelebrationAbort,
   onCelebrationBadgePress,
+  onCelebrationOverlayReady,
   undoScrubProps,
   absoluteCardLayerProps,
 }) => {
@@ -99,6 +101,7 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
           celebrationState={celebrationState}
           celebrationBindings={celebrationBindings}
           cardMetrics={topRowProps.cardMetrics}
+          onOverlayReady={onCelebrationOverlayReady}
         />
 
         {celebrationState ? (

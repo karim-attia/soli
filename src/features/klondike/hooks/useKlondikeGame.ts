@@ -421,12 +421,14 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const {
     celebrationState,
     celebrationPending,
+    celebrationOverlayReady,
     setCelebrationState,
     celebrationBindings,
     celebrationLabel,
     cycleCelebrationMode,
     startCelebrationPreview,
     handleCelebrationAbort,
+    handleCelebrationOverlayReady,
     handleWinningCardFlightSettled,
     clearCelebrationDialogTimer,
   } = useCelebrationController({
@@ -909,6 +911,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     dropHints,
     interactionsLocked: boardLocked,
     celebrationPending,
+    // Empty-column outlines hide during celebrations (outline-audit story) — gated on
+    // celebrationState directly (not the overlay-ready gate below): nothing replaces
+    // the outlines, so there is no continuity contract, matching FoundationPile.
+    celebrationActive: Boolean(celebrationState),
     onTableauRowLayout: handleTableauRowLayout,
     onTableauColumnLayout: handleTableauColumnLayout,
   }
@@ -939,6 +945,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     celebrationBindings,
     onCelebrationAbort: handleCelebrationAbort,
     onCelebrationBadgePress: cycleCelebrationMode,
+    onCelebrationOverlayReady: handleCelebrationOverlayReady,
     undoScrubProps,
     absoluteCardLayerProps: {
       stock: state.stock,
@@ -951,7 +958,11 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       invalidWiggle: invalidWiggleEnabled ? invalidWiggle : EMPTY_INVALID_WIGGLE,
       animationResetKey: dealResetKey,
       interactionsLocked: boardLocked,
-      celebrationActive: Boolean(celebrationState),
+      // Overlay-ready gate (celebration-start flicker story, user 2026-07-09): the
+      // REAL cards must stay mounted until the Skia overlay's atlas texture is ready
+      // (its first drawable frame). Hiding on celebrationState alone left the
+      // foundation area empty for the async-rasterization frames — visible flicker.
+      celebrationActive: Boolean(celebrationState) && celebrationOverlayReady,
       onDraw: handleDraw,
       onWasteTap: handleWasteTap,
       onFoundationPress: handleFoundationPress,

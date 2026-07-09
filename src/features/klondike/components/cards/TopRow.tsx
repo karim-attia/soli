@@ -177,7 +177,15 @@ export const TopRow = React.memo(
                     width={cardMetrics.width}
                   >
                     <View width={cardMetrics.width} items="flex-end" overflow="visible">
-                      {wasteCount ? (
+                      {/* Empty-placeholder audit rule (outline-audit story, user
+                          2026-07-09): EVERY dashed empty-state placeholder hides while
+                          a celebration is active — same rule as FoundationPile's
+                          outline. They showed through the transparent celebration
+                          canvas on mid-game/fresh-board previews (real wins hide them
+                          via the win-cleanup fade instead). A same-size spacer keeps
+                          the slot layout/measurements stable; the conditional render
+                          (no fade) restores the placeholder instantly on abort. */}
+                      {wasteCount || celebrationActive ? (
                         <View
                           style={{ width: cardMetrics.width, height: cardMetrics.height }}
                         />
@@ -219,7 +227,14 @@ export const TopRow = React.memo(
                     }
                     testID={STOCK_RECYCLE_TEST_ID}
                   >
-                    {drawVariant === 'stock' ? (
+                    {/* Empty-placeholder audit rule (outline-audit story, user
+                        2026-07-09): the recycle/empty CardBack is a dashed outline
+                        (+ recycle icon) that showed through the celebration canvas —
+                        the exact outline in the user's Gravity Flip screenshot. Hide
+                        it while a celebration is active by rendering the same
+                        invisible spacer the 'stock' variant uses (layout stays
+                        stable; conditional render restores it instantly on abort). */}
+                    {drawVariant === 'stock' || celebrationActive ? (
                       <View
                         pointerEvents="none"
                         style={[
