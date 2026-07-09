@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useState } from 'react'
-import { Platform } from 'react-native'
+import { Platform, ScrollView } from 'react-native'
 import { HeaderButton } from 'expo-router/react-navigation'
 import { useNavigation } from 'expo-router'
 import { Button, Text, XStack, YStack } from 'tamagui'
@@ -9,6 +9,8 @@ import {
   type KlondikeGameSessionControls,
 } from '../../src/features/klondike/components/KlondikeGameSession'
 import type { LaunchDemoGameOptions } from '../../src/features/klondike/hooks/useKlondikeGame'
+import { DEMO_AUTO_STEP_INTERVAL_MS } from '../../src/features/klondike/hooks/useDemoGameLauncher'
+import { CELEBRATION_MODE_METADATA } from '../../src/animation/celebrationModes'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
 import { AppSheet } from '../../components/AppSheet'
 import {
@@ -46,6 +48,19 @@ export default function TabOneScreen() {
     (options: LaunchDemoGameOptions) => {
       setDemoChoiceVisible(false)
       sessionControls?.handleLaunchDemoGame(options)
+    },
+    [sessionControls]
+  )
+
+  const handleStartCelebration = useCallback(
+    (modeId?: number) => {
+      setDemoChoiceVisible(false)
+      // Delay mirrors the deep-link settle delay (DEMO_AUTO_STEP_INTERVAL_MS) so the
+      // sheet dismissal doesn't race the celebration overlay mount.
+      setTimeout(
+        () => sessionControls?.startCelebrationPreview(modeId),
+        DEMO_AUTO_STEP_INTERVAL_MS
+      )
     },
     [sessionControls]
   )
@@ -115,6 +130,7 @@ export default function TabOneScreen() {
         isPresented={demoChoiceVisible}
         onDismiss={closeDemoChoice}
         onSelect={handleDemoChoice}
+        onStartCelebration={handleStartCelebration}
         onResetUndoHint={handleResetUndoHint}
         onSeedHistory={handleSeedHistory}
       />
@@ -126,14 +142,26 @@ type DemoChoiceSheetProps = {
   isPresented: boolean
   onDismiss: () => void
   onSelect: (options: LaunchDemoGameOptions) => void
+  onStartCelebration: (modeId?: number) => void
   onResetUndoHint: () => void
   onSeedHistory: (action: 'seed' | 'clear') => void
 }
+
+// Section header for the dev sheet: small muted uppercase label, tamagui
+// primitives only — Expo UI controls (FieldGroup/Picker) are avoided inside the
+// sheet because nested native Hosts had unreliable gestures on Android
+// (demo-sheet-cleanup plan, approach B).
+const SheetSectionHeader = ({ children }: { children: string }) => (
+  <Text fontSize={12} color="$color10" textTransform="uppercase" pt="$2">
+    {children}
+  </Text>
+)
 
 const DemoChoiceSheet = ({
   isPresented,
   onDismiss,
   onSelect,
+  onStartCelebration,
   onResetUndoHint,
   onSeedHistory,
 }: DemoChoiceSheetProps) => {
@@ -143,58 +171,106 @@ const DemoChoiceSheet = ({
           dismissible (swipe down / scrim tap -> onDismiss), so an in-sheet
           Cancel was dead weight (demo-sheet-undo-probes-info-hud scope 1).
           Buttons use size="$3" + tight gaps: the Android sheet detent clipped
-          the sixth option with default-size buttons (device smoke 2026-07-06). */}
+          a sixth option with default-size buttons (device smoke 2026-07-06). */}
       <YStack gap="$2" p="$4" pb="$5">
         {/* No dismiss hint on purpose: internal dev-only sheet, swipe/scrim
             dismissal is the platform convention (user feedback 2026-07-06). */}
-        <Text fontSize={18} fontWeight="700" pb="$2">
+        <Text fontSize={18} fontWeight="700">
           Run Demo
         </Text>
-        <Button size="$3" onPress={() => onSelect({ demoMode: 'old' })}>
-          Old demo game
-        </Button>
-        <Button size="$3" onPress={() => onSelect({ demoMode: 'single' })}>
-          One generated game
-        </Button>
-        <Button
-          size="$3"
-          onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 5 })}
-        >
-          5 generated games
-        </Button>
-        <Button
-          size="$3"
-          onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 10 })}
-        >
-          10 generated games
-        </Button>
-        <Button
-          size="$3"
-          onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 20 })}
-        >
-          20 generated games
-        </Button>
-        {/* Deterministic mid-game fixture (scrubber-test-automation): 40 undos +
-            40 redos available for scrubber/undo/redo testing. */}
-        <Button size="$3" onPress={() => onSelect({ demoMode: 'scrubbed' })}>
-          Mid-game, scrubbed to middle
-        </Button>
-        {/* Manual-testing reset for the undo-scrubber hint (undo-scrubber-hint plan):
-            sets lifetime past the >50 gate + hintsRemaining back to 3, so a 10-tap
-            undo streak immediately shows hint 1. No confirmation on purpose — the
-            action is harmless and this sheet is dev-only. */}
-        <Button size="$3" onPress={onResetUndoHint}>
-          Reset undo hint
-        </Button>
-        {/* Dev-only history seeding (agent-testing-skill plan): additive `seed-`
-            rows for History-tab/stats testing, reversible via the clear entry.
-            Real history rows are never modified — this is Karim's main phone. */}
-        <Button size="$3" onPress={() => onSeedHistory('seed')}>
-          Seed history
-        </Button>
-        <Button size="$3" onPress={() => onSeedHistory('clear')}>
-          Clear seeded history
-        </Button>
+
+        {/* Dense one-row-per-section layout on purpose: the first cut (separate
+            "Old demo game" + "Random" + "Reset undo hint" rows) pushed the whole
+            Testing section below the default Android detent fold (device smoke
+            2026-07-09) — budget ~4 rows + 4 headers for this sheet. */}
+        <SheetSectionHeader>Demo games</SheetSectionHeader>
+        <XStack gap="$2">
+          <Button size="$3" flex={1} onPress={() => onSelect({ demoMode: 'old' })}>
+            Old
+          </Button>
+          {/* 1/5/10/20 = generated auto-solve games (single vs playlist). */}
+          <Button size="$3" flex={1} onPress={() => onSelect({ demoMode: 'single' })}>
+            1
+          </Button>
+          <Button
+            size="$3"
+            flex={1}
+            onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 5 })}
+          >
+            5
+          </Button>
+          <Button
+            size="$3"
+            flex={1}
+            onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 10 })}
+          >
+            10
+          </Button>
+          <Button
+            size="$3"
+            flex={1}
+            onPress={() => onSelect({ demoMode: 'playlist', gameLimit: 20 })}
+          >
+            20
+          </Button>
+        </XStack>
+
+        <SheetSectionHeader>Fixtures</SheetSectionHeader>
+        <XStack gap="$2">
+          {/* Deterministic mid-game fixture (scrubber-test-automation): 40 undos +
+              40 redos available for scrubber/undo/redo testing. */}
+          <Button size="$3" flex={1} onPress={() => onSelect({ demoMode: 'scrubbed' })}>
+            Mid-game scrub
+          </Button>
+          {/* Near win launches 1 move from completion (the common case); other
+              values stay deep-link-only via ?demo=nearwin&left=N. */}
+          <Button
+            size="$3"
+            flex={1}
+            onPress={() => onSelect({ demoMode: 'nearwin', nearWinMovesLeft: 1 })}
+          >
+            Near win
+          </Button>
+        </XStack>
+
+        <SheetSectionHeader>Celebration</SheetSectionHeader>
+        {/* Dev-hold preview on the current board (same path as ?celebration=);
+            abort by tapping the running animation. Chip labels keep the mode id
+            visible for cross-referencing logs/tests. Plain RN horizontal
+            ScrollView (not an Expo UI container) is fine inside RNHostView
+            (verified on device 2026-07-09: measured + scrolled on first present). */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <XStack gap="$2">
+            <Button size="$3" onPress={() => onStartCelebration()}>
+              Random
+            </Button>
+            {CELEBRATION_MODE_METADATA.map((mode) => (
+              <Button key={mode.id} size="$3" onPress={() => onStartCelebration(mode.id)}>
+                {`${mode.id} ${mode.name}`}
+              </Button>
+            ))}
+          </XStack>
+        </ScrollView>
+
+        <SheetSectionHeader>Testing</SheetSectionHeader>
+        <XStack gap="$2">
+          {/* Manual-testing reset for the undo-scrubber hint (undo-scrubber-hint
+              plan): sets lifetime past the >50 gate + hintsRemaining back to 3, so
+              a 10-tap undo streak immediately shows hint 1. No confirmation on
+              purpose — the action is harmless and this sheet is dev-only. */}
+          <Button size="$3" flex={1} onPress={onResetUndoHint}>
+            Undo hint
+          </Button>
+          {/* Dev-only history seeding (agent-testing-skill plan): additive `seed-`
+              rows for History-tab/stats testing, reversible via the clear entry.
+              Real history rows are never modified — this is Karim's main phone. */}
+          <Button size="$3" flex={1} onPress={() => onSeedHistory('seed')}>
+            Seed history
+          </Button>
+          <Button size="$3" flex={1} onPress={() => onSeedHistory('clear')}>
+            Clear seeded
+          </Button>
+        </XStack>
       </YStack>
     </AppSheet>
   )

@@ -70,7 +70,7 @@ Caveats: `?set=` changes settings, but an in-progress game keeps the drawCount i
 
 ## 4. State resets & seeding
 
-- **Undo hint**: `soli://?reset=undoHint` (or Demo sheet → "Reset undo hint"). Sets a *testable* state — lifetime just past the >50 gate + 3 hints remaining, so a 10-tap undo streak shows hint 1 immediately.
+- **Undo hint**: `soli://?reset=undoHint` (or Demo sheet → Testing → "Undo hint"). Sets a *testable* state — lifetime just past the >50 gate + 3 hints remaining, so a 10-tap undo streak shows hint 1 immediately.
 - **Game**: `soli://?reset=game` — New Game without the confirmation dialog (current game recorded as incomplete). Deliberately NO `?reset=all`: bulk destruction stays manual to protect real phone history.
 - **Settings**: `soli://?set=...` (catalog above) — no UI taps before dealing test games.
 - **History seeding**: `yarn seedhistory` inserts `seed-`-prefixed rows (solved/incomplete, varied draws/dates/durations); `yarn seedhistory clear` deletes ONLY those. Demo sheet has matching entries. Real history rows are never touched.

@@ -104,6 +104,7 @@ export type UseKlondikeGameResult = {
   handleLaunchDemoGame: (options?: LaunchDemoGameOptions) => void
   resetUndoHintForTesting: () => void
   seedHistoryForTesting: (action: 'seed' | 'clear') => void
+  startCelebrationPreview: (modeId?: number) => void
   viewProps: KlondikeGameViewProps
 }
 
@@ -399,19 +400,22 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Deals a new game, respecting solvable-only settings and history bookkeeping.
   // stateOverride (agent-testing-skill C2): the ?deal= deep link supplies an exact
   // deal instead of the solvable-selector state; all bookkeeping stays identical.
-  const dealNewGame = useCallback((stateOverride?: GameState) => {
-    const startedAt = new Date().toISOString()
-    const nextState = stateOverride ?? createFreshGameState()
-    recordStartedGame(nextState, { startedAt })
-    dispatch({ type: 'HYDRATE_STATE', state: nextState })
-    // Absolute-layer cards stay mounted across deals, so this narrow token resets
-    // native animated positions without changing card identity for the whole deck.
-    setDealResetKey((current) => current + 1)
-    // A fresh deal is a hard context switch; a consecutive-undo streak can't span it,
-    // and the hint's per-deal flags (shown / scrub-consumed) reset here.
-    noteStreakBreak()
-    noteNewDeal()
-  }, [createFreshGameState, dispatch, noteNewDeal, noteStreakBreak, recordStartedGame])
+  const dealNewGame = useCallback(
+    (stateOverride?: GameState) => {
+      const startedAt = new Date().toISOString()
+      const nextState = stateOverride ?? createFreshGameState()
+      recordStartedGame(nextState, { startedAt })
+      dispatch({ type: 'HYDRATE_STATE', state: nextState })
+      // Absolute-layer cards stay mounted across deals, so this narrow token resets
+      // native animated positions without changing card identity for the whole deck.
+      setDealResetKey((current) => current + 1)
+      // A fresh deal is a hard context switch; a consecutive-undo streak can't span it,
+      // and the hint's per-deal flags (shown / scrub-consumed) reset here.
+      noteStreakBreak()
+      noteNewDeal()
+    },
+    [createFreshGameState, dispatch, noteNewDeal, noteStreakBreak, recordStartedGame]
+  )
 
   // Hook: own the celebration animation lifecycle and bindings.
   const {
@@ -962,6 +966,9 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     handleLaunchDemoGame,
     resetUndoHintForTesting,
     seedHistoryForTesting,
+    // Demo-sheet celebration preview (demo-sheet-cleanup): same controller entry
+    // point the ?celebration= deep link uses; undefined modeId = random mode.
+    startCelebrationPreview,
     viewProps,
   }
 }

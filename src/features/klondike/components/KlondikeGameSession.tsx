@@ -13,6 +13,7 @@ export type KlondikeGameSessionControls = {
   handleLaunchDemoGame: (options?: LaunchDemoGameOptions) => void
   resetUndoHintForTesting: () => void
   seedHistoryForTesting: (action: 'seed' | 'clear') => void
+  startCelebrationPreview: (modeId?: number) => void
 }
 
 type KlondikeGameSessionProps = {
@@ -26,6 +27,7 @@ export const KlondikeGameSession = ({ onControlsChange }: KlondikeGameSessionPro
     handleLaunchDemoGame,
     resetUndoHintForTesting,
     seedHistoryForTesting,
+    startCelebrationPreview,
     viewProps,
   } = useKlondikeGame()
 
@@ -36,6 +38,7 @@ export const KlondikeGameSession = ({ onControlsChange }: KlondikeGameSessionPro
       handleLaunchDemoGame,
       resetUndoHintForTesting,
       seedHistoryForTesting,
+      startCelebrationPreview,
     })
 
     return () => {
@@ -48,6 +51,7 @@ export const KlondikeGameSession = ({ onControlsChange }: KlondikeGameSessionPro
     requestNewGame,
     resetUndoHintForTesting,
     seedHistoryForTesting,
+    startCelebrationPreview,
   ])
 
   return <KlondikeGameView {...viewProps} />
