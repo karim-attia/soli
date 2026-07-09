@@ -91,9 +91,9 @@ None new. Uses existing demo deep-link infra + `xcrun simctl` + `adb`.
 
 - [x] Implementation sub-agent: screenshot mode (`&screenshot=1` on demo links; suppress Demo button + celebration badge; `--screenshot` flag on `yarn celebration`/deeplink wrapper; update soli-testing skill; cheap gates) — DONE 2026-07-09, typecheck/lint/jest green
 - [x] iOS sub-agent: rebuild, capture round-2 set on iPhone 17 Pro Max + iPad Air 13" sims (celebration modes pool, improved mid-game ~70/80, near-win with 2-3 face-down, settings, history via seedhistory) — DONE 2026-07-09, 14 iPhone + 4 iPad round-2 shots; screenshot mode worked flawlessly (zero dev-UI leaks across ~40 frames); see round-2 iOS learnings below
-- [ ] Orchestrator: review iOS round-2 images
+- [x] Orchestrator: review iOS round-2 images — approved. Standouts: You Win (43), Spirograph (36), Kaleidoscope (46), Meteor Shower (32). Galaxy (27) droppable. Nit: 02b foundations only 2 cards (fixture game keeps most cards in tableau at 70/80) — acceptable, 03b covers "far along".
 - [x] Android sub-agent: rebuild (`yarn release`), same round-2 set on the phone, seedhistory + clear, demo mode enter/exit — DONE 2026-07-09, 12 shots, all cleanup verified (see round-2 Android results/learnings)
-- [ ] Orchestrator: review Android round-2 images + final summary
+- [x] Orchestrator: review Android round-2 images + final summary — approved. Nits flagged to Karim: (1) Android/iPad Spirograph frames show residual board cards top-left (preview overlays current board; iPhone frame is clean since the mandala covers the full screen); (2) Android 10-history top rows are today's agent-test rows (duplicate deals, 0-move incompletes, 95 incomplete count) — weakest shot, recommend recapture on a day with real recent games or use the iOS-style seeded look.
 
 ### Round 2 shot list
 
@@ -214,6 +214,7 @@ None (artifact-only task). Output: `.test-artifacts/store-screenshots/`.
 - Visual review of every captured PNG by orchestrator (image reads) before declaring done.
 - iOS: every captured PNG was read + checked by the testing sub-agent (no dev badges/toasts, 9:41 status bar, full battery, correct resolutions via `file`): 8x 1320x2868 iPhone, 2x 2048x2732 iPad.
 - Android: every captured PNG read + checked (09:41 demo-mode status bar, full battery, wifi bars, no notification icons, no Demo button/dev badges): 8x 1080x2412. Cleanup verified: demo mode exited, screen timeout restored (600000 ms, unchanged), drawCount back to 1 (Karim's original), developer mode OFF, agent-device session closed (no live runner processes).
+- Round 2 Android: every kept PNG read + checked against the same bar (09:41, full battery, no notification icons, no dev UI): 12x 1080x2412, `file` spot-checked. Cleanup verified via screenshots: real status bar back, Demo button gone after the `--screenshot` re-clear, seed counts down by exactly 8.
 
 ## Follow-ups
 
