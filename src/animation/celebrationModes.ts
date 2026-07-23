@@ -60,6 +60,8 @@ export type CelebrationMetadata = {
 // Drift), 7 (Wave Loop), 11 (Resonance Field), 14 (Wave Sweep), 15 (Constellation
 // Waltz), 16 (Pulse Orbit), 18 (Horizon Arc), 19 (Jitter Swarm) are RETIRED —
 // all "generic circle / group of cards moving around" variants the user culled.
+// Tuning round 2 (2026-07-12): id 25 (Flock) RETIRED too — the murmuration rework
+// didn't convince on device, user decided remove (the pre-agreed outcome).
 // Never reuse these ids. A `?celebration=<retired id>` deep link devLogs
 // "unknown mode" and is ignored (metadata lookup miss — verified on device).
 export const CELEBRATION_MODE_METADATA: CelebrationMetadata[] = [
@@ -92,7 +94,6 @@ export const CELEBRATION_MODE_METADATA: CelebrationMetadata[] = [
   { id: 22, name: 'Vortex', trail: { count: 3, gapMs: 60 } },
   { id: 23, name: 'Infinity Loop' },
   { id: 24, name: 'Suit Orbits' },
-  { id: 25, name: 'Flock' },
   { id: 26, name: 'Shockwave' },
   // Trail re-enabled 2026-07-08 (renderer-polish story): the 2026-07-07 removal (16fps
   // with GPU stalls) was a view-renderer cost class the Atlas eliminated. The log
@@ -155,9 +156,10 @@ export const CELEBRATION_MODE_METADATA: CelebrationMetadata[] = [
   // Pollock action painting: chaotic tumble (fast spin + deep scale swing) laying
   // opaque rotated/scaled stamps along the whole path.
   { id: 38, name: 'Pollock', wobble: false, imprint: { policy: 'path' } },
-  // Fireworks: 13-card suit shells bursting from bottom volleys, long ghost tails,
-  // one FAINT ring stamp per card per burst (alpha 0.3) lingering at the burst point.
-  { id: 39, name: 'Fireworks', trail: { count: 6, gapMs: 60 }, wobble: false, imprint: { policy: 'events', alpha: 0.3 } },
+  // Fireworks: 13-card suit shells bursting from bottom volleys, long ghost tails.
+  // Imprint REMOVED (tuning round 2, user 2026-07-12): real fireworks vanish — the
+  // lingering burst rings read as distracting residue, not effect. Don't re-add.
+  { id: 39, name: 'Fireworks', trail: { count: 6, gapMs: 60 }, wobble: false },
   // Black Hole: no imprint, no trail — the vanish/re-emerge cycle is the effect.
   { id: 40, name: 'Black Hole' },
   // Dominoes: still formation is the point — wobble would ruin the standing rows.
@@ -204,28 +206,42 @@ const FOUNDATION_STACK_MAX = 13
 
 // Avalanche (mode 31) launch cadence, exported for the overlay's foundation-pile
 // visibility rule (cascade-fixes story). 0.06 → 0.04 raw units 2026-07-08 (user: "make
-// avalanche a bit faster") ≈ 0.23 s between launches; the last card launches ~12 s in.
-export const AVALANCHE_LAUNCH_INTERVAL_RAW = 0.04
+// avalanche a bit faster"); 0.04 → 0.035 in tuning round 2 (2026-07-12, "a little bit
+// faster" again, ~1.15× with matching drift/bounce speedups in case 31) ≈ 0.2 s
+// between launches; the last card launches ~10.5 s in.
+export const AVALANCHE_LAUNCH_INTERVAL_RAW = 0.035
 
 // Cascade Imprint (mode 33) timing, shared between case 33 and the overlay's imprint
 // sampler (both must agree on when each card flies). Polish round 2 (user 2026-07-08:
-// "feels a bit slow"): launch interval 0.2 → 0.11 raw units (≈0.63 s/card). Flights
-// typically last 0.10–0.15 raw units, so the next card often launches while the
-// previous one is still exiting — slight overlap, brisk feel. FLIGHT_SPAN is the
-// sampling window per card: it must cover the WORST-CASE exit (slowest drift ≈
-// boardWidth·1.1 at 7.5·boardWidth/raw ≈ 0.147 raw) or late imprints would be missing.
-export const IMPRINT_LAUNCH_INTERVAL_RAW = 0.11
-export const IMPRINT_FLIGHT_SPAN_RAW = 0.16
+// "feels a bit slow"): launch interval 0.2 → 0.11 raw units. Tuning round 2
+// (2026-07-12, "a little bit faster" again): 0.11 → 0.095 = 19/200 (≈0.55 s/card,
+// deck done ≈ 28.5 s) with flight drift/fall ×1.15 in case 33.
+//
+// LATTICE CONSTRAINTS (re-derived 2026-07-12 — the first retune attempt, 3/32,
+// FAILED the continuity suite): TWO event families must stay away from the
+// integer-raw boundaries the suite samples (window ±0.00144 raw, ref sample at
+// −0.00433):
+// 1. LAUNCH times k·interval (k = launchOrder + 52·pass ≤ ~105): the launch is a
+//    velocity KINK on a card whose reference delta is 0 (it was resting on the
+//    pile) — a launch inside (boundary − ~0.0023, boundary + 0.0015) fails the
+//    3×ref+2dp heuristic. 3/32 put k=32 EXACTLY on raw 3.0. With 19/200 the
+//    closest launch for any k ≤ 105 is 0.005 below a boundary (k=21 → 1.995),
+//    which sits safely BEFORE the reference sample; all others are ≥ 0.01 away.
+// 2. RETURN-SNAP times k·interval + RETURN (position jump offscreen→base): only a
+//    strict before/after straddle (±0.00144) is fatal (a snap in the ref window
+//    just inflates the reference delta). Min distance 0.0045 (k=9 → 0.9955).
+// If the interval changes again, re-derive BOTH families — launches included.
+export const IMPRINT_LAUNCH_INTERVAL_RAW = 0.095
+// Imprint sampling window per card: must cover the WORST-CASE exit (slowest drift
+// ≈ boardWidth·1.1 at 8.6·boardWidth/raw ≈ 0.128 raw) or late imprints go missing.
+export const IMPRINT_FLIGHT_SPAN_RAW = 0.135
 // Cascade-fixes story (user item 5, 2026-07-08): after its flight the card returns to
 // its foundation base and waits for its NEXT pass (launches wrap modulo the deck), so
 // a King reappears on the pile right behind the last Ace — seamless repeat. The
 // offscreen→base snap at launch + RETURN is invisible (alpha-gated in the overlay AND
-// fully offscreen: worst exit 0.147 < 0.165) but IS a position discontinuity, so the
-// value is lattice-tuned for the continuity suite: snap times are (11k + 16.5)/100 raw
-// (k = launchOrder + 52·pass), always ≥ 0.005 raw away from the integer-raw boundaries
-// the suite samples (window ±0.00144 raw). If IMPRINT_LAUNCH_INTERVAL_RAW changes,
-// re-derive this margin.
-export const IMPRINT_RETURN_RAW = 0.165
+// fully offscreen: worst exit 0.128 < 0.135 span < RETURN) but IS a position
+// discontinuity — lattice-tuned per constraint 2 above.
+export const IMPRINT_RETURN_RAW = 0.1405
 
 // Spirograph (mode 36) imprint sampling cadence: every card stamps once per this many
 // raw units (absolute lattice — all 52 cards fly for the whole run, so unlike mode 33
@@ -252,14 +268,19 @@ const WINPATH_STAMP_INTERVAL_RAW = 0.008
 const KALEIDO_STAMP_INTERVAL_RAW = 0.012
 
 // Fireworks (39): one volley per suit per cycle (suit phase offset 0.25 cycles →
-// a burst somewhere every ~0.8 s). The faint burst-ring stamp fires at u = 0.34,
-// just after the shell opens (small radius ring around the burst point).
+// a burst somewhere every ~0.8 s).
 const FIREWORK_CYCLE_RAW = 0.55
-const FIREWORK_STAMP_U = 0.34
 
-// Gravity Flip (45): gravity inverts every epoch (1.4 raw ≈ 8 s). Also the Warp
-// Drive (42) jump-epoch length — kept equal on purpose (both "every ~8 s" beats).
-const GRAVITY_FLIP_EPOCH_RAW = 1.4
+// Gravity Flip (45): gravity inverts every epoch. 1.4 → 0.7 raw ≈ 4 s (tuning
+// round 2, user 2026-07-12: "duration between going up and down significantly
+// faster"). HARD FLOOR: the bounce chain settles at ≤ delay 0.06 + fall 0.12 +
+// bounces 2·0.12·0.65/(1−0.65) ≈ 0.63 raw — epochs shorter than that break the
+// rest-before-flip continuity contract (epoch boundaries are only continuous
+// because the card is at rest on the source plane). Shrink gravityFlipParams
+// first if this ever needs to go lower.
+const GRAVITY_FLIP_EPOCH_RAW = 0.7
+// Warp Drive (42) jump-epoch length (was shared with Gravity Flip until the
+// 2026-07-12 retune; 42 keeps its ~8 s beat).
 const WARP_EPOCH_RAW = 1.4
 
 const fract = (v: number): number => {
@@ -296,15 +317,18 @@ const pinballParams = (assignment: CelebrationAssignment) => {
   const s4 = fract(seed * 4.7177 + 0.63)
   return {
     // Reflections per raw unit per axis — incommensurate so paths never repeat.
-    // ×1.15 (full-review culling story, 2026-07-09, user: "a tiny bit faster").
-    fx: (0.85 + 0.75 * s2) * 1.15,
-    fy: (1.05 + 0.85 * s3) * 1.15,
-    // Offsets with fract in [0.05, 0.35] so the FIRST impact lands ≥ ~0.3 raw in
-    // (worst case (4−o)/f = 0.65/2.19 after the ×1.15 speedup), after the anchored
-    // launch blend has saturated (stamps are computed with the blend applied — an
-    // earlier impact would ink a blended spot off the wall).
-    ox: 3.05 + 0.3 * seed,
-    oy: 3.05 + 0.3 * s4,
+    // ×1.15 (full-review culling story, 2026-07-09, user: "a tiny bit faster"),
+    // then ×1.35 on top (tuning round 2, 2026-07-12, user: "faster, but actually
+    // more than a little bit") — ×1.55 total vs the original.
+    fx: (0.85 + 0.75 * s2) * 1.55,
+    fy: (1.05 + 0.85 * s3) * 1.55,
+    // Offsets tightened to [3.0, 3.08] with the ×1.55 speedup so the FIRST impact
+    // still lands ≥ ~0.31 raw in (worst case (4−o)/f = 0.92/2.945), after the
+    // anchored launch blend has saturated (stamps are computed with the blend
+    // applied — an earlier impact would be skipped by the stamp loop's blend
+    // guard, i.e. a missing wall mark, not stray ink; keep it out of the window).
+    ox: 3.0 + 0.08 * seed,
+    oy: 3.0 + 0.08 * s4,
   }
 }
 
@@ -390,14 +414,16 @@ const WIN_GLYPHS: Record<string, number[][][]> = {
   ],
   // "!" = bar + CLEAR gap + dot (full-review culling story, 2026-07-09 — the user
   // screenshot showed it rendering as one full line; the old 0.6→0.82 gap was
-  // narrower than a card and got bridged visually).
+  // narrower than a card and got bridged visually). Gap widened again 0.30 → 0.40
+  // of the glyph (tuning round 2, 2026-07-12: "a tiny little bit more space
+  // between the long part and the dot") — bar shortened AND dot pushed down.
   '!': [
     [
       [0.5, 0],
-      [0.5, 0.52],
+      [0.5, 0.48],
     ],
     [
-      [0.5, 0.82],
+      [0.5, 0.88],
       [0.5, 1],
     ],
   ],
@@ -592,16 +618,7 @@ export const getImprintStampCount = (
     }
     case 38:
       return Math.max(0, Math.floor(rawProgress / POLLOCK_STAMP_INTERVAL_RAW))
-    case 39: {
-      // One stamp per cycle at u = FIREWORK_STAMP_U; cycles are phase-offset per
-      // suit, so m0 = first cycle index whose stamp time is > 0.
-      const off = assignment.suitIndex * 0.25
-      const m0 = Math.ceil(off - FIREWORK_STAMP_U)
-      return Math.max(
-        0,
-        Math.floor(rawProgress / FIREWORK_CYCLE_RAW + off - FIREWORK_STAMP_U) - m0 + 1
-      )
-    }
+    // Case 39 removed 2026-07-12 (Fireworks is imprint-free now — see metadata).
     case 43:
       return Math.max(0, Math.floor(rawProgress / WINPATH_STAMP_INTERVAL_RAW))
     // Case 45 removed 2026-07-09 (Gravity Flip is imprint-free now — see metadata).
@@ -643,11 +660,6 @@ export const getImprintStampRaw = (
     }
     case 38:
       return (n + 1) * POLLOCK_STAMP_INTERVAL_RAW
-    case 39: {
-      const off = assignment.suitIndex * 0.25
-      const m0 = Math.ceil(off - FIREWORK_STAMP_U)
-      return (m0 + n + FIREWORK_STAMP_U - off) * FIREWORK_CYCLE_RAW
-    }
     case 43:
       return (n + 1) * WINPATH_STAMP_INTERVAL_RAW
     case 46:
@@ -768,24 +780,38 @@ export function computeCelebrationFrame({
     // is traced with a time-warped phase (speed 0.7-1.3x, rushing through crossings and
     // lingering at the lobes), bigger amplitudes, stronger scale breath, plus a trail.
     // The warp is phase-based (theta + c*sin) so it is continuous by construction.
+    // Rounder (tuning round 2, user 2026-07-12: "a little bit rounder, not just up
+    // and down"): y blends the 1:2 Lissajous term with a QUADRATURE cos(warped) —
+    // (sin φ, cos φ) is a circle, so the trace loops in open rounded arcs instead
+    // of scanning vertically. Pure sines, continuity-safe.
     case 1: {
       const warped = theta + 0.6 * Math.sin(theta * 0.5)
       const ampX = boardRadius * (0.36 + 0.1 * Math.sin(thetaDouble))
       const ampY = boardRadius * (0.3 + 0.06 * Math.cos(thetaDouble + seed))
       pathX = centerX + Math.sin(warped) * ampX
-      pathY = centerY + Math.sin(warped * 2 + seed * TAU) * ampY
+      pathY =
+        centerY +
+        (0.55 * Math.sin(warped * 2 + seed * TAU) + 0.45 * Math.cos(warped)) * ampY
       rotation = (Math.sin(warped) * 540) / Math.PI
       targetScale = 1 + 0.18 * Math.sin(theta * 2 + normalizedIndex)
       break
     }
     // Pendulum Cascade (uplift 2026-07-08, "boring" set): taller swings, a wider
     // per-card fan, a slow whole-field horizontal sway, and more scale play + trail.
+    // Rounder (tuning round 2, user 2026-07-12, same request as mode 1): y gains a
+    // quadrature term at the SWING's own frequency (x = sin(1.5θ+…), extra
+    // y = −cos of the same argument → elliptical loops), so each swing traces an
+    // open oval instead of retracing its line. Main vertical term scaled down to
+    // keep the total y amplitude ≈ unchanged.
     case 2: {
       const ampX = boardRadius * (0.22 + stackFactor * 0.16)
       const ampY = boardRadius * 0.44
       const fieldSway = Math.sin(theta * 0.35) * boardRadius * 0.1
-      pathX = centerX + fieldSway + Math.sin(theta * 1.5 + seed * TAU) * ampX
-      pathY = centerY - Math.cos(theta + seed * 0.5) * ampY
+      const swingPhase = theta * 1.5 + seed * TAU
+      pathX = centerX + fieldSway + Math.sin(swingPhase) * ampX
+      pathY =
+        centerY -
+        (0.75 * Math.cos(theta + seed * 0.5) + 0.28 * Math.cos(swingPhase)) * ampY
       rotation = (theta * 360) / Math.PI
       targetScale = 1 + 0.14 * Math.cos(theta * 3 + seed)
       break
@@ -1011,48 +1037,8 @@ export function computeCelebrationFrame({
       targetScale = 1 + 0.05 * Math.sin(theta * 2 + suitIndex)
       break
     }
-    // Flock — MURMURATION rework (full-review culling story, 2026-07-09; user:
-    // "kind of boring, just cards following each other — improve or remove").
-    // ONE bold redesign, honest-verdict deal: four SUB-FLOCKS (one per suit, 13
-    // birds each) that SPLIT AND RE-MERGE. Each sub-flock's center = a shared
-    // wandering global path + a per-suit divergence offset gated by a slow
-    // per-suit cohesion wave (~9 s, staggered phases — sub-flocks peel off and
-    // rejoin at different moments). Within a sub-flock every card samples the
-    // SAME center trajectory at a lagged time (0.09·rank), so turns propagate
-    // visibly down the string — the "coordinated turn" murmuration look; the
-    // cohesion gate being sampled at the lagged time too makes a split RIPPLE
-    // through the flock instead of snapping. Small constant per-card scatter
-    // keeps it a cloud rather than a line. Pure sines → continuity-safe.
-    case 25: {
-      const sub = assignment.suitIndex
-      const t = theta - 0.09 * assignment.stackIndex
-      // Shared global wander (incommensurate sine sums, whole-board scale).
-      const gx = 0.18 * Math.sin(t * 0.9 + 1.1) + 0.05 * Math.sin(t * 0.37 + 4.2)
-      const gy = 0.2 * Math.sin(t * 0.73 + 2.6) + 0.08 * Math.sin(t * 0.41 + 0.7)
-      // Cohesion 1 = merged into one flock, 0 = fully split into four.
-      // Device tuning 2026-07-09: first cut (0.22 freq, 0.14/0.12 divergence)
-      // never visibly split — one cohesion cycle took ~26 s and the offsets
-      // drowned in the flock's own scatter. Now ~13 s per cycle and the
-      // divergence is biased to the PORTRAIT y axis (x is bounded by the narrow
-      // board: |gx|+|ox| ≤ 0.34·R keeps the flock on screen incl. scatter).
-      const cohesion = 0.5 + 0.5 * Math.sin(t * 0.45 + sub * 1.9)
-      const split = 1 - cohesion
-      const ox = 0.16 * Math.sin(t * 0.53 + sub * 1.7)
-      const oy = 0.28 * Math.cos(t * 0.61 + sub * 2.4)
-      pathX =
-        centerX +
-        boardRadius * (gx + ox * split) +
-        (seed - 0.5) * metrics.width * 1.3
-      pathY =
-        centerY +
-        boardRadius * (gy + oy * split) +
-        (fract(seed * 7.5313 + 0.33) - 0.5) * metrics.height * 1.1
-      // Heading proxy from the dominant velocity terms (smooth sine mix — exact
-      // atan2 would wrap ±180° and trip the continuity suite).
-      rotation = 35 * Math.cos(t * 0.9 + 1.1) - 22 * Math.sin(t * 0.73 + 2.6)
-      targetScale = 0.9 + 0.08 * Math.sin(t * 1.3 + seed * TAU)
-      break
-    }
+    // Case 25 (Flock) retired 2026-07-12 (tuning round 2) — see the tombstone
+    // above CELEBRATION_MODE_METADATA.
     // Shockwave: loose grid + radial gaussian bump. The wave radius ping-pongs via a
     // cosine (sweeps out and back) instead of a sawtooth reset, so it is continuous
     // everywhere by construction.
@@ -1194,23 +1180,24 @@ export function computeCelebrationFrame({
       const cardW = metrics.width
       const cardH = metrics.height
       // Cascade-fixes story (user 2026-07-08: "make avalanche a bit faster"): cadence
-      // 0.06 → 0.04 raw (last launch ~12 s in), drift ×~1.44, bounce freq ×1.2,
-      // initial-drop time 0.35 → 0.25, envelope slightly livelier. Constants only —
-      // continuity-safe.
+      // 0.06 → 0.04 raw, drift ×~1.44, bounce freq ×1.2, initial-drop time
+      // 0.35 → 0.25. Tuning round 2 (2026-07-12, "a little bit faster" again,
+      // ~×1.15): cadence 0.04 → 0.035 (last launch ~10.5 s in), drift/bounce
+      // freq/envelope ×1.15, drop 0.25 → 0.22. Constants only — continuity-safe.
       const tSince = Math.max(
         0,
         rawProgress - assignment.index * AVALANCHE_LAUNCH_INTERVAL_RAW
       )
       // Resting floor: cards bounce ON the visible floor, not inside the nav dock.
       const floorY = visibleFloorY - cardH
-      const drop = Math.max(0, 1 - tSince / 0.25)
+      const drop = Math.max(0, 1 - tSince / 0.22)
       // Bounce height decays and regrows via a slow smooth envelope (Big Bounce pattern).
-      const envelope = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(TAU * tSince * 0.16 + seed * TAU))
+      const envelope = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(TAU * tSince * 0.18 + seed * TAU))
       const bounceHeight = boardHeight * (0.22 + 0.18 * seed) * envelope
-      const u0 = tSince * (4.2 + 1.8 * seed)
+      const u0 = tSince * (4.8 + 2.1 * seed)
       const u = u0 - Math.floor(u0)
       const spanX = boardWidth + cardW * 8
-      const x0 = assignment.baseX + cardW * 4 + boardWidth * (0.65 + 0.5 * seed) * direction * tSince
+      const x0 = assignment.baseX + cardW * 4 + boardWidth * (0.75 + 0.58 * seed) * direction * tSince
       const ux = x0 / spanX - Math.floor(x0 / spanX)
       pathX = ux * spanX - cardW * 4
       pathY = floorY - 4 * bounceHeight * u * (1 - u) - (floorY - assignment.baseY) * drop * drop
@@ -1296,7 +1283,8 @@ export function computeCelebrationFrame({
       const dropHeight = Math.max(1, floorRestY - assignment.baseY)
       // Per-card fall time t0 → per-card gravity g; impact speed v0 = g·t0. Varying
       // t0 (was fixed 0.045) staggers impact timing/arc width between pile-mates.
-      const t0 = 0.04 + 0.012 * seedFall
+      // ×~1.15 faster falls (tuning round 2, 2026-07-12): 0.04+0.012 → 0.035+0.01.
+      const t0 = 0.035 + 0.01 * seedFall
       const g = (2 * dropHeight) / (t0 * t0)
       const v0 = g * t0
       // Restitution k: bounce n peaks at k^(2n)·dropHeight and lasts 2·v0·k^n/g, so
@@ -1322,16 +1310,17 @@ export function computeCelebrationFrame({
           y = floorRestY - (vn * tau - 0.5 * g * tau * tau)
         }
       }
-      // Constant drift, range widened 8–10.5 → 7.5–11.5 boardWidths/raw (item 6),
-      // still sized so even the slowest card fully exits within
-      // IMPRINT_FLIGHT_SPAN_RAW (worst ≈ boardWidth·1.1 at 7.5/raw ≈ 0.147 < 0.16)
-      // and x stays monotonic within a flight (continuity). Direction alternates by
-      // launch order AND pass, so consecutive launches fly to opposite sides and a
-      // card's second pass mirrors its first.
+      // Constant drift, ×1.15 in tuning round 2 (2026-07-12): 7.5–11.5 →
+      // 8.6–13.2 boardWidths/raw, still sized so even the slowest card fully
+      // exits within IMPRINT_FLIGHT_SPAN_RAW (worst ≈ boardWidth·1.1 at
+      // 8.6/raw ≈ 0.128 < 0.135) and x stays monotonic within a flight
+      // (continuity). Direction alternates by launch order AND pass, so
+      // consecutive launches fly to opposite sides and a card's second pass
+      // mirrors its first.
       const launchDirection = (launchOrder + pass) % 2 === 0 ? 1 : -1
       pathX =
         assignment.baseX +
-        boardWidth * (7.5 + 4 * seedDrift) * launchDirection * tSince
+        boardWidth * (8.6 + 4.6 * seedDrift) * launchDirection * tSince
       pathY = y
       // Upright like the Windows original: no rotation/scale games.
       break
@@ -1478,8 +1467,8 @@ export function computeCelebrationFrame({
     // (offscreen-teleport exemption; wrap times are ≥ 0.01 raw away from the
     // suite's integer-raw sample boundaries — mod-11 argument on 20/11 cycles per
     // raw). Rotation/scale/opacity never depend on the cycle discontinuously:
-    // opacity is 0 at BOTH cycle ends (smoothstep fades). The faint burst-point
-    // ring stamp (events policy, alpha 0.3) fires at u = FIREWORK_STAMP_U.
+    // opacity is 0 at BOTH cycle ends (smoothstep fades). Burst-point imprints
+    // removed 2026-07-12 (see metadata).
     case 39: {
       const cardH = metrics.height
       const cyc = rawProgress / FIREWORK_CYCLE_RAW + assignment.suitIndex * 0.25
@@ -1492,7 +1481,9 @@ export function computeCelebrationFrame({
       // Burst points confined to the upper third (full-review culling story,
       // 2026-07-09 — user: bursts "on like sixty percent of the screen height"
       // lacked fireworks vibes; was 0.16 + 0.3·hy ≈ down to 46% height).
-      const burstY = boardHeight * (0.08 + 0.2 * hy)
+      // Nudged higher again (tuning round 2, 2026-07-12: "slightly higher"):
+      // 0.08–0.28 → 0.05–0.21 of board height.
+      const burstY = boardHeight * (0.05 + 0.16 * hy)
       const startX = burstX + (seed - 0.5) * boardWidth * 0.12
       const startY = boardHeight + cardH * 4
       const ascent = smooth01(u / 0.3)
@@ -1539,10 +1530,16 @@ export function computeCelebrationFrame({
       // any moment. Wrap stays position-continuous (r = rOut at both cycle ends).
       if (u < 0.74) {
         const s = u / 0.74
-        r = rOut * Math.pow(1 - s, 1.6)
+        // Radius power 1.6 → 2.2 + fade-out pushed later, 0.8/0.17 → 0.86/0.12
+        // (tuning round 2, 2026-07-12, user: cards "could stay a little bit
+        // longer when they're getting sucked in"): the steeper power drops r
+        // early and keeps it SMALL for longer, so cards visibly dwell circling
+        // tight around the core (~1.8× the previous near-core visible time)
+        // before the delayed fade takes them.
+        r = rOut * Math.pow(1 - s, 2.2)
         angle = angle0 + 3 * TAU * s * s * s
         // Fade in near the (offscreen-ish) edge, fade out just before the core.
-        targetOpacity = smooth01(u / 0.05) * (1 - smooth01((s - 0.8) / 0.17))
+        targetOpacity = smooth01(u / 0.05) * (1 - smooth01((s - 0.86) / 0.12))
       } else {
         // Invisible transit back to the start radius; angle holds at 3·TAU ≡ 0.
         r = rOut * smooth01((u - 0.74) / 0.26)
@@ -1694,29 +1691,32 @@ export function computeCelebrationFrame({
     // story — user screenshots showed the four suit systems clumping into one
     // mid-screen blob with moons hugging their planets into noise). Now each suit
     // system lives in its OWN QUADRANT: planets circle fixed anchors at
-    // center ± 0.24·boardWidth / ± 0.22·boardHeight (symmetric → composition
-    // centered on the board), on a small 0.04·R orbit, so systems can NEVER
-    // meet — worst-case reach (0.04 orbit + 0.16 outermost moon + half a moon
-    // card ≈ 0.225·R) stays inside the 0.24·R half-separation. Moons ride
-    // clearly distinct rings (0.04–0.16·R, step 0.012 ≈ 5 dp) at spread speeds;
+    // center ± 0.28·boardWidth / ± 0.26·boardHeight (symmetric → composition
+    // centered on the board; pushed out from ±0.24/±0.22 in tuning round 2,
+    // 2026-07-12 — user: "the solar system is vast", systems read too dense),
+    // on a small 0.04·R orbit, so systems can NEVER meet — worst-case reach
+    // (0.04 orbit + 0.16 outermost moon + half a moon card ≈ 0.225·R) stays
+    // well inside the 0.28·boardWidth half-separation. Moons ride clearly
+    // distinct rings (0.04–0.16·R, step 0.012 ≈ 5 dp) at spread speeds;
     // Aces stay the pulsing central star cluster between the quadrants. Rank-
     // sorted draw order puts Kings on top of their moons for free. Pure sines →
     // continuous. Do not grow orbit/moon radii without re-checking the reach sum.
     case 44: {
       const suit = assignment.suitIndex
       const suitPhase = (suit / 4) * TAU
-      const anchorX = centerX + (suit % 2 === 0 ? -1 : 1) * boardWidth * 0.24
-      const anchorY = centerY + (suit < 2 ? -1 : 1) * boardHeight * 0.22
+      const anchorX = centerX + (suit % 2 === 0 ? -1 : 1) * boardWidth * 0.28
+      const anchorY = centerY + (suit < 2 ? -1 : 1) * boardHeight * 0.26
       const planetDirection = suit % 2 === 0 ? 1 : -1
       const planetAngle = planetDirection * theta * (0.5 + 0.08 * suit) + suitPhase
       const planetOrbit = boardRadius * 0.04
       const planetX = anchorX + Math.cos(planetAngle) * planetOrbit
       const planetY = anchorY + Math.sin(planetAngle) * planetOrbit
       if (assignment.stackIndex === 12) {
-        // King = planet.
+        // King = planet. 1.05 → 0.9 (tuning round 2, 2026-07-12: "the planet
+        // itself should be a little bit smaller" — less crowding vs its moons).
         pathX = planetX
         pathY = planetY
-        targetScale = 1.05
+        targetScale = 0.9
       } else if (assignment.stackIndex === 0) {
         // Ace = pulsing core cluster (the "sun" between the four systems).
         const coreAngle = theta * 1.3 + suitPhase

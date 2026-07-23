@@ -1576,3 +1576,170 @@ Learnings for future testers: `adb shell input tap` gets delayed 10+ s while scr
 
 - The brief real+Skia card overlap at start (~2 frames, both at identical positions) reads as a small brightness bump because the Skia sprite's baked shadow lands on top of the real card. Invisible at speed; if it ever bothers, delay the launch-anchor by one frame after onOverlayReady. Recommend leaving as is.
 - The overlay-ready gate leaves real cards mounted if the atlas texture somehow never lands (defensive fail-safe: board stays visible instead of empty). No action needed.
+
+---
+
+# Story: tuning round 2 + Flock removal
+
+Status: DONE 2026-07-13 — implemented, cheap gates green (28 suites / 280 tests, continuity suite unweakened), A065 device verification PASSED on all 11 checks (no tuning iteration needed). Results in "Testing" below.
+
+## User prompt (voice transcript, 1:1)
+
+> "Please remove celebration twenty five. Please make thirty-one. A little bit faster. Please make thirty three a little bit faster. I think the thirty Sixth paragraph. We said we wanna I have like the cards. Directly like leave an imprint, I think that helped a bit, but I think the imprint starts a bit late and not just when the cards leave a foundation. There's Please make the pinball A little bit faster, but actually more than a little bit. It's true. Make the fireworks go up slightly higher, and I don't think the fireworks, so number thirty-nine, they need to leave an imprint because I think the fireworks, like usually, they also just like Leave again after some point, and here it's a bit more distracting the imprint that it leaves. I think the black hole, the cards could stay a little bit longer when they're actually in the hole, when they're kind of getting sucked in And you win the exclamation mark, I think, needs a tiny little bit more. Space between like the long part of the line and the dot of the U in I think the solar system, the planet itself should be a little bit smaller. So The, that the stuff isn't so close to each other, and I think the individual planet things should be like, yeah, no, the sun is fine like this, but the planets in general If they could be a little bit further apart, so because like the solar system is kind of v-vast and it seems so very close together and very kind of dense, whereas the solar system has a lot of space in between, think like tiny optimization, please have a look. The gravity flip is great number forty five, but please make the duration between going up and down significantly faster. Please make the number one, the Lisa choose wave, a little bit rounder and not just up and down, but it's more a bit round. Same for the Pentonum Cascade number two, please. That's it, thank you very much."
+
+## Decision table (orchestrator-parsed)
+
+| Id | Mode | Decision | Detail |
+|----|------|----------|--------|
+| 25 | Flock | REMOVE | User decided remove despite the murmuration rework. Delete metadata + case, add to tombstone. 38 modes remain. |
+| 31 | Avalanche | TUNE | ~1.15× faster on top of current (cadence + drift + bounce freq + drop time) |
+| 33 | Cascade Imprint | TUNE | ~1.15× faster cadence/flights; keep the seamless modulo-52 repeat + continuity lattice intact |
+| 36 | Spirograph | FIX | Stamps must begin the moment cards LEAVE the foundations — find the actual gating (launchStamps restored blend-time ink but the transit still reads as starting late) |
+| 37 | Pinball | TUNE | ~1.35× on top of current (total ~1.55× vs original); wall-impact stamping stays correct |
+| 39 | Fireworks | TUNE | (a) bursts slightly higher; (b) REMOVE the imprint entirely (metadata config + event stamps) |
+| 40 | Black Hole | TUNE | Cards linger longer in the suck-in phase (slower final approach / more dwell near the core) |
+| 43 | You Win | TUNE | Slightly larger gap between the "!" bar and its dot |
+| 44 | Solar System | TUNE | Planet CARDS slightly smaller; the four systems further apart (more empty space); sun unchanged |
+| 45 | Gravity Flip | TUNE | Flip interval ~8 s → ~4 s (0.7 raw) |
+| 1 | Lissajous Weave | TUNE | Rounder — add a circular quadrature component, less pure up-down |
+| 2 | Pendulum Cascade | TUNE | Same — rounder elliptical loops instead of strictly linear swings |
+
+## Mode-36 late-stamp root cause (investigated)
+
+`launchStamps: true` DOES ink blend-time stamps — no gate skips them. The real
+cause is SAMPLING DENSITY: the stamp lattice is uniform in TIME (0.01 raw) while
+the launch blend is easeOutQuint(arg·40) with initial slope 5 — one lattice
+interval advances the blend arg by ~0.0385, so the FIRST inked point after the
+anchor already sits ~18% (worst ~33%, anchor mid-interval) of the way from base
+to orbit. On a 300–500 dp transit that is a 50–150 dp un-inked gap right at the
+foundation — exactly "the imprint starts a bit late and not just when the cards
+leave a foundation". (Stamps whose frozen time predates the anchor all stack AT
+base, so there is ink on the pile itself — the gap is the transit's first leg.)
+Fix: renderer-side SUB-STAMPING for launchStamps modes — any scheduled stamp
+whose lattice interval overlaps the active launch blend subdivides into 4
+sub-draws at intermediate frozen times (max eased step ~5% ≈ under half a card
+width). Deterministic from the stamp index → write-once semantics intact; cost
+bounded (~4× stamps for the ~1.5 s blend window, mode 36 only).
+
+## Steps to implement
+
+- [x] 1. Add this story section (before coding). DONE.
+- [x] 2. Remove 25 (metadata + case + tombstone). DONE.
+- [x] 3. Investigate the mode-36 late-stamp gating; fix so the launch transit stamps from the very first movement. DONE — sub-stamping in CascadeImprintLayer (root cause above).
+- [x] 4. Tunings 31 / 33 (lattice re-derived — see learnings) / 37 / 39 / 40 / 43 / 44 / 45 / 1 / 2. DONE.
+- [x] 5. Cheap gates: `yarn typecheck && yarn lint && yarn jest`. DONE — green, 28 suites / 280 tests (auto-shrank by 1; all touched modes pass unweakened). One iteration: the first 33 interval (3/32) put launch k=32 exactly on raw 3.0 → suite caught it; retuned to 0.095/0.1405 with margins verified numerically.
+- [x] 6. Device verification on A065 → `.test-artifacts/celebration-tuning-r2/`: badge cycle (38 names, no Flock), `?celebration=25` graceful fail, 36 launch-transit stamps, 39 higher + no imprints, 43 "!" gap, 44 spacing, 45 flip frequency, 40 dwell, 1/2 roundness, 31/33/37 speed impressions, 33 wrap seamless, gfxinfo on 37. DONE 2026-07-13 — all PASS, see Testing.
+- [x] 7. Update this story (files, learnings, results). DONE.
+
+## Plan: Files to modify
+
+- `src/animation/celebrationModes.ts` (removal, all tunings, schedule changes)
+- `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx` (36 sub-stamping)
+- This plan doc.
+
+## Files actually modified
+
+- `src/animation/celebrationModes.ts` — Flock 25 removed (metadata + case, id
+  added to the tombstone); Lissajous 1 + Pendulum 2 rounder (quadrature circular
+  y components); Avalanche 31 ×~1.15 (cadence 0.04→0.035, drift 0.65+0.5s →
+  0.75+0.58s, bounce freq 4.2+1.8s → 4.8+2.1s, drop 0.25→0.22, envelope
+  0.16→0.18); Cascade Imprint 33 ×~1.16 (interval 0.11→0.095, span 0.16→0.135,
+  return 0.165→0.1405 — lattice re-derived for BOTH launch and snap families;
+  flight drift 7.5+4s → 8.6+4.6s, fall t0 0.04+0.012s → 0.035+0.01s); Pinball 37
+  ×1.35 on top (fx/fy ×1.55 total, offsets tightened to [3.0, 3.08] to keep the
+  first impact outside the launch blend); Fireworks 39 bursts higher
+  (0.08–0.28 → 0.05–0.21 board height) + imprint fully removed (metadata config,
+  both schedule cases, FIREWORK_STAMP_U); Black Hole 40 dwell (radius power
+  1.6→2.2, fade-out 0.8/0.17 → 0.86/0.12 — ~1.8× longer visible near-core time);
+  You Win 43 "!" gap 0.30→0.40 of the glyph (bar to 0.48, dot from 0.88); Solar
+  System 44 anchors ±0.24/±0.22 → ±0.28/±0.26, King planet scale 1.05→0.9, sun
+  untouched; Gravity Flip 45 epoch 1.4→0.7 raw (~4 s; WARP_EPOCH_RAW split off,
+  42 keeps 1.4).
+- `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx` —
+  launch-transit sub-stamping for launchStamps modes (4 sub-draws per scheduled
+  stamp while its interval overlaps the anchored launch blend; frame computation
+  moved into the sub loop).
+- This plan doc.
+
+## Intermediary learnings
+
+- Mode 36's "imprint starts late" was a SAMPLING-DENSITY artifact, not a gate
+  (see root cause section). Any future launchStamps mode gets sub-stamping free.
+- **Mode 33 lattice has TWO families to keep off the suite's boundaries, not
+  one**: the first retune attempt (interval 3/32, return 9/64 — chosen so the
+  RETURN SNAPS have odd/64 numerators, provably ≥ 1/64 from integers) still
+  failed the suite: launch k=32 landed EXACTLY on raw 3.0, and a LAUNCH is a
+  velocity kink on a card whose reference delta is ~0 (it was resting) — the
+  3×ref+2dp heuristic flags it. Final pair 0.095/0.1405: closest launch 0.005
+  BELOW a boundary (safely before the reference sample), closest snap 0.0045
+  (> the ±0.00144 straddle window), both verified numerically over k ≤ 110.
+- Pinball at ×1.55 pushed the worst-case first wall impact (0.65/2.945 ≈ 0.22
+  raw) inside the launch-blend window where stamps are counted-but-skipped
+  (missing mark, not stray ink). Offsets tightened to [3.0, 3.08] so the first
+  impact stays ≥ ~0.31 raw — past typical blend saturation (~0.3 raw at a
+  ~320 ms anchor).
+- Gravity Flip's bounce chain settles by ≤ 0.63 raw (delay 0.06 + fall 0.12 +
+  geometric chain 0.446), so 0.7 raw is close to the shortest epoch that keeps
+  the rest-before-flip continuity contract. Shrink gravityFlipParams before
+  going lower (documented at the constant).
+- Solar System reach after the retune: 0.04 orbit + 0.16 outermost moon + half
+  a moon card ≈ 0.225·R vs 0.28·boardWidth half-separation — systems can never
+  touch and the composition stays centered.
+- "Rounder" for line-tracing modes = add a QUADRATURE term: x = A·sin(φ) plus a
+  y component ∝ cos(φ) turns retraced lines into open ellipses/loops without
+  touching frequencies (continuity-safe, amplitude budget ~unchanged).
+
+## Identified issues
+
+- One gate iteration (mode 33 lattice, caught by the continuity suite — see
+  learnings). No device-found issues; the one allowed per-mode tuning iteration
+  was not needed.
+- Honest note on mode 1 (Lissajous): the quadrature blend reduces the per-card
+  y-spread coefficient (1.0 → 0.55), so the train reads slightly more compact/
+  snake-like in stills. Motion is clearly rounder (the request), but if the user
+  finds the weave too clustered now, raise the sin(2·warped) coefficient back
+  toward 0.7 and drop cos to 0.3.
+
+## Testing
+
+- Cheap gates 2026-07-12: `yarn typecheck` + `yarn lint` + `yarn jest` green —
+  28 suites / 280 tests (−1: Flock's continuity test retired with the mode);
+  test file untouched, all touched modes pass unweakened.
+
+### Device run 2026-07-12/13 (A065 physical, 192.168.1.12:5555; fresh install verified — versionCode 14, lastUpdateTime 00:21; artifacts in `.test-artifacts/celebration-tuning-r2/`)
+
+| # | Check | Verdict | Evidence |
+|---|-------|---------|----------|
+| 1 | Roster: badge cycle = 38 names, no Flock, no crash | PASS — logcat start sequence 1 2 3 5 6 8 9 10 12 13 17 20 21 22 23 24 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 0 (exact metadata order, wraps to Spiral Bloom, 25 absent); crash buffer empty | `badge-cycle.txt`, `01-badge-wrap.png` |
+| 2 | `soli://?celebration=25` graceful fail | PASS — devLog `[Demo] Celebration link: unknown mode "25".`, link ignored, running preview untouched, no crash | `02-removed-25-graceful.png` |
+| 3 | 36 stamps DURING launch transit | PASS — at ~1.5 s dense continuous ink ribbons trace from the foundation piles down into the orbits with NO un-inked gap at the pile (the messy start is back AND starts immediately); mandala builds on top by 10 s | `03-mode36-1.5s.png`, `04-mode36-10s.png` |
+| 4 | 39 higher bursts + NO imprints | PASS — burst points in the upper quarter (vs the old ~60% complaint), shells droop through; zero lingering rings after shells fade at 20 s (imprint surface not even mounted) | `05-mode39-7s.png`, `06-mode39-20s.png` |
+| 5 | 43 "!" bar–dot gap | PASS — full "YOU WIN!" legible at 35 s, "!" reads as bar + clear gap + dot, well separated from N | `07-mode43-35s.png` |
+| 6 | 44 smaller planets + wider spacing | PASS vs `celebration-culling-batch/08-mode44-14s.png` — King planets visibly smaller, four systems pushed toward the corners with clearly more empty felt between them and the central sun (unchanged) | `08-mode44-8s.png`, `09-mode44-14s.png` |
+| 7 | 45 flips ~2× more frequent | PASS — screenshots 4 s apart show OPPOSITE planes (6 s: full ribbon resting on the CEILING; 10 s: resting on the visible floor) → flip interval ≈ 4 s as designed | `10-mode45-6s.png`, `11-mode45-10s.png` |
+| 8 | 40 dwell near the core | PASS — both shots 2 s apart show a cluster of small cards circling tight around the (wandering) core; the suck-in visibly lingers before cards vanish | `12-mode40-9s.png`, `13-mode40-11s.png` |
+| 9 | 1 / 2 rounder motion | PASS (subjective, stills undersell motion) — 1's train sweeps in curved loops (cluster arcs across the board between the two shots, trail curves visible); 2's field now reads as a rounded wreath / elliptical fan instead of a vertical scan — clearly rounder than the old pure up-down | `14/14b-mode1-*.png`, `15/15b-mode2-*.png` |
+| 10 | Speed 31/33 + 33 wrap | PASS — 31: foundations nearly empty at ~11 s (last launch by design 10.5 s, was ~13 s); 33: deck done ≈ 28.5 s (was ~33 s), wrap seamless — 31 s shot shows fresh King arcs relaunching from the SAME pile origins right behind the Ace bands, no offset, no pause | `16-mode31-11s.png`, `17-mode33-28s-wrap.png`, `18-mode33-31s.png` |
+| 11 | 37 faster + stamping correct + perf | PASS — visibly much faster; walls densely collect impact marks with the center clean (no stray mid-flight ink at ×1.55); gfxinfo 10 s window: 1319 frames ≈ 132 fps, modern janky 0.23%, frame 90th 13 ms, GPU 90th 5 ms (bar 110) | `19-mode37-10s.png`, `20-mode37-30s.png`, `gfx-37.txt` |
+| 12 | Abort sanity | PASS — tap mid-celebration → instant dismiss to the untouched mid-game board; Soli crash buffer EMPTY across the whole session (one FATAL in the buffer belongs to `host.exp.exponent` — the invent agent's app, not Soli) | `21-abort-restore.png` |
+
+- Session interruption (no impact on results): a cross-repo agent (invent) took
+  the Android device mid-session (overwrote `/tmp/android-device.lock`, Expo dev
+  client foregrounded) between checks 6 and 7 — waited for the lock per the
+  skill's cross-repo rule (~5 min) and resumed; all remaining checks re-ran
+  against Soli in the foreground.
+- Device-session learnings: the A065's screen dozed twice at the default 60 s
+  timeout (black screencaps, badge taps swallowed) — `android-ready.sh
+  --keep-awake` raises the timeout to 600 s but the doze bit earlier anyway;
+  `svc power stayon true` (device was charging) held for the whole session.
+  Restore BOTH at session end (`svc power stayon false` + timeout 60000). Badge
+  taps at 805×2153 (1080×2412 panel) cycle reliably at 1.1 s spacing once the
+  screen stays on.
+
+## Follow-ups
+
+- Mode 1 spread trade-off (see Identified issues): one-line coefficient swap if
+  the rounder weave reads too clustered live.
+- The `svc power stayon` learning is worth folding into the soli-testing skill's
+  troubleshooting table if the 60 s-doze recurs in future sessions (left out for
+  now — one data point, and android-ready.sh --keep-awake may usually suffice).

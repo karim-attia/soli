@@ -1109,17 +1109,6 @@ const CascadeImprintLayer = ({
             const frozenProgress =
               getImprintStampRaw(modeId, assignment, next, totalCards, stream) /
               CELEBRATION_SPEED_MULTIPLIER
-            const frame = computeCelebrationFrame({
-              modeId,
-              assignment,
-              metrics: { width: cardWidth, height: cardHeight },
-              board,
-              totalCards,
-              progress: frozenProgress,
-            })
-            if (!frame) {
-              continue
-            }
             // Same ANCHORED launch blend as the live Atlas sprite
             // (frame.launchEased is ignored there too — see the launchAnchor
             // comment); no wobble (imprint modes opt out). Stamps must reproduce
@@ -1138,28 +1127,84 @@ const CascadeImprintLayer = ({
             if (!isCascade && !launchStamps && launchBlendArg < 1) {
               continue
             }
-            // Pen-up skip (You Win): path samples with a dipped opacity are
-            // counted but not inked — letter gaps stay clean (0.98 keeps stray
-            // tails at gap entries under ~3 dp). Never trips for modes whose
-            // targetOpacity is constant 1 (33/36/37/38/45/46); Fireworks' stamp
-            // time lands at full ember opacity by design.
-            if (frame.targetOpacity < 0.98) {
-              continue
+            // Launch-transit SUB-STAMPING for launchStamps modes (tuning round 2,
+            // 2026-07-12 — user: 36's "imprint starts a bit late and not just when
+            // the cards leave a foundation"): the stamp lattice is uniform in TIME
+            // but the launch blend is easeOutQuint(arg·40), whose initial slope is
+            // 5 — one lattice interval advances the blend arg by ~0.0385, so the
+            // FIRST inked point after the anchor already sat ~18% (worst ~33%) of
+            // the way from base to path, leaving a visible un-inked gap at the
+            // foundation. While a stamp's interval overlaps the active blend,
+            // subdivide it into 4 sub-draws at intermediate frozen times (max
+            // eased step ~5%, under half a card width) so the streak traces from
+            // the very first movement off the pile. Deterministic from the stamp
+            // index → write-once semantics intact; cost is bounded (~4× stamps
+            // for the ~1.5 s blend window, mode 36 only).
+            let subCount = 1
+            let prevProgress = frozenProgress
+            if (launchStamps && launchBlendArg > 0) {
+              prevProgress =
+                next > 0
+                  ? getImprintStampRaw(
+                      modeId,
+                      assignment,
+                      next - 1,
+                      totalCards,
+                      stream
+                    ) / CELEBRATION_SPEED_MULTIPLIER
+                  : 0
+              if (
+                (prevProgress - anchor) * CELEBRATION_LAUNCH_SPEED_MULTIPLIER <
+                1
+              ) {
+                subCount = 4
+              } else {
+                prevProgress = frozenProgress
+              }
             }
-            const launchEased = easeOutQuint(
-              Math.min(1, Math.max(0, launchBlendArg))
-            )
-            const translateX =
-              assignment.baseX * (1 - launchEased) + frame.pathX * launchEased
-            const translateY =
-              assignment.baseY * (1 - launchEased) + frame.pathY * launchEased
-            stampFace(
-              slot,
-              translateX,
-              translateY,
-              frame.rotation * launchEased,
-              1 + (frame.targetScale - 1) * launchEased
-            )
+            for (let sub = subCount - 1; sub >= 0; sub -= 1) {
+              const subProgress =
+                frozenProgress - ((frozenProgress - prevProgress) * sub) / subCount
+              const subBlendArg =
+                (subProgress - anchor) * CELEBRATION_LAUNCH_SPEED_MULTIPLIER
+              // Pre-anchor sub-times all coincide at base — one stamp (the main
+              // one, sub 0) is enough.
+              if (sub > 0 && subBlendArg <= 0) {
+                continue
+              }
+              const frame = computeCelebrationFrame({
+                modeId,
+                assignment,
+                metrics: { width: cardWidth, height: cardHeight },
+                board,
+                totalCards,
+                progress: subProgress,
+              })
+              if (!frame) {
+                continue
+              }
+              // Pen-up skip (You Win): path samples with a dipped opacity are
+              // counted but not inked — letter gaps stay clean (0.98 keeps stray
+              // tails at gap entries under ~3 dp). Never trips for modes whose
+              // targetOpacity is constant 1 (33/36/37/38/45/46).
+              if (frame.targetOpacity < 0.98) {
+                continue
+              }
+              const launchEased = easeOutQuint(
+                Math.min(1, Math.max(0, subBlendArg))
+              )
+              const translateX =
+                assignment.baseX * (1 - launchEased) + frame.pathX * launchEased
+              const translateY =
+                assignment.baseY * (1 - launchEased) + frame.pathY * launchEased
+              stampFace(
+                slot,
+                translateX,
+                translateY,
+                frame.rotation * launchEased,
+                1 + (frame.targetScale - 1) * launchEased
+              )
+            }
           }
           stampState.stamped[key] = next
         }
