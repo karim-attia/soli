@@ -34,6 +34,7 @@ import { useKlondikeTimer } from './useKlondikeTimer'
 import { useKlondikePersistence } from './useKlondikePersistence'
 import { useUndoHint } from './useUndoHint'
 import { useHint } from './useHint'
+import { useRewindToWinnable } from './useRewindToWinnable'
 import { useKlondikeHistoryEntry } from './useKlondikeHistoryEntry'
 import { useSolvableDealSelector } from './useSolvableDealSelector'
 import { useCelebrationController } from './useCelebrationController'
@@ -171,13 +172,18 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     setSolvableGamesOnly,
     setWarningMode,
     setHintButtonEnabled,
+    setRewindToWinnableEnabled,
   } = useSettings()
   const { showMoves, showTime } = settingsState.statistics
   const solvableGamesOnly = settingsState.solvableGamesOnly
   const preferredDrawCount = settingsState.drawCount
   const autoUpEnabled = settingsState.autoUpEnabled
   // Warning-mode select + hint button toggle (F14) — see settings.tsx.
-  const { warningMode, hintButton: hintButtonEnabled } = settingsState.hints
+  const {
+    warningMode,
+    hintButton: hintButtonEnabled,
+    rewindToWinnable: rewindToWinnableEnabled,
+  } = settingsState.hints
   const developerModeEnabled = settingsState.developerMode
 
   const animationToggles = useAnimationToggles()
@@ -578,6 +584,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     setSolvableGamesOnly,
     setWarningMode,
     setHintButtonEnabled,
+    setRewindToWinnableEnabled,
     resetUndoHintForTesting,
     dealNewGameForTesting,
     startGameFromExactDeal,
@@ -863,13 +870,36 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Hint button + background warnings (hints plan; warning-mode select since
   // F14). Dispatchless since feedback round 1 (2026-07-23): hint visuals are a
   // dedicated overlay, never selection state, so useHint needs no dispatcher.
-  const { requestHint, activeHint, hintBubbleText, warningEmphasisNonce } = useHint({
+  const {
+    requestHint,
+    activeHint,
+    hintBubbleText,
+    warningEmphasisNonce,
+    warningEraKey,
+    enqueueSolve,
+  } = useHint({
     state,
     stateRef,
     warningMode,
     hintButtonEnabled,
     demoPlaybackActiveRef,
   })
+
+  // Rewind to the last winnable move (rewind-to-winnable plan). The SEARCH
+  // runs only while an outstanding warning says the game is proven lost, and
+  // borrows useHint's solver queue so the two never solve at the same time;
+  // the proven boundary then outlives that warning for as long as the player
+  // is walking back to it (see the lifetime invariant in the hook).
+  const { rewindIndex, rewindAvailable, rewindToWinnable, rewinding } =
+    useRewindToWinnable({
+      state,
+      stateRef,
+      enabled: rewindToWinnableEnabled,
+      warningMode,
+      warningEraKey,
+      enqueueSolve,
+      dispatch,
+    })
 
   const {
     shouldShowUndo,
@@ -985,6 +1015,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     onHintPress: requestHint,
     hintBubbleText,
     warningEmphasisNonce,
+    rewindIndex,
+    rewindAvailable,
+    rewinding,
+    onRewindPress: rewindToWinnable,
   }
 
   const viewProps: KlondikeGameViewProps = {

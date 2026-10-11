@@ -614,12 +614,12 @@ export const useHint = ({
     warningMode,
   ])
 
-  // Persistent warning text (F14): shown for every position inside the dead
-  // era. The render gate mirrors the era-exit effect so the bubble hides on
+  // The era as the RENDER sees it (F14): non-null for every position inside
+  // the dead era. The gate mirrors the era-exit effect so the bubble hides on
   // the very frame an undo below the boundary commits (the effect then clears
   // the state); the mode gate covers the one render before a mode change's
   // clear effect runs.
-  const warningText = useMemo(() => {
+  const activeDeadEra = useMemo(() => {
     if (
       !deadEra ||
       warningMode === 'off' ||
@@ -628,8 +628,19 @@ export const useHint = ({
     ) {
       return null
     }
-    return warningTextFor(deadEra.mode)
+    return deadEra
   }, [deadEra, state.exactId, state.history.length, warningMode])
+
+  // Persistent warning text: the era IS the warning.
+  const warningText = activeDeadEra ? warningTextFor(activeDeadEra.mode) : null
+  // Stable identity of the active era, for consumers that must do work ONCE
+  // per warning rather than once per position (useRewindToWinnable's boundary
+  // search). Deliberately excludes the live position: playing on inside a dead
+  // era changes the position key but not the era, and by the DeadEraMarker
+  // invariant it cannot change what the era means either.
+  const warningEraKey = activeDeadEra
+    ? `${activeDeadEra.exactId}|${activeDeadEra.historyLength}|${activeDeadEra.mode}`
+    : null
 
   // Transient notice stays position-keyed: any board change hides it without
   // cleanup effects. It only ever originates from the Hint button. A live
@@ -653,5 +664,17 @@ export const useHint = ({
     hintBubbleText,
     // For GameNoticeBubble's emphasis replay (warning fire + re-affirm).
     warningEmphasisNonce,
+    // Non-null while a solver-proven warning is showing (see warningEraKey).
+    warningEraKey,
+    // The app's ONE solver queue, lent to the other solver consumer
+    // (useRewindToWinnable) so two solves can never overlap. Sharing the queue
+    // rather than spawning a second one is deliberate: it is replace-latest, so
+    // a borrower must enqueue its whole job as a SINGLE task (a job split into
+    // several queued tasks could have one silently dropped mid-run). In
+    // practice there is no contention at all — while a dead era is outstanding
+    // this hook issues zero solver calls (the era gates the background check
+    // and a hint press only re-affirms), which is exactly when the borrower
+    // works.
+    enqueueSolve,
   }
 }

@@ -2,19 +2,40 @@
 // docs/product/undo-scrubber-hint/undo-scrubber-hint.md).
 //
 // Product reasoning for the thresholds (from the original user prompt + v2 follow-up):
-// - Lifetime > 50: some users barely undo; showing the hint early would be cognitive
+// - Lifetime gate: some users barely undo; showing the hint early would be cognitive
 //   overload, especially right after install. Only proven undo users qualify.
-// - Escalating streaks 10/20/30 (v2): a single undo doesn't benefit from the scrubber.
-//   The scrubber shines when walking back many moves in a row to explore a different
+// - Escalating streaks (v2): a single undo doesn't benefit from the scrubber. The
+//   scrubber shines when walking back several moves in a row to explore a different
 //   line of play. Up to 3 showings total, each requiring a longer streak AND a later
 //   game than the previous one — the escalation keeps repeat hints from feeling naggy
 //   while still catching users who missed the earlier ones.
 // - Scrub consumption (v2): users who demonstrably already use the scrubber (a scrub
 //   session that ended at a different timeline position) shouldn't be taught what they
 //   already know — each successful scrub silently consumes one remaining hint.
-export const UNDO_HINT_LIFETIME_THRESHOLD = 50
+//
+// v5 (2026-09-09, rewind-to-winnable plan): thresholds loosened from 50 / 10-20-30 to
+// 8 / 3-6-9. WHY — the old schedule was so conservative the hint essentially never
+// fired: it demanded 50 lifetime undo TAPS, then a 10-undo streak inside a single
+// deal, then 20 and 30 in three DIFFERENT deals. A player can use the app for weeks
+// and never see it (this is not theoretical — a player wrote in believing the
+// scrubber was a press-and-hold, i.e. having never been taught the real gesture).
+// A hint that never shows teaches nothing, which is strictly worse than one that
+// shows a little early.
+// - Lifetime 8: still filters out "barely undoes", which is all the gate was ever
+//   for, but reaches a normal player within their first sessions instead of never.
+// - Streaks 3/6/9: three consecutive undos is already the point where dragging beats
+//   tapping — it is the shortest walk-back where the scrubber pays off. Ten in a row
+//   is a rare marathon, so gating the FIRST showing on it aimed the hint at exactly
+//   the players least likely to need it.
+// These are not new numbers: the v2 on-device smoke (2026-07-07, see the plan doc)
+// was run at lifetime>0 / streaks 3/6/9 and all seven checks passed, including the
+// escalation and the exhaustion cases. The shipped 50 / 10-20-30 values were a
+// conservative guess that was never validated as a *discoverable* schedule.
+// The stop-teaching-proven-users behaviour (consumeHintForScrub) is unchanged and
+// carries the anti-nag load: anyone who actually scrubs still burns hints silently.
+export const UNDO_HINT_LIFETIME_THRESHOLD = 8
 export const UNDO_HINT_MAX_SHOWINGS = 3
-export const UNDO_HINT_STREAK_STEP = 10
+export const UNDO_HINT_STREAK_STEP = 3
 // v2: 6s → 10s per user request; gives time to read while mid-play. No X close button
 // instead — the pan gesture's hitSlop extends 50px above the undo button, exactly
 // where an X would sit, and it would steal touches from the gesture we're teaching.
@@ -27,7 +48,7 @@ export const UNDO_HINT_AUTO_DISMISS_MS = 10000
 export const UNDO_HINT_COPY =
   'Tip: Drag the Undo button sideways to time travel through your game'
 
-// 3 remaining → 10, 2 → 20, 1 → 30. One derived formula instead of a schedule table.
+// 3 remaining → 3, 2 → 6, 1 → 9. One derived formula instead of a schedule table.
 export const requiredStreakFor = (hintsRemaining: number): number =>
   UNDO_HINT_STREAK_STEP * (UNDO_HINT_MAX_SHOWINGS + 1 - hintsRemaining)
 

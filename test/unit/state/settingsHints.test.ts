@@ -11,10 +11,11 @@ import {
 //   explicit warningMode → round-2 {stuckWarning, unwinnableWarning} →
 //   pre-F11 hintsEnabled → default.
 describe('hint settings defaults and migration', () => {
-  it('defaults: warning mode noUsefulMoves, hint button OFF', () => {
+  it('defaults: warning mode noUsefulMoves, hint button OFF, rewind OFF', () => {
     expect(DEFAULT_SETTINGS.hints).toEqual({
       warningMode: 'noUsefulMoves',
       hintButton: false,
+      rewindToWinnable: false,
     })
   })
 
@@ -52,6 +53,7 @@ describe('hint settings defaults and migration', () => {
         expect(mergeSettings(DEFAULT_SETTINGS, payload).hints).toEqual({
           warningMode: expected,
           hintButton: true,
+          rewindToWinnable: false,
         })
       }
     )
@@ -85,6 +87,9 @@ describe('hint settings defaults and migration', () => {
       expect(mergeSettings(DEFAULT_SETTINGS, legacyPayload).hints).toEqual({
         warningMode: 'unwinnable',
         hintButton: true,
+        // Deliberately NOT migrated: hintsEnabled predates the rewind feature
+        // and never meant "rewind me".
+        rewindToWinnable: false,
       })
     })
 
@@ -118,6 +123,7 @@ describe('hint settings defaults and migration', () => {
       warningMode: 'unwinnable',
       // …but the explicitly stored false beats its button mapping.
       hintButton: false,
+      rewindToWinnable: false,
     })
   })
 
@@ -148,6 +154,47 @@ describe('hint settings defaults and migration', () => {
         hints: { stuckWarning: 'yes' },
       } as unknown as Partial<SettingsState>).hints
     ).toEqual(DEFAULT_SETTINGS.hints)
+  })
+
+  describe('rewind-to-winnable toggle', () => {
+    it('defaults OFF and stays off for payloads written before it existed', () => {
+      expect(DEFAULT_SETTINGS.hints.rewindToWinnable).toBe(false)
+      // A real pre-feature payload: full hints object, no rewind key.
+      const preFeature = {
+        hints: { warningMode: 'unwinnable', hintButton: true },
+      } as unknown as Partial<SettingsState>
+      expect(mergeSettings(DEFAULT_SETTINGS, preFeature).hints.rewindToWinnable).toBe(
+        false
+      )
+    })
+
+    it('round-trips an explicitly stored value', () => {
+      for (const stored of [true, false]) {
+        expect(
+          mergeSettings(DEFAULT_SETTINGS, {
+            hints: { rewindToWinnable: stored },
+          } as unknown as Partial<SettingsState>).hints.rewindToWinnable
+        ).toBe(stored)
+      }
+    })
+
+    it('keeps a stored true when merging onto a current state that has it on', () => {
+      // mergeSettings falls back to `current`, not to DEFAULT_SETTINGS — guards
+      // against the fallback being hard-coded to the default.
+      const current: SettingsState = {
+        ...DEFAULT_SETTINGS,
+        hints: { ...DEFAULT_SETTINGS.hints, rewindToWinnable: true },
+      }
+      expect(mergeSettings(current, {}).hints.rewindToWinnable).toBe(true)
+    })
+
+    it('ignores junk values', () => {
+      expect(
+        mergeSettings(DEFAULT_SETTINGS, {
+          hints: { rewindToWinnable: 'yes' },
+        } as unknown as Partial<SettingsState>).hints.rewindToWinnable
+      ).toBe(false)
+    })
   })
 
   it('leaves unrelated settings untouched by the migration', () => {

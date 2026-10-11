@@ -19,6 +19,8 @@ import {
   createDemoReplayGameState,
   createNearWinGameState,
   createScrubbedMidGameState,
+  createStuckGameState,
+  createUnwinnableGameState,
   getDemoUndoProbePlan,
   resolveDemoReplayAction,
   resolveNearWinMovesLeft,
@@ -30,7 +32,17 @@ import { setDemoProgress } from '../state/demoProgressStore'
 import { devLog } from '../../../utils/devLogger'
 
 type DispatchGameActionFn = (action: GameAction) => void
-export type DemoLaunchMode = 'old' | 'single' | 'playlist' | 'scrubbed' | 'nearwin'
+// Fixture modes are named after the warning MODE each one trips (2026-09-10):
+// 'unwinnable' = solver-proven lost but still has legal moves; 'stuck' = the
+// shipped DEFAULT warning's predicate (stock empty + no useful move).
+export type DemoLaunchMode =
+  | 'old'
+  | 'single'
+  | 'playlist'
+  | 'scrubbed'
+  | 'nearwin'
+  | 'unwinnable'
+  | 'stuck'
 
 type UseDemoGameLauncherOptions = {
   stateRef: MutableRefObject<GameState>
@@ -67,6 +79,7 @@ type UseDemoGameLauncherOptions = {
   // mode (see resolveWarningLinkUpdate).
   setWarningMode: (mode: WarningMode | ((current: WarningMode) => WarningMode)) => void
   setHintButtonEnabled: (enabled: boolean) => void
+  setRewindToWinnableEnabled: (enabled: boolean) => void
   resetUndoHintForTesting: () => void
   dealNewGameForTesting: () => void
   startGameFromExactDeal: (exactId: ExactDealId, drawCount?: DrawCount) => void
@@ -182,6 +195,7 @@ export type SettingsLinkUpdates = {
   autoUp?: boolean
   solvableOnly?: boolean
   hintButton?: boolean
+  rewindToWinnable?: boolean
   warningUpdates: WarningLinkUpdate[]
   ignoredPairs: string[]
 }
@@ -261,6 +275,16 @@ export const parseSettingsLinkParam = (raw: string): SettingsLinkUpdates => {
         updates.hintButton = parsed
         return
       }
+    } else if (key === 'rewind' || key === 'rewindtowinnable') {
+      // Rewind-to-winnable toggle. Short `rewind` is the hand-typed spelling;
+      // the full setting key is accepted too (same pattern as
+      // `warnings`/`nousefulmoves`). Plain boolean — unlike the warning keys it
+      // has no ladder to resolve against, so it applies directly.
+      const parsed = parseOptionalBooleanParam(value)
+      if (parsed !== null) {
+        updates.rewindToWinnable = parsed
+        return
+      }
     } else if (key === 'warnings') {
       const mode = WARNING_MODE_LINK_VALUES[(value ?? '').toLowerCase()]
       if (mode !== undefined) {
@@ -307,6 +331,7 @@ export const useDemoGameLauncher = ({
   setSolvableGamesOnly,
   setWarningMode,
   setHintButtonEnabled,
+  setRewindToWinnableEnabled,
   resetUndoHintForTesting,
   dealNewGameForTesting,
   startGameFromExactDeal,
@@ -788,23 +813,38 @@ export const useDemoGameLauncher = ({
       clearPlaylistTimers()
       demoPlaybackActiveRef.current = false
 
-      if (demoMode === 'scrubbed' || demoMode === 'nearwin') {
-        // Deterministic replay fixtures, both with Auto Up OFF:
+      if (
+        demoMode === 'scrubbed' ||
+        demoMode === 'nearwin' ||
+        demoMode === 'unwinnable' ||
+        demoMode === 'stuck'
+      ) {
+        // Deterministic replay fixtures, all with Auto Up OFF:
         // - scrubbed (scrubber-test-automation): "far game, scrubbed to middle",
         //   40 undos + 40 redos by default, exact same board every launch; no
         //   auto-queue mutates depths underneath a test's assertions.
         // - nearwin (agent-testing-skill C5): solution replayed to N moves before
         //   completion, so an agent plays the final move(s) manually and gets a
         //   REAL win + celebration end-to-end.
+        // - unwinnable (rewind-to-winnable): solver-PROVEN unwinnable position on
+        //   a provably winnable history — lost but NOT stuck, so it trips the
+        //   `unwinnable` warning mode.
+        // - stuck (rewind-to-winnable, round 2): stock empty AND no useful move,
+        //   so it trips the shipped DEFAULT `noUsefulMoves` mode — the one the
+        //   player actually plays in. Also solver-proven unwinnable.
         let fixtureState: GameState
         try {
           fixtureState =
             demoMode === 'nearwin'
               ? createNearWinGameState(options?.nearWinMovesLeft)
-              : createScrubbedMidGameState({
-                  steps: options?.scrubbedSteps,
-                  scrubIndex: options?.scrubbedScrubIndex,
-                })
+              : demoMode === 'unwinnable'
+                ? createUnwinnableGameState()
+                : demoMode === 'stuck'
+                  ? createStuckGameState()
+                  : createScrubbedMidGameState({
+                      steps: options?.scrubbedSteps,
+                      scrubIndex: options?.scrubbedScrubIndex,
+                    })
         } catch (error) {
           // Only reachable on fixture drift (regenerated playlist); fail loudly
           // instead of hydrating a corrupt board.
@@ -933,6 +973,9 @@ export const useDemoGameLauncher = ({
         if (updates.hintButton !== undefined) {
           setHintButtonEnabled(updates.hintButton)
         }
+        if (updates.rewindToWinnable !== undefined) {
+          setRewindToWinnableEnabled(updates.rewindToWinnable)
+        }
         // Applied in link order through the functional setter so alias
         // semantics see the mode as earlier pairs left it.
         for (const update of updates.warningUpdates) {
@@ -943,6 +986,7 @@ export const useDemoGameLauncher = ({
           autoUp: updates.autoUp,
           solvableOnly: updates.solvableOnly,
           hintButton: updates.hintButton,
+          rewindToWinnable: updates.rewindToWinnable,
           warningUpdates: updates.warningUpdates,
         })
         return
@@ -1070,6 +1114,17 @@ export const useDemoGameLauncher = ({
       const demoRequestsScrubbed = normalizedDemoParam === 'scrubbed'
       // soli://?demo=nearwin&left=N → solution replayed to N moves before the win.
       const demoRequestsNearWin = normalizedDemoParam === 'nearwin'
+      // soli://?demo=unwinnable → solver-proven unwinnable position with a
+      // winnable history (lost, but moves remain → `unwinnable` warning mode).
+      // `deadend` stays as an alias: it was the original spelling and is already
+      // in device notes/scripts. Both parameterless on purpose — the fixtures'
+      // whole value is that the solver verdicts behind them are PINNED and
+      // verified, and a depth knob would hand out unverified positions.
+      const demoRequestsUnwinnable =
+        normalizedDemoParam === 'unwinnable' || normalizedDemoParam === 'deadend'
+      // soli://?demo=stuck → stock empty + no useful move → the DEFAULT
+      // `noUsefulMoves` warning mode (rewind-to-winnable plan, round 2).
+      const demoRequestsStuck = normalizedDemoParam === 'stuck'
       const recordHistoryParam =
         parsed.searchParams.get('recordHistory') ?? parsed.searchParams.get('history')
       const nextRecordHistoryEnabled = parseOptionalBooleanParam(recordHistoryParam)
@@ -1082,7 +1137,9 @@ export const useDemoGameLauncher = ({
         normalizedDemoParam === 'true' ||
         demoRequestsAutoReveal ||
         demoRequestsScrubbed ||
-        demoRequestsNearWin
+        demoRequestsNearWin ||
+        demoRequestsUnwinnable ||
+        demoRequestsStuck
       ) {
         lastDemoLinkRef.current = incomingUrl
 
@@ -1135,6 +1192,19 @@ export const useDemoGameLauncher = ({
           return
         }
 
+        if (demoRequestsUnwinnable || demoRequestsStuck) {
+          applyLinkDeveloperMode()
+          const fixtureMode: DemoLaunchMode = demoRequestsStuck ? 'stuck' : 'unwinnable'
+          setTimeout(() => {
+            handleLaunchDemoGame({
+              demoMode: fixtureMode,
+              force: true,
+              screenshotMode,
+            })
+          }, DEMO_AUTO_STEP_INTERVAL_MS)
+          return
+        }
+
         const autoParam =
           parsed.searchParams.get('auto') ?? parsed.searchParams.get('autoreveal')
         const solveParam =
@@ -1182,6 +1252,7 @@ export const useDemoGameLauncher = ({
       setDrawCount,
       setWarningMode,
       setHintButtonEnabled,
+      setRewindToWinnableEnabled,
       setSolvableGamesOnly,
       startGameFromExactDeal,
       startCelebrationPreview,

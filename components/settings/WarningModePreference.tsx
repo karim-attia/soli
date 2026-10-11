@@ -2,6 +2,7 @@ import { Platform } from 'react-native'
 import { Column, Picker, Row, Spacer, Text } from '@expo/ui'
 
 import { warningModePreference, type WarningMode } from '../../src/state/settings'
+import { SETTINGS_ROW_SECONDARY_TEXT_COLOR } from './settingsRowColors'
 
 type WarningModePreferenceProps = {
   value: WarningMode
@@ -57,7 +58,7 @@ export const WarningModePreference = ({
         </>
       )}
       {/* Mid-gray stays readable on both light and dark Host themes. */}
-      <Text textStyle={{ fontSize: 13, color: '#8E8E93' }}>
+      <Text textStyle={{ fontSize: 13, color: SETTINGS_ROW_SECONDARY_TEXT_COLOR }}>
         {warningModePreference.description}
       </Text>
     </Column>

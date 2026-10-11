@@ -32,11 +32,30 @@ const tapTimes = (start: UndoHintTracker, count: number) => {
   return { tracker: current, shown }
 }
 
+// v5 schedule (rewind-to-winnable plan): 8 lifetime undos, streaks 3/6/9 —
+// loosened from 50 / 10-20-30, which was so conservative the hint essentially
+// never fired. See the reasoning block in undoHint.ts.
 describe('requiredStreakFor', () => {
-  it('escalates 10/20/30 as hints get used up', () => {
-    expect(requiredStreakFor(3)).toBe(10)
-    expect(requiredStreakFor(2)).toBe(20)
-    expect(requiredStreakFor(1)).toBe(30)
+  it('escalates 3/6/9 as hints get used up', () => {
+    expect(requiredStreakFor(3)).toBe(3)
+    expect(requiredStreakFor(2)).toBe(6)
+    expect(requiredStreakFor(1)).toBe(9)
+  })
+})
+
+describe('hint schedule constants', () => {
+  it('is reachable within a normal player\'s first sessions', () => {
+    // The pinned numbers, asserted directly: the whole point of v5 is that a
+    // player who undoes a handful of times and walks back three moves in a row
+    // gets taught the gesture. Drifting these back up silently would restore
+    // the "hint that never shows" bug.
+    expect(UNDO_HINT_LIFETIME_THRESHOLD).toBe(8)
+    expect(UNDO_HINT_STREAK_STEP).toBe(3)
+    expect(UNDO_HINT_MAX_SHOWINGS).toBe(3)
+    // Cheapest possible path to the first hint: 9 undo taps in one deal
+    // (the 9th clears BOTH the >8 lifetime gate and the 3-streak).
+    const fresh = tapTimes(tracker(), 9)
+    expect(fresh.shown).toBe(true)
   })
 })
 
@@ -49,7 +68,7 @@ describe('recordUndoTap', () => {
   })
 
   it('requires lifetime strictly greater than the threshold', () => {
-    // Tap that lands exactly ON the threshold (50) must not show the hint...
+    // Tap that lands exactly ON the threshold must not show the hint...
     const atThreshold = recordUndoTap(
       tracker({
         lifetimeUndoTaps: UNDO_HINT_LIFETIME_THRESHOLD - 1,
@@ -59,7 +78,7 @@ describe('recordUndoTap', () => {
     expect(atThreshold.tracker.lifetimeUndoTaps).toBe(UNDO_HINT_LIFETIME_THRESHOLD)
     expect(atThreshold.showHint).toBe(false)
 
-    // ...the next one (51) does.
+    // ...the next one does.
     const aboveThreshold = recordUndoTap(atThreshold.tracker)
     expect(aboveThreshold.tracker.lifetimeUndoTaps).toBe(
       UNDO_HINT_LIFETIME_THRESHOLD + 1
@@ -67,19 +86,19 @@ describe('recordUndoTap', () => {
     expect(aboveThreshold.showHint).toBe(true)
   })
 
-  it('requires streak of at least the current threshold (10 for the first hint)', () => {
-    const nineInARow = recordUndoTap(tracker({ lifetimeUndoTaps: 100, streak: 8 }))
-    expect(nineInARow.tracker.streak).toBe(9)
-    expect(nineInARow.showHint).toBe(false)
+  it('requires streak of at least the current threshold (3 for the first hint)', () => {
+    const twoInARow = recordUndoTap(tracker({ lifetimeUndoTaps: 100, streak: 1 }))
+    expect(twoInARow.tracker.streak).toBe(2)
+    expect(twoInARow.showHint).toBe(false)
 
-    const tenInARow = recordUndoTap(nineInARow.tracker)
-    expect(tenInARow.tracker.streak).toBe(10)
-    expect(tenInARow.showHint).toBe(true)
+    const threeInARow = recordUndoTap(twoInARow.tracker)
+    expect(threeInARow.tracker.streak).toBe(3)
+    expect(threeInARow.showHint).toBe(true)
   })
 
   it('decrements hintsRemaining and marks the deal when a hint fires', () => {
     const { tracker: next, showHint } = recordUndoTap(
-      tracker({ lifetimeUndoTaps: 100, streak: 9 })
+      tracker({ lifetimeUndoTaps: 100, streak: 2 })
     )
     expect(showHint).toBe(true)
     expect(next.hintsRemaining).toBe(2)
@@ -87,37 +106,37 @@ describe('recordUndoTap', () => {
   })
 
   it('never shows two hints in the same deal, even at a higher streak', () => {
-    // First hint at streak 10.
-    const first = tapTimes(tracker({ lifetimeUndoTaps: 100 }), 10)
+    // First hint at streak 3.
+    const first = tapTimes(tracker({ lifetimeUndoTaps: 100 }), 3)
     expect(first.shown).toBe(true)
     expect(first.tracker.hintsRemaining).toBe(2)
 
-    // Keep tapping in the SAME deal all the way past the next threshold (20): blocked.
-    const sameDeal = tapTimes(first.tracker, 30)
+    // Keep tapping in the SAME deal all the way past the next threshold (6): blocked.
+    const sameDeal = tapTimes(first.tracker, 12)
     expect(sameDeal.shown).toBe(false)
     expect(sameDeal.tracker.hintsRemaining).toBe(2)
   })
 
   it('shows the next hint in a later deal at the escalated threshold', () => {
-    const first = tapTimes(tracker({ lifetimeUndoTaps: 100 }), 10)
+    const first = tapTimes(tracker({ lifetimeUndoTaps: 100 }), 3)
     const nextDeal = breakStreak(noteNewDeal(first.tracker))
 
-    // 19 consecutive undos: below the escalated threshold of 20 → no hint.
-    const nineteen = tapTimes(nextDeal, 19)
-    expect(nineteen.shown).toBe(false)
+    // 5 consecutive undos: below the escalated threshold of 6 → no hint.
+    const five = tapTimes(nextDeal, 5)
+    expect(five.shown).toBe(false)
 
-    // The 20th shows hint #2.
-    const twentieth = recordUndoTap(nineteen.tracker)
-    expect(twentieth.showHint).toBe(true)
-    expect(twentieth.tracker.hintsRemaining).toBe(1)
+    // The 6th shows hint #2.
+    const sixth = recordUndoTap(five.tracker)
+    expect(sixth.showHint).toBe(true)
+    expect(sixth.tracker.hintsRemaining).toBe(1)
 
-    // Hint #3 needs a new deal and streak 30.
-    const thirdDeal = breakStreak(noteNewDeal(twentieth.tracker))
-    const twentyNine = tapTimes(thirdDeal, 29)
-    expect(twentyNine.shown).toBe(false)
-    const thirtieth = recordUndoTap(twentyNine.tracker)
-    expect(thirtieth.showHint).toBe(true)
-    expect(thirtieth.tracker.hintsRemaining).toBe(0)
+    // Hint #3 needs a new deal and streak 9.
+    const thirdDeal = breakStreak(noteNewDeal(sixth.tracker))
+    const eight = tapTimes(thirdDeal, 8)
+    expect(eight.shown).toBe(false)
+    const ninth = recordUndoTap(eight.tracker)
+    expect(ninth.showHint).toBe(true)
+    expect(ninth.tracker.hintsRemaining).toBe(0)
   })
 
   it('never shows again once hintsRemaining reaches 0', () => {
@@ -135,12 +154,13 @@ describe('recordUndoTap', () => {
     )
     expect(result.tracker.lifetimeUndoTaps).toBe(201)
     expect(result.tracker.streak).toBe(16)
+    expect(result.showHint).toBe(false)
   })
 })
 
 describe('breakStreak', () => {
   it('resets streak progress toward the hint', () => {
-    const broken = breakStreak(tracker({ lifetimeUndoTaps: 100, streak: 9 }))
+    const broken = breakStreak(tracker({ lifetimeUndoTaps: 100, streak: 2 }))
     expect(broken.streak).toBe(0)
 
     // After a break the user must re-earn the full streak.
@@ -180,11 +200,11 @@ describe('consumeHintForScrub', () => {
     expect(consumed.hintsRemaining).toBe(2)
     expect(consumed.scrubConsumedThisDeal).toBe(true)
 
-    // With 2 remaining, the next hint needs a 20-streak (in a fresh deal).
+    // With 2 remaining, the next hint needs a 6-streak (in a fresh deal).
     const nextDeal = breakStreak(noteNewDeal(consumed))
-    const atNineteen = tapTimes(nextDeal, 19)
-    expect(atNineteen.shown).toBe(false)
-    expect(recordUndoTap(atNineteen.tracker).showHint).toBe(true)
+    const atFive = tapTimes(nextDeal, 5)
+    expect(atFive.shown).toBe(false)
+    expect(recordUndoTap(atFive.tracker).showHint).toBe(true)
   })
 
   it('consumes at most once per deal', () => {
@@ -196,7 +216,7 @@ describe('consumeHintForScrub', () => {
   })
 
   it('does not consume in a deal where a hint was already shown', () => {
-    const shown = tapTimes(tracker({ lifetimeUndoTaps: 100 }), 10)
+    const shown = tapTimes(tracker({ lifetimeUndoTaps: 100 }), 3)
     expect(shown.shown).toBe(true)
 
     const result = consumeHintForScrub(shown.tracker)

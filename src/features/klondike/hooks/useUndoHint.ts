@@ -117,9 +117,11 @@ export const useUndoHint = () => {
   }, [])
 
   // Manual-testing helper (demo sheet): resets to a TESTABLE state, not a true
-  // fresh-install one — lifetime is set just past the >50 gate so a 10-tap undo
-  // streak immediately shows hint 1. Resetting lifetime to 0 would require 51 real
-  // undos before anything shows, defeating the button's purpose.
+  // fresh-install one — lifetime is set just past the lifetime gate so the first
+  // required undo streak immediately shows hint 1. Resetting lifetime to 0 would
+  // require the whole gate to be re-earned before anything shows, defeating the
+  // button's purpose. Deliberately expressed via the constants, not literals, so
+  // a threshold change (v5: 8 / 3-6-9) keeps this helper honest.
   const resetUndoHintForTesting = useCallback(() => {
     trackerRef.current = {
       lifetimeUndoTaps: UNDO_HINT_LIFETIME_THRESHOLD + 1,

@@ -14,7 +14,7 @@ Single source of truth for testing Soli on devices/simulators. Package/bundle id
    - **Android physical phone (`yarn release`)**: drive by a11y labels; native pan works (scrubber needs no Appium). It is Karim's MAIN phone — data guardrail in section 4.
    - **iOS simulator (`yarn ios`)**: drive by testIDs; zero risk, full wipes allowed (`xcrun simctl uninstall`). Use alone when the phone is unavailable or the test needs destructive resets.
    - Web: not a target (native-only app).
-3. **Fixture**: fresh deal = default launch (`soli:///`) · full stress = auto-solve playlist (`yarn release/ios --auto-solve` after code changes: builds + monitors logs with pass/fail exit; `yarn deeplink 'soli:///?demo=playlist&games=N'` when the installed build is current — no rebuild, watch logs yourself) · undo/redo/scrubber = `yarn scrubtest` · real win + celebration = `yarn nearwin` (play the last move(s) manually) · specific-deal repro = `?deal=<exactId>` · history/stats = `yarn seedhistory`.
+3. **Fixture**: fresh deal = default launch (`soli:///`) · full stress = auto-solve playlist (`yarn release/ios --auto-solve` after code changes: builds + monitors logs with pass/fail exit; `yarn deeplink 'soli:///?demo=playlist&games=N'` when the installed build is current — no rebuild, watch logs yourself) · undo/redo/scrubber = `yarn scrubtest` · real win + celebration = `yarn nearwin` (play the last move(s) manually) · **warnings / rewind-to-winnable = `yarn unwinnable` or `yarn stuck`** — pick by the WARNING MODE you need: `yarn stuck` for the DEFAULT `noUsefulMoves` mode (stock empty + no useful move — what players actually see), `yarn unwinnable` for the solver-only `unwinnable` mode (lost but moves remain). Never play deals until one dies — that takes minutes and is not reproducible · specific-deal repro = `?deal=<exactId>` · history/stats = `yarn seedhistory`.
 
 ## 2. Build & run
 
@@ -34,8 +34,11 @@ Parsed by `processDemoLink()` in `src/features/klondike/hooks/useDemoGameLaunche
 | `soli:///?demo=playlist&games=N` | Auto-solve playlist, N games (clamped to 20); `demo=autosolve&games=1` for a single game |
 | `soli://?demo=scrubbed` | **Scrubbed mid-game fixture**: deterministic board, 80 moves scrubbed to index 40 → 40 undos + 40 redos, Auto Up off. `&steps=S&scrub=K` for other depths (clamped; defaults keep the pinned card labels valid) |
 | `soli://?demo=nearwin&left=N` | **Near-win fixture**: solution replayed to N moves before completion (default 1), Auto Up off — finish manually for a REAL win + celebration |
+| `soli://?demo=stuck` | **Stuck fixture** — trips the DEFAULT `noUsefulMoves` WARNING MODE, i.e. what players actually see: playlist entry 19 (`default-20-draw-1`) replayed 210 solution steps, then four killing moves, Auto Up off. Satisfies the shipped predicate exactly (`stock.length === 0 && !hasUsefulMove`) AND is solver-proven `unsolvable`, with the position four moves earlier `solved` — boundary at timeline index 210 of a 215-index timeline (214 moves played). Legal moves DO remain (king shuffles, recycle); "no useful moves" is the shipped semantics, not "no legal moves". Use with `?set=warnings:stuck,rewind:on` (or just the defaults) |
+| `soli://?demo=unwinnable` (alias `deadend`) | **Unwinnable fixture** — trips the `unwinnable` WARNING MODE: same deal replayed 81 solution steps, then one killing move (K♠ into the only empty column), Auto Up off. Solver-PROVEN `unsolvable`, and `solved` one move earlier, so a real rewind boundary sits at timeline index 81 (82 moves played). **Lost but NOT stuck** — moves remain legal, so the DEFAULT warning mode stays silent here. Parameterless — the pinned verdicts are the whole point. Pair with `?set=warnings:unwinnable,rewind:on`; the warning fires ~600 ms after load |
 | `soli://?deal=<exactId>&draw=N` | New game from an exact deal id (`E1_...`) — bug repro, hand-crafted scenarios. `draw` optional; invalid id devLogged + ignored |
-| `soli://?set=drawCount:3,autoUp:off,solvableOnly:on,warnings:stuck,hintButton:on` | Apply settings without UI taps (`drawCount` 1–5; booleans on/off: `autoUp`, `solvableOnly`, `hintButton`; `warnings:off\|stuck\|unwinnable` = warning-mode select [stuck = "no more useful moves", the default]. Aliases: `hints` → `hintButton`; round-2 `stuckWarning`/`unwinnableWarning:on\|off` map into the select without downgrading a stronger mode). Unknown pairs devLogged + skipped, rest applies |
+| `soli://?set=drawCount:3,autoUp:off,solvableOnly:on,warnings:stuck,hintButton:on,rewind:on` | Apply settings without UI taps (`drawCount` 1–5; booleans on/off: `autoUp`, `solvableOnly`, `hintButton`, `rewind`; `warnings:off\|stuck\|unwinnable` = warning-mode select [stuck = "no more useful moves", the default]. Aliases: `hints` → `hintButton`, `rewindToWinnable` → `rewind`; round-2 `stuckWarning`/`unwinnableWarning:on\|off` map into the select without downgrading a stronger mode). Unknown pairs devLogged + skipped, rest applies |
+| `soli://?set=warnings:unwinnable,rewind:on` | **Rewind to last winnable move** in one link: `rewind` alone does nothing visible — the action only appears while a warning is outstanding, so the warning mode must be on too. Default OFF. Then `yarn unwinnable` for a board that is already provably lost (or `yarn stuck` with the default `warnings:stuck` mode) |
 | `soli://?reset=undoHint` / `?reset=game` | Targeted resets, section 4 |
 | `soli://?celebration=<modeId\|random>` | Celebration overlay on the current board WITHOUT winning (note below). With `&screenshot=1` the header shows synthetic MOVES/TIME; `&moves=N&time=SECONDS` overrides them |
 | `soli://demo-game` | Old handcrafted demo (rarely useful — no undo history) |
@@ -50,8 +53,12 @@ Delivery — always use `yarn deeplink`. **Default target: the connected Android
 | `yarn celebration [modeId]` | `?celebration=<modeId\|random>` | warm |
 | `yarn scrubtest [steps] [scrub]` | `?demo=scrubbed[&steps=S&scrub=K]` | **cold** (a stale warm demo run would overwrite the fixture) |
 | `yarn nearwin [left]` | `?demo=nearwin[&left=N]` | **cold** (same reason) |
+| `yarn stuck` | `?demo=stuck` | **cold** (same reason) |
+| `yarn unwinnable` (alias `yarn deadend`) | `?demo=unwinnable` | **cold** (same reason) |
 | `yarn seedhistory [clear]` | `?seedHistory=default\|clear` | warm |
 | `yarn deeplink '<soli:// url>'` | any raw catalog link | warm |
+
+All four fixtures also have buttons in the in-app **Run Demo sheet** (header → Demo → FIXTURES): "Mid-game scrub", "Near win", "Unwinnable game", "No useful moves". The last two are labelled verbatim after the Settings warning-mode options, because which mode a fixture trips is the only thing that distinguishes them.
 
 `--cold`/`--warm` override; `--no-retry` keeps the URL as-is (dedup applies; an existing `#fragment` also skips the nonce); `--screenshot` appends `screenshot=1` to any shortcut or raw URL (store-screenshot capture, e.g. `yarn celebration 39 --screenshot`).
 
@@ -72,7 +79,7 @@ Caveats: `?set=` changes settings, but an in-progress game keeps the drawCount i
 
 ## 4. State resets & seeding
 
-- **Undo hint**: `soli://?reset=undoHint` (or Demo sheet → Testing → "Undo hint"). Sets a *testable* state — lifetime just past the >50 gate + 3 hints remaining, so a 10-tap undo streak shows hint 1 immediately.
+- **Undo hint**: `soli://?reset=undoHint` (or Demo sheet → Testing → "Undo hint"). Sets a *testable* state — lifetime just past the lifetime gate + 3 hints remaining, so the first required undo streak shows hint 1 immediately. Schedule since v5 (2026-09-09): lifetime > 8, streaks **3/6/9** (was 50 and 10/20/30, which almost never fired) — so after the reset link, **3 undo taps in a row** show hint 1.
 - **Game**: `soli://?reset=game` — New Game without the confirmation dialog (current game recorded as incomplete). Deliberately NO `?reset=all`: bulk destruction stays manual to protect real phone history.
 - **Settings**: `soli://?set=...` (catalog above) — no UI taps before dealing test games.
 - **History seeding**: `yarn seedhistory` inserts `seed-`-prefixed rows (solved/incomplete, varied draws/dates/durations); `yarn seedhistory clear` deletes ONLY those. Demo sheet has matching entries. Real history rows are never touched.
@@ -103,6 +110,8 @@ The board exposes a full a11y tree — always prefer it over coordinate taps. So
 | Undo button | — | `undo` |
 | Undo-hint bubble | not queryable on Android | `undo-hint` |
 | Scrubber track | invisible at rest (both platforms) | `undo-scrubber-track` (only while scrubbing) |
+| Rewind pill | `Rewind to last winnable move` | `rewind-to-winnable` |
+| Winnable marker on the track | read it off the track's label: `Undo scrubber, position N of M, last winnable move K` | `undo-scrubber-winnable-marker` (child of the accessible track, so assert via the track label) |
 
 agent-device usage:
 
@@ -140,6 +149,7 @@ Enter the deterministic fixture first: `yarn scrubtest` (index 40 of 80).
 | Wireless adb dropped / phone dozed | `scripts/android-ready.sh` (reconnect + pin + wake + unlock in one shot); never hand-roll loops |
 | Terminal file says a build is running but nothing happens | Terminal metadata can be stale; trust `/tmp/soli-build.lock` and `ps` |
 | Deep link seems ignored | You bypassed the wrapper — `yarn deeplink` adds the retry nonce + cold force-stop; raw links need `#retry-N` / manual force-stop |
+| A `?set=` key "did not apply" | Check the log first: `[Demo] Settings link applied {...}` lists everything that parsed, `[Demo] Settings link: ignored unknown pair "<pair>"` everything that did not — that answers "did it parse?" without opening Settings. Then check you are not judging a key by an effect it does not have: `warnings:unwinnable` changes nothing visible until the solver proves the CURRENT position dead (use `yarn unwinnable`), and an in-progress game keeps the drawCount it was DEALT with. Third: a `?set=` link's write is async, so a cold fixture link fired immediately after (`yarn scrubtest`/`nearwin`/`unwinnable`/`stuck` force-stop by default) can drop it — settle a second, or send `?set=` first and verify before the fixture link |
 | iOS sim deep links suddenly ALL dead (openurl silent, no alert, XCTest main-thread timeouts) | App process wedged — seen after `simctl uninstall`+`install`+`launch` over a running app. `xcrun simctl terminate <udid> ch.karimattia.soli && xcrun simctl launch ...` fixes it immediately; restart the app BEFORE debugging the links themselves |
 | Signature mismatch on Android install | Check `SOLI_UPLOAD_*` in `.env` first — uninstalling wipes real history, last resort (section 4) |
 | Gradle fails in ~1 s with "Could not start 'node'" | Stale Gradle daemon caching a dead env: `cd android && ./gradlew --stop`, rerun |
