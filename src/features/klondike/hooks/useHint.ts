@@ -20,6 +20,9 @@ import { getCardAccessibilityLabel } from '../components/cards/accessibility'
 // simply retried on the next position (budgets are enforced inside Rust).
 const HINT_BUDGET_MS = 1500
 const BACKGROUND_BUDGET_MS = 800
+// Burst protection for the per-move check in mode 'unwinnable' ONLY. The
+// end-of-stock check in mode 'noUsefulMoves' is deliberately NOT debounced
+// (F16, see the evaluation effect).
 const BACKGROUND_DEBOUNCE_MS = 600
 // One shared duration for every hint visual (stock ring AND source/target
 // rings) so all three hint kinds behave as one design.
@@ -107,6 +110,13 @@ type HighlightState = PositionKeyed & { hint: SolverHint }
 //     but not the era.
 // Exiting the era (undo/scrub below the boundary, new deal, hydrate/remount)
 // clears the warning and re-arms evaluation.
+//
+// The same invariant also works BACKWARDS in time (F16): a dead-proof that
+// arrives after the player already moved on is still valid for the current
+// position as long as the current position is inside the era the proof
+// defines (same deal, depth >= the evaluated depth). So proofs are never
+// dropped as "stale" — the era boundary is simply placed at the EVALUATED
+// board, not at the board of the moment the response lands.
 type DeadEraMarker = {
   exactId: string
   historyLength: number
@@ -116,8 +126,15 @@ type DeadEraMarker = {
 const warningTextFor = (mode: DeadEraMarker['mode']): string =>
   mode === 'unwinnable' ? UNWINNABLE_BUBBLE_TEXT : STUCK_BUBBLE_TEXT
 
+// Is `current` at/inside the dead era a proof for `evaluated` would define?
+// (Forward moves only: same deal, depth not below the evaluated depth.)
+const isInsideEraOf = (current: GameState, evaluated: GameState): boolean =>
+  current.exactId === evaluated.exactId &&
+  current.history.length >= evaluated.history.length
+
 // Owns the hint/warning features: the on-demand Hint button solve and the
-// debounced background warning evaluation (mode-dependent since F14). All
+// background warning evaluation (mode-dependent since F14; immediate at the
+// end of the stock, debounced per move in mode 'unwinnable' — F16). All
 // solver traffic is funneled through one replace-latest queue so two solves
 // never overlap.
 //
@@ -201,18 +218,23 @@ export const useHint = ({
     [drainSolveQueue]
   )
 
-  // Serializes the board AT RUN time (not enqueue time) so a queued request
-  // always solves the newest committed position.
+  // Solves a SNAPSHOT: the board handed in at enqueue time, not
+  // stateRef.current at run time (changed in F16 — the old run-time read made
+  // the evaluated position unknowable once the player moved on, so every late
+  // result had to be dropped as stale). The handler receives the evaluated
+  // board + its key and decides itself what a late result still means (a
+  // dead-proof stays valid inside its era; a hint for an old position does
+  // not).
   const makeSolveTask = useCallback(
     (
       source: 'hint' | 'auto',
       budgetMs: number,
-      handle: (response: SolverResponse, keyAtRun: string, stale: boolean) => void
+      board: GameState,
+      handle: (response: SolverResponse, evaluated: GameState, keyAtRun: string) => void
     ) =>
       async () => {
-        const current = stateRef.current
-        const keyAtRun = positionKeyOf(current)
-        const request = buildSolverRequest(current, budgetMs)
+        const keyAtRun = positionKeyOf(board)
+        const request = buildSolverRequest(board, budgetMs)
         let response: SolverResponse
         try {
           response = parseSolverResponse(await solvePosition(JSON.stringify(request)))
@@ -220,15 +242,19 @@ export const useHint = ({
           response = { status: 'error', message: String(error) }
         }
         // Plain console.log on purpose (not devLog): device tests grep these
-        // lines without requiring developer mode.
+        // lines without requiring developer mode. `stock`/`depth` identify the
+        // evaluated snapshot (F16 device evidence: the end-of-stock solve must
+        // show stock=0 even when the player already recycled).
         console.log(
           `[solver] source=${source} status=${response.status} ms=${
             response.solveMs?.toFixed(1) ?? '-'
-          } visited=${response.visited ?? '-'} moves=${response.winMovesRemaining ?? '-'}`
+          } visited=${response.visited ?? '-'} moves=${response.winMovesRemaining ?? '-'} stock=${
+            board.stock.length
+          } depth=${board.history.length}`
         )
-        handle(response, keyAtRun, positionKeyOf(stateRef.current) !== keyAtRun)
+        handle(response, board, keyAtRun)
       },
-    [stateRef]
+    []
   )
 
   const showNotice = useCallback((text: string, key: string, durationMs: number) => {
@@ -244,14 +270,15 @@ export const useHint = ({
   }, [])
 
   // Starts a dead era: persistent warning bubble + announcement + evaluation
-  // block. The boundary is the warn-time position (callers guarantee via
-  // stale checks that stateRef.current IS that position). No timer — the
+  // block. The boundary is the EVALUATED board (the one the proof is about) —
+  // callers pass the solved snapshot, never stateRef.current, and guarantee
+  // the current position is inside that era (isInsideEraOf). No timer — the
   // warning outlives position changes inside the era by design (F14).
   const fireWarning = useCallback(
-    (mode: DeadEraMarker['mode'], board: GameState) => {
+    (mode: DeadEraMarker['mode'], evaluated: GameState) => {
       setDeadEra({
-        exactId: board.exactId,
-        historyLength: board.history.length,
+        exactId: evaluated.exactId,
+        historyLength: evaluated.history.length,
         mode,
       })
       setWarningEmphasisNonce((nonce) => nonce + 1)
@@ -346,7 +373,8 @@ export const useHint = ({
   //                              warn here ('unwinnable' always;
   //                              'noUsefulMoves' when the stuck condition
   //                              holds), warn NOW instead of hinting —
-  //                              otherwise the debounced background check
+  //                              otherwise the background check (debounced
+  //                              in mode 'unwinnable', or still in flight)
   //                              would raise the warning moments after we
   //                              showed a hint (the exact contradiction this
   //                              table kills). Mode wouldn't warn (mode off,
@@ -381,8 +409,11 @@ export const useHint = ({
       return
     }
     enqueueSolve(
-      makeSolveTask('hint', HINT_BUDGET_MS, (response, keyAtRun, stale) => {
-        if (stale) {
+      makeSolveTask('hint', HINT_BUDGET_MS, current, (response, board, keyAtRun) => {
+        // A hint is only meaningful for the position it was asked about —
+        // ANY board change since the press drops the result (unlike the
+        // background dead-proofs, see handleBackgroundResult).
+        if (positionKeyOf(stateRef.current) !== keyAtRun) {
           return
         }
         switch (response.status) {
@@ -392,8 +423,15 @@ export const useHint = ({
             }
             // solved without hint = position already won → nothing to show.
             break
-          case 'unsolvable': {
-            const board = stateRef.current
+          case 'unsolvable':
+            // The background check may have proven the same position dead
+            // while this press was queued behind it (since F16 the end-of-
+            // stock solve starts immediately, so the press's solve is the one
+            // that lands second) — the warning is already up, don't fire/
+            // announce it twice.
+            if (deadEraRef.current) {
+              break
+            }
             // Case 2, fire-on-discovery (see the decision table above).
             if (
               warningMode === 'unwinnable' ||
@@ -409,11 +447,10 @@ export const useHint = ({
             }
             showClassicFallback(board, keyAtRun)
             break
-          }
           case 'unknown':
             // Budget miss: identical fallback handling so the button leaks
             // nothing about winnability — but never a warning (unproven).
-            showClassicFallback(stateRef.current, keyAtRun)
+            showClassicFallback(board, keyAtRun)
             break
           default:
             // invalid/error should not happen in production; keep the payload
@@ -434,11 +471,83 @@ export const useHint = ({
     warningMode,
   ])
 
-  // Background warning evaluation: debounced after every committed position
-  // change; skipped while winning/auto-completing/demo playback. Which check
-  // runs is the warning mode's business alone — the F11 two-toggle precedence
-  // dance (and its once-per-position dedupe refs) collapsed into this single
-  // mode switch plus the sticky era.
+  // Result handler shared by both background triggers below. The evaluated
+  // board is the SNAPSHOT the solver actually saw (makeSolveTask), so a result
+  // landing after further moves is judged against the era it would define
+  // rather than dropped (F16; the DeadEraMarker "backwards in time" note).
+  const handleBackgroundResult = useCallback(
+    (response: SolverResponse, evaluated: GameState, keyAtRun: string) => {
+      if (response.status === 'unsolvable') {
+        // Don't fire twice: a hint press can prove the position dead
+        // (fire-on-discovery) while this solve was queued behind it.
+        if (deadEraRef.current) {
+          return
+        }
+        // Dead-proofs are never dropped as stale (F16): fire with the
+        // boundary at the EVALUATED depth whenever the player is still inside
+        // that era — forward moves since the evaluation cannot have revived
+        // the game. Drop only if they undid below it or changed deal (the
+        // proof is then about a line they left). NOTE: this is deliberately
+        // NOT a position-key comparison — the key changes on every forward
+        // move, and dropping on it is exactly what lost the warning before.
+        if (!isInsideEraOf(stateRef.current, evaluated)) {
+          return
+        }
+        // No per-position dedupe needed: the era itself blocks any
+        // re-evaluation until the player exits it, and re-warning AFTER an
+        // exit-and-return is exactly the wanted re-arm behavior.
+        fireWarning(warningMode === 'unwinnable' ? 'unwinnable' : 'noUsefulMoves', evaluated)
+      } else if (response.status === 'solved') {
+        // In mode 'noUsefulMoves' a background solve only ever runs when the
+        // heuristic said "stuck", so 'solved' here IS a heuristic false
+        // positive the solver gate just rescued — the live counter of
+        // Microsoft-style wrong warnings we prevented (foundation digs /
+        // rearrangements the enumeration excludes on purpose). console.warn
+        // so device tests can grep it. Keyed on the evaluated board.
+        if (warningMode === 'noUsefulMoves') {
+          console.warn(
+            '[stuck-heuristic] false positive: no useful move found but position is solvable',
+            {
+              positionKey: keyAtRun,
+              drawCount: evaluated.drawCount,
+              wasteLength: evaluated.waste.length,
+              winMovesRemaining: response.winMovesRemaining,
+            }
+          )
+        }
+      } else if (response.status === 'invalid' || response.status === 'error') {
+        console.warn('[solver] background check failed', response)
+      }
+      // 'unknown' (budget miss): suppress silently — a warning must never
+      // rest on an unproven claim; the next position retries anyway.
+    },
+    [fireWarning, stateRef, warningMode]
+  )
+
+  // Background warning evaluation after every committed position change;
+  // skipped while winning/auto-completing/demo playback. Which check runs is
+  // the warning mode's business alone — the F11 two-toggle precedence dance
+  // (and its once-per-position dedupe refs) collapsed into this single mode
+  // switch plus the sticky era. Two triggers with DIFFERENT timing:
+  //
+  //   'noUsefulMoves' → end-of-stock trigger, IMMEDIATE (F16). Classic stuck
+  //        check with F11 semantics: only evaluated at the recycle-flip
+  //        moment (stock empty) — mid-stock the warning must stay silent (the
+  //        genre contract is "you played the deck out", never a mid-deck
+  //        oracle about unseen cards), so mid-stock we skip even the µs-cheap
+  //        heuristic. The solver confirmation runs only when the heuristic
+  //        already says dead, which keeps the default mode at (near) zero
+  //        background solver work. NOT debounced: the trigger fires once per
+  //        stock cycle, and a debounce actively lost the warning — user
+  //        report 2026-10-11: cycling the stock fast, the recycle tap landed
+  //        within 600 ms of the stock emptying, the next committed position
+  //        cleared the timer, and post-recycle (stock non-empty) nothing
+  //        evaluates anymore — the only evaluation that could fire had been
+  //        cancelled. The solve runs against a snapshot of the stock-empty
+  //        board, so the recycle can no longer change what gets evaluated.
+  //   'unwinnable'    → per-move trigger, DEBOUNCED (burst protection: it
+  //        would otherwise solve 10×/s under rapid tapping). A proof that
+  //        lands after further forward moves still fires (handleBackgroundResult).
   useEffect(() => {
     if (
       warningMode === 'off' ||
@@ -458,6 +567,21 @@ export const useHint = ({
       return
     }
     const key = positionKey
+    if (warningMode === 'noUsefulMoves') {
+      // Read the committed board via the ref (synced before this effect runs)
+      // rather than depending on `state`: the state object also changes on
+      // selection taps, which must not re-run the heuristic/solve.
+      const board = stateRef.current
+      if (
+        board.stock.length !== 0 ||
+        demoPlaybackActiveRef.current ||
+        hasUsefulMove(board)
+      ) {
+        return
+      }
+      enqueueSolve(makeSolveTask('auto', BACKGROUND_BUDGET_MS, board, handleBackgroundResult))
+      return
+    }
     const timer = setTimeout(() => {
       // Ref reads at fire time: demo playback drives the reducer rapidly and
       // must never trigger solver work; the board ref is guarded by the key
@@ -474,75 +598,18 @@ export const useHint = ({
       if (deadEraRef.current) {
         return
       }
-      // Classic stuck check (F11 semantics, unchanged in F14). Battery/
-      // psychology decisions, in one place:
-      // - Only evaluated at the recycle-flip moment (stock empty). Mid-stock
-      //   the warning must stay silent — the classic genre contract is "you
-      //   played the deck out", never a mid-deck oracle about unseen cards —
-      //   so mid-stock we skip even the (µs-cheap) heuristic.
-      // - The solver confirmation below runs ONLY in mode 'unwinnable' OR
-      //   when the heuristic already says dead, which keeps the default mode
-      //   ('noUsefulMoves') at (near) zero background solver work.
-      const heuristicStuck =
-        warningMode === 'noUsefulMoves' &&
-        board.stock.length === 0 &&
-        !hasUsefulMove(board)
-      if (warningMode !== 'unwinnable' && !heuristicStuck) {
-        return
-      }
-      enqueueSolve(
-        makeSolveTask('auto', BACKGROUND_BUDGET_MS, (response, keyAtRun, stale) => {
-          // The era re-check also covers the rare in-flight race: a hint
-          // press can prove the position dead (fire-on-discovery) while this
-          // background solve is queued behind it — don't fire twice.
-          if (stale || keyAtRun !== key || deadEraRef.current) {
-            return
-          }
-          if (response.status === 'unsolvable') {
-            // Solver-proven dead → start the era for the active mode. No
-            // per-position dedupe needed anymore: the era itself blocks any
-            // re-evaluation until the player exits it, and re-warning AFTER
-            // an exit-and-return is exactly the wanted re-arm behavior.
-            fireWarning(
-              warningMode === 'unwinnable' ? 'unwinnable' : 'noUsefulMoves',
-              board
-            )
-          } else if (response.status === 'solved') {
-            if (heuristicStuck) {
-              // Heuristic false positive the solver gate just rescued — this
-              // is the live counter of Microsoft-style wrong warnings we
-              // prevented (foundation digs / rearrangements the enumeration
-              // excludes on purpose). console.warn so device tests can grep it.
-              console.warn(
-                '[stuck-heuristic] false positive: no useful move found but position is solvable',
-                {
-                  positionKey: key,
-                  drawCount: state.drawCount,
-                  wasteLength: state.waste.length,
-                  winMovesRemaining: response.winMovesRemaining,
-                }
-              )
-            }
-          } else if (response.status === 'invalid' || response.status === 'error') {
-            console.warn('[solver] background check failed', response)
-          }
-          // 'unknown' (budget miss): suppress silently — a warning must never
-          // rest on an unproven claim; the next position retries anyway.
-        })
-      )
+      enqueueSolve(makeSolveTask('auto', BACKGROUND_BUDGET_MS, board, handleBackgroundResult))
     }, BACKGROUND_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [
     demoPlaybackActiveRef,
     enqueueSolve,
-    fireWarning,
+    handleBackgroundResult,
     makeSolveTask,
     positionKey,
     state.autoQueue.length,
-    state.drawCount,
     state.hasWon,
     state.isAutoCompleting,
-    state.waste.length,
     stateRef,
     warningMode,
   ])
