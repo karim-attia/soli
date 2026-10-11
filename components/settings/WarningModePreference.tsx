@@ -26,7 +26,13 @@ export const WarningModePreference = ({
   onValueChange,
 }: WarningModePreferenceProps) => {
   const picker = (
+    // `key={value}`: Expo UI 57's Android Picker pushes its label into an
+    // uncontrolled Compose TextField once on becoming visible and then fails to
+    // reflect later selections (upstream expo/expo#50800 — fixed in 57.0.22 for
+    // the community picker only, not this universal one). Remounting on value
+    // change re-seeds the label; the menu is closing at that moment anyway.
     <Picker
+      key={value}
       selectedValue={value}
       onValueChange={(nextValue) => onValueChange(nextValue as WarningMode)}
     >
