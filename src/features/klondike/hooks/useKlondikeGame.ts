@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { Alert, LayoutChangeEvent, LayoutRectangle, useColorScheme } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSharedValue } from 'react-native-reanimated'
 
 import {
   createGameStateFromExactId,
@@ -38,6 +39,8 @@ import { useKlondikeHistoryEntry } from './useKlondikeHistoryEntry'
 import { useSolvableDealSelector } from './useSolvableDealSelector'
 import { useCelebrationController } from './useCelebrationController'
 import { useUndoScrubber } from './useUndoScrubber'
+import { useCardDrag } from './useCardDrag'
+import { useDragSelfTest } from './useDragSelfTest'
 import { useDemoGameLauncher, type LaunchDemoGameOptions } from './useDemoGameLauncher'
 import { useAutoQueueRunner } from './useAutoQueueRunner'
 import type { KlondikeGameViewProps } from '../components/KlondikeGameView'
@@ -228,6 +231,11 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const bufferedWasteTapCountRef = useRef(0)
   const lastWasteAutoMoveRef = useRef<WasteAutoMoveMarker | null>(null)
   const [boardLocked, setBoardLocked] = useState(false)
+  // Owned here, not by either gesture hook, because both need it: useCardDrag
+  // writes it, useUndoScrubber reads it (and vice versa via scrubActive). The two
+  // gestures live in disjoint subtrees, so a plain shared value is all the mutual
+  // exclusion they need — see useCardDrag.
+  const dragActiveShared = useSharedValue(0)
   const [dealResetKey, setDealResetKey] = useState(0)
   const [wasteTapQueueVersion, setWasteTapQueueVersion] = useState(0)
 
@@ -555,6 +563,15 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     [performDealAgain, preferredDrawCount]
   )
 
+  // Dev-only drag self-test behind soli://?dragtest=1 (card-drag-and-drop plan).
+  // Lives here so it can read the live board + measured layouts; it runs its cases
+  // on synthetic boards, so it never dispatches into the player's game.
+  const runDragSelfTest = useDragSelfTest({
+    stateRef,
+    layouts: absoluteCardLayerLayouts,
+    cardMetrics,
+  })
+
   const { handleLaunchDemoGame } = useDemoGameLauncher({
     stateRef,
     dispatch,
@@ -584,6 +601,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     // ?celebration= preview now lives in useCelebrationController (Story 5) —
     // the old useKlondikeGame-local triggerCelebrationForTesting was removed.
     startCelebrationPreview,
+    runDragSelfTest,
   })
 
   // Triggers the invalid-move wiggle animation for the provided selection.
@@ -892,6 +910,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     // remaining hint.
     onScrubBegin: noteStreakBreak,
     onScrubEnd: noteScrubEnd,
+    dragActiveShared,
   })
 
   // Developer-mode log marker when the auto-complete queue engages.
@@ -922,6 +941,39 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     [attemptAutoMove]
   )
 
+  // Card drag (card-drag-and-drop plan). Drag is ADDED ON TOP of tap-to-move: the
+  // gesture uses manual activation and fails on every touch it does not claim, so
+  // the press path above is untouched. A drop dispatches the same APPLY_MOVE a tap
+  // would have — no reducer change, no MOVE_LOG_VERSION bump.
+  const dragEnabled =
+    !boardLocked &&
+    !celebrationState &&
+    !state.isAutoCompleting &&
+    state.autoQueue.length === 0
+  const { dragGesture, hiddenCardIds, dragDropHints, cardTransforms, dragOverlayProps } =
+    useCardDrag({
+      state,
+      stateRef,
+      cardMetrics,
+      layouts: absoluteCardLayerLayouts,
+      enabled: dragEnabled,
+      animationsEnabled,
+      animationResetKey: dealResetKey,
+      dragActiveShared,
+      scrubActiveShared: scrubActive,
+      dispatchGameAction,
+      notifyInvalidMove,
+      onTableauCardPress: handleTableauCardPress,
+      onWasteTap: handleWasteTap,
+      onFoundationPress: handleFoundationPress,
+    })
+
+  // While a drag is running the board highlights the DRAG's legal targets instead
+  // of the selection's. Same prop, same COLOR_DROP_BORDER paths in TopRow /
+  // TableauSection / FoundationPile — zero new UI code, and both components are
+  // memoized on this identity, so they re-render exactly twice per drag.
+  const activeDropHints = dragDropHints ?? dropHints
+
   // Perf (A2): the board components receive narrow state slices instead of the whole
   // GameState so their React.memo can skip re-renders when piles kept identity
   // (TIMER_TICK, selection-only changes, moves that don't touch a given pile).
@@ -935,7 +987,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     onDraw: handleDraw,
     onFoundationPress: handleFoundationPress,
     cardMetrics,
-    dropHints,
+    dropHints: activeDropHints,
     interactionsLocked: boardLocked,
     onTopRowLayout: handleTopRowLayout,
     onFoundationLayout: handleFoundationLayout,
@@ -950,7 +1002,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     selected: state.selected,
     hasWon: state.hasWon,
     cardMetrics,
-    dropHints,
+    dropHints: activeDropHints,
     interactionsLocked: boardLocked,
     celebrationPending,
     // Empty-column outlines hide during celebrations (outline-audit story) — gated on
@@ -1015,6 +1067,13 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
           cardMetrics,
         }
       : null,
+    // Lifted cards during a drag: null during normal play, so the overlay costs
+    // nothing per move and cannot disturb the card layer's memo boundaries.
+    dragOverlayProps,
+    // Consumed by KlondikeGameView, which attaches it to the board shell rather
+    // than the card plane (Android BOX_NONE handler collection — see the comments
+    // in AbsoluteCardLayer and KlondikeGameView).
+    dragGesture,
     absoluteCardLayerProps: {
       stock: state.stock,
       waste: state.waste,
@@ -1031,6 +1090,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       // (its first drawable frame). Hiding on celebrationState alone left the
       // foundation area empty for the async-rasterization frames — visible flicker.
       celebrationActive: Boolean(celebrationState) && celebrationOverlayReady,
+      // All three are identity-stable while no drag runs (null / memoized gesture /
+      // ref-boxed registry), so the card layer's React.memo is unaffected.
+      hiddenCardIds,
+      cardTransforms,
       onDraw: handleDraw,
       onWasteTap: handleWasteTap,
       onFoundationPress: handleFoundationPress,

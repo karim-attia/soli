@@ -64,6 +64,17 @@ import {
 // cards mid-flight). Keep any future value above the flight band's ceiling
 // (10000 + max item zIndex) and below nothing board-local — bubbles/dock live
 // outside the board shell's stacking context and stay above by tree order.
+//
+// UPDATE (card-drag-and-drop, 2026-09-09): the card plane described above is no
+// longer flattened. AbsoluteCardLayer's box-none root is now wrapped in a
+// GestureDetector for the drag pan, and GestureDetector clones its child with
+// collapsable={false}. Cards therefore sort INSIDE that plane instead of inside
+// the board shell. The outcome here is unchanged: the plane itself carries no
+// explicit zIndex, so it sorts as 0 among the board shell's children where it is
+// a LATER sibling than TopRow/TableauSection (RN's zIndex sort is stable, so
+// equal values keep document order) — cards still paint over the structural
+// slots, and this constant still beats the whole plane. DragOverlayLayer's
+// DRAG_OVERLAY_Z_INDEX (15000) sits between the flight band and this one.
 const HINT_OVERLAY_Z_INDEX = 20000
 
 const overlayStyle: StyleProp<ViewStyle> = [

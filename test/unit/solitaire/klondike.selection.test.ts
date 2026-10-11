@@ -1,4 +1,4 @@
-import { klondikeReducer } from '../../../src/solitaire/klondike'
+import { klondikeReducer, previewSelectionStack } from '../../../src/solitaire/klondike'
 import { card, createTestState, resetCardCounter, tableauWith } from './helpers'
 
 beforeEach(() => {
@@ -174,5 +174,48 @@ describe('CLEAR_SELECTION', () => {
     const state = createTestState()
 
     expect(klondikeReducer(state, { type: 'CLEAR_SELECTION' })).toBe(state)
+  })
+})
+
+// Exported for the card drag (it decides which cards lift into the drag overlay
+// and which card ids the card layer hides), so its contract is pinned here.
+describe('previewSelectionStack', () => {
+  it('lifts the tapped tableau card and everything stacked on it', () => {
+    const run = [card('spades', 8), card('hearts', 7), card('clubs', 6)]
+    const state = createTestState({ tableau: tableauWith([card('clubs', 10, false), ...run]) })
+
+    expect(
+      previewSelectionStack(state, { source: 'tableau', columnIndex: 0, cardIndex: 1 })
+    ).toEqual(run)
+  })
+
+  it('lifts only the top card of the waste and of a foundation', () => {
+    const wasteTop = card('diamonds', 4)
+    const foundationTop = card('hearts', 2)
+    const state = createTestState({
+      waste: [card('spades', 9), wasteTop],
+      foundations: {
+        hearts: [card('hearts', 1), foundationTop],
+        diamonds: [],
+        clubs: [],
+        spades: [],
+      },
+    })
+
+    expect(previewSelectionStack(state, { source: 'waste' })).toEqual([wasteTop])
+    expect(previewSelectionStack(state, { source: 'foundation', suit: 'hearts' })).toEqual([
+      foundationTop,
+    ])
+  })
+
+  it('returns an empty stack for no selection and for empty piles', () => {
+    const state = createTestState()
+
+    expect(previewSelectionStack(state, null)).toEqual([])
+    expect(previewSelectionStack(state, { source: 'waste' })).toEqual([])
+    expect(previewSelectionStack(state, { source: 'foundation', suit: 'clubs' })).toEqual([])
+    expect(
+      previewSelectionStack(state, { source: 'tableau', columnIndex: 9, cardIndex: 0 })
+    ).toEqual([])
   })
 })

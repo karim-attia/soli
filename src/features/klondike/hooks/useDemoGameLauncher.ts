@@ -78,6 +78,8 @@ type UseDemoGameLauncherOptions = {
     modeId?: number,
     previewStats?: CelebrationPreviewStatsRequest
   ) => void
+  // C7 (card-drag-and-drop): dev-only drag self-test, owned by useDragSelfTest.
+  runDragSelfTest: () => void
 }
 
 export type LaunchDemoGameOptions = {
@@ -311,6 +313,7 @@ export const useDemoGameLauncher = ({
   dealNewGameForTesting,
   startGameFromExactDeal,
   startCelebrationPreview,
+  runDragSelfTest,
 }: UseDemoGameLauncherOptions) => {
   const playlistRunIdRef = useRef(0)
   const playlistTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([])
@@ -1007,6 +1010,26 @@ export const useDemoGameLauncher = ({
         return
       }
 
+      // C7: soli://?dragtest=1 — dev-only drag self-test (card-drag-and-drop plan).
+      // Runs the drag decision pipeline against the LIVE measured layout registry on
+      // synthetic boards and devLogs one [DragTest] PASS/FAIL line per case. Not a
+      // game launch and not a dispatch: the player's board is never touched.
+      const dragTestParam = parseOptionalBooleanParam(parsed.searchParams.get('dragtest'))
+      if (dragTestParam !== null) {
+        lastDemoLinkRef.current = incomingUrl
+        applyLinkDeveloperMode()
+        if (!dragTestParam) {
+          devLog('info', '[DragTest] Link received with dragtest off; nothing to run.')
+          return
+        }
+        // Same settle delay as the launches below: a cold-start deep link can arrive
+        // before the board has been measured, and the harness needs real layouts.
+        setTimeout(() => {
+          runDragSelfTest()
+        }, DEMO_AUTO_STEP_INTERVAL_MS)
+        return
+      }
+
       // C6: soli://?celebration=<modeId|random> — celebration PREVIEW on the current
       // board without winning (Story 5: dev-hold, abort returns to the game without
       // a dialog). Unknown mode → devLog + ignore. Not a game launch.
@@ -1185,6 +1208,7 @@ export const useDemoGameLauncher = ({
       setSolvableGamesOnly,
       startGameFromExactDeal,
       startCelebrationPreview,
+      runDragSelfTest,
     ]
   )
 

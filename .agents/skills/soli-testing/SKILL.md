@@ -1,6 +1,6 @@
 ---
 name: soli-testing
-description: On-device testing cookbook for the Soli app — build/run commands (yarn release, yarn ios), demo deep links, mid-game fixtures, state resets and the phone-data guardrail, a11y handles and testIDs for driving the board, Appium scrub for iOS, log streaming, and troubleshooting. Use whenever building, installing, or testing Soli on a device or simulator.
+description: On-device testing cookbook for the Soli app — build/run commands (yarn release, yarn ios), demo deep links, mid-game fixtures, state resets and the phone-data guardrail, a11y handles and testIDs for driving the board, gesture automation (card-drag self-test, Appium scrub for iOS), log streaming, and troubleshooting. Use whenever building, installing, or testing Soli on a device or simulator.
 ---
 
 # Soli on-device testing cookbook
@@ -14,7 +14,7 @@ Single source of truth for testing Soli on devices/simulators. Package/bundle id
    - **Android physical phone (`yarn release`)**: drive by a11y labels; native pan works (scrubber needs no Appium). It is Karim's MAIN phone — data guardrail in section 4.
    - **iOS simulator (`yarn ios`)**: drive by testIDs; zero risk, full wipes allowed (`xcrun simctl uninstall`). Use alone when the phone is unavailable or the test needs destructive resets.
    - Web: not a target (native-only app).
-3. **Fixture**: fresh deal = default launch (`soli:///`) · full stress = auto-solve playlist (`yarn release/ios --auto-solve` after code changes: builds + monitors logs with pass/fail exit; `yarn deeplink 'soli:///?demo=playlist&games=N'` when the installed build is current — no rebuild, watch logs yourself) · undo/redo/scrubber = `yarn scrubtest` · real win + celebration = `yarn nearwin` (play the last move(s) manually) · specific-deal repro = `?deal=<exactId>` · history/stats = `yarn seedhistory`.
+3. **Fixture**: fresh deal = default launch (`soli:///`) · full stress = auto-solve playlist (`yarn release/ios --auto-solve` after code changes: builds + monitors logs with pass/fail exit; `yarn deeplink 'soli:///?demo=playlist&games=N'` when the installed build is current — no rebuild, watch logs yourself) · undo/redo/scrubber = `yarn scrubtest` · real win + celebration = `yarn nearwin` (play the last move(s) manually) · specific-deal repro = `?deal=<exactId>` · history/stats = `yarn seedhistory` · card-drag logic = `soli://?dragtest=1` (section 6).
 
 ## 2. Build & run
 
@@ -38,6 +38,7 @@ Parsed by `processDemoLink()` in `src/features/klondike/hooks/useDemoGameLaunche
 | `soli://?set=drawCount:3,autoUp:off,solvableOnly:on,warnings:stuck,hintButton:on` | Apply settings without UI taps (`drawCount` 1–5; booleans on/off: `autoUp`, `solvableOnly`, `hintButton`; `warnings:off\|stuck\|unwinnable` = warning-mode select [stuck = "no more useful moves", the default]. Aliases: `hints` → `hintButton`; round-2 `stuckWarning`/`unwinnableWarning:on\|off` map into the select without downgrading a stronger mode). Unknown pairs devLogged + skipped, rest applies |
 | `soli://?reset=undoHint` / `?reset=game` | Targeted resets, section 4 |
 | `soli://?celebration=<modeId\|random>` | Celebration overlay on the current board WITHOUT winning (note below). With `&screenshot=1` the header shows synthetic MOVES/TIME; `&moves=N&time=SECONDS` overrides them |
+| `soli://?dragtest=1` | **Card-drag self-test** — runs the drag decision pipeline against the live measured layouts on synthetic boards and logs `[DragTest] PASS/FAIL` per case (section 6). Never touches the player's game |
 | `soli://demo-game` | Old handcrafted demo (rarely useful — no undo history) |
 | `soli://?seedHistory=default` / `=clear` | Seed / clear history rows, section 4 |
 
@@ -90,7 +91,9 @@ Scope first: only ever touch the Soli app's own data (`adb shell pm clear ch.kar
 
 The board exposes a full a11y tree — always prefer it over coordinate taps. Source of truth: `src/features/klondike/components/cards/accessibility.ts`.
 
-**Interaction model: tap-to-move only. Cards CANNOT be dragged** — tap a card to select, tap the destination to move (agents have wasted whole sessions trying to drag).
+**Interaction model: tap-to-move AND drag-and-drop.** Tapping is unchanged and is still what agents should use: tap a card and the game auto-moves it to the best legal target — one a11y action, no coordinates. Dragging (card-drag-and-drop, 2026-09-09) is additive, for humans and for intent ("this 7♥ onto *that* 8♠"): press a face-up tableau card (which lifts it plus everything below it), the waste top card, or a foundation top card, move ≥ 8 px, and it follows the finger; release over a legal target to move it. Below 8 px of travel the touch is still a plain tap.
+
+**Agents: do not try to drive the drag with `agent-device`.** It cannot pan on iOS (see §6), and a drag is never *required* — every move is reachable by tap. Use `soli://?dragtest=1` (§6) for drag logic coverage. Nothing about the a11y tree below changed: the drag adds no focusable nodes (the drag overlay is `pointerEvents="none"` and unlabeled), and lifted cards are only hidden for the ~1 s a finger is down.
 
 | Target | Android handle (label/content-desc) | iOS handle (testID) |
 |---|---|---|
@@ -116,7 +119,32 @@ agent-device usage:
 
 Gotchas: agent-device `screenshot` costs ~2 s — for short-lived UI (hint rings auto-clear after 2.5 s), chain `adb -s <serial> exec-out screencap -p > file.png` right after the triggering press instead. To ASSERT a colored overlay (e.g. the amber hint ring, `COLOR_HINT` #FFB020) in a screenshot without eyeballing: `ffmpeg -i shot.png -vf "crop=<slot rect>,colorkey=0xFFB020:0.14:0.0,format=rgba,alphaextract,signalstats,metadata=print:key=lavfi.signalstats.YAVG" -f null -` → YAVG ≈255 clean, noticeably lower (~226 for a ring) when present — good for unattended loops like "follow draw hints until a move hint appears". Screenrecord frame numbers are VFR (encode-on-change): locate moments by content signals (luma spikes), never by frame arithmetic; a LOW unique-frame count itself proves a static screen (useful for animations-off checks). `uiautomator dump` fails on this app (the game timer never idles). Drawer tabs report off-screen coordinates on iOS until the drawer is OPEN — label selectors (`label=History`) fail with "not safe to click"; the reliable loop is tap the hamburger @ref → fresh `snapshot -i` → tap the tab's fresh @ref (refs go stale after every navigation). Don't use foundation/card taps as timer nudges — tap-to-move can auto-play cards (tap Undo+Redo or empty green instead).
 
-## 6. Scrubber automation
+## 6. Gesture automation
+
+### Card drag
+
+`agent-device` cannot pan on **iOS** (a single ~300 ms swipe; the RNGH pan never activates — exactly the scrubber limitation below), and on Android a native pan would have to clear the 8 px activation threshold and land inside the target column's drop zone. So drags are not part of a normal agent run.
+
+Cover the drag logic with the dev-only self-test instead:
+
+```bash
+yarn deeplink 'soli://?dragtest=1' --ios      # or drop --ios for the phone
+```
+
+Dev-mode gated like every other link. It drives the drag **state machine** directly (no synthetic touches): source model → hit test → selection → drop-hint mask → drop zones → resolution → the real reducer, run against the **live measured layout registry** on the device it is running on, over a scripted matrix (single-card tableau→tableau, 3-card run, waste→foundation, foundation→tableau, King→empty column, illegal drop, drop over nothing, sloppy-tap fallback) plus one case against the live board. Output is one line per case in the `[SoliDev]` stream (§7):
+
+```
+[SoliDev] [DragTest] PASS single card tableau -> tableau { resolution: 'legal', lifted: 1 }
+[SoliDev] [DragTest] PASS summary: 9 passed, 0 failed
+```
+
+Cases run on **synthetic** boards — the player's game is never dispatched into or persisted — so the link is safe to fire on the phone at any time. A `FAIL setup: board layout not measured yet` line means the link landed before the first layout pass; re-fire it.
+
+What the harness does NOT cover, because it needs real touches: RNGH plumbing (the 8 px activation, touch cancellation so `onPress` cannot double-fire, `pointerEvents` handler collection). Those are on the manual checklist in `docs/product/card-drag-and-drop/card-drag-and-drop.md` § Testing — including the open Android question about the `box-none` attach point, which specifically affects **waste** drags on a physical Android device and cannot reproduce on the simulator.
+
+If a real iOS drag ever has to be automated, Appium W3C pointer actions are the route; `scripts/ios-scrub.js` is the working precedent to generalise.
+
+### Scrubber automation
 
 Enter the deterministic fixture first: `yarn scrubtest` (index 40 of 80).
 
@@ -151,5 +179,5 @@ Mirror of the AGENTS.md rule: if any instruction here was wrong, stale, or cause
 
 ## 10. Further reading
 
-- `docs/external-package-guides/`: `appium.md` (iOS scrub recipe), `agent-device.md`, `expo-run-ios-and-simctl.md`
-- `docs/product/`: `agent-testing-skill/` (history + rationale behind these recipes), `scrubber-test-automation/` (fixture + ios-scrub background), `klondike-card-accessibility/` (a11y handle design)
+- `docs/external-package-guides/`: `appium.md` (iOS scrub recipe), `agent-device.md`, `expo-run-ios-and-simctl.md`, `react-native-gesture-handler.md` (why agent-device cannot drive an RNGH pan)
+- `docs/product/`: `agent-testing-skill/` (history + rationale behind these recipes), `scrubber-test-automation/` (fixture + ios-scrub background), `klondike-card-accessibility/` (a11y handle design), `card-drag-and-drop/` (drag manual checklist + the open Android attach-point question)

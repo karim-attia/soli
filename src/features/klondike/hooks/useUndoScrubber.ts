@@ -3,6 +3,7 @@ import { Dimensions } from 'react-native'
 import { Gesture } from 'react-native-gesture-handler'
 import type { GestureType } from 'react-native-gesture-handler'
 import { runOnJS, useSharedValue } from 'react-native-reanimated'
+import type { SharedValue } from 'react-native-reanimated'
 
 import type { GameAction, GameState } from '../../../solitaire/klondike'
 import { UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING } from '../constants'
@@ -21,6 +22,12 @@ type UseUndoScrubberOptions = {
   // a different history index than it started (a "successful" scrub). Used by the
   // undo-hint feature to consume a remaining hint from proven scrubber users.
   onScrubEnd?: (changed: boolean) => void
+  // Card drag (card-drag-and-drop plan): the two gestures live in disjoint
+  // subtrees, so they can never compete for ONE touch — but two fingers could
+  // otherwise scrub the timeline while a card is mid-drag. Guarded reciprocally
+  // (useCardDrag fails on scrubActiveShared) instead of via RNGH cross-detector
+  // relations, which would mean threading gesture refs through both hooks.
+  dragActiveShared?: SharedValue<number>
 }
 
 type ScrubOrigin = {
@@ -160,6 +167,7 @@ export const useUndoScrubber = ({
   handleUndo,
   onScrubBegin,
   onScrubEnd,
+  dragActiveShared,
 }: UseUndoScrubberOptions) => {
   const hasUndo = state.history.length > 0
   const timelineRange = state.history.length + state.future.length
@@ -332,7 +340,13 @@ export const useUndoScrubber = ({
   const handleUndoRef = useRef(handleUndo)
   handleUndoRef.current = handleUndo
 
+  const dragActiveRef = useRef(dragActiveShared)
+  dragActiveRef.current = dragActiveShared
+
   const handleTapEnd = useCallback(() => {
+    if ((dragActiveRef.current?.value ?? 0) > 0) {
+      return
+    }
     if (canUndoRef.current) {
       handleUndoRef.current()
     }
@@ -360,7 +374,11 @@ export const useUndoScrubber = ({
         .hitSlop({ bottom: 50, top: 50, left: 20, right: 20 })
         .cancelsTouchesInView(false)
         .onStart((event) => {
-          if (boardLockedShared.value > 0 || shouldShowUndoShared.value === 0) {
+          if (
+            boardLockedShared.value > 0 ||
+            shouldShowUndoShared.value === 0 ||
+            (dragActiveShared?.value ?? 0) > 0
+          ) {
             return
           }
 
@@ -431,6 +449,7 @@ export const useUndoScrubber = ({
   }, [
     beginScrubSession,
     boardLockedShared,
+    dragActiveShared,
     finishScrubSession,
     historyLengthShared,
     safeAreaLeftShared,

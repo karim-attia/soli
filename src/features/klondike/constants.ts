@@ -32,6 +32,30 @@ export const CARD_FLIP_HALF_DURATION_MS = 40
 export const WIGGLE_OFFSET_PX = 5
 export const WIGGLE_SEGMENT_DURATION_MS = 70
 
+// Card drag (card-drag-and-drop plan). Drag is an INPUT method, so none of this
+// is behind a user-facing setting; only the decorative lift/snap-back timings
+// gate on the existing animations.master toggle.
+// 8 px activation: the undo scrubber uses 5 px on a 48 pt button, but a card is
+// 50–90 px wide and 8 px still sits comfortably inside RN Pressability's press
+// rect, so a real tap can never be mistaken for a drag.
+export const DRAG_ACTIVATION_DISTANCE_PX = 8
+export const DRAG_LIFT_SCALE = 1.04
+export const DRAG_LIFT_DURATION_MS = 90
+export const DRAG_SNAP_BACK_DURATION_MS = 140
+// Fraction of a card's area that must overlap a drop zone for it to count. 0.2
+// is deliberately generous: players aim roughly, and the alternative (a
+// nearest-target magnet) makes a card teleport across the board from a drop over
+// empty felt, which reads as a bug.
+export const DRAG_DROP_MIN_OVERLAP_RATIO = 0.2
+// Tableau drop zones extend half a card below the column's last card so
+// "drop just below the pile" targets that column — which is what players do.
+export const DRAG_DROP_EXTEND_Y_RATIO = 0.5
+// Horizontal slack on drop zones; matches the board's own inter-column margin so
+// the zones tile the board without overlapping each other.
+export const DRAG_DROP_ZONE_PAD_X = BOARD_COLUMN_MARGIN
+// boxShadow is native on RN 0.76+/New Arch (same as HintOverlayLayer's rings).
+export const DRAG_CARD_SHADOW = '0 8px 16px rgba(0, 0, 0, 0.35)'
+
 export const FOUNDATION_GLOW_MAX_OPACITY = 1
 export const FOUNDATION_GLOW_IN_DURATION_MS = 90
 export const FOUNDATION_GLOW_OUT_DURATION_MS = 220
