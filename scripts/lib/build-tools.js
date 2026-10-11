@@ -1126,6 +1126,7 @@ module.exports = {
   logError,
   extractAppLogMessage,
   formatClockDuration,
+  parseEnvFile,
   loadReleaseSigningEnv,
   runCommand,
   runCommandWithProgress,

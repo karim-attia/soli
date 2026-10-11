@@ -108,6 +108,33 @@ EOF
   fi
 }
 
+# Sync versionCode/versionName from app.json into the generated build.gradle.
+# android/ is gitignored and produced by `expo prebuild`; bumping app.json alone
+# does NOT reach android/app/build.gradle without a prebuild, and a clean
+# prebuild (`yarn prebuild:android`) is slow and resets the signing block
+# (re-applied below anyway). Patching the two lines directly keeps the release
+# build incremental and makes app.json the single place to bump
+# (release-automation plan, 2026-10-11). app.json is static (no app.config.js),
+# so a plain require() reads the exact values Expo would use.
+apply_version_from_app_json() {
+  local version_code
+  local version_name
+  version_code="$(node -p "require('./app.json').expo.android.versionCode")"
+  version_name="$(node -p "require('./app.json').expo.version")"
+
+  SOLI_VERSION_CODE="${version_code}" SOLI_VERSION_NAME="${version_name}" perl -pi -e '
+    s/^(\s*)versionCode \d+$/$1versionCode $ENV{SOLI_VERSION_CODE}/;
+    s/^(\s*)versionName "[^"]*"$/$1versionName "$ENV{SOLI_VERSION_NAME}"/;
+  ' "${BUILD_GRADLE_FILE}"
+
+  if ! rg -q "^\\s*versionCode ${version_code}\$" "${BUILD_GRADLE_FILE}" ||
+    ! rg -q "^\\s*versionName \"${version_name}\"\$" "${BUILD_GRADLE_FILE}"; then
+    echo "Error: could not sync versionCode/versionName into ${BUILD_GRADLE_FILE}"
+    exit 1
+  fi
+  echo "Android version: ${version_name} (versionCode ${version_code})"
+}
+
 # Load environment variables and export them.
 if [ -f "${ENV_FILE}" ]; then
   set -a
@@ -138,15 +165,41 @@ if [ ! -f "${SOLI_UPLOAD_STORE_FILE}" ]; then
 fi
 
 apply_release_signing_patch
+apply_version_from_app_json
 
 # Rust solver artifacts are gitignored (hints plan doc, "Artifacts-in-git
 # decision 2026-07-23") — a stale/missing solver must never reach a Play
 # Store bundle. Rebuilds when rust/ changed; silent no-op when up to date.
 node scripts/ensure-rust-solver.js
 
+# ABIs: the bundle ships all four from android/gradle.properties
+# (armeabi-v7a, arm64-v8a, x86, x86_64) and scripts/build-rust-solver.sh builds
+# the solver for all four. History: on 2026-10-11 this script briefly forced
+# `ORG_GRADLE_PROJECT_reactNativeArchitectures="arm64-v8a,x86_64"` because the
+# solver only existed for 64-bit; Play then warned the bundle dropped 5,607
+# device models (29% of phones/tablets, all TVs) vs 1.0.0, so the 32-bit solver
+# targets were added instead and the override removed. The guard after the
+# build keeps the invariant: every ABI in the AAB must carry the solver.
+
+# Agent/non-interactive shells don't source ~/.zshrc (where ANDROID_HOME lives)
+# and android/local.properties is not generated here, so Gradle fails with
+# "SDK location not found" (seen on the 1.1.0 release build, 2026-10-11).
+# Same default as scripts/build-rust-solver.sh.
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
+
 # Navigate to android directory and build.
 cd android
 echo "Building Android App Bundle..."
 ./gradlew bundleRelease
 
-echo "Build completed: android/app/build/outputs/bundle/release/app-release.aab"
+AAB_PATH="app/build/outputs/bundle/release/app-release.aab"
+# Guard for the ABI note above: every ABI in the bundle must carry the solver.
+for abi in $(unzip -Z1 "${AAB_PATH}" 'base/lib/*' | cut -d/ -f3 | sort -u); do
+  if ! unzip -Z1 "${AAB_PATH}" "base/lib/${abi}/libsoli_solver_ffi.so" >/dev/null 2>&1; then
+    echo "Error: ${AAB_PATH} contains ABI ${abi} without libsoli_solver_ffi.so"
+    exit 1
+  fi
+  echo "ABI ${abi}: solver present"
+done
+
+echo "Build completed: android/${AAB_PATH}"

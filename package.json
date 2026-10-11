@@ -1,6 +1,6 @@
 {
   "name": "soli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "main": "index.js",
   "scripts": {
@@ -21,11 +21,13 @@
     "scrubtest": "node scripts/deeplink.js scrubtest",
     "nearwin": "node scripts/deeplink.js nearwin",
     "seedhistory": "node scripts/deeplink.js seedhistory",
-    "build:ios": "node scripts/ensure-rust-solver.js && npx eas build --platform ios --profile production --non-interactive",
+    "build:ios": "node scripts/ensure-rust-solver.js && npx eas-cli build --platform ios --profile production --non-interactive",
     "web": "pkill -f 'expo.*start.*web' 2>/dev/null || true && BROWSER=none expo start --web --port 8081",
     "test": "jest --watchAll",
     "generate:solvable-deals": "node scripts/generate-solvable-deals-v2.js",
     "build:android": "./build-android.sh",
+    "submit:android": "node scripts/submit-android.js",
+    "submit:ios": "npx eas-cli submit --platform ios --latest --non-interactive",
     "prebuild": "yarn prebuild:android",
     "prebuild:android": "npx expo prebuild --platform android --clean",
     "prebuild:ios": "npx expo prebuild --platform ios --clean"

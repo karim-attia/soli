@@ -30,13 +30,23 @@ ensure_rustup_target() {
   fi
 }
 
-echo "==> Android (arm64-v8a + x86_64 via cargo-ndk)"
+# All FOUR Android ABIs on purpose (2026-10-11): the Play Store bundle
+# (build-android.sh) ships every ABI in android/gradle.properties, and an ABI
+# split without libsoli_solver_ffi.so crashes in System.loadLibrary. A 64-bit-
+# only bundle was tried first and reverted after Play warned it dropped 5,607
+# device models (29% of phones/tablets, all TVs) vs 1.0.0. The 32-bit builds
+# cost ~1 min and ~1 MB; the solver has no pointer-width assumptions (reviewed
+# in docs/product/release-automation/release-automation.md). Dev builds
+# (`yarn release`) still only package arm64-v8a.
+echo "==> Android (arm64-v8a + armeabi-v7a + x86_64 + x86 via cargo-ndk)"
 if ! command -v cargo-ndk >/dev/null 2>&1; then
   echo "==> cargo-ndk not found — installing"
   cargo install cargo-ndk
 fi
 ensure_rustup_target aarch64-linux-android
+ensure_rustup_target armv7-linux-androideabi
 ensure_rustup_target x86_64-linux-android
+ensure_rustup_target i686-linux-android
 
 # cargo-ndk needs an NDK; RN 0.86 pins 27.x. Pick the highest installed 27.x
 # when no env var points at one (cargo-ndk v4 auto-adds the 16 KB page-size
@@ -56,7 +66,7 @@ fi
 rm -rf "${JNILIBS_DIR}"
 mkdir -p "${JNILIBS_DIR}"
 # --platform 24 matches RN 0.86 minSdk.
-(cd "${RUST_DIR}" && cargo ndk -t arm64-v8a -t x86_64 --platform 24 \
+(cd "${RUST_DIR}" && cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -t x86 --platform 24 \
   -o "${JNILIBS_DIR}" build --release -p soli-solver-ffi)
 
 echo "==> iOS (device + universal simulator static libs → XCFramework)"

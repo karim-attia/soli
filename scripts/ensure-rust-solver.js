@@ -32,11 +32,16 @@ const BUILD_SCRIPT = path.join(REPOSITORY_ROOT, 'scripts', 'build-rust-solver.sh
 const MODULE_DIR = path.join(REPOSITORY_ROOT, 'modules', 'soli-solver')
 const FINGERPRINT_PATH = path.join(MODULE_DIR, '.artifacts-fingerprint.json')
 
-// All four artifacts the build script produces; a missing one means a broken
-// or partial build regardless of what the fingerprint says.
+// All six artifacts the build script produces; a missing one means a broken
+// or partial build regardless of what the fingerprint says. The four Android
+// ABIs match android/gradle.properties `reactNativeArchitectures` — the Play
+// bundle must never ship an ABI split without the solver (see the comment in
+// scripts/build-rust-solver.sh, 2026-10-11).
 const ARTIFACT_PATHS = [
   'android/src/main/jniLibs/arm64-v8a/libsoli_solver_ffi.so',
+  'android/src/main/jniLibs/armeabi-v7a/libsoli_solver_ffi.so',
   'android/src/main/jniLibs/x86_64/libsoli_solver_ffi.so',
+  'android/src/main/jniLibs/x86/libsoli_solver_ffi.so',
   'ios/SoliSolver.xcframework/ios-arm64/libsoli_solver_ffi.a',
   'ios/SoliSolver.xcframework/ios-arm64_x86_64-simulator/libsoli_solver_ffi.a',
 ].map((rel) => path.join(MODULE_DIR, rel))
@@ -103,7 +108,7 @@ const TOOLCHAIN_HELP = [
   '  brew install rustup && rustup-init -y',
   '  (then restart the shell so cargo/rustup are on PATH)',
   '',
-  'scripts/build-rust-solver.sh self-installs the four cross-compile targets',
+  'scripts/build-rust-solver.sh self-installs all cross-compile targets',
   'and cargo-ndk on first run. Re-run the build afterwards.',
 ].join('\n')
 

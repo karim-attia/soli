@@ -187,6 +187,11 @@ main() {
   fi
 
   warn_if_short_screen_timeout "${adb_bin}" "${stable_serial}"
+  # Agent/non-interactive shells don't source ~/.zshrc (where ANDROID_HOME is
+  # exported) and android/local.properties is not generated, so Gradle fails
+  # with "SDK location not found" (2026-10-11). Same default as build-android.sh
+  # and scripts/build-rust-solver.sh.
+  export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
   # exec (not a plain call) so no shell parent lingers after the Node entry
   # exits; "$@" forwards --logs/--auto-solve. Bare gradlew replaced `expo run:android` here —
   # autolinking + RN codegen run inside Gradle, so no expo codegen step is lost

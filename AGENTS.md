@@ -120,10 +120,13 @@ However, also test everything you do in a real environment (when it makes sense!
 
 **Any agent doing device testing must first read `.agents/skills/soli-testing/SKILL.md`** — the on-device testing cookbook (build/run commands and flags, a11y handles, demo deep links, fixtures, state resets, scrubber automation, troubleshooting). Recipes live there, not here.
 
+**Any agent doing a store release ("let's release", TestFlight / Google Play upload) must first read `.agents/skills/soli-release/SKILL.md`** — the release cookbook (bump rules, release notes + approval, builds, uploads in API/manual mode, testers, what needs Karim's go-ahead, troubleshooting).
+
 ## Commands
 
 - Cheap gates: `yarn typecheck` — `yarn lint` — `yarn jest`
 - Device build+run: `yarn release` (Android phone) or `yarn ios` (simulator) — flags and everything else: soli-testing skill
+- Store release: `yarn build:ios` (EAS) / `yarn build:android` (local AAB) / `yarn submit:android [--dry-run]` / `yarn submit:ios` — flow and everything else: soli-release skill
 
 # External packages
 

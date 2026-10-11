@@ -272,20 +272,27 @@ Rust-side thread spawning, channels, or async runtime — simplest possible FFI.
 the 16 KB page-size linker flag automatically for 64-bit targets on NDK <= 27):
 
 ```bash
-rustup target add aarch64-linux-android x86_64-linux-android
+rustup target add aarch64-linux-android armv7-linux-androideabi \
+  x86_64-linux-android i686-linux-android
 cargo install cargo-ndk
 # -o writes libsoli_solver.so directly into the jniLibs/<abi>/ layout.
 # --platform 24 matches RN 0.86 minSdk 24.
-cargo ndk -t arm64-v8a -t x86_64 --platform 24 \
+cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -t x86 --platform 24 \
   -o ../../modules/soli-solver/android/src/main/jniLibs \
   build --release
 ```
 
-arm64-v8a covers real devices; x86_64 is only for emulator. Skip armeabi-v7a
-and x86 unless we decide to keep shipping 32-bit (Play has required 64-bit
-since 2019; the Expo template still builds all four ABIs, so either build all
-four Rust ABIs or set `reactNativeArchitectures=arm64-v8a,x86_64` via our
-gradle-properties plugin — decide at implementation time).
+**Decision (2026-10-11): build all four ABIs.** The Expo template's
+`android/gradle.properties` ships `armeabi-v7a,arm64-v8a,x86,x86_64`, and an
+ABI split without the `.so` crashes in `System.loadLibrary`. The first 1.1.0
+bundle forced `reactNativeArchitectures=arm64-v8a,x86_64` instead; Play
+Console then warned it dropped 5,607 device models (29% of phones/tablets,
+all Android TVs) versus 1.0.0 — "64-bit required since 2019" only means a
+64-bit variant must exist, not that 32-bit devices are gone. The 32-bit
+targets add ~1 min of build time and ~1 MB of artifacts. lonelybot is
+pointer-width agnostic (bitboards/encodes/hasher are explicit `u64`, `usize`
+only indexes small arrays), so no code changes were needed. Dev builds
+(`yarn release`) still package arm64-v8a only (`scripts/lib/build-tools.js`).
 
 Kotlin side (in `modules/soli-solver/android/.../SoliSolverModule.kt`) —
 plain `external fun` + `System.loadLibrary`, no JNI_OnLoad needed if we use

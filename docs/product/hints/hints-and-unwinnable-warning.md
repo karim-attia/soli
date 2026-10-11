@@ -81,7 +81,7 @@ Why Lonelybot: already validated offline for deal harvesting (`scripts/generate-
 - **Local Expo module `modules/soli-solver/` + hand-written C ABI (JSON strings in/out), not uniffi-bindgen-react-native.** UBRN is still "not yet production" and polls Rust futures on the JS thread; overkill for a 1–3 function API.
 - `modules/` is auto-discovered by Expo autolinking in SDK 57; no npm package needed.
 - Expo `AsyncFunction` runs off the JS thread (Swift: serial `expo.modules.AsyncFunctionQueue`; Kotlin: dedicated HandlerThread). The Rust FFI additionally spawns its own 4 MiB-stack thread per solve and joins it (stack headroom + keeps the shared Expo queue responsive enough).
-- Android: `cargo ndk -t arm64-v8a -t x86_64 -o <module>/android/src/main/jniLibs build --release`; NDK 27.1 (pinned by RN 0.86); cargo-ndk v4 auto-adds 16 KB page alignment (Play requirement for Android 15+).
+- Android: `cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -t x86 -o <module>/android/src/main/jniLibs build --release` (all four ABIs since 2026-10-11 — the Play bundle ships all four and a split without the `.so` crashes; originally only the 64-bit pair); NDK 27.1 (pinned by RN 0.86); cargo-ndk v4 auto-adds 16 KB page alignment (Play requirement for Android 15+).
 - iOS: `aarch64-apple-ios` + `aarch64-apple-ios-sim` static libs, `IPHONEOS_DEPLOYMENT_TARGET=16.4`, packaged via `xcodebuild -create-xcframework`, vendored in the module podspec.
 - Kotlin side loads via `System.loadLibrary` + `external fun`; Swift via bridging header in the pod.
 - `catch_unwind` at every FFI entry, `panic = "unwind"`.
@@ -266,7 +266,7 @@ Response JSON:
 ## Dependencies
 
 - Vendored: lonelybot core crate (MIT, upstream rev `ae30d39`) → `rust/vendor/lonelybot/`, with `VENDORED.md` (rev, license, list of local patches). No new npm dependencies.
-- Toolchain (dev machine only): rustup targets `aarch64-linux-android`, `x86_64-linux-android`, `aarch64-apple-ios`, `aarch64-apple-ios-sim`; `cargo-ndk`.
+- Toolchain (dev machine only): rustup targets `aarch64-linux-android`, `armv7-linux-androideabi`, `x86_64-linux-android`, `i686-linux-android` (32-bit targets added 2026-10-11 so the Play bundle can ship all four ABIs — see `docs/product/release-automation/release-automation.md`), `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `x86_64-apple-ios`; `cargo-ndk`.
 - Guides: `docs/external-package-guides/lonelybot.md`, `docs/external-package-guides/rust-mobile.md` (refresh 2026-07-12).
 
 ## UX/UI Considerations
@@ -292,7 +292,7 @@ Track status inline: [ ] todo, [x] done, [~] in progress.
 - [x] A3. `rust/soli-solver-ffi/` crate: JSON (serde) request/response per FFI contract; suit remap in Rust; state validation (52 cards exactly once, 7 columns, hidden≤i, legal visible runs, drawCount 1..=9); solve on spawned 4 MiB-stack thread with deadline `TerminateSignal`; `catch_unwind`; `extern "C"` `soli_solver_solve` + `soli_solver_free_string`; pure-Rust `solve_request_json` for tests/perf; `app_model::AppState` (test/perf-only mirror of app semantics).
 - [x] A4. Rust tests (13 total, all green): fresh-deal equivalence seeds 0..20 × draw {1,3} (`equivalent_to` + identical solve result); draw-cycle equivalence incl. recycle wrap and consumed cards (validates `Deck::from_remaining` mask/map); replay-along-solution (seed 0 draw 1, 30 positions, status solved + hint legality vs app model); unsolvable fixture (scan seeds 0..50 × draws) → `unsolvable`; budget 0 ms → `unknown`; forced K♣ foundation hint (suit remap end-to-end); duplicate card / structural errors → `invalid`; raw FFI round-trip incl. null safety.
 - [x] A5. Desktop perf harness `rust/soli-solver-ffi/examples/perf.rs`: draws {1,3,5} × 150 solvable seeds, winning-line walk re-solving every 5th position (every position for 30 seeds) through the JSON API, plus 50 known-unsolvable fresh deals per draw; P50/P90/P99/max + visited. Results below under ## Testing.
-- [x] A6. `scripts/build-rust-solver.sh`: cargo-ndk build (arm64-v8a, x86_64, --platform 24) → `modules/soli-solver/android/src/main/jniLibs/`; iOS device+sim static libs (IPHONEOS_DEPLOYMENT_TARGET=16.4) → `SoliSolver.xcframework` → `modules/soli-solver/ios/`; header `rust/soli-solver-ffi/include/soli_solver.h`. Idempotent, prints artifact sizes. Run successfully (sizes below).
+- [x] A6. `scripts/build-rust-solver.sh`: cargo-ndk build (arm64-v8a, x86_64, --platform 24; armeabi-v7a + x86 added 2026-10-11, release-automation plan) → `modules/soli-solver/android/src/main/jniLibs/`; iOS device+sim static libs (IPHONEOS_DEPLOYMENT_TARGET=16.4) → `SoliSolver.xcframework` → `modules/soli-solver/ios/`; header `rust/soli-solver-ffi/include/soli_solver.h`. Idempotent, prints artifact sizes. Run successfully (sizes below).
 
 ### Phase B — Expo module + app integration
 

@@ -4,6 +4,26 @@ Soli is a free, ad-free, open-source Solitaire.
 
 ---
 
+## 1.1.0 — 2026-10-11
+
+- **Hints**: optional Hint button next to Undo (turn it on in Settings, off by default). It shows the next move on a winning line — the card to move and where it goes, or the stock when drawing is the right move
+- **"No more useful moves" warning**: a small notice appears once you have gone through the stock without any move that helps. In Settings you can choose to warn on no more useful moves (default), only when the game is proven unwinnable, or never
+- Both are powered by a built-in solver that runs on your device; answers usually take a few milliseconds
+- Small celebration polish
+- Fix: the warning-mode picker on Android showed a stale label after choosing an option
+
+Google Play:
+
+Soli 1.1 adds hints!
+
+- New Hint button (off by default, turn it on in the settings)
+- New warning when there are no more useful moves
+- Small fixes and polish
+
+Happy playing!
+
+---
+
 ## 1.0.0 — 2026-07-09
 
 - **Unlimited game history**: history now lives in an on-device database — every game you've played stays available, and the history screen stays fast
