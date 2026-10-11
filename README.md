@@ -11,7 +11,7 @@ No ads, in-app purchases, or gamification to get you to play more.
 
 - Klondike.
 - Draw 1-5 modes.
-- Auto-complete when all cards are face up.
+- Auto-complete in every draw mode: once no face-down cards are left in the tableau and the remaining cards can all be played to the foundations, the game finishes itself.
 - Solvable games
 - Nice animations
 - Undo time travel through game

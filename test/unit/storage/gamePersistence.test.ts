@@ -322,6 +322,33 @@ describe('gamePersistence (payload v1: deal + move log + final snapshot + clock)
     expect(loaded!.state.history).toHaveLength(0)
   })
 
+  // "Can a stranded auto-complete survive a reload?" — it must not. A run in
+  // flight is live-only state: serializeState stores snapshotFromState, which
+  // hardcodes autoQueue: [] and isAutoCompleting: false. That is what keeps the
+  // one incoherent combination out of reach — isAutoCompleting true with an empty
+  // queue, which useAutoQueueRunner never arms on (no queue) and nothing ever
+  // clears, leaving the flag on forever while it suppresses hints and
+  // invalid-move feedback (useHint, notifyInvalidMove).
+  it('never restores a stranded auto-complete run from a save taken mid-run', async () => {
+    const played = playRandomGame(101, 40, { allowScrub: false })
+    const live: GameState = {
+      ...played,
+      autoQueue: [{ type: 'draw' }],
+      isAutoCompleting: true,
+    }
+
+    const { serialized, loaded } = await saveAndReload(live)
+
+    const payload = JSON.parse(serialized)
+    expect(payload.finalSnapshot.autoQueue).toEqual([])
+    expect(payload.finalSnapshot.isAutoCompleting).toBe(false)
+
+    const restored = loaded!.state
+    expect(boardSignature(restored)).toBe(boardSignature(live))
+    expect(restored.isAutoCompleting).toBe(false)
+    expect(restored.autoQueue).toHaveLength(0)
+  })
+
   it('falls back to the final snapshot when the replayed depth mismatches the guard (R1)', async () => {
     const live = playRandomGame(13, 40, { allowScrub: false })
     expect(live.history.length).toBeGreaterThan(0)

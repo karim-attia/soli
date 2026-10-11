@@ -213,6 +213,49 @@ describe('move log recording', () => {
     })
   })
 
+  // MOVE_LOG_VERSION exists because auto-queue scheduling is a replay input:
+  // scheduling pushes a history snapshot with no move-log entry of its own, so the
+  // rules that decide *whether* to schedule have to reach the same answer on replay
+  // or the undo depth drifts. Nothing replayed a whole run before — the R2a test
+  // above stops at the scheduling push, and the persistence fuzz driver never
+  // reaches an auto-completable board — which left the one property the version
+  // bump protects untested. Draw 3 on purpose: that is where the new outcome gate
+  // changed the answer.
+  it('replays a full auto-complete run to the same board and undo depth', () => {
+    resetCardCounter()
+    const start = createTestState({
+      autoUpEnabled: false,
+      drawCount: 3,
+      tableau: tableauWith([makeCard('hearts', 3)]),
+      waste: [makeCard('hearts', 1)],
+      stock: [makeCard('hearts', 2, false)],
+    })
+    const base = structuredClone(start)
+
+    let live = klondikeReducer(start, { type: 'SET_AUTO_UP_ENABLED', enabled: true })
+    expect(live.isAutoCompleting).toBe(true)
+
+    let guard = 0
+    while (live.isAutoCompleting && guard < 50) {
+      live = klondikeReducer(live, { type: 'ADVANCE_AUTO_QUEUE' })
+      guard += 1
+    }
+    expect(guard).toBeLessThan(50)
+    // One 'adv' per queued action; the scheduling history push is the step with no
+    // entry of its own, which is exactly why replay has to re-derive it.
+    expect(live.moveLog.filter((entry) => entry.k === 'adv')).toHaveLength(4)
+    expect(live.history).toHaveLength(1)
+
+    const replayed = replayMoveLog(base, live.moveLog)
+
+    expect(boardSignature(replayed)).toBe(boardSignature(live))
+    expect(replayed.history).toHaveLength(live.history.length)
+    expect(replayed.future).toHaveLength(live.future.length)
+    expect(replayed.autoCompleteRuns).toBe(live.autoCompleteRuns)
+    expect(replayed.isAutoCompleting).toBe(false)
+    expect(replayed.autoQueue).toHaveLength(0)
+  })
+
   it('derives the deal-time Auto Up value from the first logged toggle', () => {
     expect(initialAutoUpFromMoveLog([], true)).toBe(true)
     expect(initialAutoUpFromMoveLog([], false)).toBe(false)
