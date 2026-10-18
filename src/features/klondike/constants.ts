@@ -107,3 +107,54 @@ export const UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING = 40
 // Task 20-6: Keep undo scrubber clear of iOS home indicator / Android nav gesture area.
 // This is the extra dock gap above the system inset, not a replacement for the inset.
 export const UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING = 20
+
+// Rewind-to-winnable playback. The jump used to be one SCRUB_TO_INDEX, which
+// teleported the board — the player saw the end state with no sense of how far
+// back they went or what got undone. Stepping one index at a time instead lets
+// the existing 90 ms card flights play per move, so it reads as a rewind reel.
+//
+// The distance varies enormously (4 moves in the stuck fixture, 40+ after a
+// real mistake), so a fixed per-step delay would either crawl or flicker. The
+// step delay is therefore derived from a target TOTAL duration and clamped:
+// short rewinds get the slow, readable end, long ones the brisk one.
+//
+// The floor is HALF a card flight, not a whole one, and that is deliberate:
+// past ~20 steps each flight is still in the air when the next one starts, so
+// two cards overlap. The alternative — a 90 ms floor, one full flight per step
+// — makes a 40-move rewind take 3.6 s (and a 100-move one nine seconds) with
+// the pill inert throughout, which is a worse answer to "show me what is being
+// undone" than briefly overlapping flights on a walk that is all in the same
+// direction. Keep the two in sync if either changes.
+export const REWIND_PLAYBACK_TARGET_TOTAL_MS = 900
+export const REWIND_PLAYBACK_MIN_STEP_MS = CARD_ANIMATION_DURATION_MS / 2
+export const REWIND_PLAYBACK_MAX_STEP_MS = 140
+
+// Exported for tests: the per-step delay for a rewind of `steps` moves.
+export const resolveRewindStepDelayMs = (steps: number): number => {
+  if (steps <= 0) {
+    return REWIND_PLAYBACK_MAX_STEP_MS
+  }
+  const even = REWIND_PLAYBACK_TARGET_TOTAL_MS / steps
+  return Math.min(
+    REWIND_PLAYBACK_MAX_STEP_MS,
+    Math.max(REWIND_PLAYBACK_MIN_STEP_MS, even)
+  )
+}
+
+// The indices a rewind walks through, current position down to the boundary,
+// one move per step. Pure so the sequence is testable without React: the hook
+// re-derives the next index from the LIVE board each tick (so an interfering
+// undo or scrub abandons playback), and this is the shape that walk must have.
+export const planRewindSteps = (
+  fromHistoryLength: number,
+  boundary: number
+): number[] => {
+  if (!Number.isInteger(fromHistoryLength) || !Number.isInteger(boundary)) {
+    return []
+  }
+  const steps: number[] = []
+  for (let index = fromHistoryLength - 1; index >= boundary; index -= 1) {
+    steps.push(index)
+  }
+  return steps
+}

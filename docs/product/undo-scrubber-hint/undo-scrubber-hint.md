@@ -359,3 +359,16 @@ None — v1 iOS smoke (step 9) and v2 Android smoke (v2 step 9) both found no bu
 1. **Re-show logic if the user still never scrubs** — ~~skip now~~ DONE in v2 (3 showings with 10/20/30 escalation + scrub consumption).
 2. **General hint/coach-mark primitive** — if we ever add a second hint (e.g. auto-up, draw-3), extract `UndoHintBubble` into `components/` as a shared `HintBubble`. Pro: reuse. Con: premature abstraction for one call site today. Recommendation: wait for the second use case.
 3. **Settings toggle "Reset hints"** — ~~skip~~ SUPERSEDED by v3 (2026-07-07): a "Reset undo hint" button now lives in the dev-only demo sheet instead of settings, which avoids the settings-clutter concern while giving easy manual re-testing. It resets to a testable state (lifetime 51, 3 hints), not a fresh-install one.
+
+## v5 (2026-09-09) — schedule loosened so the hint actually fires
+
+Everything above describes the v1-v4 schedule (lifetime > 50, streaks 10/20/30) and stays as the historical record. **The thresholds are now lifetime > 8, streaks 3/6/9.** Changed as part of `docs/product/rewind-to-winnable/rewind-to-last-winnable-move.md`.
+
+Why: a player wrote in saying "you can press and hold undo to go back to the move where you can still solve the deck" — i.e. they had formed a wrong model of the gesture, having never been taught the real one. The v2 schedule is the reason. It demanded 50 lifetime undo **taps**, then a 10-undo streak inside a single deal, then 20 and 30 in three *different* deals. A player can use the app for weeks and never see the hint, and a hint that never shows teaches nothing — strictly worse than one that shows a little early.
+
+- **Lifetime 50 → 8.** The gate only ever existed to filter out "barely undoes"; 8 does that and is reachable in a player's first sessions.
+- **Streaks 10/20/30 → 3/6/9.** Three consecutive undos is already the point where dragging beats tapping — the shortest walk-back where the scrubber pays off. Ten in a row is a rare marathon, so gating the *first* showing on it aimed the hint at exactly the players least likely to need it.
+- Not new numbers: the v2 Android smoke (2026-07-07, section "Testing" above) was run at lifetime > 0 / streaks 3/6/9 and all seven checks passed, escalation and exhaustion included. The shipped 50 / 10-20-30 values were a conservative guess that was never validated as a *discoverable* schedule.
+- **Unchanged:** 3 showings max, one per deal, 10s auto-dismiss, the "drag" copy (NOT "hold" — see `UNDO_HINT_COPY`), and `consumeHintForScrub`. The last one carries the anti-nag load: anyone who demonstrably already uses the scrubber still burns hints silently and stops being taught.
+
+Files touched: `src/features/klondike/undoHint.ts` (constants + reasoning comment), `src/features/klondike/hooks/useUndoHint.ts` (reset-helper comment), `test/unit/features/klondike/undoHint.test.ts`, `.agents/skills/soli-testing/SKILL.md` (section 4).

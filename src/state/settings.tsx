@@ -53,6 +53,12 @@ type HintPreferences = {
   //   happens — changes how the game plays (you undo the moment it appears).
   warningMode: WarningMode
   hintButton: boolean
+  // Rewind to the last winnable move (rewind-to-winnable plan). Lives in the
+  // hints group because it is solver-powered and only ever surfaces once a
+  // warning has already said the game is lost — with warnings off it can never
+  // fire. Default OFF: it is a strong assist (it hands the player the exact
+  // move where the game died), so it stays opt-in like the Hint button.
+  rewindToWinnable: boolean
 }
 
 export type SettingsState = {
@@ -77,6 +83,7 @@ type SettingsContextValue = {
   // useDemoGameLauncher).
   setWarningMode: (mode: WarningMode | ((current: WarningMode) => WarningMode)) => void
   setHintButtonEnabled: (enabled: boolean) => void
+  setRewindToWinnableEnabled: (enabled: boolean) => void
   setDeveloperMode: (enabled: boolean) => void
   setStatisticsPreference: (key: StatisticsPreferenceKey, enabled: boolean) => void
 }
@@ -103,6 +110,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   hints: {
     warningMode: 'noUsefulMoves',
     hintButton: false,
+    rewindToWinnable: false,
   },
   developerMode: false,
   statistics: {
@@ -155,6 +163,14 @@ export const animationPreferenceDescriptors: Array<{
 export const hintButtonPreference = {
   label: 'Hint button',
   description: 'Show a Hint button that reveals the next move.',
+}
+
+export const rewindToWinnablePreference = {
+  label: 'Rewind to winnable',
+  // Says WHEN it appears, because the row is otherwise mysterious: with
+  // warnings off the action can never show up.
+  description:
+    "When a warning says the game is lost, offer a jump back to the last move you could still win from.",
 }
 
 export const warningModePreference: {
@@ -313,6 +329,14 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     )
   }, [])
 
+  const setRewindToWinnableEnabled = useCallback((enabled: boolean) => {
+    setState((previous) =>
+      previous.hints.rewindToWinnable === enabled
+        ? previous
+        : { ...previous, hints: { ...previous.hints, rewindToWinnable: enabled } }
+    )
+  }, [])
+
   // Developer logging is synced by the state.developerMode effect below (which also
   // covers the hydrated-from-storage value), so no direct call here.
   const setDeveloperMode = useCallback((enabled: boolean) => {
@@ -356,6 +380,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setAutoUpEnabled,
       setWarningMode,
       setHintButtonEnabled,
+      setRewindToWinnableEnabled,
       setDeveloperMode,
       setStatisticsPreference,
     }),
@@ -366,6 +391,7 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setAutoUpEnabled,
       setWarningMode,
       setHintButtonEnabled,
+      setRewindToWinnableEnabled,
       setSolvableGamesOnly,
       setDrawCount,
       setDeveloperMode,
@@ -488,6 +514,14 @@ export const mergeSettings = (
       hintButton: getBoolean(
         hints.hintButton,
         legacyHintsEnabled || current.hints.hintButton
+      ),
+      // No migration chain: the toggle is new, so any payload written before it
+      // existed simply has no key and falls back to the (off) default. It is
+      // deliberately NOT wired to legacyHintsEnabled — that key predates the
+      // feature and never meant "rewind me".
+      rewindToWinnable: getBoolean(
+        hints.rewindToWinnable,
+        current.hints.rewindToWinnable
       ),
     },
     developerMode: getBoolean(incoming.developerMode, current.developerMode),

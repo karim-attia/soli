@@ -232,6 +232,22 @@ const DemoChoiceSheet = ({
             Near win
           </Button>
         </XStack>
+        {/* Second fixtures row (rewind-to-winnable, round 2): the two
+            warning/rewind fixtures. Labels are VERBATIM the Settings warning
+            -mode option labels, because the whole point of having two is which
+            mode each one trips — a shorter label confused a reader once. Own
+            row rather than a four-button row: "Unwinnable game" mid-word-wraps
+            at quarter width. */}
+        <XStack gap="$2">
+          {/* Lost but NOT stuck — moves remain, only the solver knows. */}
+          <Button size="$3" flex={1} onPress={() => onSelect({ demoMode: 'unwinnable' })}>
+            Unwinnable game
+          </Button>
+          {/* Stock empty + no useful move — trips the DEFAULT warning mode. */}
+          <Button size="$3" flex={1} onPress={() => onSelect({ demoMode: 'stuck' })}>
+            No useful moves
+          </Button>
+        </XStack>
 
         <SheetSectionHeader>Celebration</SheetSectionHeader>
         {/* Dev-hold preview on the current board (same path as ?celebration=);

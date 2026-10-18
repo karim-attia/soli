@@ -222,11 +222,16 @@ const describeGameCard = (card: { suit: Suit; rank: Rank } | null | undefined): 
 export const SCRUBBED_DEMO_STEPS = 80
 export const SCRUBBED_DEMO_SCRUB_INDEX = 40
 
-// All deterministic fixtures below fold playlist entry 0 (`default-0-draw-1`).
-const getReplayFixtureEntry = (): DemoAutoSolvePlaylistEntry => {
-  const entry = getDemoAutoSolvePlaylist()[0]
+// Most deterministic fixtures below fold playlist entry 0 (`default-0-draw-1`).
+// The index is a parameter because the STUCK fixture needs a different deal:
+// entry 0's shortest stuck-AND-unwinnable position is 34 moves off its solution
+// line, while entry 19 (`default-20-draw-1`) has one four moves off its own (see
+// createStuckGameState). Every entry is a solved deal, so a
+// fold prefix is provably winnable whichever one is used.
+const getReplayFixtureEntry = (index = 0): DemoAutoSolvePlaylistEntry => {
+  const entry = getDemoAutoSolvePlaylist()[index]
   if (!entry) {
-    throw new Error('Demo auto-solve playlist is empty.')
+    throw new Error(`Demo auto-solve playlist has no entry ${index}.`)
   }
   return entry
 }
@@ -319,4 +324,126 @@ export const createNearWinGameState = (
   const entry = getReplayFixtureEntry()
   const { movesLeft: resolved } = resolveNearWinMovesLeft(movesLeft)
   return foldReplayFixture(entry, entry.moves.length - resolved)
+}
+
+// --- "Unwinnable" fixture (rewind-to-winnable) ---
+// Exercises the `unwinnable` WARNING MODE: a position the solver can PROVE is
+// lost while legal moves are still available, whose own history is provably
+// winnable — i.e. a real rewind boundary — reachable from one deep link.
+// Before this existed the only way to reach a lost game was to deal random
+// deals until one died, which took minutes and was not reproducible.
+//
+// Naming (2026-09-10, after a device session): the fixtures are named after
+// the warning MODE each one trips, because that is the distinction that
+// matters and it confused a reader once already. This board is lost but NOT
+// stuck — draws and plays remain legal — so only the solver-proven
+// `unwinnable` mode warns here. For the DEFAULT `noUsefulMoves` mode use
+// createStuckGameState below.
+//
+// Recipe: replay 81 primitive steps of playlist entry 0's solution, then play
+// ONE deliberately bad move. Step 81 is a draw that puts the K♠ on the waste;
+// the killing move drops that K♠ into the board's only empty column. That
+// column is the sole route to unload tableau column 7 (six face-down cards on
+// top of the A♠), so filling it with a king that nothing can ever move again
+// is irreversible — and it is exactly the move a real player would make.
+//
+// VERIFIED against the vendored Rust solver (rust/, `solve_request_json`,
+// budget 2000 ms, 2026-09-10) — both verdicts are pinned as a permanent
+// regression test in rust/soli-solver-ffi/tests/solver_tests.rs
+// (`unwinnable_demo_fixture_boundary_is_real`):
+//   after 81 solution steps  → {"status":"solved"}       (0.1 ms)
+//   after the K♠ move        → {"status":"unsolvable"}   (0.1 ms)
+// So the last winnable timeline index is 81 and the current position (82) is
+// dead. Verified on a real phone: `[rewind] boundary=81 timeline=83`.
+// Change either constant below and the Rust test must be re-verified.
+export const UNWINNABLE_DEMO_SOLUTION_STEPS = 81
+// Exported so the tests (and any future device recipe) name the same move.
+export const UNWINNABLE_DEMO_KILLING_MOVE: DemoReplayMove = {
+  type: 'move',
+  card: { suit: 'spades', rank: 13 },
+  source: { type: 'waste' },
+  target: { type: 'tableau', columnIndex: 1 },
+}
+
+// Auto Up off (inherited from createDemoReplayGameState) so the board does not
+// clean itself up underneath the warning, and the fold runs the real reducer,
+// so the state carries a real exactId plus an 82-entry moveLog and 82 undo
+// snapshots — the binary search in useRewindToWinnable gets a genuine timeline
+// to search (83 indices → ~7 solver probes).
+export const createUnwinnableGameState = (): GameState => {
+  const entry = getReplayFixtureEntry()
+  const state = foldReplayFixture(entry, UNWINNABLE_DEMO_SOLUTION_STEPS)
+  // Same THROWING validation as the fold: if a regenerated playlist ever left a
+  // different card on the waste, this fails loudly instead of silently shipping
+  // a fixture that is not actually dead.
+  return applyDemoReplayMoveForValidation(state, UNWINNABLE_DEMO_KILLING_MOVE)
+}
+
+// --- "Stuck" fixture (rewind-to-winnable, round 2) ---
+// Exercises the DEFAULT `noUsefulMoves` WARNING MODE — the one that actually
+// ships and the one players see. That mode's predicate is exactly
+// `stock.length === 0 && !hasUsefulMove(board)` (useHint's background check),
+// i.e. the deck is played out AND the classic heuristic finds no useful move.
+// The `unwinnable` fixture above does NOT satisfy it (that board is lost but
+// still has plays), which is precisely why this second fixture exists.
+//
+// The heuristic alone is NOT enough: the app solver-CONFIRMS before it warns,
+// and a heuristically-stuck board is very often still winnable (the heuristic
+// deliberately ignores non-revealing rearrangements and foundation digs — the
+// first 100 candidates the search produced were all solver-`solved`). So this
+// board had to satisfy the predicate AND be proven unsolvable.
+//
+// Deal: playlist entry 19 (`default-20-draw-1`), NOT entry 0. Entry 0 does have
+// stuck-and-unwinnable positions, but the shortest is 34 moves off its solution
+// line; this one is four, which is a fixture a human can still read.
+//
+// Recipe: replay 210 primitive steps of entry 19's solution, then play four
+// deliberately bad moves: 6♦ from the waste up to its foundation (the move that
+// actually kills it — that 6♦ was the last red six, and the 5♣ sitting on the
+// A♠ needs a red six to move onto), then the lone 6♣ out of column 5 (which
+// empties it), then two draws to run the stock out. The A♠ ends up buried under
+// three cards in column 7 with no spade on its foundation, and nothing can dig
+// it out.
+//
+// VERIFIED against the vendored Rust solver (rust/, `solve_request_json`,
+// budget 2000 ms, 2026-09-10) — both verdicts are pinned as a permanent
+// regression test in rust/soli-solver-ffi/tests/solver_tests.rs
+// (`stuck_demo_fixture_boundary_is_real`):
+//   after 210 solution steps → {"status":"solved"}
+//   after the four moves     → {"status":"unsolvable"}
+// The stuck PREDICATE itself is pinned in demoReplay.stuck.test.ts, so a change
+// to hasUsefulMove cannot silently make this board non-stuck.
+export const STUCK_DEMO_PLAYLIST_INDEX = 19
+export const STUCK_DEMO_SOLUTION_STEPS = 210
+// Exported so tests and device recipes name the same moves.
+export const STUCK_DEMO_KILLING_MOVES: readonly DemoReplayMove[] = [
+  {
+    type: 'move',
+    card: { suit: 'diamonds', rank: 6 },
+    source: { type: 'waste' },
+    target: { type: 'foundation', suit: 'diamonds' },
+  },
+  {
+    type: 'move',
+    card: { suit: 'clubs', rank: 6 },
+    source: { type: 'tableau', columnIndex: 4 },
+    target: { type: 'tableau', columnIndex: 2 },
+  },
+  { type: 'draw' },
+  { type: 'draw' },
+]
+
+// Auto Up off (inherited from createDemoReplayGameState), real reducer fold, so
+// the state carries a real exactId plus a 214-entry moveLog and 214 undo
+// snapshots — a 215-index timeline for the rewind's binary search.
+export const createStuckGameState = (): GameState => {
+  const entry = getReplayFixtureEntry(STUCK_DEMO_PLAYLIST_INDEX)
+  let state = foldReplayFixture(entry, STUCK_DEMO_SOLUTION_STEPS)
+  for (const move of STUCK_DEMO_KILLING_MOVES) {
+    // Same THROWING validation as the fold: a regenerated playlist that moved
+    // any of these cards fails loudly instead of shipping a board that is not
+    // actually stuck.
+    state = applyDemoReplayMoveForValidation(state, move)
+  }
+  return state
 }

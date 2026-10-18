@@ -631,3 +631,55 @@ fn ffi_round_trip_and_null_safety() {
     // Freeing null is a no-op.
     unsafe { soli_solver_ffi::soli_solver_free_string(std::ptr::null_mut()) };
 }
+
+/// Pins the two verdicts the `?demo=unwinnable` fixture depends on
+/// (`src/solitaire/demoReplay.ts`, `createUnwinnableGameState`): the fixture is
+/// a dead end ONLY if the solver proves the position after its killing move
+/// unsolvable AND the position before it solvable — otherwise the rewind
+/// boundary the fixture exists to exercise would not exist at all.
+///
+/// The two request strings are byte-identical copies of the ones pinned in
+/// `test/unit/solitaire/demoReplay.unwinnable.test.ts`, which asserts that they are
+/// exactly what `buildSolverRequest` produces for the fixture. So the TS side
+/// pins the boards and this test pins their verdicts; drift on either side
+/// fails a gate instead of silently shipping a fixture that is still winnable.
+#[test]
+fn unwinnable_demo_fixture_boundary_is_real() {
+    // After 81 primitive steps of playlist entry 0's solution (the 81st is the
+    // draw that puts the K♠ on the waste). The only empty column is column 2.
+    let before_killing_move = r#"{"drawCount":1,"budgetMs":2000,"foundations":{"c":1,"d":0,"h":2,"s":0},"tableau":[{"hidden":[],"visible":["s8","d7","c6"]},{"hidden":[],"visible":[]},{"hidden":["s5","d5"],"visible":["s4","h3","s2"]},{"hidden":["c4","h11"],"visible":["h7"]},{"hidden":["d8","c8","s9","d1"],"visible":["d6","c5","d4","c3","d2"]},{"hidden":["s7","h4","c2","d10","s3"],"visible":["c9"]},{"hidden":["d12","s1","h12","c10","h13","h8"],"visible":["c12"]}],"stock":["d3","h5","d13","s11","d9","d11","s12","h6","s6","c11","c13","c7"],"waste":["h9","s10","h10","s13"]}"#;
+    // Same board after the killing move: the K♠ now fills that empty column, so
+    // the Q♣ on column 7 can never move and the A♠ under it is buried forever.
+    let after_killing_move = r#"{"drawCount":1,"budgetMs":2000,"foundations":{"c":1,"d":0,"h":2,"s":0},"tableau":[{"hidden":[],"visible":["s8","d7","c6"]},{"hidden":[],"visible":["s13"]},{"hidden":["s5","d5"],"visible":["s4","h3","s2"]},{"hidden":["c4","h11"],"visible":["h7"]},{"hidden":["d8","c8","s9","d1"],"visible":["d6","c5","d4","c3","d2"]},{"hidden":["s7","h4","c2","d10","s3"],"visible":["c9"]},{"hidden":["d12","s1","h12","c10","h13","h8"],"visible":["c12"]}],"stock":["d3","h5","d13","s11","d9","d11","s12","h6","s6","c11","c13","c7"],"waste":["h9","s10","h10"]}"#;
+
+    assert_eq!(solve_json(before_killing_move)["status"], "solved");
+    assert_eq!(solve_json(after_killing_move)["status"], "unsolvable");
+}
+
+/// Pins the two verdicts the `?demo=stuck` fixture depends on
+/// (`src/solitaire/demoReplay.ts`, `createStuckGameState`). That fixture exists
+/// to trip the DEFAULT `noUsefulMoves` warning, whose predicate is
+/// `stock.length == 0 && !hasUsefulMove(board)` — but the app only WARNS after
+/// the solver confirms the heuristic, so a stuck-LOOKING board that is still
+/// solvable would never show the warning at all. That is not hypothetical: the
+/// first hundred candidates the search produced satisfied the predicate and
+/// were every one of them `solved`, because the heuristic ignores non-revealing
+/// rearrangements and foundation digs while the solver uses both.
+///
+/// The stuck predicate itself is pinned on the TS side
+/// (`test/unit/solitaire/demoReplay.stuck.test.ts`), which also asserts that
+/// these two request strings are exactly what `buildSolverRequest` produces.
+#[test]
+fn stuck_demo_fixture_boundary_is_real() {
+    // Playlist entry 19 (`default-20-draw-1`) after 210 primitive solution
+    // steps: two stock cards left and the 6D still on the waste.
+    let before_killing_moves = r#"{"drawCount":1,"budgetMs":2000,"foundations":{"c":3,"d":5,"h":2,"s":0},"tableau":[{"hidden":[],"visible":["d13","s12","h11","s10","h9","s8","h7","s6"]},{"hidden":[],"visible":["c13","h12","s11","h10","s9","d8","c7","h6","s5","h4","s3"]},{"hidden":[],"visible":["d9","c8","d7"]},{"hidden":[],"visible":["s13","d12","c11","d10"]},{"hidden":[],"visible":["c6","h5","c4","h3","s2"]},{"hidden":["c12","c10"],"visible":["d11"]},{"hidden":["s1","c9","h13"],"visible":["c5"]}],"stock":["h8","s7"],"waste":["s4","d6"]}"#;
+    // After the four killing moves: the 6D is on its foundation, column 5 is
+    // empty and the stock is out. The AS is buried under three cards in column 7
+    // with nothing on the spade foundation, and no red six is left in play to
+    // move the 5C off it.
+    let after_killing_moves = r#"{"drawCount":1,"budgetMs":2000,"foundations":{"c":3,"d":6,"h":2,"s":0},"tableau":[{"hidden":[],"visible":["d13","s12","h11","s10","h9","s8","h7","s6"]},{"hidden":[],"visible":["c13","h12","s11","h10","s9","d8","c7","h6","s5","h4","s3"]},{"hidden":[],"visible":["d9","c8","d7","c6","h5","c4","h3","s2"]},{"hidden":[],"visible":["s13","d12","c11","d10"]},{"hidden":[],"visible":[]},{"hidden":["c12","c10"],"visible":["d11"]},{"hidden":["s1","c9","h13"],"visible":["c5"]}],"stock":[],"waste":["s4","s7","h8"]}"#;
+
+    assert_eq!(solve_json(before_killing_moves)["status"], "solved");
+    assert_eq!(solve_json(after_killing_moves)["status"], "unsolvable");
+}
