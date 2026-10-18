@@ -11,6 +11,7 @@ import {
 } from './klondike'
 import type { DrawCount } from './drawCount'
 import type { DealCard, ExactDealId } from './dealIdentity'
+import { recyclesLeft } from './scoring'
 // Value import from ../data is safe: demoAutoSolvePlaylist.ts only imports TYPES
 // from this module, so there is no runtime cycle.
 import { getDemoAutoSolvePlaylist } from '../data/demoAutoSolvePlaylist'
@@ -319,4 +320,85 @@ export const createNearWinGameState = (
   const entry = getReplayFixtureEntry()
   const { movesLeft: resolved } = resolveNearWinMovesLeft(movesLeft)
   return foldReplayFixture(entry, entry.moves.length - resolved)
+}
+
+// --- Vegas fixtures (scoring plan, round 3) ---
+// Every fixture above is an UNLIMITED game (solver replays recycle freely). Vegas
+// is a rules mode (pass limit = draw count), so testing it needs boards that carry
+// vegasRules — three deterministic ones, reachable via ?demo=vegas|vegaslastpass|
+// vegasnearwin and the Demo sheet. They hydrate like the other fixtures (history
+// row created by the hydration effect, charged −$52 + earnings at game end like a
+// real deal, so the cumulative total and Deal Again can be tested on them).
+
+// Deal found during the P2-D device test (2026-10-13): A♦ is the top of column 7
+// from the start and stays the only useful tableau play after a full draw-through
+// with no plays — so the same deal serves the "fresh Vegas deal with a foundation
+// play" and the "last pass almost done" fixtures.
+export const VEGAS_FIXTURE_EXACT_ID = 'E1_3wg0zvd1izdp5860yamwkszzaj908rw031kavl52rtlu'
+export const VEGAS_FIXTURE_DRAW_COUNT: DrawCount = 3
+
+// Fresh Draw-3 Vegas deal: VEGAS −$52, 2 recycles left, A♦ playable from column 7.
+export const createVegasDealGameState = (): GameState =>
+  createGameStateFromExactId(VEGAS_FIXTURE_EXACT_ID, VEGAS_FIXTURE_DRAW_COUNT, {
+    vegasRules: true,
+    autoUpEnabled: false,
+  })
+
+export const VEGAS_LASTPASS_DEFAULT_TAPS_LEFT = 1
+// 24 stock cards at draw 3 = 8 taps per pass.
+const VEGAS_LASTPASS_MAX_TAPS = 8
+
+export const resolveVegasLastPassTapsLeft = (
+  tapsLeft?: number
+): { tapsLeft: number; clamped: boolean } => {
+  const requested = tapsLeft ?? VEGAS_LASTPASS_DEFAULT_TAPS_LEFT
+  const resolved = clampInt(requested, 1, VEGAS_LASTPASS_MAX_TAPS)
+  return { tapsLeft: resolved, clamped: resolved !== requested }
+}
+
+// The fresh Vegas deal tapped (no plays) through both recycles into the LAST pass,
+// stopping `tapsLeft` stock taps before the stock is exhausted: one more tap per
+// remaining group shows the ⊘ "no passes left" mark and the dock's New Game
+// button; Undo gives the draw back and hides it again. Every tap is a real
+// reducer action, so undo/scrub can walk back to the "2 left" / "1 left" captions.
+export const createVegasLastPassGameState = (
+  tapsLeft: number = VEGAS_LASTPASS_DEFAULT_TAPS_LEFT
+): GameState => {
+  const { tapsLeft: resolved } = resolveVegasLastPassTapsLeft(tapsLeft)
+  let state = createVegasDealGameState()
+  let guard = 0
+  while (
+    recyclesLeft(state) > 0 ||
+    Math.ceil(state.stock.length / state.drawCount) > resolved
+  ) {
+    const next = klondikeReducer(state, { type: 'DRAW_OR_RECYCLE' })
+    if (next === state || ++guard > 60) {
+      throw new Error('Vegas last-pass fixture: draw-through did not converge.')
+    }
+    state = next
+  }
+  return state
+}
+
+// Vegas near win: the near-win fixture (playlist entry 0's Draw-1 solution) with
+// Vegas rules. The solution recycles ten times, so it cannot be FOLDED under a
+// Draw-1 pass limit (no playlist entry can — every Lonelybot solution recycles);
+// the board is folded unlimited and then flagged Vegas on the snapshot AND every
+// undo snapshot (undo must not flip the game back to Standard). Trade-offs,
+// accepted for a dev fixture: stockPasses exceeds the limit (recyclesLeft reads
+// 0 → ⊘ on the stock, which is the state a player sees at the end anyway), and
+// the move log is cleared because it would not replay under Vegas rules —
+// kill + relaunch takes persistence's snapshot fallback (no undo depth), like
+// the dev demo board. The Vegas tally is a pure function of the foundations, so
+// the win still records exactly $208.
+export const createVegasNearWinGameState = (
+  movesLeft: number = NEARWIN_DEMO_DEFAULT_MOVES_LEFT
+): GameState => {
+  const state = createNearWinGameState(movesLeft)
+  return {
+    ...state,
+    vegasRules: true,
+    history: state.history.map((snapshot) => ({ ...snapshot, vegasRules: true })),
+    moveLog: [],
+  }
 }

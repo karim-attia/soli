@@ -207,7 +207,8 @@ const CelebrationAtlas = ({
   // (~1 frame) the offset is 0 = the old clipped extent; invisible in practice because
   // cards launch from the foundations well inside the board.
   const window = useWindowDimensions()
-  const wrapperRef = useRef<View>(null)
+  // RN 0.88 strict types: ref holds the View host instance, not the `View` component type.
+  const wrapperRef = useRef<React.ComponentRef<typeof View>>(null)
   // null until measureInWindow resolves (~1 frame) — the floor derivation below must
   // know whether a real measurement exists, so no {0,0} sentinel.
   const [windowOffset, setWindowOffset] = useState<{ x: number; y: number } | null>(

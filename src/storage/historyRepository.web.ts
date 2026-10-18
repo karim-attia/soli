@@ -29,6 +29,7 @@ export const getHistorySummary = async (): Promise<HistorySummary> => ({
   solvedCount: 0,
   incompleteCount: 0,
   activeCount: 0,
+  vegasTotal: 0,
 })
 
 export const getSolvableDealHistoryStats = async (): Promise<

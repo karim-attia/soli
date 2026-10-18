@@ -1,7 +1,7 @@
-import { useLayoutEffect } from 'react'
-import { FieldGroup, Host, Switch } from '@expo/ui'
+import { useCallback, useLayoutEffect } from 'react'
+import { Button, FieldGroup, Host, Switch } from '@expo/ui'
 import { useNavigation } from 'expo-router'
-import { Platform } from 'react-native'
+import { Alert, Platform } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import {
@@ -10,13 +10,17 @@ import {
 } from '../../components/navigation/HeaderMenuButton'
 import { DescribedSwitchRow } from '../../components/settings/DescribedSwitchRow'
 import { DrawCountPreference } from '../../components/settings/DrawCountPreference'
-import { WarningModePreference } from '../../components/settings/WarningModePreference'
+import { PickerPreference } from '../../components/settings/PickerPreference'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
+import { useHistory } from '../../src/state/history'
 import {
   animationPreferenceDescriptors,
   hintButtonPreference,
+  scoringPreference,
   statisticsPreferenceDescriptors,
   useSettings,
+  vegasTotalPreference,
+  warningModePreference,
 } from '../../src/state/settings'
 
 export default function SettingsScreen() {
@@ -33,11 +37,32 @@ export default function SettingsScreen() {
     setHintButtonEnabled,
     setDeveloperMode,
     setStatisticsPreference,
+    setScoringMode,
+    setVegasTotalEnabled,
+    setVegasTotalOffset,
   } = useSettings()
+  // Settled Vegas sum (finished rows) — the reset offset (P2-C, plan § P-H).
+  const { vegasTotal: settledVegasTotal } = useHistory()
 
   // Settings hydrate synchronously (expo-sqlite/kv-store getItemSync), so there is no
   // loading state and controls are always live.
   const animationDetailsDisabled = !state.animations.master
+  const vegasSelected = state.statistics.scoring === 'vegas'
+
+  // "Reset Vegas total": the offset becomes the settled sum, so the HUD total reads
+  // the live game only (or $0 on a won board). No number shown in Settings on
+  // purpose — it would differ from the HUD by the live game, which this screen
+  // cannot see (simplification; the TOTAL badge is the one source).
+  const confirmResetVegasTotal = useCallback(() => {
+    Alert.alert(vegasTotalPreference.resetTitle, vegasTotalPreference.resetMessage, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reset',
+        style: 'destructive',
+        onPress: () => setVegasTotalOffset(settledVegasTotal),
+      },
+    ])
+  }, [setVegasTotalOffset, settledVegasTotal])
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -56,8 +81,9 @@ export default function SettingsScreen() {
     // handles the home-indicator inset inside its own scroll content (content scrolls
     // edge-to-edge under it), so an outer inset would double up and cut the scroll area
     // short. On Android the Compose LazyColumn behind FieldGroup has hardcoded 16dp
-    // contentPadding and no window-inset support (as of @expo/ui in SDK 57), so the
-    // inset must stay outside the scroll view.
+    // contentPadding and no window-inset support (re-checked on @expo/ui 58.0.20:
+    // still true — `FieldGroup.android.tsx` contentPadding 16, only `imePadding`
+    // modifier), so the inset must stay outside the scroll view.
     <SafeAreaView edges={Platform.OS === 'ios' ? [] : ['bottom']} style={{ flex: 1 }}>
       <Host style={{ flex: 1 }}>
         <FieldGroup>
@@ -68,6 +94,37 @@ export default function SettingsScreen() {
               value={state.solvableGamesOnly}
               onValueChange={setSolvableGamesOnly}
             />
+            {/* Scoring moved here from Statistics in Phase 2: Vegas is now a rules
+                mode (pass limit = draw count) that, like the draw count, is fixed
+                at deal time — so it belongs with the other next-game settings. */}
+            {/* The description switches with the value: once Vegas is picked it
+                only says what is switched off (hints, warnings, solvable deals)
+                and that it applies from the next game — no rules explanation
+                (user, prompt 6). */}
+            <PickerPreference
+              {...scoringPreference}
+              description={
+                vegasSelected ? scoringPreference.vegasDescription : scoringPreference.description
+              }
+              value={state.statistics.scoring}
+              onValueChange={setScoringMode}
+            />
+            {vegasSelected ? (
+              <DescribedSwitchRow
+                label={vegasTotalPreference.label}
+                description={vegasTotalPreference.description}
+                value={state.statistics.vegasTotal}
+                onValueChange={setVegasTotalEnabled}
+              />
+            ) : null}
+            {vegasSelected && state.statistics.vegasTotal ? (
+              <Button
+                variant="outlined"
+                label={vegasTotalPreference.resetLabel}
+                onPress={confirmResetVegasTotal}
+                testID="reset-vegas-total"
+              />
+            ) : null}
           </FieldGroup.Section>
 
           <FieldGroup.Section title="Gameplay">
@@ -87,7 +144,8 @@ export default function SettingsScreen() {
               value={state.hints.hintButton}
               onValueChange={setHintButtonEnabled}
             />
-            <WarningModePreference
+            <PickerPreference
+              {...warningModePreference}
               value={state.hints.warningMode}
               onValueChange={setWarningMode}
             />

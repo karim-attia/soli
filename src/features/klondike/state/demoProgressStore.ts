@@ -1,3 +1,5 @@
+import { createValueStore } from '../../../utils/valueStore'
+
 // Tiny external store for demo playback progress (demo-sheet-undo-probes-info-hud
 // scope 3). Module-level singleton on purpose: the demo launcher is effectively a
 // singleton per session and only the dev-only DemoPlaylistHud subscribes. Keeping
@@ -14,24 +16,8 @@ export type DemoProgress = {
   readonly gameCount: number
 }
 
-let currentProgress: DemoProgress | null = null
-const listeners = new Set<() => void>()
+const store = createValueStore<DemoProgress | null>(null)
 
-export const getDemoProgress = (): DemoProgress | null => currentProgress
-
-export const setDemoProgress = (next: DemoProgress | null): void => {
-  if (next === currentProgress) {
-    return
-  }
-  currentProgress = next
-  listeners.forEach((listener) => {
-    listener()
-  })
-}
-
-export const subscribeDemoProgress = (listener: () => void): (() => void) => {
-  listeners.add(listener)
-  return () => {
-    listeners.delete(listener)
-  }
-}
+export const getDemoProgress = store.get
+export const setDemoProgress = store.set
+export const subscribeDemoProgress = store.subscribe

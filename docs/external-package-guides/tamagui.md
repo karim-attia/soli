@@ -1,6 +1,6 @@
 # Tamagui Guide
 
-Last refreshed: 2026-07-07
+Last refreshed: 2026-10-17 (Tamagui 3 facts + Expo SDK 58 compatibility note)
 
 ## Scope
 
@@ -11,6 +11,73 @@ Last refreshed: 2026-07-07
 ## Current guidance
 
 Use this as the main Tamagui package guide. Keep package bumps coordinated across Tamagui packages and validate with `yarn check:tamagui` plus native smoke checks when UI behavior can change.
+
+## Tamagui 3 facts (2026-10-17, research for docs/product/tamagui-3-upgrade/tamagui-major-upgrade.md)
+
+- Sources: https://tamagui.dev/blog/version-three (2026-10-09), https://tamagui.dev/docs/guides/how-to-upgrade
+  (page truncates; the full v2→v3 checklist is `@tamagui/cli@3.0.18/src/migrate.ts`, printed by
+  `npx tamagui migrate --from v2`), https://tamagui.dev/docs/core/config-v6, https://tamagui.dev/docs/core/native,
+  https://tamagui.dev/docs/intro/compiler-install, https://tamagui.dev/ui/lucide-icons,
+  https://github.com/tamagui/tamagui/releases, https://github.com/tamagui/tamagui/issues/4324, and the
+  `3.0.18` tarballs of `@tamagui/{config,metro-plugin,cli,native,core,themes,shorthands,button,image}`.
+- Versions: `3.0.0` 2026-10-10, `3.0.18` = npm `latest` (2026-10-16). v2 ended at `2.7.7` (2026-08-15).
+  `@tamagui/babel-plugin` and `@tamagui/lucide-icons-2` have no 3.x release (removed in v3).
+- Requirements: React 19, RN 0.81+, TS 5+. Native runtime (`@tamagui/native-registry` +
+  `react-native-nitro-modules`, `experimental.nativeFastPath`) is opt-in beta, RN 0.82+ New Arch.
+- Metro: `@tamagui/metro-plugin@3` peer `metro >=0.84.4 <0.88.0`; runtime gate `/^0\.8[4-7]\./`
+  (SDK 58's Metro 0.87 accepted since 3.0.14). `withTamagui` from `@tamagui/cli/metro` is a
+  re-export of `@tamagui/metro-plugin`; options `components`, `config`, `logTimings`,
+  `disableExtraction` (or a root `tamagui.build.ts`). No Babel plugin.
+- Tokens: `$` sigil removed with no runtime compatibility path: `p="$4"` → `p="4"`,
+  `color="$color10"` → `color="color10"` (on config v5). Numeric `fontSize` stays raw px; numeric
+  Tamagui `lineHeight` becomes a ratio, so run the codemod with `--source-semantics v2-pixels`
+  (`npx @tamagui/codemod-flat-values --source-semantics v2-pixels --report flat-values-report.md ./src`,
+  then `--write`). Conditions are flat clauses: `bg="background hover:background-hover"`, `p="4 sm:6"`,
+  or object form `{ default: '4', sm: '6' }`.
+- Config: v6 is default (Tailwind 4px space scale `1`=4 … `4`=16, kebab theme keys `color-1..11`,
+  `border-color`, control sizes `xs|sm|md|lg|xl`). `@tamagui/config/v5` remains as a frozen pack and
+  is the recommended intermediate checkpoint: keys stay `color10`, `red10`, `accent10`, `yellow11`,
+  `green3` (`borderColor` + `border-color` both present) and shorthands stay `@tamagui/shorthands/v4`
+  (`items`, `justify`, `self`, `rounded`, `maxW`). Animations: `@tamagui/config/animations-{css,rn,reanimated,motion}`
+  (`v5-reanimated`/`v5-css` entries still exported).
+- Icons: `yarn add react-native-svg @tamagui/helpers-icon`, then
+  `npx @tamagui/cli icons add Atom Clock Settings Smile Star Lightbulb Shuffle Undo2 Ban RefreshCcw --out components/icons`
+  (generated per-icon files; `@tamagui/lucide-icons-2` is 36 MB and imports all icons via one index).
+- Other breaking changes (none used by Soli): `Sheet.Frame` → `Sheet.Container` + `Sheet.Background`;
+  removed `focusable`, `fullscreen`, `themeInverse`, `styleable()`, `$true`, `useProps`/`useStyle`/
+  `usePropsAndStyle`, `getTokenRelative`, `stepTokenUpOrDown`, `spacedChildren`, `Unspaced`,
+  `onDidAnimate` (→ `onTransition`), `createTamagui({ defaultProps })`; `@tamagui/colors/legacy` →
+  `@tamagui/colors`; Toast provider API → `toast()` from `tamagui/toast`.
+- CLI (`@tamagui/cli@3`): `check [--strict]`, `generate` (replaces `generate-css`), `icons`, `add`,
+  `build`, `upgrade`, `setup`, `migrate --from v2|v1`.
+- `@tamagui/native@3` keeps `setup-teleport` and `setup-gesture-handler({ pressEvents, sheet })`;
+  adds `setup-safe-area` (needs `SafeAreaProvider` outside `TamaguiProvider`), `setup-keyboard-controller`,
+  `setup-expo-ui-menu`, `setup-zeego`, `setup-burnt`. Soli uses no Tamagui portal component, so the
+  teleport/gesture setup is unused today (see the plan's stage 0).
+- Decision: see `docs/product/tamagui-3-upgrade/tamagui-major-upgrade.md` — recommended path is to
+  shrink Tamagui out (Expo UI + RN StyleSheet) rather than migrate; v3-on-v5 is the fallback.
+
+## Expo SDK 58 compatibility (2026-10-17)
+
+- Sources:
+  - https://tamagui.dev/blog/version-three (v3 release, 2026-10-10) and
+    https://tamagui.dev/docs/intro/upgrade-guide
+  - https://github.com/tamagui/tamagui/issues/4324 (v3 metro plugin gated Metro to 0.84 and
+    failed on Expo SDK 58 until 3.0.14, 2026-10-15)
+  - `@tamagui/metro-plugin@2.4.2/dist/cjs/index.js` and `@tamagui/portal@2.4.2` (read locally)
+- Decision for the SDK 58 upgrade: stay on `2.4.2` for all `@tamagui/*` packages
+  (`yarn check:tamagui` enforces one version). Reasons: `@tamagui/metro-plugin@2.4.2` has no
+  Metro version gate (the 0.84-only gate that broke SDK 58 was introduced in v3); the only
+  RN deep import (`@tamagui/portal` -> `react-native/Libraries/Renderer/shims/ReactFabric`)
+  still exists in RN 0.88 and is wrapped in try/catch.
+- Caveat: the v2 line ended with `2.7.7` (2026-08-15), so Tamagui 2 is not validated
+  upstream on RN 0.88 / Metro 0.87. Fallback order if Metro/Babel extraction or runtime
+  styling breaks: (1) bump all packages to `2.7.7`, (2) temporarily set
+  `disableExtraction` in `@tamagui/babel-plugin` to isolate the compiler, (3) plan the v3
+  migration separately.
+- Tamagui 3 is a real migration, not a bump: flat style props replace condition objects
+  (`hoverStyle`, `$sm`), config v6 renames theme keys, `@tamagui/babel-plugin` is removed,
+  the metro plugin moves to `@tamagui/cli/metro`. Tracked as a follow-up in the SDK 58 plan.
 
 ## Source-backed notes
 

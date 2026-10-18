@@ -1,6 +1,6 @@
 # Expo UI Guide
 
-Last refreshed: 2026-07-05
+Last refreshed: 2026-10-17 (Expo UI 58)
 
 ## Scope
 
@@ -17,6 +17,31 @@ composition in its route.
 ## Detailed guidance
 
 The sections below are the definitive combined notes for this package or tool. Keep version-specific context when it affects compatibility, but update this single file instead of adding task- or feature-prefixed guides.
+
+### SDK 58 Expo UI Notes
+
+- Package: `@expo/ui` (`~58.0.19` bundled by `expo@58.0.12`; `58.0.20` is npm latest)
+- Retrieved: 2026-10-17
+- Primary docs:
+  - https://expo.dev/changelog/sdk-58
+  - https://docs.expo.dev/versions/latest/sdk/ui/
+  - `@expo/ui@58.0.20` tarball changelog, read in a scratch directory
+
+#### Breaking changes and Soli status
+
+| Change | Soli |
+| --- | --- |
+| iOS `<Host>` content is top-aligned (was centered) | `app/(tabs)/settings.tsx` wraps `FieldGroup` in `<Host style={{ flex: 1 }}>`; the form fills the host so this should be invisible. Confirm with a screenshot during native validation. `HeaderMenuButton` uses `Host matchContents` (unaffected) |
+| `HStack` / `VStack` with unset `spacing` now use the system default spacing | Not used (Soli composes `Row` / `Column` / `Spacer` in `components/settings/*`) |
+| Android `RNHostView` lost its `style` prop | `components/AppSheet.tsx` uses `matchContents` only; no `style` |
+| Hosted-view touches and measurement inside `BottomSheet` fixed | Positive for the History preview sheet; smoke tap targets inside the sheet |
+
+#### Repo usage notes
+
+- Keep Expo UI usage behind the wrappers in `components/` (`AppSheet`, settings controls,
+  `HeaderMenuButton`). No API change needed for SDK 58.
+- `Stack.Toolbar` (Expo Router) takes `@expo/ui` as an optional peer; not adopted (see
+  `expo-router.md`).
 
 ### SDK 57 Deferred Adoption Opportunities
 

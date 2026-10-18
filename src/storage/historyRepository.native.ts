@@ -19,7 +19,7 @@ const DATABASE_NAME = 'soli-history.db'
 // steps with toVersion >= 2 — never edit the baseline step again, and NEVER drop
 // user data in a migration after 1.0. (Pre-release test-device schemas were cleared
 // manually before the freeze, so the baseline can assume a clean slate at version 0.)
-const DATABASE_VERSION = 1
+const DATABASE_VERSION = 2
 
 // Ordered migration steps; each brings the schema *to* `toVersion` and runs in its
 // own exclusive transaction (the runner bumps PRAGMA user_version alongside it).
@@ -64,6 +64,19 @@ const MIGRATIONS: ReadonlyArray<{ toVersion: number; sql: string }> = [
         WHERE status = 'active';
     `,
   },
+  {
+    // Scoring (docs/product/scoring/scoring.md, 2026-10-11): BOTH tallies are
+    // stored on every finished row, independent of the Scoring setting — the
+    // setting is display-only, so switching it later still shows meaningful
+    // history. NULL on rows written before this version (and on active rows).
+    // No scoring_mode column on purpose (it would freeze a display choice into data).
+    toVersion: 2,
+    sql: `
+      ALTER TABLE history_entries
+        ADD COLUMN standard_score INTEGER CHECK (standard_score IS NULL OR standard_score >= 0);
+      ALTER TABLE history_entries ADD COLUMN vegas_score INTEGER;
+    `,
+  },
 ]
 
 type HistoryRow = {
@@ -78,6 +91,8 @@ type HistoryRow = {
   duration_ms: number | null
   preview_json: string
   status: HistoryEntry['status']
+  standard_score: number | null
+  vegas_score: number | null
 }
 
 type SummaryRow = {
@@ -85,6 +100,7 @@ type SummaryRow = {
   solved_count: number
   incomplete_count: number
   active_count: number
+  vegas_total: number
 }
 
 type SolvableStatsRow = {
@@ -107,9 +123,11 @@ const INSERT_SQL = `
     duration_ms,
     preview_json,
     status,
+    standard_score,
+    vegas_score,
     moves_json,
     move_log_version
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 const UPDATE_COLUMNS_SQL = `
@@ -122,7 +140,9 @@ const UPDATE_COLUMNS_SQL = `
     move_count = ?,
     duration_ms = ?,
     preview_json = ?,
-    status = ?`
+    status = ?,
+    standard_score = ?,
+    vegas_score = ?`
 
 const UPDATE_SQL = `
   UPDATE history_entries
@@ -210,6 +230,8 @@ const toInsertParams = (
   entry.durationMs,
   JSON.stringify(entry.preview),
   entry.status,
+  entry.standardScore,
+  entry.vegasScore,
   ...toMoveLogParams(moveLog),
 ]
 
@@ -224,6 +246,8 @@ const toUpdateParams = (entry: HistoryEntry): SQLite.SQLiteBindValue[] => [
   entry.durationMs,
   JSON.stringify(entry.preview),
   entry.status,
+  entry.standardScore,
+  entry.vegasScore,
 ]
 
 const createEmptyPreview = (): HistoryEntry['preview'] => ({
@@ -271,8 +295,27 @@ const toHistoryEntry = (row: HistoryRow): HistoryEntry => {
     durationMs: row.duration_ms,
     preview: parsePreview(row.preview_json),
     status: row.status,
+    standardScore: row.standard_score,
+    vegasScore: row.vegas_score,
   }
 }
+
+// Shared column list for the row SELECTs (page / by id / active). moves_json is
+// deliberately NOT here — see getHistoryEntryMoveLog.
+const ROW_COLUMNS_SQL = `
+       id,
+       exact_id,
+       deck_checksum,
+       display_name,
+       started_at,
+       finished_at,
+       draw_count,
+       move_count,
+       duration_ms,
+       preview_json,
+       status,
+       standard_score,
+       vegas_score`
 
 const normalizePageArgument = (value: number): number =>
   Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0
@@ -299,18 +342,7 @@ export const getHistoryPage = async (
 ): Promise<HistoryEntry[]> => {
   const database = await getDatabase()
   const rows = await database.getAllAsync<HistoryRow>(
-    `SELECT
-       id,
-       exact_id,
-       deck_checksum,
-       display_name,
-       started_at,
-       finished_at,
-       draw_count,
-       move_count,
-       duration_ms,
-       preview_json,
-       status
+    `SELECT${ROW_COLUMNS_SQL}
      FROM history_entries
      ORDER BY started_at DESC, id DESC
      LIMIT ? OFFSET ?`,
@@ -323,18 +355,7 @@ export const getHistoryPage = async (
 export const getHistoryEntryById = async (id: string): Promise<HistoryEntry | null> => {
   const database = await getDatabase()
   const row = await database.getFirstAsync<HistoryRow>(
-    `SELECT
-       id,
-       exact_id,
-       deck_checksum,
-       display_name,
-       started_at,
-       finished_at,
-       draw_count,
-       move_count,
-       duration_ms,
-       preview_json,
-       status
+    `SELECT${ROW_COLUMNS_SQL}
      FROM history_entries
      WHERE id = ?`,
     [id]
@@ -348,18 +369,7 @@ export const getHistoryEntryById = async (id: string): Promise<HistoryEntry | nu
 export const getActiveHistoryEntry = async (): Promise<HistoryEntry | null> => {
   const database = await getDatabase()
   const row = await database.getFirstAsync<HistoryRow>(
-    `SELECT
-       id,
-       exact_id,
-       deck_checksum,
-       display_name,
-       started_at,
-       finished_at,
-       draw_count,
-       move_count,
-       duration_ms,
-       preview_json,
-       status
+    `SELECT${ROW_COLUMNS_SQL}
      FROM history_entries
      WHERE status = 'active'`
   )
@@ -377,7 +387,8 @@ export const getHistorySummary = async (): Promise<HistorySummary> => {
         SUM(CASE WHEN status = 'incomplete' THEN 1 ELSE 0 END),
         0
       ) AS incomplete_count,
-      COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0) AS active_count
+      COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0) AS active_count,
+      COALESCE(SUM(CASE WHEN status <> 'active' THEN vegas_score END), 0) AS vegas_total
     FROM history_entries
   `)
 
@@ -386,6 +397,7 @@ export const getHistorySummary = async (): Promise<HistorySummary> => {
     solvedCount: row?.solved_count ?? 0,
     incompleteCount: row?.incomplete_count ?? 0,
     activeCount: row?.active_count ?? 0,
+    vegasTotal: row?.vegas_total ?? 0,
   }
 }
 

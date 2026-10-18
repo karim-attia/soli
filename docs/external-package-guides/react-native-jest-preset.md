@@ -1,11 +1,45 @@
 # React Native Jest Preset Guide
 
-Last refreshed: 2026-07-07
+Last refreshed: 2026-10-17 (RN 0.88 preset, Jest 30)
 
-> Note (2026-07-07): the repo is now on Expo SDK 57 / `react-native@0.86.0` with
-> `@react-native/jest-preset@^0.86.0` (verified in `package.json`). The SDK 56 /
-> RN 0.85.3 versions below are historical; the guidance (keep the preset aligned
-> with the installed RN version, keep `jest-expo` as the Jest preset) still holds.
+> Note (2026-10-17): the repo is on Expo SDK 58 / `react-native@0.88.0` with
+> `@react-native/jest-preset@^0.88.0` and Jest 30 (`jest ~30.5.2`, `@types/jest 30.0.0`,
+> `jest-expo ~58.0.11`). Older version numbers below are historical; the rule (keep the
+> preset aligned with the installed RN version, keep `jest-expo` as the Jest preset) holds.
+
+## SDK 58 / Jest 30 notes (2026-10-17)
+
+- Sources:
+  - https://jestjs.io/blog/2025/06/04/jest-30
+  - https://jestjs.io/docs/upgrading-to-jest30
+  - https://exp.host/--/api/v2/versions (SDK 58 `relatedPackages`: `jest ~30.5.2`,
+    `@types/jest 30.0.0`)
+  - `jest-expo@58.0.11/package.json` (peer `jest ^29 || ^30`, peer
+    `@react-native/jest-preset ^0.88.0`; internals depend on `babel-jest`,
+    `jest-environment-node`, `jest-mock`, `jest-snapshot` `^30`)
+- Decision: move to Jest 30 together with SDK 58. Staying on Jest 29 would mix two Jest
+  trees because `jest-expo@58`'s internals are already Jest 30.
+- Jest 30 changes checked against Soli (45 test files, 0 snapshots):
+  - alias matchers removed (`toBeCalled`, `toReturn`, ...): grep clean;
+  - `--testPathPattern` renamed to `--testPathPatterns`: not used in scripts;
+  - `jest.mock` paths are case-sensitive: paths in `test/setup/*` and `package.json`
+    `moduleNameMapper` already match on-disk casing;
+  - non-enumerable properties are excluded from equality: no test relied on them.
+- `@react-native/jest-preset` is not in Expo's bundled list; align it by hand to the RN
+  version Expo installed: `yarn add -D @react-native/jest-preset@^0.88.0`.
+- `jest-pnp-resolver` was removed on 2026-10-17 (Soli uses `nodeLinker: node-modules`; the
+  PnP resolver predated the linker switch). The `resolver` slot now holds
+  `react-native-reanimated/jest/resolver`, which Reanimated 4.7 needs under Jest (see
+  `react-native-reanimated.md`).
+- `jest-expo@58` no longer depends on `react-test-renderer` (it did in 57). Soli's three
+  tests that import it keep working because `react-test-renderer 19.3.0` (peer
+  `react ^19.3.0`) and `@types/react-test-renderer` are now explicit dev dependencies.
+  React deprecates `react-test-renderer`; moving those tests to
+  `@testing-library/react-native` is a tracked follow-up.
+- `@react-native/jest-preset@0.88.0` itself still depends on `babel-jest ^29.7.0` and
+  `jest-environment-node ^29.7.0`, so two `babel-jest` majors coexist in `node_modules`.
+  Upstream choice; the suite is green.
+
 
 ## Scope
 

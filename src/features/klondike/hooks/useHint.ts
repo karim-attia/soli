@@ -46,8 +46,8 @@ export const NO_HINT_BUBBLE_TEXT = 'No hint found.'
 // stuck wording is reserved for the played-out deck (stock empty), mirroring
 // the warning's own timing so the button never acts as a mid-deck oracle.
 // Exported for unit tests.
-export const getHintFallbackNoticeText = (stockLength: number): string =>
-  stockLength === 0 ? STUCK_BUBBLE_TEXT : NO_HINT_BUBBLE_TEXT
+export const getHintFallbackNoticeText = (board: Pick<GameState, 'stock'>): string =>
+  board.stock.length === 0 ? STUCK_BUBBLE_TEXT : NO_HINT_BUBBLE_TEXT
 
 // Hint visuals are deliberately DECOUPLED from game selection state (user
 // feedback 2026-07-23): the earlier approach dispatched SELECT_* to reuse the
@@ -62,8 +62,13 @@ type UseHintOptions = {
   // Two settings since F14:
   // - warningMode: ONE select for the proactive warning ('off' |
   //   'noUsefulMoves' | 'unwinnable') — the modes are a strictness ladder,
-  //   see settings.tsx.
-  // - hintButtonEnabled: the Hint button + its visuals.
+  //   see settings.tsx. Ignored on Vegas-rules games (see the gate below).
+  // - hintButtonEnabled: the Hint button + its visuals. The caller passes
+  //   `setting && !state.vegasRules` — the button is HIDDEN on Vegas-rules games
+  //   (user decision round 2 / prompt 5: casino experience, no hints; tried the
+  //   "any useful move" hints first and found them not worth it in a short
+  //   casino game). A Standard game in progress keeps its button while Vegas
+  //   is selected (the rule is the game's, not the setting's).
   warningMode: WarningMode
   hintButtonEnabled: boolean
   demoPlaybackActiveRef: MutableRefObject<boolean>
@@ -149,11 +154,28 @@ const isInsideEraOf = (current: GameState, evaluated: GameState): boolean =>
 export const useHint = ({
   state,
   stateRef,
-  warningMode,
+  warningMode: warningModeSetting,
   hintButtonEnabled,
   demoPlaybackActiveRef,
 }: UseHintOptions) => {
   const positionKey = positionKeyOf(state)
+
+  // THE Vegas gate: on a Vegas-rules game (pass limit = draw count, Phase 2) the
+  // whole hint/warning machinery is OFF — no solver call, no stuck heuristic, no
+  // bubble of any kind; the caller hides the Hint button (hintButtonEnabled
+  // false), so requestHint never runs either. Why (user decisions, prompts 4–6):
+  //   - the bundled Lonelybot assumes unlimited recycles, so its verdicts are
+  //     meaningless under a pass limit, and a pass-aware solver is a separate
+  //     Rust project the user decided against (Vegas is about the bankroll);
+  //   - rounds 1–2 instead fired the pass-aware stuck heuristic WITHOUT solver
+  //     confirmation as a "Game over — result −$47" bubble; that end could be
+  //     premature (foundation digs / two-step rearrangements the heuristic
+  //     excludes), and the user prefers to decide themselves when a casino game
+  //     is over ("they check if they can do anything still and then start a new
+  //     game") — the dock shows a New Game button once the stock is exhausted
+  //     (useKlondikeGame) instead. Simpler code, no false claims.
+  // A Standard-rules game keeps every solver-backed path exactly as before.
+  const warningMode: WarningMode = state.vegasRules ? 'off' : warningModeSetting
 
   // Transient button-press notice ("No hint found." / stuck notice) — the old
   // position-keyed + timer behavior. The proactive warnings do NOT live here:
@@ -313,11 +335,10 @@ export const useHint = ({
         applyHintHighlight(fallback, keyAtRun)
         return
       }
-      const noticeText = getHintFallbackNoticeText(board.stock.length)
       showNotice(
-        noticeText,
+        getHintFallbackNoticeText(board),
         keyAtRun,
-        noticeText === STUCK_BUBBLE_TEXT ? STUCK_NOTICE_MS : NO_HINT_BUBBLE_MS
+        board.stock.length === 0 ? STUCK_NOTICE_MS : NO_HINT_BUBBLE_MS
       )
     },
     [applyHintHighlight, showNotice]

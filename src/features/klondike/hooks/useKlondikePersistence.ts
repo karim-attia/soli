@@ -9,7 +9,7 @@ import {
 } from '../../../storage/gamePersistence'
 import type { GameAction, GameState } from '../../../solitaire/klondike'
 import { useHistory } from '../../../state/history'
-import { moveLogForGameRecord } from './useKlondikeHistoryEntry'
+import { moveLogForGameRecord, scoresForGameRecord } from './useKlondikeHistoryEntry'
 
 type UseKlondikePersistenceParams = {
   state: GameState
@@ -131,6 +131,9 @@ export const useKlondikePersistence = ({
                   // final duration; savedAt approximates the win time.
                   durationMs: persisted.state.elapsedMs,
                   finishedAt: persisted.savedAt,
+                  // Scores too (round 2): a won Vegas game must settle its +$208
+                  // into the cumulative total even on this crash-repair path.
+                  ...scoresForGameRecord(persisted.state),
                   moveLog: moveLogForGameRecord(persisted.state),
                 })
               }

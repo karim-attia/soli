@@ -95,6 +95,8 @@ const sampleEntry = (overrides: Partial<HistoryEntry> = {}): HistoryEntry => ({
     stockCount: 0,
   },
   status: 'incomplete',
+  standardScore: 65,
+  vegasScore: -37,
   ...overrides,
 })
 
@@ -136,27 +138,88 @@ describe('historyRepository.native (v1 baseline schema + migration scaffold)', (
     expect(schemaSql).toContain('CHECK (json_valid(preview_json))')
     expect(schemaSql).toContain('CHECK (moves_json IS NULL OR json_valid(moves_json))')
     expect(schemaSql).toContain('CHECK ((moves_json IS NULL) = (move_log_version IS NULL))')
-    expect(fake.getUserVersion()).toBe(1)
+    // The v1 baseline must stay frozen: scoring columns arrive via the v2 ALTER step.
+    expect(schemaSql).not.toContain('standard_score')
+    expect(fake.getUserVersion()).toBe(2)
   })
 
-  it('leaves an up-to-date database untouched', async () => {
+  it('migrates a v1 database to v2 by adding the two nullable score columns only', async () => {
     const fake = createFakeDatabase(1)
     const repository = loadRepository(fake)
 
     await repository.initializeHistoryRepository()
 
     expect(fake.execCalls.find((sql) => sql.includes('CREATE TABLE'))).toBeUndefined()
-    expect(fake.getUserVersion()).toBe(1)
+    const alter = fake.execCalls.find((sql) => sql.includes('ALTER TABLE'))
+    expect(alter).toBeDefined()
+    expect(alter).toContain('ADD COLUMN standard_score INTEGER')
+    expect(alter).toContain('ADD COLUMN vegas_score INTEGER')
+    expect(alter).not.toContain('scoring_mode')
+    expect(alter).not.toMatch(/DROP|DELETE/)
+    expect(fake.getUserVersion()).toBe(2)
   })
 
-  it('refuses to open a database written by a newer app version', async () => {
+  it('leaves an up-to-date database untouched', async () => {
     const fake = createFakeDatabase(2)
     const repository = loadRepository(fake)
 
+    await repository.initializeHistoryRepository()
+
+    expect(fake.execCalls.find((sql) => sql.includes('CREATE TABLE'))).toBeUndefined()
+    expect(fake.execCalls.find((sql) => sql.includes('ALTER TABLE'))).toBeUndefined()
+    expect(fake.getUserVersion()).toBe(2)
+  })
+
+  it('refuses to open a database written by a newer app version', async () => {
+    const fake = createFakeDatabase(3)
+    const repository = loadRepository(fake)
+
     await expect(repository.initializeHistoryRepository()).rejects.toThrow(
-      'Unsupported history database version: 2'
+      'Unsupported history database version: 3'
     )
     expect(fake.database.closeAsync).toHaveBeenCalled()
+  })
+
+  it('writes both score tallies on insert and update, and reads NULLs back as null', async () => {
+    const fake = createFakeDatabase()
+    const repository = loadRepository(fake)
+
+    await repository.insertHistoryEntry(sampleEntry())
+    const insert = fake.runCalls.find(({ sql }) => sql.includes('INSERT INTO'))!
+    expect(insert.sql).toContain('standard_score')
+    expect(insert.sql).toContain('vegas_score')
+    // … status, standard_score, vegas_score, moves_json, move_log_version.
+    expect(insert.params.slice(-4, -2)).toEqual([65, -37])
+
+    fake.runCalls.length = 0
+    await repository.updateHistoryEntry(sampleEntry({ standardScore: null, vegasScore: null }))
+    const update = fake.runCalls.find(({ sql }) => sql.includes('UPDATE'))!
+    expect(update.sql).toContain('standard_score = ?')
+    expect(update.params.slice(-3)).toEqual([null, null, 'hist_test_1'])
+
+    // Rows written before v2 come back with NULL scores → null on the entry.
+    fake.setAllRows([
+      {
+        id: 'hist_old',
+        exact_id: 'E1_0',
+        deck_checksum: 'D1_TEST',
+        display_name: 'Old',
+        started_at: '2026-07-06T10:00:00.000Z',
+        finished_at: null,
+        draw_count: 1,
+        move_count: 12,
+        duration_ms: 1000,
+        preview_json: '{}',
+        status: 'incomplete',
+        standard_score: null,
+        vegas_score: null,
+      },
+    ])
+    const [entry] = await repository.getHistoryPage(50, 0)
+    expect(entry.standardScore).toBeNull()
+    expect(entry.vegasScore).toBeNull()
+    const select = fake.database.getAllAsync.mock.calls.at(-1)![0] as string
+    expect(select).toContain('standard_score')
   })
 
   it('writes moves_json and move_log_version on insert when a move log is provided', async () => {
@@ -375,6 +438,96 @@ describe('historyRepository.native (v1 baseline schema + migration scaffold)', (
         expect(() => insert({ status: 'won' })).toThrow(/CHECK/)
         expect(() => insert({ move_count: -1 })).toThrow(/CHECK/)
       })
+    })
+
+    // Scoring v2 migration on a REAL v1 database: the existing row survives with NULL
+    // scores, new rows accept both tallies, and the ADD COLUMN CHECK holds.
+    it('upgrades a populated v1 database to v2 without touching existing rows', async () => {
+      const baseline = createFakeDatabase()
+      await loadRepository(baseline).initializeHistoryRepository()
+      const baselineSql = baseline.execCalls.find((sql) => sql.includes('CREATE TABLE'))!
+      const upgrade = createFakeDatabase(1)
+      await loadRepository(upgrade).initializeHistoryRepository()
+      const alterSql = upgrade.execCalls.find((sql) => sql.includes('ALTER TABLE'))!
+
+      const db = new DatabaseSync(':memory:')
+      try {
+        db.exec(baselineSql)
+        const columns = Object.keys(validRow)
+        db.prepare(
+          `INSERT INTO history_entries (${columns.join(', ')})
+           VALUES (${columns.map(() => '?').join(', ')})`
+        ).run(...Object.values(validRow))
+
+        db.exec(alterSql)
+
+        const query = db as unknown as {
+          prepare: (sql: string) => { get: (...params: unknown[]) => unknown }
+        }
+        expect(
+          query.prepare('SELECT standard_score, vegas_score FROM history_entries').get()
+        ).toEqual({ standard_score: null, vegas_score: null })
+
+        const insertScored = db.prepare(
+          `INSERT INTO history_entries (${columns.join(', ')}, standard_score, vegas_score)
+           VALUES (${columns.map(() => '?').join(', ')}, ?, ?)`
+        )
+        expect(() =>
+          insertScored.run(...Object.values({ ...validRow, id: 'row_2' }), 685, 208)
+        ).not.toThrow()
+        expect(() =>
+          insertScored.run(...Object.values({ ...validRow, id: 'row_3' }), -5, -52)
+        ).toThrow(/CHECK/)
+      } finally {
+        db.close()
+      }
+    })
+
+    // Cumulative Vegas total (scoring plan P2-C): the summary's vegas_total sums
+    // vegas_score over FINISHED rows only — NULL rows (not a Vegas game) and the
+    // active row contribute nothing. Run the exact summary SQL in real SQLite.
+    it('sums vegas_score over finished rows in the summary query', async () => {
+      const fake = createFakeDatabase()
+      const repository = loadRepository(fake)
+      await repository.initializeHistoryRepository()
+      const baselineSql = fake.execCalls.find((sql) => sql.includes('CREATE TABLE'))!
+      const alterSql = fake.execCalls.find((sql) => sql.includes('ALTER TABLE'))!
+      expect(await repository.getHistorySummary()).toMatchObject({ vegasTotal: 0 })
+      const summarySql = (
+        fake.database.getFirstAsync.mock.calls.find(([sql]: [string]) =>
+          sql.includes('vegas_total')
+        ) as [string]
+      )[0]
+
+      const db = new DatabaseSync(':memory:')
+      try {
+        db.exec(baselineSql)
+        db.exec(alterSql)
+        const columns = Object.keys(validRow)
+        const insert = db.prepare(
+          `INSERT INTO history_entries (${columns.join(', ')}, vegas_score)
+           VALUES (${columns.map(() => '?').join(', ')}, ?)`
+        )
+        const row = (id: string, status: string, vegasScore: number | null) =>
+          insert.run(...Object.values({ ...validRow, id, status }), vegasScore)
+        row('abandoned', 'incomplete', -47)
+        row('zero_move', 'incomplete', -52)
+        row('won', 'solved', 208)
+        row('standard_game', 'incomplete', null)
+        // An active row never carries a score in practice; prove the filter anyway.
+        row('live', 'active', 999)
+
+        const summary = (
+          db as unknown as { prepare: (sql: string) => { get: () => Record<string, number> } }
+        )
+          .prepare(summarySql)
+          .get()
+        expect(summary.vegas_total).toBe(-47 - 52 + 208)
+        expect(summary.total_count).toBe(5)
+        expect(summary.active_count).toBe(1)
+      } finally {
+        db.close()
+      }
     })
   })
 

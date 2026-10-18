@@ -1,6 +1,6 @@
 # @shopify/react-native-skia Guide
 
-Last refreshed: 2026-07-08 (atlas color semantics + applyUpdates cost model, from the v2.6.2 native source)
+Last refreshed: 2026-10-17 (Expo SDK 58 bump to 2.14.0; atlas notes below from the v2.6.2 source still apply)
 
 ## Scope
 
@@ -23,7 +23,32 @@ Last refreshed: 2026-07-08 (atlas color semantics + applyUpdates cost model, fro
   - Source verified at tag `v2.6.2`: `packages/skia/src/dom/types/Drawings.ts` (AtlasProps), `packages/skia/src/external/reanimated/buffers.ts` (useRSXformBuffer etc.), `packages/skia/src/external/reanimated/textures.tsx` (useTexture), `packages/skia/src/renderer/Offscreen.tsx` (drawAsImage), `packages/skia/src/skia/web/JsiSkia.ts` (RSXformFromRadians formula), `packages/skia/src/views/types.ts` (Canvas props)
   - GitHub issues: #3726 (colorBlendMode prop, landed before 2.6.x), #2528 (Atlas per-sprite opacity + premultiplied colors)
 
-## Installation (Soli: Expo SDK 57 / RN 0.86 / new architecture)
+## SDK 58 refresh (2026-10-17): `@shopify/react-native-skia` 2.6.2 -> 2.14.0
+
+- Sources:
+  - https://github.com/Shopify/react-native-skia/releases (2.7.0 through 2.14.0)
+  - https://docs.expo.dev/versions/latest/sdk/skia/
+  - `expo@58.0.12/bundledNativeModules.json` (`@shopify/react-native-skia: 2.14.0`)
+- Expo SDK 58 bundles exact `2.14.0` (published 2026-10-01). Stay on Expo's version.
+- Release-line changes relevant to Soli's Atlas celebration renderer:
+  - 2.10: host objects moved to native states (internal; no API change for `Atlas`,
+    `useRSXformBuffer`, `useTexture`).
+  - 2.13: legacy architecture support removed (Soli is New Architecture only).
+  - 2.14: the mutable `SkPath` API was removed. Soli uses no `Skia.Path`; it uses
+    `Skia.Surface.MakeOffscreen`, `Skia.Paint`, `Skia.XYWHRect`, `Skia.RRectXY`, `Atlas`,
+    `Canvas`, `Group`, `Image`, `useFont`, `Shadow`, `RoundedRect`
+    (`src/features/klondike/components/cards/CelebrationOverlayLayer.tsx`).
+- Repository and naming: the project moved to `wcandillon/react-native-skia`. v3 ships as
+  the unscoped `react-native-skia` package (3.6.x); the `@shopify/react-native-skia` 2.x
+  line continues on the `release-2.x` tag (2.15.1 at refresh time). Do not switch package
+  names; follow Expo's bundled `@shopify/*` version.
+- Installation note: the `dependenciesMeta["@shopify/react-native-skia"].built: true`
+  opt-in in `package.json` is still required (Yarn `enableScripts: false`; Skia's
+  postinstall copies the prebuilt native libraries).
+- Validation after the bump: `yarn celebration` on both platforms plus the 20-game
+  playlist; watch for atlas/surface glitches (risk R9 in the SDK 58 plan).
+
+## Installation (Soli: Expo SDK 58 / RN 0.88 / new architecture)
 
 - **Exact version: `2.6.2`** — this is what Expo SDK 57 pins (verified in our local `node_modules/expo/bundledNativeModules.json`; expo-doctor warns on any other version). Do NOT install `latest` (2.6.9); stay on the SDK-pinned version.
 - Install command (Yarn 4.12 project, use the expo wrapper so the pinned version is picked):

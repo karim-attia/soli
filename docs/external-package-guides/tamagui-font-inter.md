@@ -1,6 +1,21 @@
 # Tamagui Font Inter Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-10-17
+
+## Status (2026-10-17): no longer used by Soli code
+
+- `app/_layout.tsx` stopped `require`-ing `Inter-Medium.otf` / `Inter-Bold.otf` on
+  2026-10-17 (SDK 58 plan, candidate C4). Reason: since the Tamagui config v5 adoption
+  (2026-06-13) `defaultConfig.fonts` comes from `createSystemFont()` (`"System"` on native,
+  a system CSS stack on web — `tamagui-web.css` contains no `Inter`), and no Soli source
+  sets `fontFamily: 'Inter'`/`'InterBold'`. The OTFs were loaded on every cold start and
+  never drawn. The v4-era `createInterFont` + `face: { 700: { normal: 'InterBold' } }`
+  mapping lives only in `@tamagui/config`'s legacy `fonts.mjs`, which Soli does not import.
+- The direct `@tamagui/font-inter@2.4.2` dependency in `package.json` is therefore a
+  removal candidate (follow-up; `@tamagui/config` still depends on it transitively, so
+  `node_modules` keeps a copy either way). Not removed on 2026-10-17 only because
+  `package.json`/`yarn.lock` were owned by the concurrent `expo 58.0.14` bump.
+- The notes below are kept for history; "Verification" no longer applies.
 
 ## Scope
 

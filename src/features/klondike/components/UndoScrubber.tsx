@@ -8,7 +8,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated'
 import { GestureDetector, type GestureType } from 'react-native-gesture-handler'
-import { Lightbulb, Undo2 } from '@tamagui/lucide-icons-2'
+import { Lightbulb, Shuffle, Undo2 } from '@tamagui/lucide-icons-2'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
@@ -44,7 +44,51 @@ export type UndoScrubberProps = {
   onHintPress: () => void
   hintBubbleText: string | null
   warningEmphasisNonce: number
+  // New Game in the Hint slot (scoring plan round 3): shown on a Vegas-rules game
+  // once the stock is exhausted with no pass left — Vegas has no game-end
+  // detection (the player decides), so the free slot offers the natural next
+  // step. Never visible together with the Hint button (hidden on Vegas games).
+  newGameButtonVisible: boolean
+  onNewGamePress: () => void
 }
+
+// Left-half dock pill shared by the Hint and New Game buttons. Plain RN
+// Pressable, deliberately OUTSIDE the GestureWrapper/pan area (Tamagui/expo-ui
+// buttons conflict with the pan gesture — see GestureWrapper). Mirrors the Undo
+// pill (same metrics as DemoPlaylistHud, which may overlap during dev-only demo
+// playback — accepted). Note the pan gesture's hitSlop extends 20px left of the
+// Undo button, slightly over this button's right edge: a plain tap there still
+// hits this Pressable (the pan needs 5px of horizontal movement to activate).
+//
+// No busy/disabled state on purpose (user feedback 2026-07-23: flicker =
+// no-go): a hintDisabled prop driven by solver-busy state used to dim the Hint
+// button for 1-2 frames around every background solve after each move. The
+// buttons are visually static; hint presses during an in-flight solve are
+// absorbed by useHint's replace-latest queue.
+const DockActionButton = ({
+  icon,
+  label,
+  testID,
+  bottom,
+  onPress,
+}: {
+  icon: React.ReactNode
+  label: string
+  testID: string
+  bottom: number
+  onPress: () => void
+}) => (
+  <Pressable
+    style={[styles.dockActionButton, { bottom }]}
+    onPress={onPress}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+    testID={testID}
+  >
+    {icon}
+    <Text style={styles.undoButtonText}>{label}</Text>
+  </Pressable>
+)
 
 const AnimatedView = createAnimatedComponent(View)
 const SCRUBBER_THUMB_SIZE = 20
@@ -120,8 +164,12 @@ export const UndoScrubber = React.memo(
     onHintPress,
     hintBubbleText,
     warningEmphasisNonce,
+    newGameButtonVisible,
+    onNewGamePress,
   }: UndoScrubberProps) => {
-    const trackRef = useRef<View>(null)
+    // RN 0.88 strict types: `View` is a function component, so the ref is its host
+    // instance (`ComponentRef<typeof View>`), not `View` itself.
+    const trackRef = useRef<React.ComponentRef<typeof View>>(null)
     const trackWidth = useSharedValue(0)
     const safeArea = useSafeAreaInsets()
     const bottomDockOffset = safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING
@@ -255,32 +303,22 @@ export const UndoScrubber = React.memo(
           emphasisNonce={warningEmphasisNonce}
         />
         {hintButtonVisible ? (
-          // Plain RN Pressable, deliberately OUTSIDE the GestureWrapper/pan
-          // area (Tamagui/expo-ui buttons conflict with the pan gesture — see
-          // GestureWrapper). Mirrors the Undo pill in the left half of the dock
-          // (same metrics as DemoPlaylistHud, which may overlap during
-          // dev-only demo playback — accepted). Note the pan gesture's
-          // hitSlop extends 20px left of the Undo button, slightly over this
-          // button's right edge: a plain tap there still hits this Pressable
-          // (the pan needs 5px of horizontal movement to activate).
-          //
-          // No busy/disabled state on purpose (user feedback 2026-07-23:
-          // flicker = no-go): a hintDisabled prop driven by solver-busy state
-          // used to dim this button for 1-2 frames around every background
-          // solve after each move. The button is now visually static; presses
-          // during an in-flight solve are absorbed by useHint's replace-latest
-          // queue. This subtree re-renders per move anyway (historyIndex in the
-          // dock), but renders an identical element tree — no native update.
-          <Pressable
-            style={[styles.hintButton, { bottom: bottomDockOffset }]}
-            onPress={onHintPress}
-            accessibilityRole="button"
-            accessibilityLabel="Hint"
+          <DockActionButton
+            icon={<Lightbulb size={20} color="#000" />}
+            label="Hint"
             testID="hint-button"
-          >
-            <Lightbulb size={20} color="#000" />
-            <Text style={styles.undoButtonText}>Hint</Text>
-          </Pressable>
+            bottom={bottomDockOffset}
+            onPress={onHintPress}
+          />
+        ) : null}
+        {newGameButtonVisible ? (
+          <DockActionButton
+            icon={<Shuffle size={20} color="#000" />}
+            label="New Game"
+            testID="new-game-button"
+            bottom={bottomDockOffset}
+            onPress={onNewGamePress}
+          />
         ) : null}
         <GestureWrapper gesture={gesture} scrubActive={scrubActive} canUndo={canUndo} />
       </View>
@@ -368,8 +406,8 @@ const styles = StyleSheet.create({
   },
   // Left-half twin of undoButton (absolute so the in-flow undo layout — and
   // therefore the setting-off render — is untouched); 8px gap like
-  // DemoPlaylistHud's marginRight.
-  hintButton: {
+  // DemoPlaylistHud's marginRight. Shared by the Hint and New Game pills.
+  dockActionButton: {
     position: 'absolute',
     left: 0,
     right: '50%',

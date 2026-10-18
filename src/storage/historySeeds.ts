@@ -50,6 +50,10 @@ type SeedSpec = {
   startedAgoMs: number
   moves: number | null
   durationMs: number | null
+  // Scoring tallies (both stored on real finished rows). Optional here so the
+  // catalog also covers "row written before scoring existed" (null → no segment).
+  standardScore?: number
+  vegasScore?: number
 }
 
 // Initial-deal board derived from the entry's actual deck, so previews render as
@@ -110,6 +114,8 @@ const toSeedEntry = (spec: SeedSpec, now: Date): HistoryEntry => {
     durationMs: spec.durationMs,
     preview: solved ? createSolvedPreview() : createInitialDealPreview(spec.exactId),
     status: spec.status,
+    standardScore: spec.standardScore ?? null,
+    vegasScore: spec.vegasScore ?? null,
   }
 }
 
@@ -138,6 +144,9 @@ export const createHistorySeedEntries = (now: Date = new Date()): HistoryEntry[]
       startedAgoMs: 2 * HOUR_MS,
       moves: 96,
       durationMs: 9 * MINUTE_MS,
+      // A win: Vegas is always 52 × $5 − $52 = $208.
+      standardScore: 685,
+      vegasScore: 208,
     },
     {
       id: 'seed-solved-draw3',
@@ -156,6 +165,9 @@ export const createHistorySeedEntries = (now: Date = new Date()): HistoryEntry[]
       startedAgoMs: 3 * DAY_MS,
       moves: 23,
       durationMs: 3 * MINUTE_MS,
+      // Abandoned early: 3 foundation cards → Vegas −$37.
+      standardScore: 65,
+      vegasScore: -37,
     },
     {
       id: 'seed-solved-random',

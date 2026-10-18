@@ -16,6 +16,7 @@ import {
 } from '../../../solitaire/klondike'
 import type { ExactDealId } from '../../../solitaire/dealIdentity'
 import type { DrawCount } from '../../../solitaire/drawCount'
+import { recyclesLeft } from '../../../solitaire/scoring'
 import { devLog } from '../../../utils/devLogger'
 import { clearGameState } from '../../../storage/gamePersistence'
 import { useHistory } from '../../../state/history'
@@ -33,6 +34,10 @@ import type { CelebrationPreviewStatsRequest } from '../celebrationPreviewStats'
 import { useKlondikeTimer } from './useKlondikeTimer'
 import { useKlondikePersistence } from './useKlondikePersistence'
 import { useUndoHint } from './useUndoHint'
+import {
+  clearPendingDealRequest,
+  usePendingDealRequest,
+} from '../state/pendingDealRequestStore'
 import { useHint } from './useHint'
 import { useKlondikeHistoryEntry } from './useKlondikeHistoryEntry'
 import { useSolvableDealSelector } from './useSolvableDealSelector'
@@ -54,6 +59,21 @@ import { loadBoardMetricsSync, saveBoardMetrics } from '../../../storage/uiPrefe
 export type { LaunchDemoGameOptions } from './useDemoGameLauncher'
 
 export type RequestNewGameFn = (options?: { reason?: 'manual' | 'celebration' }) => void
+// Play a specific deal from scratch (retry-and-share-deal plan): History → Retry
+// ('retry') and incoming share links ('shared'). onConfirmed fires right before the
+// new deal, only once the user confirmed (or no confirmation was needed), so the
+// caller can dismiss its sheet / switch tabs without doing so on Cancel.
+export type PlayDealPrompt = 'retry' | 'shared'
+export type RequestPlayDealFn = (
+  exactId: ExactDealId,
+  drawCount: DrawCount,
+  options?: { prompt?: PlayDealPrompt; onConfirmed?: () => void }
+) => void
+
+const PLAY_DEAL_PROMPTS: Record<PlayDealPrompt, { title: string; confirm: string }> = {
+  retry: { title: 'Retry this deal?', confirm: 'Retry' },
+  shared: { title: 'Play shared deal?', confirm: 'Play' },
+}
 
 // PBI-28: Run auto-up (auto-complete) much faster than manual play cadence.
 const AUTO_QUEUE_INTERVAL_MS = 25
@@ -103,6 +123,7 @@ function collectSelectionCardIds(
 export type UseKlondikeGameResult = {
   developerModeEnabled: boolean
   requestNewGame: RequestNewGameFn
+  requestPlayDeal: RequestPlayDealFn
   handleLaunchDemoGame: (options?: LaunchDemoGameOptions) => void
   resetUndoHintForTesting: () => void
   seedHistoryForTesting: (action: 'seed' | 'clear') => void
@@ -171,20 +192,39 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     setSolvableGamesOnly,
     setWarningMode,
     setHintButtonEnabled,
+    setScoringMode,
+    setVegasTotalEnabled,
   } = useSettings()
-  const { showMoves, showTime } = settingsState.statistics
+  const {
+    showMoves,
+    showTime,
+    scoring,
+    vegasTotal: vegasTotalEnabled,
+    vegasTotalOffset,
+  } = settingsState.statistics
   const solvableGamesOnly = settingsState.solvableGamesOnly
   const preferredDrawCount = settingsState.drawCount
   const autoUpEnabled = settingsState.autoUpEnabled
   // Warning-mode select + hint button toggle (F14) — see settings.tsx.
-  const { warningMode, hintButton: hintButtonEnabled } = settingsState.hints
+  const { warningMode, hintButton: hintButtonSetting } = settingsState.hints
+  // No Hint button on Vegas-rules games (user decision round 2 / prompt 5: casino
+  // experience, no hints — decided after trying "any useful move" hints there).
+  // Keyed on the GAME's rules, not the setting, so a Standard game in progress
+  // keeps its button while Vegas is selected for the next deal.
+  const hintButtonEnabled = hintButtonSetting && !state.vegasRules
   const developerModeEnabled = settingsState.developerMode
 
   const animationToggles = useAnimationToggles()
   // Only solvable stats are read here; the history-entry lifecycle (rows, recording,
   // recovery) lives in useKlondikeHistoryEntry, which calls useHistory() itself.
   // seedHistoryForTesting is only forwarded to the demo launcher / demo sheet.
-  const { solvableStats, seedHistoryForTesting } = useHistory()
+  // entries + vegasTotal feed the cumulative TOTAL badge (P2-C) below.
+  const {
+    solvableStats,
+    seedHistoryForTesting,
+    entries: historyEntries,
+    vegasTotal: settledVegasTotal,
+  } = useHistory()
   const {
     master: animationsEnabled,
     invalidMoveWiggle: invalidWiggleEnabled,
@@ -333,15 +373,20 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // during startup; history stats hydrate async and may still be empty on the
   // startup paths — the selector then just picks an unplayed solvable deal
   // (repeat-weighting is best-effort, the solvability guarantee is not).
+  // Vegas (Phase 2) is a rules mode copied onto the deal like the draw count. The
+  // "Solvable deals" catalog is proven for unlimited passes only, so a Vegas deal
+  // is always random — an honest casino deal (the history row's `solvable` flag is
+  // derived from the catalog, so it comes out false by itself).
+  const vegasRules = scoring === 'vegas'
   const createFreshGameState = useCallback((): GameState => {
-    if (solvableGamesOnly) {
+    if (solvableGamesOnly && !vegasRules) {
       const solvableDeal = selectNextSolvableDeal()
       if (solvableDeal) {
         return createSolvableGameState(solvableDeal, preferredDrawCount)
       }
     }
-    return createInitialState(preferredDrawCount)
-  }, [preferredDrawCount, selectNextSolvableDeal, solvableGamesOnly])
+    return createInitialState(preferredDrawCount, vegasRules)
+  }, [preferredDrawCount, selectNextSolvableDeal, solvableGamesOnly, vegasRules])
 
   // Hook: hydrate and persist game state via expo-sqlite/kv-store once per relevant change.
   // Task 10-7: Persist the current history entry linkage across restarts.
@@ -366,6 +411,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     recordCurrentGameResult,
     clearCurrentGameEntryLink,
     flushPendingSolvedResultAfterHandoff,
+    boardEntryId,
   } = useKlondikeHistoryEntry({
     state,
     stateRef,
@@ -441,21 +487,48 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Builds the statistics badges based on current settings and elapsed time.
   // Placed after the celebration controller because screenshot-mode celebration
   // PREVIEWS override the pair (see below).
-  const { moveCount, elapsedMs, timerState, timerStartedAt } = state
+  const { moveCount, elapsedMs, timerState, timerStartedAt, score } = state
   // Store-screenshots round 3: a `?celebration=<id>&screenshot=1` preview runs on
   // a board that was never played, so the real header reads MOVES 0 / TIME 0:00 —
   // obviously fake in store shots. The preview carries display-only synthetic
   // stats; this is the ONLY place that reads them, so state/history/persistence
-  // never see the fake numbers (celebrationPreviewStats.ts).
+  // never see the fake numbers (celebrationPreviewStats.ts). The score badge is
+  // NOT synthesised (scoring is off by default; previews show the board's real
+  // tally if it is on) — extend CelebrationPreviewStats if screenshots need it.
   const celebrationPreviewStats = celebrationState?.previewStats
 
+  // Cumulative Vegas total (P2-C, plan § P-H): settled history sum − the offset
+  // taken at the last reset + the live game — unless this game's own row already
+  // carries its result (won board, result recorded) in which case the row is in
+  // the settled sum and the live tally must not be added again. The row is looked
+  // up in the in-memory entries: it is always the newest one (first page).
+  // Invariant (G8): "settled" is read off the row the result was WRITTEN to —
+  // boardEntryId is published by the write itself (useKlondikeHistoryEntry), and
+  // the provider keeps the in-memory copy of a row current even when the write
+  // raced history hydration. Only the SQL sum lags the write by one queue task
+  // (accepted ~1-frame gap, plan § P-H gap note).
+  const boardRowSettled = useMemo(
+    () =>
+      boardEntryId !== null &&
+      typeof historyEntries.find((entry) => entry.id === boardEntryId)?.vegasScore ===
+        'number',
+    [boardEntryId, historyEntries]
+  )
+  const vegasTotal =
+    vegasTotalEnabled && state.vegasRules
+      ? settledVegasTotal - vegasTotalOffset + (boardRowSettled ? 0 : score.vegas)
+      : null
+
+  // Scoring (2026-10-11): the former `!showMoves && !showTime → []` early return
+  // was dropped — buildStatisticsRows returns [] itself when nothing is enabled.
   const statisticsRows: StatisticsRow[] = useMemo(() => {
-    if (!showMoves && !showTime) {
-      return []
-    }
     return buildStatisticsRows({
       showMoves,
       showTime,
+      scoring,
+      vegasRules: state.vegasRules,
+      score,
+      vegasTotal,
       moveCount: celebrationPreviewStats?.moveCount ?? moveCount,
       elapsedMs: celebrationPreviewStats?.elapsedMs ?? elapsedMs,
       // Frozen while previewing: 'paused' + no start timestamp make
@@ -468,10 +541,14 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     celebrationPreviewStats,
     elapsedMs,
     moveCount,
+    score,
+    scoring,
     showMoves,
     showTime,
+    state.vegasRules,
     timerStartedAt,
     timerState,
+    vegasTotal,
   ])
 
   const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(
@@ -542,17 +619,20 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
 
   // ?deal=<exactId>&draw=N (agent-testing-skill C2): bug-report repro and
   // hand-crafted scenario deals. The launcher validates the id before calling.
+  // Exact-deal paths (?deal= and Retry) take the CURRENT Scoring setting's rules,
+  // same as the draw count fallback: the deal id fixes the cards, not the rule set.
   const startGameFromExactDeal = useCallback(
     (exactId: ExactDealId, drawCount?: DrawCount) => {
       performDealAgain({
         stateOverride: createGameStateFromExactId(
           exactId,
-          drawCount ?? preferredDrawCount
+          drawCount ?? preferredDrawCount,
+          { vegasRules }
         ),
         logContext: { reason: 'deepLink-deal', exactId, drawCount },
       })
     },
-    [performDealAgain, preferredDrawCount]
+    [performDealAgain, preferredDrawCount, vegasRules]
   )
 
   const { handleLaunchDemoGame } = useDemoGameLauncher({
@@ -578,6 +658,8 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     setSolvableGamesOnly,
     setWarningMode,
     setHintButtonEnabled,
+    setScoringMode,
+    setVegasTotalEnabled,
     resetUndoHintForTesting,
     dealNewGameForTesting,
     startGameFromExactDeal,
@@ -712,6 +794,59 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     },
     [clearCelebrationDialogTimer, performDealAgain, updateBoardLocked]
   )
+
+  // Play a specific deal from scratch (retry-and-share-deal plan): History → Retry and
+  // incoming share links. Product decisions: same exactId + drawCount, NEW history row
+  // via the normal new-game path (an existing row for that deal stays untouched),
+  // current game recorded incomplete exactly like "New Game". Confirmation mirrors
+  // requestNewGame; it is skipped when nothing is at stake — a won board (celebration
+  // showing) or a non-Vegas board without moves. Lives here (not in the history screen /
+  // +native-intent) because stateRef makes that skip two lines.
+  const requestPlayDeal = useCallback<RequestPlayDealFn>(
+    (exactId, drawCount, options) => {
+      clearCelebrationDialogTimer()
+      const prompt = PLAY_DEAL_PROMPTS[options?.prompt ?? 'retry']
+      const play = () => {
+        options?.onConfirmed?.()
+        performDealAgain({
+          // Retried/shared deals take the current Scoring setting's rules (see
+          // startGameFromExactDeal), not the rules of the row being retried.
+          stateOverride: createGameStateFromExactId(exactId, drawCount, { vegasRules }),
+          logContext: { reason: options?.prompt ?? 'retry', exactId, drawCount },
+        })
+      }
+      const current = stateRef.current
+      // A zero-move VEGAS board still has money at stake (every deal costs $52,
+      // round 2), so it gets the confirmation too.
+      if (current.hasWon || (current.moveCount === 0 && !current.vegasRules)) {
+        play()
+        return
+      }
+      Alert.alert(prompt.title, 'Your current game will end and be recorded as incomplete.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: prompt.confirm, style: 'destructive', onPress: play },
+      ])
+    },
+    [clearCelebrationDialogTimer, performDealAgain, vegasRules]
+  )
+
+  // Incoming share link (https://karimattia.ch/soli/deal/… or soli://soli/deal/…),
+  // stashed by app/+native-intent.tsx. Consumed only after persistence hydrated: on a
+  // cold start the link arrives before the saved game is restored, and prompting (or
+  // skip-confirming on the not-yet-hydrated empty board) earlier would let the restore
+  // stomp the new deal — the dev links solve the same race with a fixed settle delay.
+  const pendingDealRequest = usePendingDealRequest()
+  useEffect(() => {
+    if (!storageHydrated || !pendingDealRequest) {
+      return
+    }
+    clearPendingDealRequest()
+    requestPlayDeal(
+      pendingDealRequest.exactId,
+      pendingDealRequest.drawCount ?? preferredDrawCount,
+      { prompt: 'shared' }
+    )
+  }, [pendingDealRequest, preferredDrawCount, requestPlayDeal, storageHydrated])
 
   // Keeps the new-game request ref synchronized with the latest callback.
   useEffect(() => {
@@ -928,6 +1063,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const topRowProps: TopRowProps = {
     stockCount: state.stock.length,
     wasteCount: state.waste.length,
+    recyclesLeft: recyclesLeft(state),
     foundations: state.foundations,
     selected: state.selected,
     hasWon: state.hasWon,
@@ -961,6 +1097,25 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     onTableauColumnLayout: handleTableauColumnLayout,
   }
 
+  // New Game in the (empty) Hint slot of the dock — scoring plan round 3. Vegas
+  // has NO game-end detection (user decision, prompt 6: the heuristic end could
+  // be premature and "the user should decide themselves"), so once a Vegas game
+  // has nothing left to draw — stock empty and no pass left, i.e. the ⊘ state of
+  // the stock slot (or stock + waste both empty) — the dock offers the natural
+  // next step. Undo past the last draw/recycle hides it again (pure derivation
+  // from the snapshot). Standard games never show it (unlimited recycles). The
+  // header's "New Game" stays as well — same requestNewGame confirmation.
+  const vegasNewGameButtonVisible =
+    state.vegasRules &&
+    !state.hasWon &&
+    !celebrationState &&
+    state.stock.length === 0 &&
+    recyclesLeft(state) === 0
+  const requestNewGameFromDock = useCallback(
+    () => requestNewGame({ reason: 'manual' }),
+    [requestNewGame]
+  )
+
   // requirement 20-6: onUndoPress removed - tap is handled by composed gesture
   const undoScrubProps: UndoScrubberProps = {
     // With the Hint button ON the dock also shows on a fresh deal (empty
@@ -968,7 +1123,12 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     // then visible but inert (canUndo false dims it, the pan/tap guards
     // no-op). With the button OFF this is exactly the pre-feature
     // `shouldShowUndo` — the warning-only settings never affect the dock.
-    visible: shouldShowUndo || (hintButtonEnabled && !state.hasWon && !celebrationState),
+    // (vegasNewGameButtonVisible implies a non-empty timeline, so it never
+    // opens the dock on its own — listed for clarity.)
+    visible:
+      shouldShowUndo ||
+      (hintButtonEnabled && !state.hasWon && !celebrationState) ||
+      vegasNewGameButtonVisible,
     scrubActive,
     scrubIndex: scrubAnimatedIndex,
     sliderMax: scrubSliderMax,
@@ -985,6 +1145,8 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     onHintPress: requestHint,
     hintBubbleText,
     warningEmphasisNonce,
+    newGameButtonVisible: vegasNewGameButtonVisible,
+    onNewGamePress: requestNewGameFromDock,
   }
 
   const viewProps: KlondikeGameViewProps = {
@@ -1042,6 +1204,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   return {
     developerModeEnabled,
     requestNewGame,
+    requestPlayDeal,
     handleLaunchDemoGame,
     resetUndoHintForTesting,
     seedHistoryForTesting,

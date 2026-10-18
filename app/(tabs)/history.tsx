@@ -1,8 +1,17 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react'
-import { FlatList, Pressable, useWindowDimensions } from 'react-native'
+import { FlatList, Platform, Pressable, Share, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useNavigation } from 'expo-router'
-import { Paragraph, Separator, Spinner, Text, XStack, YStack, useTheme } from 'tamagui'
+import { useNavigation, useRouter } from 'expo-router'
+import {
+  Button,
+  Paragraph,
+  Separator,
+  Spinner,
+  Text,
+  XStack,
+  YStack,
+  useTheme,
+} from 'tamagui'
 
 import { AppSheet } from '../../components/AppSheet'
 import {
@@ -10,11 +19,16 @@ import {
   HEADER_MENU_LEADING_PADDING,
 } from '../../components/navigation/HeaderMenuButton'
 import { BoardPreview } from '../../src/features/klondike/components/BoardPreview'
+import { useSessionControls } from '../../src/features/klondike/state/sessionControlsStore'
+import { isExactDealId } from '../../src/solitaire/dealIdentity'
+import { buildDealShareUrl } from '../../src/solitaire/dealShareLink'
+import { formatStandardScore, formatVegasScore } from '../../src/solitaire/scoring'
 import {
   type HistoryEntry,
   type HistoryEntryStatus,
   useHistory,
 } from '../../src/state/history'
+import { useSettings, type ScoringMode } from '../../src/state/settings'
 import { devLog } from '../../src/utils/devLogger'
 import { formatElapsedDuration } from '../../src/utils/time'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
@@ -34,6 +48,8 @@ function HistoryScreen() {
     loadingMore,
     loadMore,
   } = useHistory()
+  // Rows show the tally matching the CURRENT Scoring setting (both are stored).
+  const scoring = useSettings().state.statistics.scoring
   const [selectedEntry, setSelectedEntry] = useState<HistoryEntry | null>(null)
 
   useLayoutEffect(() => {
@@ -83,10 +99,11 @@ function HistoryScreen() {
           <EmptyHistory hydrated={hydrated} paddingHorizontal={24} paddingVertical={48} />
         }
         renderItem={({ item }) => (
-          <HistoryListItem entry={item} onSelect={setSelectedEntry} />
+          <HistoryListItem entry={item} scoring={scoring} onSelect={setSelectedEntry} />
         )}
         ItemSeparatorComponent={ListSpacer}
-        ListFooterComponent={loadingMore ? LoadingFooter : null}
+        // RN 0.88 FlatList types no longer accept null here (undefined only).
+        ListFooterComponent={loadingMore ? LoadingFooter : undefined}
         contentContainerStyle={{ paddingBottom: 64 }}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}
@@ -104,6 +121,7 @@ function HistoryScreen() {
 
 type HistoryListItemProps = {
   entry: HistoryEntry
+  scoring: ScoringMode
   // Stable callback (not an inline closure from renderItem) so React.memo below
   // actually skips re-renders; the row builds its own onPress from it.
   onSelect: (entry: HistoryEntry) => void
@@ -159,7 +177,7 @@ const NBSP = '\u00A0'
 const joinWrappingSegments = (segments: string[]): string =>
   segments.map((segment) => segment.split(' ').join(NBSP)).join(`${NBSP}· `)
 
-const formatEntryMetadata = (entry: HistoryEntry): string => {
+const formatEntryMetadata = (entry: HistoryEntry, scoring: ScoringMode): string => {
   const segments: string[] = [formatEntryTimeLabel(entry)]
   // Product decision (round 3): active games show no moves (durationMs is already
   // null for them) — the stored count only syncs at save points, so it would show a
@@ -172,6 +190,13 @@ const formatEntryMetadata = (entry: HistoryEntry): string => {
   if (typeof entry.durationMs === 'number' && entry.durationMs >= 0) {
     segments.push(formatElapsedDuration(entry.durationMs))
   }
+  // Scoring: only the tally matching the current setting; nothing when Off or when
+  // the row predates scoring (null). Active rows carry null by construction.
+  if (scoring === 'standard' && typeof entry.standardScore === 'number') {
+    segments.push(`Score ${formatStandardScore(entry.standardScore)}`)
+  } else if (scoring === 'vegas' && typeof entry.vegasScore === 'number') {
+    segments.push(`Vegas ${formatVegasScore(entry.vegasScore)}`)
+  }
   segments.push(`Draw ${entry.drawCount}`)
   if (entry.solvable) {
     segments.push('Solvable')
@@ -181,7 +206,7 @@ const formatEntryMetadata = (entry: HistoryEntry): string => {
 
 // History-entries-cleanup B4: memoized so FlatList re-renders (pagination, sheet
 // open/close) don't re-render unchanged rows.
-const HistoryListItem = memo(({ entry, onSelect }: HistoryListItemProps) => {
+const HistoryListItem = memo(({ entry, scoring, onSelect }: HistoryListItemProps) => {
   const theme = useTheme()
   const onPress = useCallback(() => onSelect(entry), [entry, onSelect])
 
@@ -213,7 +238,7 @@ const HistoryListItem = memo(({ entry, onSelect }: HistoryListItemProps) => {
         </XStack>
 
         <Paragraph color="$color10" fontSize={14}>
-          {formatEntryMetadata(entry)}
+          {formatEntryMetadata(entry, scoring)}
         </Paragraph>
       </YStack>
     </Pressable>
@@ -374,8 +399,50 @@ type HistoryPreviewSheetProps = {
 const HistoryPreviewSheet = ({ entry, onDismiss }: HistoryPreviewSheetProps) => {
   const { width } = useWindowDimensions()
   const insets = useSafeAreaInsets()
+  const router = useRouter()
+  // Live game session controls (retry-and-share-deal plan); null until the game
+  // screen has mounted its session, in which case Retry is disabled.
+  const sessionControls = useSessionControls()
+  const scoring = useSettings().state.statistics.scoring
   // Expo's universal sheet supplies 16 dp/pt/px of horizontal content padding per side.
   const contentWidth = Math.max(1, width - 32)
+
+  // Defensive: history rows always carry a real exact id (real games, seeds), but a
+  // malformed one would throw inside createGameStateFromExactId — disable instead.
+  const { exactId, drawCount } = entry
+  const canRetry = Boolean(sessionControls) && isExactDealId(exactId)
+  const handleRetry = useCallback(() => {
+    if (!sessionControls || !isExactDealId(exactId)) {
+      return
+    }
+    // Confirmation (if any) is owned by the session; the sheet closes and the drawer
+    // switches to the game tab only once the retry actually happens, so Cancel leaves
+    // the user exactly where they were. Shown for every status on purpose — for the
+    // active row this simply restarts the current game.
+    sessionControls.requestPlayDeal(exactId, drawCount, {
+      onConfirmed: () => {
+        onDismiss()
+        router.navigate('/')
+      },
+    })
+  }, [drawCount, exactId, onDismiss, router, sessionControls])
+
+  // Share = the public https link (dealShareLink.ts). iOS gets `url` separately so
+  // the share sheet shows a proper link preview and apps that take only URLs still
+  // work; Android's share intent only reads `message`, so the URL goes inline there.
+  // Fire-and-forget: a dismissed sheet resolves normally, a failure is only devLogged.
+  const handleShare = useCallback(() => {
+    if (!isExactDealId(exactId)) {
+      return
+    }
+    const url = buildDealShareUrl(exactId, drawCount)
+    const message = `Play this Klondike deal in Soli (Draw ${drawCount})`
+    void Share.share(
+      Platform.OS === 'ios' ? { message, url } : { message: `${message}: ${url}` }
+    ).catch((error) => {
+      devLog('warn', '[history] Share failed', error)
+    })
+  }, [drawCount, exactId])
 
   return (
     <AppSheet isPresented onDismiss={onDismiss}>
@@ -393,11 +460,38 @@ const HistoryPreviewSheet = ({ entry, onDismiss }: HistoryPreviewSheetProps) => 
             <StatusText status={entry.status} />
           </XStack>
           <Paragraph color="$color10" fontSize={14}>
-            {formatEntryMetadata(entry)}
+            {formatEntryMetadata(entry, scoring)}
           </Paragraph>
         </YStack>
 
         <BoardPreview tableau={entry.preview.tableau} availableWidth={contentWidth} />
+
+        {/* "Retry" = this deal from scratch (not resume — see plan Follow-ups); "Share"
+            = public link to the same deal. Plain tamagui Buttons like the demo sheet:
+            Expo UI controls inside a sheet had unreliable gestures on Android. a11y
+            handles: label (Android) + testID (iOS). Both shown for every status. */}
+        <XStack gap="$2">
+          <Button
+            size="$3"
+            flex={1}
+            disabled={!canRetry}
+            opacity={canRetry ? 1 : 0.5}
+            onPress={handleRetry}
+            accessibilityLabel="Retry this deal"
+            testID="history-retry"
+          >
+            Retry
+          </Button>
+          <Button
+            size="$3"
+            flex={1}
+            onPress={handleShare}
+            accessibilityLabel="Share this deal"
+            testID="history-share"
+          >
+            Share
+          </Button>
+        </XStack>
       </YStack>
     </AppSheet>
   )

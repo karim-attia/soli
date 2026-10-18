@@ -1,6 +1,6 @@
 # Expo Router Guide
 
-Last refreshed: 2026-07-05
+Last refreshed: 2026-10-17 (Expo Router 58)
 
 ## Scope
 
@@ -17,6 +17,50 @@ documents them.
 ## Detailed guidance
 
 The sections below are the definitive combined notes for this package or tool. Keep version-specific context when it affects compatibility, but update this single file instead of adding task- or feature-prefixed guides.
+
+### SDK 58 Router Notes (reworked navigation core)
+
+- Package: `expo-router`
+- Retrieved: 2026-10-17
+- Primary docs:
+  - https://docs.expo.dev/router/migrate/sdk-57-to-58/
+  - https://expo.dev/changelog/sdk-58
+  - https://docs.expo.dev/versions/latest/sdk/router/
+  - `expo-router@58.0.21` / `58.0.23` tarball entry points (`native`, `elements`, `core`,
+    `routers`, `drawer`) read in a scratch directory
+
+#### Target facts
+
+- Expo SDK 58 bundles `expo-router ~58.0.21` (`expo@58.0.12`); `58.0.23` is npm latest.
+  Peer `react-native-screens ^4.30.0 || ^5.0.0-alpha.3`; optional peers `@expo/ui`
+  (for `Stack.Toolbar`) and `expo-symbols` (not needed; Soli uses `@expo/material-symbols`).
+- SDK 58 replaced the navigation core. Behavior changes: `navigation.dispatch` is queued
+  until after the React commit (drawer open via `DrawerActions.openDrawer()` still works but
+  is no longer synchronous), `useNavigation` throws when called outside a navigator,
+  Drawer renders only declared screens, `freezeOnBlur` is a no-op, web routes are async and
+  `web.output` defaults to `server` (Soli sets `static`; web is not a target).
+
+#### Removed or renamed APIs (SDK 57 -> 58 migration guide) and Soli status
+
+| Change | Soli |
+| --- | --- |
+| `unstable_settings.initialRouteName` -> `unstable_settings.anchor` | Renamed in `app/_layout.tsx` (2026-10-17) |
+| `NavigationContainer`, React Navigation `Link`, `navigateDeprecated`, `resetRoot`, `beforeRemove`, `Screen redirect/initialParams`, `withLayoutContext` third argument removed | Not used |
+| Many `expo-router/react-navigation` compatibility exports removed | Everything Soli imports still exists in 58: `ThemeProvider`, `DarkTheme`, `DefaultTheme`, `HeaderButton`, `DrawerActions`, `useNavigation`, `useFocusEffect`; `expo-router/drawer` still exports `DrawerContentScrollView`, `DrawerItem`, `DrawerItemList`, `DrawerContentComponentProps` |
+| `InteractionManager` dependency inside `Card.js` (SDK 57) | Gone in 58; irrelevant now that RN 0.87 removed `InteractionManager` |
+
+#### `Stack.Toolbar` status
+
+Toolbars are marked stable in SDK 58 (optional peer `@expo/ui`). Soli's Play/Settings/
+History headers are owned by the nested Drawer in `app/(tabs)/_layout.tsx`, not a Stack
+screen, so adoption is still an open research question (15-minute cap, result recorded in
+the SDK 58 upgrade plan's Follow-ups). Do not restructure the Drawer to adopt it.
+
+#### Repo usage notes
+
+- Keep importing React Navigation APIs only from `expo-router/*` entry points.
+- Smoke after upgrade: drawer opens from the header button, headers render on all four
+  routes, `yarn deeplink` cold start (iOS now via `SceneDelegate`), Android hardware back.
 
 ### SDK 57 Router Notes
 
@@ -261,3 +305,26 @@ Official SDK 55 to 56 migration guide mappings:
 - Follow-up candidate, outside this documentation-only refresh: decide whether to accept
   the SDK 56 patch drift from `expo-router@56.2.11` to the docs-recommended `~56.2.12`
   through `npx expo install --check` / `--fix`.
+
+### Incoming links: `+native-intent.tsx` / `redirectSystemPath` (added 2026-10-12)
+
+- Source: https://docs.expo.dev/router/advanced/native-intent/ (read 2026-10-12) +
+  `node_modules/expo-router/build/getLinkingConfig.js` and `build/link/linking.js` (SDK 57).
+- File: `app/+native-intent.tsx` (top level of the routes dir; `+` files are not routes and
+  do not appear in typed routes). Export `redirectSystemPath({ path, initial })`; return a
+  string (sync) or a Promise of one. Native only — never runs on web.
+- **`path` is the raw URL**, not a path: expo-router passes `Linking.getInitialURL()` /
+  the `url` event value straight through (`redirectSystemPath({ path: initialUrl, initial:
+  true })`). The docs even say "there is no guarantee that this is a path or a valid URL".
+  Parse defensively; our `parseDealShareUrl` is regex-based for that reason.
+- Whatever you return then goes through `extractExpoPathFromURL`: `https://host/a/b?x` →
+  `/a/b?x`; custom scheme `soli://a/b` → `a/b` (host + pathname concatenated, so
+  `soli://soli/deal/<id>` and `https://karimattia.ch/soli/deal/<id>` route identically);
+  `/` → root route. Returning `'/'` lands on `(tabs)/index`; returning `path` unchanged
+  keeps normal routing.
+- "Do not crash inside this function" — wrap in try/catch and fall back to a safe route.
+- Soli usage: public deal links are parsed, stashed in `pendingDealRequestStore` and
+  rewritten to `/`; everything else passes through (the dev `soli://?demo=…` family is
+  handled by `useDemoGameLauncher`'s own `Linking` listener, which sees the raw URL too).
+  Without the rewrite, `/soli/deal/<id>` would open `+not-found`.
+- `legacy_subscribe` exists (alpha, SDK 52+) for React-Navigation-only SDKs — not needed.

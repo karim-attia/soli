@@ -10,7 +10,10 @@ import {
   getTableauCardLabel,
   getTableauColumnTestID,
   getWasteLabel,
+  formatRecyclesLeft,
+  getStockRecycleLabel,
   STOCK_EMPTY_LABEL,
+  STOCK_EXHAUSTED_LABEL,
   STOCK_RECYCLE_LABEL,
 } from '../../../../src/features/klondike/components/cards/accessibility'
 
@@ -57,6 +60,15 @@ describe('stock and waste labels', () => {
   it('has recycle and empty stock labels', () => {
     expect(STOCK_RECYCLE_LABEL).toBe('Recycle waste into stock')
     expect(STOCK_EMPTY_LABEL).toBe('Stock, empty')
+  })
+
+  // Vegas pass limits (scoring plan, Phase 2).
+  it('labels the recycle slot with the remaining passes on limited games only', () => {
+    expect(getStockRecycleLabel(Infinity)).toBe(STOCK_RECYCLE_LABEL)
+    expect(getStockRecycleLabel(2)).toBe('Recycle waste into stock, 2 left')
+    expect(getStockRecycleLabel(1)).toBe('Recycle waste into stock, 1 left')
+    expect(formatRecyclesLeft(2)).toBe('2 left')
+    expect(STOCK_EXHAUSTED_LABEL).toBe('Stock, no passes left')
   })
 
   it('names the waste top card', () => {

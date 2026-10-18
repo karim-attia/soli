@@ -1,16 +1,17 @@
 import { Drawer } from 'expo-router/drawer'
 import { Platform } from 'react-native'
 import { useTheme } from 'tamagui'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Atom, Clock, Settings, Smile } from '@tamagui/lucide-icons-2'
+
+import { AppDrawerContent } from '../../components/navigation/AppDrawerContent'
 
 export default function DrawerLayout() {
   const theme = useTheme()
-  const insets = useSafeAreaInsets()
   const headerRightPadding = 16
 
   return (
     <Drawer
+      drawerContent={(props) => <AppDrawerContent {...props} />}
       screenOptions={{
         drawerActiveTintColor: theme.red10?.val,
         drawerInactiveTintColor: theme.color?.val,
@@ -23,7 +24,10 @@ export default function DrawerLayout() {
           borderBottomColor: theme.borderColor?.val,
         },
         headerTintColor: theme.color?.val,
-        headerStatusBarHeight: insets.top,
+        // `headerStatusBarHeight: insets.top` removed on SDK 58 (2026-10-17): it was
+        // identical to Expo Router's header default (`isParentHeaderShown ? 0 :
+        // insets.top`; the root Stack hides its header, so the drawer header gets
+        // the full top inset anyway).
         headerLeft: () => null,
         headerRightContainerStyle: {
           paddingRight: headerRightPadding,

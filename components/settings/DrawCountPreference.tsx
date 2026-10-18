@@ -21,7 +21,8 @@ export const DrawCountPreference = ({
     <Text>Cards drawn</Text>
     <Spacer flexible />
     {/* Expo UI 57 FieldGroup rows render lower-level menu/segmented/slider
-        experiments on Android, but their nested gestures did not fire reliably. */}
+        experiments on Android, but their nested gestures did not fire reliably
+        (re-checked on @expo/ui 58.0.20: still true, Picker stays). */}
     <Picker
       selectedValue={value}
       onValueChange={(nextValue) => onValueChange(normalizeDrawCount(nextValue))}

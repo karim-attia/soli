@@ -7,7 +7,7 @@ import {
 } from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
 import { Text } from 'tamagui'
-import { RefreshCcw } from '@tamagui/lucide-icons-2'
+import { Ban, RefreshCcw } from '@tamagui/lucide-icons-2'
 
 import type { Card } from '../../../../solitaire/klondike'
 import {
@@ -153,17 +153,23 @@ export const CardVisual = ({ card, metrics, onPress, disabled }: CardVisualProps
 
 export type CardBackProps = {
   label?: string
+  // Small text under the recycle icon ("2 left" on Vegas-rules games).
+  caption?: string
   metrics: CardMetrics
-  variant: 'stock' | 'recycle' | 'empty'
+  // 'exhausted' (Vegas pass limits): stock empty, waste non-empty, no recycle
+  // left — same dashed outline as 'recycle' with a circle-slash instead of the
+  // recycle arrows. A mark on the slot, no modal: the player can still play
+  // waste/tableau cards and undo gives the pass back.
+  variant: 'stock' | 'recycle' | 'empty' | 'exhausted'
 }
 
-export const CardBack = ({ label, metrics, variant }: CardBackProps) => {
+export const CardBack = ({ label, caption, metrics, variant }: CardBackProps) => {
   const containerStyle: StyleProp<ViewStyle> = [
     variant === 'stock'
       ? styles.cardBack
       : [
           styles.cardBackOutline,
-          variant === 'recycle' ? styles.cardBackRecycle : styles.cardBackEmpty,
+          variant === 'empty' ? styles.cardBackEmpty : styles.cardBackRecycle,
         ],
     {
       width: metrics.width,
@@ -171,12 +177,17 @@ export const CardBack = ({ label, metrics, variant }: CardBackProps) => {
       borderRadius: metrics.radius,
     },
   ]
-  const recycleIconSize = Math.max(16, Math.round(metrics.width * 0.22))
+  const iconSize = Math.max(16, Math.round(metrics.width * 0.22))
 
   return (
     <View style={containerStyle}>
       {variant === 'recycle' ? (
-        <RefreshCcw color="#0f172a" size={recycleIconSize} />
+        <>
+          <RefreshCcw color="#0f172a" size={iconSize} />
+          {caption ? <Text style={styles.cardBackCaption}>{caption}</Text> : null}
+        </>
+      ) : variant === 'exhausted' ? (
+        <Ban color="#0f172a" size={iconSize} />
       ) : label ? (
         <Text style={styles.cardBackText}>{label}</Text>
       ) : null}

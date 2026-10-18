@@ -14,6 +14,9 @@ export type HistorySummary = {
   solvedCount: number
   incompleteCount: number
   activeCount: number
+  // Sum of vegas_score over finished rows (P2-C cumulative total; NULL rows = not a
+  // Vegas game and contribute nothing). Refreshed with the counts after every write.
+  vegasTotal: number
 }
 
 export type SolvableDealHistoryStats = {

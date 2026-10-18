@@ -16,6 +16,7 @@ import {
 } from '../../../../src/solitaire/klondike'
 import type { SolverHint } from '../../../../src/solitaire/solverBridge'
 import type { WarningMode } from '../../../../src/state/settings'
+import { card, createTestState, tableauWith } from '../../solitaire/helpers'
 
 // Hook-level tests for the F14 sticky dead era and the F15 hint × warning
 // decision table. The solver native module and the useful-move enumeration
@@ -612,6 +613,58 @@ describe('hint press × warning interplay (F15)', () => {
       jest.advanceTimersByTime(2500)
     })
     expect(hookResult.hintBubbleText).toBeNull()
+    driver.unmount()
+  })
+})
+
+// Vegas-rules games (scoring plan, round 3): hints AND warnings are off — no
+// solver call, no stuck heuristic, no bubble, in every warning mode. Rounds 1–2
+// fired a "Game over — result …" bubble from the pass-aware heuristic here; the
+// user dropped it (premature ends possible, the player decides when a casino
+// game is over). The Hint button is hidden by the caller on Vegas games.
+describe('Vegas-rules games (hints and warnings off)', () => {
+  // Draw 1 Vegas = no recycle at all; two unplayable stock cards.
+  const vegasState = (overrides: Partial<GameState> = {}) =>
+    createTestState({
+      drawCount: 1,
+      vegasRules: true,
+      stock: [card('clubs', 5), card('spades', 9)],
+      tableau: tableauWith([card('clubs', 2)], [card('spades', 4)]),
+      ...overrides,
+    })
+
+  it.each<WarningMode>(['noUsefulMoves', 'unwinnable'])(
+    'mode %s: no evaluation and no bubble, even stuck at the end of the last pass',
+    async (warningMode) => {
+      solverResponds('unsolvable')
+      hasUsefulMove.mockReturnValue(false)
+      const driver = setup({ warningMode, state: vegasState() })
+
+      drawUntilStockEmpty(driver)
+      await driver.settle()
+      // A refused recycle tap is a reducer no-op; still nothing.
+      driver.draw()
+      await driver.settle()
+
+      expect(solvePosition).not.toHaveBeenCalled()
+      expect(hasUsefulMove).not.toHaveBeenCalled()
+      expect(hookResult.hintBubbleText).toBeNull()
+      expect(announceSpy).not.toHaveBeenCalled()
+      driver.unmount()
+    }
+  )
+
+  it('a Standard game in the same position still warns (the gate is the game\'s rule, not the setting)', async () => {
+    solverResponds('unsolvable')
+    hasUsefulMove.mockReturnValue(false)
+    const driver = setup({
+      warningMode: 'noUsefulMoves',
+      state: vegasState({ vegasRules: false }),
+    })
+    drawUntilStockEmpty(driver)
+    await driver.settle()
+    expect(solvePosition).toHaveBeenCalledTimes(1)
+    expect(hookResult.hintBubbleText).toBe(STUCK_BUBBLE_TEXT)
     driver.unmount()
   })
 })

@@ -52,6 +52,11 @@ export type HistoryEntry = {
   durationMs: number | null
   preview: HistoryPreview
   status: HistoryEntryStatus
+  // Scoring: BOTH tallies recorded at game end regardless of the Scoring setting
+  // (display-only setting; the history row shows whichever is active). null on
+  // active rows and on rows written before scoring existed.
+  standardScore: number | null
+  vegasScore: number | null
 }
 
 export type RecordGameResultInput = {
@@ -65,6 +70,8 @@ export type RecordGameResultInput = {
   // null is allowed so active rows can explicitly carry "no duration yet"
   // (createEntry stores non-numbers as null either way, but the type makes it visible).
   durationMs?: number | null
+  standardScore?: number | null
+  vegasScore?: number | null
   preview: HistoryPreview
   displayName?: string
   status?: HistoryEntryStatus
@@ -79,6 +86,8 @@ export type UpdateEntryInput = {
   status?: HistoryEntryStatus
   moves?: number
   durationMs?: number
+  standardScore?: number
+  vegasScore?: number
   finishedAt?: string | Date | null
   preview?: HistoryPreview
   // undefined = leave the stored move log untouched; null = clear; value = write.
@@ -119,6 +128,8 @@ type HistoryContextValue = {
   totalCount: number
   solvedCount: number
   incompleteCount: number
+  // Settled Vegas sum over finished rows (P2-C); the HUD adds the live game.
+  vegasTotal: number
   solvableStats: ReadonlyMap<string, SolvableHistoryStat>
   hasMore: boolean
   loadingMore: boolean
@@ -141,6 +152,7 @@ const EMPTY_HISTORY_SUMMARY: HistorySummary = {
   solvedCount: 0,
   incompleteCount: 0,
   activeCount: 0,
+  vegasTotal: 0,
 }
 
 export const HistoryProvider = ({ children }: PropsWithChildren) => {
@@ -299,10 +311,23 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
             devLog('warn', `[history] Attempted to update non-existent entry: ${id}`)
             return
           }
-          await updateHistoryEntry(
-            applyHistoryEntryUpdates(persisted, updates),
-            updates.moveLog
-          )
+          const updated = applyHistoryEntryUpdates(persisted, updates)
+          await updateHistoryEntry(updated, updates.moveLog)
+          // G8 (scoring plan): the row can page in between queueing and running —
+          // typically a game result written BEFORE history hydration finished (a
+          // relaunch whose auto-complete wins within ~35 ms): the initial page read
+          // precedes this write (writes wait for `ready`), so the loaded copy is
+          // stale (still 'active', no score) and the History tab / TOTAL badge
+          // would never see the result. Replace it in place; a row that is still
+          // not loaded is genuinely paged out and stays DB-only (merging it in
+          // would shift loadMore's offset).
+          if (mountedRef.current && entriesRef.current.some((entry) => entry.id === id)) {
+            const next = entriesRef.current.map((entry) =>
+              entry.id === id ? updated : entry
+            )
+            entriesRef.current = next
+            setEntries(next)
+          }
         })
         return
       }
@@ -400,6 +425,7 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
       totalCount: summary.totalCount,
       solvedCount: summary.solvedCount,
       incompleteCount: summary.incompleteCount,
+      vegasTotal: summary.vegasTotal,
       solvableStats,
       hasMore,
       loadingMore,
@@ -499,6 +525,8 @@ const createEntry = (input: RecordGameResultInput): HistoryEntry => {
     durationMs: typeof input.durationMs === 'number' ? input.durationMs : null,
     preview,
     status,
+    standardScore: typeof input.standardScore === 'number' ? input.standardScore : null,
+    vegasScore: typeof input.vegasScore === 'number' ? input.vegasScore : null,
   }
 }
 
@@ -521,6 +549,8 @@ function applyHistoryEntryUpdates(
     status: updates.status ?? existing.status,
     moves: updates.moves ?? existing.moves,
     durationMs: updates.durationMs ?? existing.durationMs,
+    standardScore: updates.standardScore ?? existing.standardScore,
+    vegasScore: updates.vegasScore ?? existing.vegasScore,
     finishedAt,
     preview: updates.preview ?? existing.preview,
   }
@@ -621,6 +651,8 @@ export const normalizeHistoryEntry = (entry: HistoryEntry): HistoryEntry => {
     finishedAt,
     moves: typeof entry.moves === 'number' ? entry.moves : null,
     durationMs: typeof entry.durationMs === 'number' ? entry.durationMs : null,
+    standardScore: typeof entry.standardScore === 'number' ? entry.standardScore : null,
+    vegasScore: typeof entry.vegasScore === 'number' ? entry.vegasScore : null,
     drawCount,
     solvableForDrawCount,
     status,

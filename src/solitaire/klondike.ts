@@ -16,6 +16,14 @@ import {
   DEMO_EXACT_DEAL_ID,
   DEMO_STOCK_ORDER,
 } from './demoDeal'
+import {
+  INITIAL_SCORE,
+  addScore,
+  canRecycle,
+  scoreMove,
+  scoreRecycle,
+  type ScoreTally,
+} from './scoring'
 
 // Display order for the foundation row (hearts first); the canonical deck order
 // (clubs → spades) lives in dealIdentity's DEAL_SUITS/DEAL_RANKS, which are also
@@ -71,6 +79,13 @@ export type MoveTarget =
 // logs replay through this exact reducer, and a version mismatch makes load fall
 // back to the stored final snapshot instead of replaying with drifted rules.
 // See docs/product/move-log-persistence/move-log-persistence-and-resumable-history.md
+// Scoring (2026-10-11) added score/stockPasses to GameSnapshot WITHOUT a bump: the
+// tallies are derived from the same actions and change neither move legality nor
+// history/future depth, so old logs replay identically (and gain their scores).
+// Vegas pass limits (2026-10-12) also need NO bump: a refused recycle is a reducer
+// no-op (no log entry, no history push), the limit only applies when the deal
+// carries vegasRules, and every stored log comes from an unlimited game
+// (vegasRules defaults to false on old payloads) — proven by a replay test.
 export const MOVE_LOG_VERSION = 1
 
 // Terse keys (k/sel/tgt) keep a ~300-move log at ~15–25 KB serialized.
@@ -102,6 +117,19 @@ export interface GameSnapshot {
   exactId: string
   deckChecksum: string
   drawCount: DrawCount
+  // Scoring: both tallies live on the snapshot (like moveCount) so undo/scrub/
+  // persistence/replay restore them for free; the setting only picks the display.
+  // Unlike moveCount, undo DOES revert the score (see handleUndo).
+  score: ScoreTally
+  // Waste→stock recycles so far (Standard's Draw-3 rule charges from the 3rd on;
+  // Vegas-rules games may recycle at most drawCount − 1 times).
+  stockPasses: number
+  // Vegas rules (pass limit = drawCount) — copied from the Scoring setting at deal
+  // time, like drawCount: active games never read the global setting, so flipping
+  // Scoring mid-game applies to the NEXT deal (draw-count precedent; nothing
+  // destructive from a settings tap). The limit itself is derived from drawCount
+  // (scoring.ts recyclesAllowed), so the two can never disagree.
+  vegasRules: boolean
 }
 
 export interface GameState extends GameSnapshot {
@@ -198,6 +226,9 @@ const createExactDealIdentity = (
 type CreateGameStateFromExactIdOptions = {
   revealInitialWaste?: boolean
   autoUpEnabled?: boolean
+  // Default false: demo/fixture replays and old persisted payloads are unlimited
+  // games; only player-facing deals pass the Scoring setting through.
+  vegasRules?: boolean
 }
 
 export const createGameStateFromExactId = (
@@ -227,6 +258,9 @@ export const createGameStateFromExactId = (
     winCelebrations: 0,
     ...dealIdentity,
     drawCount: normalizedDrawCount,
+    score: INITIAL_SCORE,
+    stockPasses: 0,
+    vegasRules: options.vegasRules === true,
   }
 
   return {
@@ -244,11 +278,16 @@ export const createGameStateFromExactId = (
 }
 
 export const createInitialState = (
-  drawCount: DrawCount = DEFAULT_DRAW_COUNT
+  drawCount: DrawCount = DEFAULT_DRAW_COUNT,
+  vegasRules = false
 ): GameState => {
   const exactId = createRandomExactDealId()
-  return createGameStateFromExactId(exactId, drawCount)
+  return createGameStateFromExactId(exactId, drawCount, { vegasRules })
 }
+
+// No vegasRules argument on purpose: the solvable catalog is proven for UNLIMITED
+// passes only, so Vegas-rules deals never come from it (useKlondikeGame deals a
+// random game instead — an honest casino deal).
 
 export const createSolvableGameState = (
   deal: SolvableDealV2,
@@ -321,6 +360,9 @@ export const createDemoGameState = (
     exactId: DEMO_EXACT_DEAL_ID,
     deckChecksum: DEMO_DECK_CHECKSUM,
     drawCount,
+    score: INITIAL_SCORE,
+    stockPasses: 0,
+    vegasRules: false,
   }
 
   return {
@@ -405,6 +447,11 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
         // Defensive defaults: hydrated states predating the move log carry neither field.
         moveLog: action.state.moveLog ?? [],
         initialWasteRevealed: action.state.initialWasteRevealed ?? true,
+        // Pre-scoring states (saved before 2026-10-11) carry neither score field;
+        // pre-Phase-2 states (before 2026-10-12) carry no vegasRules = unlimited.
+        score: action.state.score ?? INITIAL_SCORE,
+        stockPasses: action.state.stockPasses ?? 0,
+        vegasRules: action.state.vegasRules ?? false,
       }
       // If hydration flips Auto Up relative to the incoming state (the settings value
       // can change between app runs), log the flip: replay derives the deal-time
@@ -652,11 +699,16 @@ const drawFromStock = (
   }
 }
 
+// ONE enforcement point for the Vegas pass limit: every recycle (player tap via
+// drawFromStock, planAutoActions, advanceAutoQueue) goes through here, and a
+// refused recycle returns `state` unchanged — the reducer then logs nothing, pushes
+// no undo snapshot and bumps no moveCount (DRAW_OR_RECYCLE skips the log entry
+// when nextState === workingState). canRecycle also covers the empty-waste case.
 const recycleWasteToStock = (
   state: GameState,
   options: { recordHistory?: boolean } = {}
 ): GameState => {
-  if (!state.waste.length) {
+  if (!canRecycle(state)) {
     return state
   }
 
@@ -675,6 +727,11 @@ const recycleWasteToStock = (
     future: history === state.history ? state.future : [],
     selected: null,
     moveCount: state.moveCount + 1,
+    stockPasses: state.stockPasses + 1,
+    score: addScore(
+      state.score,
+      scoreRecycle({ drawCount: state.drawCount, recyclesSoFar: state.stockPasses })
+    ),
   }
 }
 
@@ -878,6 +935,12 @@ const applyMove = (
     }
   }
 
+  // A flip happened iff the card left under the moved stack was face-down before
+  // the move (read off the PRE-move state, so no plumbing through extractMovingCards).
+  const flipped =
+    selection.source === 'tableau' &&
+    state.tableau[selection.columnIndex][selection.cardIndex - 1]?.faceUp === false
+
   return {
     ...state,
     tableau: nextTableau,
@@ -887,6 +950,10 @@ const applyMove = (
     future: history === state.history ? state.future : [],
     selected: null,
     moveCount: state.moveCount + 1,
+    score: addScore(
+      state.score,
+      scoreMove({ source: selection.source, targetType: target.type, flipped })
+    ),
   }
 }
 
@@ -1087,13 +1154,16 @@ const planAutoActions = (state: GameState): AutoAction[] => {
     }
 
     if (!workingState.stock.length) {
-      if (workingState.waste.length) {
-        workingState = recycleWasteToStock(workingState, { recordHistory: false })
-        planned.push({ type: 'recycle' })
-        steps += 1
-        continue
+      const recycled = recycleWasteToStock(workingState, { recordHistory: false })
+      // Unchanged = empty waste OR no Vegas pass left: the run stops here, so a
+      // Vegas auto-complete can legitimately end with cards stuck in the waste.
+      if (recycled === workingState) {
+        break
       }
-      break
+      workingState = recycled
+      planned.push({ type: 'recycle' })
+      steps += 1
+      continue
     }
 
     workingState = drawFromStock(workingState, {
@@ -1438,6 +1508,9 @@ export const snapshotFromState = (state: GameState): GameSnapshot => ({
   exactId: state.exactId,
   deckChecksum: state.deckChecksum,
   drawCount: state.drawCount,
+  score: state.score,
+  stockPasses: state.stockPasses,
+  vegasRules: state.vegasRules,
 })
 
 // Deep clone of a snapshot's board. Used by the undo/scrub restores (spread over the
@@ -1459,6 +1532,12 @@ export const cloneSnapshot = (snapshot: GameSnapshot): GameSnapshot => ({
   exactId: snapshot.exactId,
   deckChecksum: snapshot.deckChecksum,
   drawCount: normalizeDrawCount(snapshot.drawCount),
+  // Defaults cover persisted snapshots written before scoring existed (the
+  // snapshot-fallback load path spreads this straight into the live state).
+  score: snapshot.score ?? INITIAL_SCORE,
+  stockPasses: snapshot.stockPasses ?? 0,
+  // Pre-Phase-2 snapshots: unlimited game.
+  vegasRules: snapshot.vegasRules ?? false,
 })
 
 const cloneCards = (cards: Card[]): Card[] => cards.map((card) => ({ ...card }))

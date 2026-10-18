@@ -13,8 +13,10 @@ import {
 import type { CardMetrics, DropHints } from '../../types'
 import {
   STOCK_EMPTY_LABEL,
-  STOCK_RECYCLE_LABEL,
+  STOCK_EXHAUSTED_LABEL,
   STOCK_RECYCLE_TEST_ID,
+  formatRecyclesLeft,
+  getStockRecycleLabel,
 } from './accessibility'
 import { EmptySlot, CardBack } from './CardVisual'
 import { PileButton } from './PileButton'
@@ -56,6 +58,9 @@ export type TopRowProps = {
   // skip re-renders when the relevant pieces kept identity (e.g. TIMER_TICK).
   stockCount: number
   wasteCount: number
+  // Recycles the game still has (scoring.ts recyclesLeft): Infinity on unlimited
+  // games; a finite value shows "N left" on the recycle card and 0 = exhausted.
+  recyclesLeft: number
   foundations: Foundations
   selected: Selection | null
   hasWon: boolean
@@ -77,6 +82,7 @@ export const TopRow = React.memo(
   ({
     stockCount,
     wasteCount,
+    recyclesLeft,
     foundations,
     selected,
     hasWon,
@@ -107,13 +113,18 @@ export const TopRow = React.memo(
       [onFoundationLayout]
     )
 
-    const stockDisabled = (!stockCount && !wasteCount) || interactionsLocked
     const showRecycle = !stockCount && wasteCount > 0
-    const drawVariant: 'stock' | 'recycle' | 'empty' = showRecycle
-      ? 'recycle'
-      : stockCount
-        ? 'stock'
-        : 'empty'
+    // Vegas pass limits: a recycle slot with no pass left is the 'exhausted' mark —
+    // disabled, so a tap never reaches the reducer (which would refuse it anyway).
+    const exhausted = showRecycle && recyclesLeft === 0
+    const stockDisabled = (!stockCount && !wasteCount) || exhausted || interactionsLocked
+    const drawVariant: 'stock' | 'recycle' | 'empty' | 'exhausted' = exhausted
+      ? 'exhausted'
+      : showRecycle
+        ? 'recycle'
+        : stockCount
+          ? 'stock'
+          : 'empty'
     // Task 28-2: Keep the board stable until the final winning card finishes settling.
     const showWinCleanup = hasWon && !celebrationPending
 
@@ -220,10 +231,12 @@ export const TopRow = React.memo(
                     // a11y node); only recycle/empty states are labeled here.
                     accessibilityLabel={
                       drawVariant === 'recycle'
-                        ? STOCK_RECYCLE_LABEL
-                        : drawVariant === 'empty'
-                          ? STOCK_EMPTY_LABEL
-                          : undefined
+                        ? getStockRecycleLabel(recyclesLeft)
+                        : drawVariant === 'exhausted'
+                          ? STOCK_EXHAUSTED_LABEL
+                          : drawVariant === 'empty'
+                            ? STOCK_EMPTY_LABEL
+                            : undefined
                     }
                     testID={STOCK_RECYCLE_TEST_ID}
                   >
@@ -249,6 +262,11 @@ export const TopRow = React.memo(
                     ) : (
                       <CardBack
                         label={stockCount ? drawLabel : undefined}
+                        caption={
+                          drawVariant === 'recycle' && Number.isFinite(recyclesLeft)
+                            ? formatRecyclesLeft(recyclesLeft)
+                            : undefined
+                        }
                         metrics={cardMetrics}
                         variant={drawVariant}
                       />

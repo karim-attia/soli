@@ -30,12 +30,34 @@ type AnimationPreferences = {
 
 export type AnimationPreferenceKey = Exclude<keyof AnimationPreferences, 'master'>
 
+// Scoring (docs/product/scoring/scoring.md): ONE picker Off / Standard / Vegas,
+// default Off (user: scoring as a whole is opt-in). Off/Standard are display-
+// only (the reducer always computes both tallies). Vegas is a RULES mode since
+// Phase 2 (pass limit = draw count) and, like the draw count, is copied onto the
+// game at deal time — so the picker applies to the NEXT game; the HUD keeps
+// showing the current game's honest tally (StatisticsHud badge rule).
+export const SCORING_MODES = ['off', 'standard', 'vegas'] as const
+export type ScoringMode = (typeof SCORING_MODES)[number]
+
 type StatisticsPreferences = {
   showMoves: boolean
   showTime: boolean
+  scoring: ScoringMode
+  // Cumulative Vegas total (P2-C): "Keep Vegas total" switch + the settled history
+  // sum at the last reset. The total itself is DERIVED (history rows' vegas_score −
+  // offset + live game), never stored; the offset lives here rather than in its
+  // own kv module because it is one number that travels with the switch
+  // (simplification, round 2 — see plan § P-H for the offset-vs-timestamp choice).
+  vegasTotal: boolean
+  vegasTotalOffset: number
 }
 
-export type StatisticsPreferenceKey = keyof StatisticsPreferences
+// The boolean switches rendered as plain rows in the Statistics section; the
+// Vegas fields have their own setters.
+export type StatisticsPreferenceKey = Exclude<
+  keyof StatisticsPreferences,
+  'scoring' | 'vegasTotal' | 'vegasTotalOffset'
+>
 
 // Warning model (hints plan, F14, 2026-07-24): ONE select instead of the two
 // F11 warning toggles. The two warnings are a strictness ladder (the classic
@@ -79,6 +101,10 @@ type SettingsContextValue = {
   setHintButtonEnabled: (enabled: boolean) => void
   setDeveloperMode: (enabled: boolean) => void
   setStatisticsPreference: (key: StatisticsPreferenceKey, enabled: boolean) => void
+  setScoringMode: (mode: ScoringMode) => void
+  setVegasTotalEnabled: (enabled: boolean) => void
+  // "Reset Vegas total": pass the currently settled history sum.
+  setVegasTotalOffset: (offset: number) => void
 }
 
 // Renamed from '@soli/settings/v1' at the 1.0 reset — the `@` was an AsyncStorage-era
@@ -108,6 +134,9 @@ export const DEFAULT_SETTINGS: SettingsState = {
   statistics: {
     showMoves: true,
     showTime: true,
+    scoring: 'off',
+    vegasTotal: false,
+    vegasTotalOffset: 0,
   },
 }
 
@@ -163,7 +192,8 @@ export const warningModePreference: {
   options: Array<{ value: WarningMode; label: string }>
 } = {
   label: 'Warnings',
-  // One line explaining the strictness ladder between the two modes.
+  // One line explaining the strictness ladder between the two modes. Warnings
+  // are off in Vegas games (useHint); the Scoring row says so, not this one.
   description:
     "Warn when you run out of useful moves, or as soon as the game can't be won anymore.",
   options: [
@@ -171,6 +201,45 @@ export const warningModePreference: {
     { value: 'noUsefulMoves', label: 'No more useful moves' },
     { value: 'unwinnable', label: 'Unwinnable game' },
   ],
+}
+
+// Rendered as a picker row with a description (like warningModePreference).
+// The description SWITCHES with the value — once Vegas is picked it says ONLY
+// what is switched off and when it applies (user, prompt 6: the round-2 version
+// "explained the whole thing" — $52, $5 per card, limited passes — and that was
+// too much); otherwise one plain line. Forbidden words: solver, catalog,
+// heuristic.
+export const scoringPreference: {
+  label: string
+  description: string
+  vegasDescription: string
+  options: Array<{ value: ScoringMode; label: string }>
+} = {
+  label: 'Scoring',
+  description: 'Standard points or Vegas dollars. Applies to your next game.',
+  vegasDescription:
+    'Hints, warnings and solvable deals are off in Vegas. Applies to your next game.',
+  options: [
+    { value: 'off', label: 'Off' },
+    { value: 'standard', label: 'Standard' },
+    { value: 'vegas', label: 'Vegas' },
+  ],
+}
+
+// "Keep Vegas total" switch (P2-C), shown under the Scoring picker only while
+// Vegas is selected; the reset row sits under it while the switch is on.
+// Copy made MORE explicit in round 3 (user, prompt 6: "wonder what you mean,
+// please explain better" — the opposite of the Scoring row, which got shorter):
+// say what carries over, where it shows, and what a reset does to the game on
+// the board.
+export const vegasTotalPreference = {
+  label: 'Keep Vegas total',
+  description:
+    'Carry your balance from game to game. The header then shows your running total instead of this game’s result.',
+  resetLabel: 'Reset Vegas total',
+  resetTitle: 'Reset Vegas total?',
+  resetMessage:
+    'Your running total starts again from $0. The game on the board still counts.',
 }
 
 export const statisticsPreferenceDescriptors: Array<{
@@ -342,6 +411,33 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     []
   )
 
+  const setScoringMode = useCallback((mode: ScoringMode) => {
+    setState((previous) =>
+      previous.statistics.scoring === mode
+        ? previous
+        : { ...previous, statistics: { ...previous.statistics, scoring: mode } }
+    )
+  }, [])
+
+  const setVegasTotalEnabled = useCallback((enabled: boolean) => {
+    setState((previous) =>
+      previous.statistics.vegasTotal === enabled
+        ? previous
+        : { ...previous, statistics: { ...previous.statistics, vegasTotal: enabled } }
+    )
+  }, [])
+
+  const setVegasTotalOffset = useCallback((offset: number) => {
+    setState((previous) =>
+      previous.statistics.vegasTotalOffset === offset
+        ? previous
+        : {
+            ...previous,
+            statistics: { ...previous.statistics, vegasTotalOffset: offset },
+          }
+    )
+  }, [])
+
   useEffect(() => {
     setDeveloperLoggingEnabled(state.developerMode)
   }, [state.developerMode])
@@ -358,11 +454,17 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
       setHintButtonEnabled,
       setDeveloperMode,
       setStatisticsPreference,
+      setScoringMode,
+      setVegasTotalEnabled,
+      setVegasTotalOffset,
     }),
     [
       setAnimationPreference,
       setGlobalAnimationsEnabled,
       setStatisticsPreference,
+      setScoringMode,
+      setVegasTotalEnabled,
+      setVegasTotalOffset,
       setAutoUpEnabled,
       setWarningMode,
       setHintButtonEnabled,
@@ -494,9 +596,19 @@ export const mergeSettings = (
     statistics: {
       showMoves: getBoolean(statistics.showMoves, current.statistics.showMoves),
       showTime: getBoolean(statistics.showTime, current.statistics.showTime),
+      // Pre-scoring payloads (and junk strings) land on the current/default mode.
+      scoring: parseScoringMode(statistics.scoring) ?? current.statistics.scoring,
+      vegasTotal: getBoolean(statistics.vegasTotal, current.statistics.vegasTotal),
+      vegasTotalOffset: getInteger(
+        statistics.vegasTotalOffset,
+        current.statistics.vegasTotalOffset
+      ),
     },
   }
 }
+
+const getInteger = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isInteger(value) ? value : fallback
 
 const getBoolean = (value: unknown, fallback: boolean): boolean =>
   typeof value === 'boolean' ? value : fallback
@@ -504,4 +616,9 @@ const getBoolean = (value: unknown, fallback: boolean): boolean =>
 const parseWarningMode = (value: unknown): WarningMode | null =>
   typeof value === 'string' && (WARNING_MODES as readonly string[]).includes(value)
     ? (value as WarningMode)
+    : null
+
+export const parseScoringMode = (value: unknown): ScoringMode | null =>
+  typeof value === 'string' && (SCORING_MODES as readonly string[]).includes(value)
+    ? (value as ScoringMode)
     : null

@@ -47,6 +47,19 @@ export const getStockLabel = (stockCount: number): string =>
 
 export const STOCK_RECYCLE_LABEL = 'Recycle waste into stock'
 export const STOCK_EMPTY_LABEL = 'Stock, empty'
+// Vegas pass limits (scoring plan, Phase 2): the recycle slot says how many
+// recycles remain on a limited game; once none is left the slot is disabled and
+// reads as exhausted (same testID as the recycle slot so device recipes resolve it).
+export const STOCK_EXHAUSTED_LABEL = 'Stock, no passes left'
+
+// Infinity = unlimited game → the plain recycle label.
+export const getStockRecycleLabel = (recyclesLeft: number): string =>
+  Number.isFinite(recyclesLeft)
+    ? `${STOCK_RECYCLE_LABEL}, ${formatRecyclesLeft(recyclesLeft)}`
+    : STOCK_RECYCLE_LABEL
+
+// Also the caption printed on the recycle card back ("2 left").
+export const formatRecyclesLeft = (recyclesLeft: number): string => `${recyclesLeft} left`
 
 export const getWasteLabel = (topCard: CardIdentity): string =>
   `Waste, ${getCardAccessibilityLabel(topCard)}`

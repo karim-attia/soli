@@ -97,6 +97,14 @@ export const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
   },
+  // "N left" under the recycle icon (Vegas pass limits); dark like the icon so it
+  // reads on the felt through the transparent outline card.
+  cardBackCaption: {
+    color: '#0f172a',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
   stockContainer: {
     position: 'relative',
     justifyContent: 'center',

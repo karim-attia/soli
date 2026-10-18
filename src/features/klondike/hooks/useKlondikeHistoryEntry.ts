@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Dispatch, MutableRefObject } from 'react'
 
 import { MOVE_LOG_VERSION } from '../../../solitaire/klondike'
@@ -27,6 +27,24 @@ export const moveLogForGameRecord = (
     ? null
     : { version: MOVE_LOG_VERSION, entries: state.moveLog }
 
+// Scores written at game end (solved AND incomplete — a Vegas loss is a meaningful
+// number). Standard is always honest (same point table, at most stricter rules), so
+// every game records it. Vegas is recorded ONLY for Vegas-rules games: an unlimited
+// game has no honest Vegas number (the player used passes a casino would not sell),
+// and `vegas_score IS NOT NULL` doubles as "played under Vegas rules" — no schema
+// change (plan § Phase 2, P-F). EVERY Vegas deal is charged, zero-move abandons
+// included (user decision round 2 / prompt 5: "in the casino it costs you" —
+// exempting them would let players re-deal until aces show). The earlier
+// zero-move exemption (PySolFC-style) was deliberately reversed; the row then
+// shows "Vegas −$52" and the cumulative total counts it.
+// Exported for unit tests.
+export const scoresForGameRecord = (
+  state: Pick<GameState, 'score' | 'vegasRules'>
+): { standardScore: number; vegasScore: number | undefined } => ({
+  standardScore: state.score.standard,
+  vegasScore: state.vegasRules ? state.score.vegas : undefined,
+})
+
 type UseKlondikeHistoryEntryParams = {
   state: GameState
   stateRef: MutableRefObject<GameState>
@@ -52,6 +70,17 @@ export type UseKlondikeHistoryEntryResult = {
   recordCurrentGameResult: (options?: { solved?: boolean }) => void
   clearCurrentGameEntryLink: () => void
   flushPendingSolvedResultAfterHandoff: () => void
+  // History row of the game on the board (P2-C cumulative total). Unlike
+  // currentGameEntryIdRef (nulled the moment a result is recorded, so the next
+  // deal creates a fresh row), this stays set across the win → Deal Again window
+  // so the HUD can tell "this game's row is already settled" from the in-memory
+  // entries. null for fixtures that never got a row (demo playback).
+  // Invariant (G8): whichever row RECEIVES the board game's result becomes
+  // boardEntryId — set by the write itself (recordCurrentGameResult), not only by
+  // the hydration/deal effects. A result can be written before the hydration
+  // effect ever links the row (relaunch + auto-complete win), and a row that is
+  // scored but unlinked would be counted twice (settled sum + live tally).
+  boardEntryId: string | null
 }
 
 // A1 extraction: owns the active history-entry lifecycle for the Klondike screen —
@@ -83,6 +112,7 @@ export const useKlondikeHistoryEntry = ({
   // it was removed in the A1 extraction because nothing ever read it — the fallback
   // path recomputes the preview from history[0] instead.)
   const currentDisplayNameRef = useRef(formatDealDisplayName(state.exactId))
+  const [boardEntryId, setBoardEntryId] = useState<string | null>(null)
   const pendingSolvedResultRef = useRef(false)
   const pendingSolvedResultTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -104,6 +134,7 @@ export const useKlondikeHistoryEntry = ({
         createStartedHistoryEntryInputFromState(nextState, { ...options, displayName })
       )
       currentGameEntryIdRef.current = entryId
+      setBoardEntryId(entryId)
       return entryId
     },
     [currentGameEntryIdRef, recordResult]
@@ -139,6 +170,7 @@ export const useKlondikeHistoryEntry = ({
         if (linked.status !== 'active') {
           updateEntry(entryId, { status: 'active', solved: false, finishedAt: null })
         }
+        setBoardEntryId(entryId)
         return
       }
     }
@@ -151,6 +183,7 @@ export const useKlondikeHistoryEntry = ({
     )
     if (matchingActive) {
       currentGameEntryIdRef.current = matchingActive.id
+      setBoardEntryId(matchingActive.id)
       return
     }
 
@@ -198,6 +231,10 @@ export const useKlondikeHistoryEntry = ({
         status,
         moves: currentState.moveCount,
         durationMs: elapsedForRecord,
+        // Scoring: see scoresForGameRecord — the Scoring SETTING never decides what
+        // is recorded (it only picks what the history row shows); the game's own
+        // rules do.
+        ...scoresForGameRecord(currentState),
         finishedAt,
         // Move-log persistence: game boundaries are the only history writes that
         // carry the log (kv payload covers the live session). Demo playback never
@@ -207,17 +244,24 @@ export const useKlondikeHistoryEntry = ({
       } as const
 
       // If we have a tracked entry ID, update it; otherwise find or create one.
+      // Every branch below also publishes the written row as boardEntryId (G8
+      // invariant, see the result type): the HUD's "already settled" check must
+      // follow the WRITE, whatever the effect ordering around it.
       if (currentGameEntryIdRef.current) {
-        updateEntry(currentGameEntryIdRef.current, {
+        const entryId = currentGameEntryIdRef.current
+        updateEntry(entryId, {
           ...resultFields,
           // Task 10-7: Never overwrite preview on completion; it must remain the start snapshot.
         })
         currentGameEntryIdRef.current = null
+        setBoardEntryId(entryId)
         return
       }
 
-      // No tracked entry - only record if there's been meaningful play
-      if (!solved && currentState.moveCount === 0) {
+      // No tracked entry - only record if there's been meaningful play. A
+      // Vegas-rules deal is always recorded: the deck was bought (−$52) even at
+      // zero moves (round 2, see scoresForGameRecord).
+      if (!solved && currentState.moveCount === 0 && !currentState.vegasRules) {
         return
       }
 
@@ -231,6 +275,7 @@ export const useKlondikeHistoryEntry = ({
       )
       if (matchingActive) {
         updateEntry(matchingActive.id, resultFields)
+        setBoardEntryId(matchingActive.id)
         return
       }
 
@@ -245,6 +290,14 @@ export const useKlondikeHistoryEntry = ({
       // *which* row is written, never *what* is written.
       const displayName = currentDisplayNameRef.current
       const recordCalledAt = new Date().toISOString()
+      // Late completion: the board may already show the NEXT game (its row linked
+      // synchronously by recordStartedGame) — then the written row is history, not
+      // the board's, and boardEntryId must stay on the new game.
+      const publishBoardRow = (entryId: string) => {
+        if (currentGameEntryIdRef.current === null) {
+          setBoardEntryId(entryId)
+        }
+      }
       void (async () => {
         try {
           const activeEntry = await getActiveEntry()
@@ -259,6 +312,7 @@ export const useKlondikeHistoryEntry = ({
             activeEntry.startedAt <= recordCalledAt
           ) {
             updateEntry(activeEntry.id, resultFields)
+            publishBoardRow(activeEntry.id)
             return
           }
         } catch (error) {
@@ -269,16 +323,18 @@ export const useKlondikeHistoryEntry = ({
           )
         }
 
-        recordResult({
-          exactId: currentState.exactId,
-          deckChecksum: currentState.deckChecksum,
-          drawCount: currentState.drawCount,
-          startedAt: new Date().toISOString(), // Best approximation when no tracked entry
-          // Task 10-7: Prefer the game start snapshot for history preview (sheet shows start state).
-          preview: createHistoryPreviewFromState(currentState.history[0] ?? currentState),
-          displayName,
-          ...resultFields,
-        })
+        publishBoardRow(
+          recordResult({
+            exactId: currentState.exactId,
+            deckChecksum: currentState.deckChecksum,
+            drawCount: currentState.drawCount,
+            startedAt: new Date().toISOString(), // Best approximation when no tracked entry
+            // Task 10-7: Prefer the game start snapshot for history preview (sheet shows start state).
+            preview: createHistoryPreviewFromState(currentState.history[0] ?? currentState),
+            displayName,
+            ...resultFields,
+          })
+        )
       })()
     },
     [
@@ -382,5 +438,6 @@ export const useKlondikeHistoryEntry = ({
     recordCurrentGameResult,
     clearCurrentGameEntryLink,
     flushPendingSolvedResultAfterHandoff,
+    boardEntryId,
   }
 }

@@ -41,6 +41,25 @@ describe('parseSettingsLinkParam', () => {
     ])
   })
 
+  it('parses the scoring key (case-insensitive) and rejects unknown modes', () => {
+    expect(parseSettingsLinkParam('scoring:vegas').scoring).toBe('vegas')
+    expect(parseSettingsLinkParam('scoring:Standard').scoring).toBe('standard')
+    expect(parseSettingsLinkParam('scoring:off').scoring).toBe('off')
+    expect(parseSettingsLinkParam('scoring:casino')).toEqual({
+      warningUpdates: [],
+      ignoredPairs: ['scoring:casino'],
+    })
+  })
+
+  it('parses the vegasTotal switch (P2-C) like the other booleans', () => {
+    expect(parseSettingsLinkParam('vegasTotal:on').vegasTotal).toBe(true)
+    expect(parseSettingsLinkParam('VegasTotal:off').vegasTotal).toBe(false)
+    expect(parseSettingsLinkParam('vegasTotal:maybe')).toEqual({
+      warningUpdates: [],
+      ignoredPairs: ['vegasTotal:maybe'],
+    })
+  })
+
   it('rejects unknown warnings values', () => {
     expect(parseSettingsLinkParam('warnings:loud')).toEqual({
       warningUpdates: [],

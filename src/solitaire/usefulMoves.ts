@@ -17,11 +17,15 @@
 //   5. partial-run splits, only when the card they expose plays to a
 //      foundation right now (PySolFC step020 — cuts the equal-rank-run false
 //      warnings without counting pure rearrangements)
-//   6. draw — exact reachable-stock simulation (draw 1–5, unlimited recycles)
+//   6. draw — exact reachable-stock simulation (draw 1–5, two passes)
 // Excluded on purpose, matching every classic app: foundation→tableau digs
 // and non-revealing rearrangements. The solver-proven unwinnable warning is
 // the separate, stronger feature; this heuristic is additionally CONFIRMED by
 // a solver call before the stuck warning ever shows (see useHint).
+// Unlimited recycles are assumed throughout: Vegas-rules games (pass limit =
+// draw count) never run this enumeration — hints and warnings are off there
+// (useHint). A pass-aware variant existed in rounds 1–2 of the scoring plan as
+// the Vegas game end and was removed with it (round 3).
 //
 // Everything here reads only face-up knowledge a player has (face-down cards
 // are never inspected — "we do not cheat"), stays allocation-light, and runs

@@ -10,7 +10,11 @@ import {
   type Suit,
 } from '../../../solitaire/klondike'
 import { isDrawCount, type DrawCount } from '../../../solitaire/drawCount'
-import type { WarningMode } from '../../../state/settings'
+import {
+  parseScoringMode,
+  type ScoringMode,
+  type WarningMode,
+} from '../../../state/settings'
 import { isExactDealId, parseExactDealId } from '../../../solitaire/dealIdentity'
 import type { ExactDealId } from '../../../solitaire/dealIdentity'
 import { CELEBRATION_MODE_METADATA } from '../../../animation/celebrationModes'
@@ -19,10 +23,14 @@ import {
   createDemoReplayGameState,
   createNearWinGameState,
   createScrubbedMidGameState,
+  createVegasDealGameState,
+  createVegasLastPassGameState,
+  createVegasNearWinGameState,
   getDemoUndoProbePlan,
   resolveDemoReplayAction,
   resolveNearWinMovesLeft,
   resolveScrubbedDemoOptions,
+  resolveVegasLastPassTapsLeft,
   type DemoAutoSolvePlaylistEntry,
 } from '../../../solitaire/demoReplay'
 import { getDemoAutoSolvePlaylist } from '../../../data/demoAutoSolvePlaylist'
@@ -30,7 +38,16 @@ import { setDemoProgress } from '../state/demoProgressStore'
 import { devLog } from '../../../utils/devLogger'
 
 type DispatchGameActionFn = (action: GameAction) => void
-export type DemoLaunchMode = 'old' | 'single' | 'playlist' | 'scrubbed' | 'nearwin'
+// 'vegas*' = the three Vegas-rules fixtures (scoring plan round 3; demoReplay.ts).
+export type DemoLaunchMode =
+  | 'old'
+  | 'single'
+  | 'playlist'
+  | 'scrubbed'
+  | 'nearwin'
+  | 'vegas'
+  | 'vegaslastpass'
+  | 'vegasnearwin'
 
 type UseDemoGameLauncherOptions = {
   stateRef: MutableRefObject<GameState>
@@ -67,6 +84,8 @@ type UseDemoGameLauncherOptions = {
   // mode (see resolveWarningLinkUpdate).
   setWarningMode: (mode: WarningMode | ((current: WarningMode) => WarningMode)) => void
   setHintButtonEnabled: (enabled: boolean) => void
+  setScoringMode: (mode: ScoringMode) => void
+  setVegasTotalEnabled: (enabled: boolean) => void
   resetUndoHintForTesting: () => void
   dealNewGameForTesting: () => void
   startGameFromExactDeal: (exactId: ExactDealId, drawCount?: DrawCount) => void
@@ -91,7 +110,10 @@ export type LaunchDemoGameOptions = {
   // 1 move left) that demoReplay tests + device-test card labels rely on.
   scrubbedSteps?: number
   scrubbedScrubIndex?: number
+  // Shared by 'nearwin' and 'vegasnearwin'.
   nearWinMovesLeft?: number
+  // 'vegaslastpass': stock taps left before the last pass is exhausted.
+  vegasLastPassTapsLeft?: number
   // Screenshot mode (store-screenshots round 2, named per Karim): suppresses the
   // force-launch dev-mode auto-enable below so a &screenshot=1 deep link leaves
   // developer mode OFF (no Demo header button in store shots).
@@ -182,6 +204,8 @@ export type SettingsLinkUpdates = {
   autoUp?: boolean
   solvableOnly?: boolean
   hintButton?: boolean
+  scoring?: ScoringMode
+  vegasTotal?: boolean
   warningUpdates: WarningLinkUpdate[]
   ignoredPairs: string[]
 }
@@ -243,13 +267,16 @@ export const parseSettingsLinkParam = (raw: string): SettingsLinkUpdates => {
         updates.drawCount = parsed
         return
       }
-    } else if (key === 'autoup' || key === 'solvableonly') {
+    } else if (key === 'autoup' || key === 'solvableonly' || key === 'vegastotal') {
       const parsed = parseOptionalBooleanParam(value)
       if (parsed !== null) {
         if (key === 'autoup') {
           updates.autoUp = parsed
-        } else {
+        } else if (key === 'solvableonly') {
           updates.solvableOnly = parsed
+        } else {
+          // `vegasTotal:on|off` = the "Keep Vegas total" switch (P2-C).
+          updates.vegasTotal = parsed
         }
         return
       }
@@ -267,6 +294,13 @@ export const parseSettingsLinkParam = (raw: string): SettingsLinkUpdates => {
         updates.warningUpdates.push({ set: mode })
         return
       }
+    } else if (key === 'scoring') {
+      // `scoring:off|standard|vegas` — the setting's own values, lowercased.
+      const mode = parseScoringMode((value ?? '').toLowerCase())
+      if (mode) {
+        updates.scoring = mode
+        return
+      }
     } else if (key === 'stuckwarning' || key === 'unwinnablewarning') {
       const parsed = parseOptionalBooleanParam(value)
       if (parsed !== null) {
@@ -282,6 +316,29 @@ export const parseSettingsLinkParam = (raw: string): SettingsLinkUpdates => {
   })
 
   return updates
+}
+
+// One switch for every deterministic fixture mode (everything except the
+// handcrafted 'old' board and the playlist runs). Throws only on fixture drift.
+const createDemoFixtureState = (
+  demoMode: Exclude<DemoLaunchMode, 'old' | 'single' | 'playlist'>,
+  options?: LaunchDemoGameOptions
+): GameState => {
+  switch (demoMode) {
+    case 'scrubbed':
+      return createScrubbedMidGameState({
+        steps: options?.scrubbedSteps,
+        scrubIndex: options?.scrubbedScrubIndex,
+      })
+    case 'nearwin':
+      return createNearWinGameState(options?.nearWinMovesLeft)
+    case 'vegas':
+      return createVegasDealGameState()
+    case 'vegaslastpass':
+      return createVegasLastPassGameState(options?.vegasLastPassTapsLeft)
+    case 'vegasnearwin':
+      return createVegasNearWinGameState(options?.nearWinMovesLeft)
+  }
 }
 
 export const useDemoGameLauncher = ({
@@ -307,6 +364,8 @@ export const useDemoGameLauncher = ({
   setSolvableGamesOnly,
   setWarningMode,
   setHintButtonEnabled,
+  setScoringMode,
+  setVegasTotalEnabled,
   resetUndoHintForTesting,
   dealNewGameForTesting,
   startGameFromExactDeal,
@@ -788,23 +847,19 @@ export const useDemoGameLauncher = ({
       clearPlaylistTimers()
       demoPlaybackActiveRef.current = false
 
-      if (demoMode === 'scrubbed' || demoMode === 'nearwin') {
-        // Deterministic replay fixtures, both with Auto Up OFF:
+      if (demoMode !== 'old') {
+        // Deterministic fixtures, all with Auto Up OFF:
         // - scrubbed (scrubber-test-automation): "far game, scrubbed to middle",
         //   40 undos + 40 redos by default, exact same board every launch; no
         //   auto-queue mutates depths underneath a test's assertions.
         // - nearwin (agent-testing-skill C5): solution replayed to N moves before
         //   completion, so an agent plays the final move(s) manually and gets a
         //   REAL win + celebration end-to-end.
+        // - vegas / vegaslastpass / vegasnearwin (scoring plan round 3): the
+        //   same, under Vegas rules — see demoReplay.ts.
         let fixtureState: GameState
         try {
-          fixtureState =
-            demoMode === 'nearwin'
-              ? createNearWinGameState(options?.nearWinMovesLeft)
-              : createScrubbedMidGameState({
-                  steps: options?.scrubbedSteps,
-                  scrubIndex: options?.scrubbedScrubIndex,
-                })
+          fixtureState = createDemoFixtureState(demoMode, options)
         } catch (error) {
           // Only reachable on fixture drift (regenerated playlist); fail loudly
           // instead of hydrating a corrupt board.
@@ -933,6 +988,12 @@ export const useDemoGameLauncher = ({
         if (updates.hintButton !== undefined) {
           setHintButtonEnabled(updates.hintButton)
         }
+        if (updates.scoring !== undefined) {
+          setScoringMode(updates.scoring)
+        }
+        if (updates.vegasTotal !== undefined) {
+          setVegasTotalEnabled(updates.vegasTotal)
+        }
         // Applied in link order through the functional setter so alias
         // semantics see the mode as earlier pairs left it.
         for (const update of updates.warningUpdates) {
@@ -943,6 +1004,8 @@ export const useDemoGameLauncher = ({
           autoUp: updates.autoUp,
           solvableOnly: updates.solvableOnly,
           hintButton: updates.hintButton,
+          scoring: updates.scoring,
+          vegasTotal: updates.vegasTotal,
           warningUpdates: updates.warningUpdates,
         })
         return
@@ -1070,6 +1133,14 @@ export const useDemoGameLauncher = ({
       const demoRequestsScrubbed = normalizedDemoParam === 'scrubbed'
       // soli://?demo=nearwin&left=N → solution replayed to N moves before the win.
       const demoRequestsNearWin = normalizedDemoParam === 'nearwin'
+      // soli://?demo=vegas | vegaslastpass&left=N | vegasnearwin&left=N → the
+      // three Vegas-rules fixtures (scoring plan round 3).
+      const vegasDemoMode =
+        normalizedDemoParam === 'vegas' ||
+        normalizedDemoParam === 'vegaslastpass' ||
+        normalizedDemoParam === 'vegasnearwin'
+          ? normalizedDemoParam
+          : null
       const recordHistoryParam =
         parsed.searchParams.get('recordHistory') ?? parsed.searchParams.get('history')
       const nextRecordHistoryEnabled = parseOptionalBooleanParam(recordHistoryParam)
@@ -1082,9 +1153,34 @@ export const useDemoGameLauncher = ({
         normalizedDemoParam === 'true' ||
         demoRequestsAutoReveal ||
         demoRequestsScrubbed ||
-        demoRequestsNearWin
+        demoRequestsNearWin ||
+        vegasDemoMode !== null
       ) {
         lastDemoLinkRef.current = incomingUrl
+
+        if (vegasDemoMode !== null) {
+          applyLinkDeveloperMode()
+          // `left` = moves left (vegasnearwin) or stock taps left (vegaslastpass);
+          // ignored by the fresh deal. Clamped like the other fixtures.
+          const leftParam = parseOptionalIntParam(parsed.searchParams.get('left'))
+          const resolved =
+            vegasDemoMode === 'vegaslastpass'
+              ? resolveVegasLastPassTapsLeft(leftParam)
+              : resolveNearWinMovesLeft(leftParam)
+          if (resolved.clamped) {
+            devLog('warn', `[Demo] ${vegasDemoMode} link param clamped: ${JSON.stringify(resolved)}.`)
+          }
+          setTimeout(() => {
+            handleLaunchDemoGame({
+              demoMode: vegasDemoMode,
+              force: true,
+              screenshotMode,
+              nearWinMovesLeft: 'movesLeft' in resolved ? resolved.movesLeft : undefined,
+              vegasLastPassTapsLeft: 'tapsLeft' in resolved ? resolved.tapsLeft : undefined,
+            })
+          }, DEMO_AUTO_STEP_INTERVAL_MS)
+          return
+        }
 
         if (demoRequestsScrubbed) {
           applyLinkDeveloperMode()
@@ -1182,6 +1278,8 @@ export const useDemoGameLauncher = ({
       setDrawCount,
       setWarningMode,
       setHintButtonEnabled,
+      setScoringMode,
+      setVegasTotalEnabled,
       setSolvableGamesOnly,
       startGameFromExactDeal,
       startCelebrationPreview,

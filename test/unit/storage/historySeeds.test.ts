@@ -96,6 +96,8 @@ const realEntry = (overrides: Partial<HistoryEntry> = {}): HistoryEntry => ({
     stockCount: 0,
   },
   status: 'incomplete',
+  standardScore: null,
+  vegasScore: null,
   ...overrides,
 })
 

@@ -31,6 +31,8 @@ const createEntry = (index: number): HistoryEntry => ({
   durationMs: index * 1000,
   preview,
   status: 'incomplete',
+  standardScore: null,
+  vegasScore: null,
 })
 
 describe('history pagination merging', () => {

@@ -2,12 +2,25 @@ import React from 'react'
 import { StyleSheet, View, Text } from 'react-native'
 
 import type { TimerState } from '../../../solitaire/klondike'
-import { computeElapsedWithReference, formatElapsedDuration } from '../../../utils/time'
+import {
+  formatStandardScore,
+  formatVegasScore,
+  formatVegasScoreSpoken,
+  type ScoreTally,
+} from '../../../solitaire/scoring'
+import type { ScoringMode } from '../../../state/settings'
+import {
+  computeElapsedWithReference,
+  formatElapsedDuration,
+  formatElapsedDurationSpoken,
+} from '../../../utils/time'
 import { STAT_BADGE_MIN_WIDTH } from '../constants'
 
 export type StatisticsRow = {
   label: string
   value: string
+  // Spoken form of the whole badge ("Vegas, minus 47 dollars"); testID = `stat-<label>`.
+  accessibilityLabel: string
 }
 
 type StatisticsHudProps = {
@@ -22,8 +35,14 @@ export const StatisticsHud: React.FC<StatisticsHudProps> = ({ rows }) => {
   return (
     <View style={styles.row}>
       {rows.map((row, index) => (
+        // Each badge is ONE a11y node (user, round 2 / prompt 5: "label all three
+        // badges"): the raw badge text reads "−$47" / "3:12" badly, and labelling
+        // only the score badge would be inconsistent with its neighbours.
         <View
           key={row.label}
+          accessible
+          accessibilityLabel={row.accessibilityLabel}
+          testID={`stat-${row.label.toLowerCase()}`}
           style={[styles.badge, index > 0 ? styles.badgeSpacing : undefined]}
         >
           <Text style={styles.badgeLabel}>{row.label}</Text>
@@ -39,23 +58,64 @@ export const StatisticsPlaceholder: React.FC = () => <View style={styles.placeho
 type BuildStatisticsRowsParams = {
   showMoves: boolean
   showTime: boolean
+  scoring: ScoringMode
+  // Whether the CURRENT game was dealt as a Vegas-rules game (Phase 2).
+  vegasRules: boolean
+  score: ScoreTally
+  // Cumulative Vegas total (P2-C): settled history + live game − reset offset.
+  // null = "Keep Vegas total" is off → the per-game Vegas badge shows instead.
+  vegasTotal: number | null
   moveCount: number
   elapsedMs: number
   timerState: TimerState
   timerStartedAt: number | null
 }
 
+const vegasRow = (label: 'Vegas' | 'Total', value: number): StatisticsRow => ({
+  label,
+  value: formatVegasScore(value),
+  accessibilityLabel: `${label}, ${formatVegasScoreSpoken(value)}`,
+})
+
 export const buildStatisticsRows = ({
   showMoves,
   showTime,
+  scoring,
+  vegasRules,
+  score,
+  vegasTotal,
   moveCount,
   elapsedMs,
   timerState,
   timerStartedAt,
 }: BuildStatisticsRowsParams): StatisticsRow[] => {
   const rows: StatisticsRow[] = []
+  // Score badge goes FIRST so Moves/Time keep their familiar positions against
+  // the right edge (docs/product/scoring/scoring.md, UX section).
+  // Badge rule since Phase 2 (Vegas = rules mode): Off → none; a Vegas-rules game
+  // shows its Vegas tally whatever the setting now says (it was dealt as a casino
+  // game) — as TOTAL when the player keeps a running total (P2-C), else per game;
+  // any other game shows Standard — an unlimited game has no honest Vegas
+  // number, and the Vegas setting applies to the next deal.
+  if (scoring !== 'off') {
+    if (!vegasRules) {
+      rows.push({
+        label: 'Score',
+        value: formatStandardScore(score.standard),
+        accessibilityLabel: `Score, ${formatStandardScore(score.standard)}`,
+      })
+    } else if (vegasTotal === null) {
+      rows.push(vegasRow('Vegas', score.vegas))
+    } else {
+      rows.push(vegasRow('Total', vegasTotal))
+    }
+  }
   if (showMoves) {
-    rows.push({ label: 'Moves', value: String(moveCount) })
+    rows.push({
+      label: 'Moves',
+      value: String(moveCount),
+      accessibilityLabel: `Moves, ${moveCount}`,
+    })
   }
   if (showTime) {
     const effectiveElapsedMs = computeElapsedWithReference(
@@ -64,7 +124,11 @@ export const buildStatisticsRows = ({
       timerStartedAt,
       Date.now()
     )
-    rows.push({ label: 'Time', value: formatElapsedDuration(effectiveElapsedMs) })
+    rows.push({
+      label: 'Time',
+      value: formatElapsedDuration(effectiveElapsedMs),
+      accessibilityLabel: `Time, ${formatElapsedDurationSpoken(effectiveElapsedMs)}`,
+    })
   }
   return rows
 }

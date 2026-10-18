@@ -4,11 +4,9 @@ import { HeaderButton } from 'expo-router/react-navigation'
 import { useNavigation } from 'expo-router'
 import { Button, Text, XStack, YStack } from 'tamagui'
 
-import {
-  KlondikeGameSession,
-  type KlondikeGameSessionControls,
-} from '../../src/features/klondike/components/KlondikeGameSession'
+import { KlondikeGameSession } from '../../src/features/klondike/components/KlondikeGameSession'
 import type { LaunchDemoGameOptions } from '../../src/features/klondike/hooks/useKlondikeGame'
+import { useSessionControls } from '../../src/features/klondike/state/sessionControlsStore'
 import { DEMO_AUTO_STEP_INTERVAL_MS } from '../../src/features/klondike/hooks/useDemoGameLauncher'
 import { CELEBRATION_MODE_METADATA } from '../../src/animation/celebrationModes'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
@@ -28,17 +26,11 @@ const IOS_HEADER_TEXT_HORIZONTAL_PADDING = 6
 export default function TabOneScreen() {
   const navigation = useNavigation()
   const openDrawer = useDrawerOpener()
-  const [sessionControls, setSessionControls] =
-    useState<KlondikeGameSessionControls | null>(null)
+  // Published by KlondikeGameSession via the module store (retry-and-share-deal plan);
+  // the History tab's Retry button reads the same controls.
+  const sessionControls = useSessionControls()
   const [demoChoiceVisible, setDemoChoiceVisible] = useState(false)
   const isIOS = Platform.OS === 'ios'
-
-  const handleSessionControlsChange = useCallback(
-    (controls: KlondikeGameSessionControls | null) => {
-      setSessionControls(controls)
-    },
-    []
-  )
 
   const openDemoChoice = useCallback(() => {
     setDemoChoiceVisible(true)
@@ -125,7 +117,7 @@ export default function TabOneScreen() {
 
   return (
     <>
-      <KlondikeGameSession onControlsChange={handleSessionControlsChange} />
+      <KlondikeGameSession />
       <DemoChoiceSheet
         isPresented={demoChoiceVisible}
         onDismiss={closeDemoChoice}
@@ -230,6 +222,32 @@ const DemoChoiceSheet = ({
             onPress={() => onSelect({ demoMode: 'nearwin', nearWinMovesLeft: 1 })}
           >
             Near win
+          </Button>
+        </XStack>
+        {/* Vegas-rules fixtures (scoring plan round 3): fresh Draw-3 deal with A♦
+            playable, last pass one tap from exhaustion (⊘ + dock New Game), and
+            the near-win board under Vegas rules (win → $208 recorded once). A
+            second Fixtures row without its own header to stay within the sheet's
+            row budget (see the comment above). Labels are short on purpose: three
+            buttons per row truncate "Vegas last pass" at ~400 pt (round 3 device
+            test); "Near win $" = the Vegas twin of row 1's "Near win". */}
+        <XStack gap="$2">
+          <Button size="$3" flex={1} onPress={() => onSelect({ demoMode: 'vegas' })}>
+            Vegas deal
+          </Button>
+          <Button
+            size="$3"
+            flex={1}
+            onPress={() => onSelect({ demoMode: 'vegaslastpass', vegasLastPassTapsLeft: 1 })}
+          >
+            Last pass
+          </Button>
+          <Button
+            size="$3"
+            flex={1}
+            onPress={() => onSelect({ demoMode: 'vegasnearwin', nearWinMovesLeft: 1 })}
+          >
+            Near win $
           </Button>
         </XStack>
 

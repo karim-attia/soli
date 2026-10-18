@@ -1,0 +1,475 @@
+<title>Soli Store Creative</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Fraunces:ital,opsz,wght@1,9..144,500&display=swap">
+<style>
+/* Layout: one-column review doc (max 1100px); each numbered section is one deliverable Karim can reference by number.
+   Palette: cool paper with a green bias, felt green accent from the icon, gold from the spade. */
+:root{
+  --bg:#f3f6f3; --fg:#17201a; --muted:#5a6a60; --surface:#ffffff; --line:#d8e0da; --soft:#e8eee9;
+  --accent:#3f6e58; --accent-fg:#ffffff; --gold:#a98a34; --felt:#416f57;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --body:ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10150f; --fg:#e7ece8; --muted:#9aa89f; --surface:#181f1a; --line:#2a342d; --soft:#1f2822;
+  --accent:#7fb597; --accent-fg:#0f1a14; --gold:#dbbd67; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10150f; --fg:#e7ece8; --muted:#9aa89f; --surface:#181f1a; --line:#2a342d; --soft:#1f2822;
+  --accent:#7fb597; --accent-fg:#0f1a14; --gold:#dbbd67; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+.wrap{max-width:1100px;margin:0 auto}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+h1{font-size:clamp(28px,4vw,40px);font-weight:800;line-height:1.05}
+h2{font-size:clamp(22px,2.6vw,28px);font-weight:700}
+h3{font-size:17px;font-weight:700}
+p{margin:0}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.9em;background:var(--soft);padding:1px 5px;border-radius:4px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+
+header.top{padding-block:40px 8px;display:grid;gap:14px}
+header.top p{max-width:68ch}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+nav.toc a{text-decoration:none;font-size:13px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;color:var(--fg);background:var(--surface)}
+nav.toc a b{color:var(--accent);margin-right:4px}
+.chips{display:flex;flex-wrap:wrap;gap:10px}
+.chip{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--muted)}
+.chip i{width:16px;height:16px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.12)}
+
+section{padding-block:40px 8px;border-top:1px solid var(--line);margin-top:32px;display:grid;gap:18px}
+.sec-head{display:grid;gap:6px}
+.sec-head .num{font-family:var(--display);font-weight:800;color:var(--accent);font-size:13px;letter-spacing:.06em}
+.lede{max-width:72ch;color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.btn{font:600 13px var(--body);padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn:focus-visible,.toggle input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;user-select:none}
+.toggle input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.tag{display:inline-block;font:700 11px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;padding:5px 8px;border-radius:6px;background:var(--accent);color:var(--accent-fg)}
+.tag.alt{background:var(--soft);color:var(--fg)}
+.note{font-size:13px;color:var(--muted);max-width:80ch}
+.note b{color:var(--fg)}
+ul.tight{margin:0;padding-left:18px;font-size:14px;display:grid;gap:4px}
+table{border-collapse:collapse;font-size:13px;width:100%;font-variant-numeric:tabular-nums}
+td,th{text-align:left;padding:6px 10px 6px 0;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600}
+.scroll{overflow-x:auto}
+
+/* ---- live scaled creative stage ---- */
+.stage{position:relative;width:100%;aspect-ratio:5244/2950;max-width:100%;overflow:hidden;border-radius:10px;background:#2c4f3e;box-shadow:0 1px 0 rgba(0,0,0,.08),0 12px 40px -20px rgba(0,0,0,.35)}
+.stage .cre{position:absolute;left:0;top:0;transform-origin:0 0}
+.guides{position:absolute;inset:0;pointer-events:none}
+.guides[hidden]{display:none}
+.g32{position:absolute;top:0;bottom:0;left:calc(410/5244*100%);right:calc(410/5244*100%);border-left:2px dashed rgba(255,230,120,.95);border-right:2px dashed rgba(255,230,120,.95)}
+.g219{position:absolute;left:0;right:0;top:calc(351/2950*100%);bottom:calc(351/2950*100%);border-top:2px dashed rgba(140,210,255,.95);border-bottom:2px dashed rgba(140,210,255,.95)}
+.gsafe{position:absolute;left:calc(410/5244*100%);right:calc(410/5244*100%);top:calc(351/2950*100%);bottom:calc(351/2950*100%);box-shadow:0 0 0 9999px rgba(0,0,0,.28)}
+.glabel{position:absolute;font:600 11px var(--mono);padding:3px 6px;border-radius:4px;color:#111}
+.glabel.y{background:rgba(255,230,120,.95);left:calc(410/5244*100% + 6px);top:8px}
+.glabel.b{background:rgba(140,210,255,.95);left:8px;top:calc(351/2950*100% + 6px)}
+.glabel.w{background:rgba(255,255,255,.9);right:calc(410/5244*100% + 6px);bottom:calc(351/2950*100% + 6px)}
+
+/* ---- iOS App Store chrome mockups (explicitly light/dark artboards, independent of page theme) ---- */
+.previews{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.pv{display:grid;gap:8px;justify-items:center}
+.pv .cap{font-size:12px;color:var(--muted);text-align:center}
+.ios{--ib:#fff;--it:#000;--i2:#86868b;--ibtn:#eeeef0;--iblue:#0a7aff;--isep:#e5e5ea;
+  width:100%;max-width:300px;aspect-ratio:300/420;border-radius:28px;overflow:hidden;background:var(--ib);color:var(--it);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;position:relative;
+  box-shadow:0 0 0 6px #1b1b1d,0 0 0 7px #3a3a3e,0 18px 40px -16px rgba(0,0,0,.5)}
+.ios.dark{--ib:#000;--it:#fff;--i2:#98989f;--ibtn:#1c1c1e;--iblue:#0a84ff;--isep:#2c2c2e}
+.sb{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:12px;font-weight:600}
+.sb .isl{width:70px;height:18px;background:#000;border-radius:10px;margin:auto}
+.search{margin:4px 14px 10px;height:30px;border-radius:9px;background:var(--ibtn);display:flex;align-items:center;gap:6px;padding:0 10px;font-size:13px;color:var(--i2)}
+.cell{padding:0 14px 12px;display:grid;gap:10px}
+.cell .hd{display:flex;align-items:center;gap:10px}
+.appicon{width:54px;height:54px;border-radius:12px;overflow:hidden;flex:none;box-shadow:0 0 0 .5px rgba(0,0,0,.12)}
+.appicon svg{display:block;width:100%;height:100%}
+.cell .nm{flex:1;min-width:0;display:grid;line-height:1.2}
+.cell .nm b{font-size:15px;font-weight:600}
+.cell .nm span{font-size:11.5px;color:var(--i2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.get{font-size:13px;font-weight:700;color:var(--iblue);background:var(--ibtn);padding:5px 16px;border-radius:999px}
+.hero32{width:100%;aspect-ratio:3/2;border-radius:10px;overflow:hidden;background:#2c4f3e}
+.hero32 img,.hero219 img{width:100%;height:100%;object-fit:cover;object-position:center;display:block}
+.competitor{padding:0 14px;display:grid;gap:10px;opacity:.55}
+.competitor .shots{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.competitor .shots i{display:block;aspect-ratio:9/19.5;border-radius:7px;background:var(--ibtn)}
+.competitor .appicon{background:var(--ibtn);box-shadow:none}
+.competitor .nm b::after{content:"";display:block;height:10px;width:110px;border-radius:4px;background:var(--ibtn)}
+.competitor .nm span::after{content:"";display:block;height:8px;width:150px;border-radius:4px;background:var(--ibtn);margin-top:5px}
+.hero219{width:100%;aspect-ratio:21/9;overflow:hidden;background:#2c4f3e;position:relative}
+.hero219::after{content:"";position:absolute;inset:auto 0 0 0;height:40%;background:linear-gradient(to bottom,transparent,var(--ib))}
+.ios .nav{position:absolute;top:0;left:0;right:0;height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;color:#fff;font-size:13px;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+.pphead{display:flex;gap:12px;padding:0 14px;margin-top:-20px;position:relative}
+.pphead .appicon{width:84px;height:84px;border-radius:19px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.pphead .meta{display:grid;align-content:end;gap:3px;min-width:0;flex:1}
+.pphead .meta b{font-size:18px;line-height:1.1;font-weight:700}
+.pphead .meta span{font-size:12px;color:var(--i2)}
+.pphead .meta .get{justify-self:start;margin-top:6px}
+.stats{display:flex;justify-content:space-around;padding:14px 14px 0;font-size:10px;color:var(--i2);text-transform:uppercase;letter-spacing:.04em}
+.stats div{display:grid;justify-items:center;gap:2px}
+.stats b{font-size:15px;text-transform:none;letter-spacing:0;color:var(--i2)}
+.sepline{height:.5px;background:var(--isep);margin:12px 14px}
+
+/* ---- icon section ---- */
+.icons{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:18px}
+.ico{display:grid;gap:8px;justify-items:center;text-align:center}
+.ico .cap{font-size:12px;color:var(--muted)}
+.ico .cap b{display:block;color:var(--fg);font-size:13px}
+.home{width:100%;max-width:150px;aspect-ratio:1;border-radius:22px;display:grid;place-items:center;background:linear-gradient(160deg,#cfe3ff,#f7d9ea 55%,#ffe9c7)}
+.home.dark{background:linear-gradient(160deg,#1a2238,#2a1a33 55%,#111)}
+.home.tint{background:linear-gradient(160deg,#20242b,#15171c)}
+.sq{width:66%;aspect-ratio:1;border-radius:22.4%;overflow:hidden;position:relative;box-shadow:0 10px 24px -8px rgba(0,0,0,.45)}
+.sq svg{display:block;width:100%;height:100%}
+.sq::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(150deg,rgba(255,255,255,.28),rgba(255,255,255,0) 45%,rgba(0,0,0,.08));
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.45),inset 0 -1px 2px rgba(0,0,0,.18)}
+.sq.clear{backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);background:rgba(255,255,255,.22)}
+.layers{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:28px;align-items:center}
+@media (max-width:640px){.layers{grid-template-columns:1fr}}
+.stack{position:relative;width:100%;max-width:300px;aspect-ratio:1;margin:0 auto}
+.stack .ly{position:absolute;left:0;top:0;width:66%;aspect-ratio:1;border-radius:22.4%;overflow:hidden}
+.stack .ly svg{display:block;width:100%;height:100%}
+.stack .ly.l1{transform:translate(0,34%)}
+.stack .ly.l2{transform:translate(17%,17%);outline:1.5px dashed color-mix(in srgb,var(--fg) 35%,transparent)}
+.stack .ly.l3{transform:translate(34%,0);outline:1.5px dashed color-mix(in srgb,var(--fg) 35%,transparent)}
+.ltable{display:grid;gap:10px;font-size:14px}
+.ltable div{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:baseline}
+.ltable b{font-family:var(--display);color:var(--accent)}
+
+/* ---- open questions ---- */
+ol.q{margin:0;padding-left:0;list-style:none;display:grid;gap:14px;counter-reset:q}
+ol.q li{display:grid;grid-template-columns:36px 1fr;gap:10px;counter-increment:q;font-size:14px}
+ol.q li::before{content:counter(q);font:800 18px var(--display);color:var(--accent)}
+ol.q li b{display:block;font-size:15px}
+ol.q li .rec{color:var(--muted)}
+ol.q li .rec strong{color:var(--fg);font-weight:600}
+</style>
+
+<!-- ======== CREATIVE (fixed 5244x2950 coordinate system). Extracted by build.py for pixel-exact rendering. ======== -->
+<style id="cre-css">
+.cre{width:5244px;height:2950px;position:relative;overflow:hidden;background:#38624c;color:#fff;
+  font-family:"Bricolage Grotesque",ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif}
+/* felt: base green, light pool behind the phones, dark vignette, fine weave */
+.cre .felt{position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 1900px 1500px at 3700px 1400px,rgba(255,255,255,.10),rgba(255,255,255,0) 70%),
+    radial-gradient(ellipse 2200px 1800px at 1500px 1500px,rgba(255,255,255,.04),rgba(255,255,255,0) 70%),
+    radial-gradient(ellipse 110% 100% at 50% 50%,rgba(0,0,0,0) 45%,rgba(0,0,0,.34) 100%),
+    linear-gradient(180deg,#3c6a52,#2e5542)}
+.cre .weave{position:absolute;inset:0;opacity:.5;mix-blend-mode:soft-light;
+  background:
+    repeating-linear-gradient(45deg,rgba(255,255,255,.12) 0 3px,rgba(0,0,0,0) 3px 9px),
+    repeating-linear-gradient(-45deg,rgba(0,0,0,.14) 0 3px,rgba(0,0,0,0) 3px 9px)}
+.cre .txt{position:absolute;left:600px;top:870px;width:2100px;display:grid;gap:70px}
+.cre .suits{font:600 92px/1 ui-sans-serif,system-ui,-apple-system,"Apple Color Emoji",sans-serif;letter-spacing:.35em;color:#dbbd67;display:flex}
+.cre .suits .r{color:#e0695a}
+.cre h1.hl{margin:0;font-weight:800;font-size:330px;line-height:.98;letter-spacing:-.025em;text-wrap:balance;
+  font-variation-settings:"opsz" 96;text-shadow:0 10px 50px rgba(0,0,0,.35)}
+.cre .sub{margin:0;font:italic 500 124px/1.15 "Fraunces",Georgia,"Times New Roman",serif;color:#dbbd67;letter-spacing:-.005em;
+  font-variation-settings:"opsz" 144;text-shadow:0 6px 30px rgba(0,0,0,.3)}
+/* phones: 1284x2778 screenshots in a thin dark frame. Bottom runs past the canvas edge on purpose (the lower third is empty felt). */
+.cre .phone{position:absolute;border-radius:170px;padding:22px;background:#15201b;
+  box-shadow:0 60px 140px -30px rgba(0,0,0,.65),0 0 0 2px rgba(255,255,255,.12) inset}
+.cre .phone img{display:block;width:100%;height:auto;border-radius:150px;background:#6b8e5a}
+.cre .phone.back{border-radius:150px}
+.cre .phone.back img{border-radius:130px}
+.cre .phone.back::after{content:"";position:absolute;inset:0;border-radius:inherit;background:rgba(20,40,30,.18)}
+.cre .pc{width:1150px;left:3180px;top:470px;z-index:3}
+.cre .pl{width:940px;left:2600px;top:830px;z-index:2;transform:rotate(-7deg)}
+.cre .pr{width:940px;left:3980px;top:830px;z-index:1;transform:rotate(7deg)}
+/* variant B: celebration hero */
+.cre.b .hero{position:absolute;left:2380px;top:-1740px;width:2568px;height:auto;
+  -webkit-mask-image:radial-gradient(circle 1500px at 1284px 3225px,#000 1130px,rgba(0,0,0,0) 1250px);
+  mask-image:radial-gradient(circle 1500px at 1284px 3225px,#000 1130px,rgba(0,0,0,0) 1250px);
+  filter:saturate(1.08) contrast(1.03)}
+.cre.b .txt{top:900px;width:2300px}
+.cre.b h1.hl{font-size:340px}
+/* pool of the board green under the masked screenshot so its own felt melts into the backdrop instead of showing as a disk */
+.cre.b .glow{position:absolute;left:2164px;top:-15px;width:3000px;height:3000px;border-radius:50%;
+  background:radial-gradient(circle,#6b8e5a 0 1100px,rgba(107,142,90,0) 1300px)}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <p class="eyebrow">App Store creative assets, iOS 27 · proposal round 1 · 2026-10-17</p>
+  <h1>Soli store creative: one 16:9 image for search and the product page header</h1>
+  <p class="lede">One universal 5244x2950 PNG (approach A from the plan) serves both the search result card (shown as 3:2) and the product page header (shown as 21:9). Below: the creative at full composition, how it crops in both placements in light and dark App Store chrome, one alternative, the layered icon for Liquid Glass, and the open questions by number.</p>
+  <div class="chips">
+    <span class="chip"><i style="background:#416f57"></i>felt #416F57</span>
+    <span class="chip"><i style="background:#6b8e5a"></i>board #6B8E5A</span>
+    <span class="chip"><i style="background:#dbbd67"></i>gold #DBBD67</span>
+    <span class="chip"><i style="background:#be5748"></i>red #BE5748</span>
+    <span class="chip"><i style="background:#284b6c"></i>navy #284B6C</span>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><b>1</b>Universal creative</a>
+    <a href="#s2"><b>2</b>In context</a>
+    <a href="#s3"><b>3</b>Variant B</a>
+    <a href="#s4"><b>4</b>Liquid Glass icon</a>
+    <a href="#s5"><b>5</b>Open questions</a>
+  </nav>
+</header>
+
+<!-- ============ 1. Universal creative A ============ -->
+<section id="s1">
+  <div class="sec-head">
+    <p class="num">1 · UNIVERSAL CREATIVE</p>
+    <div class="row"><h2>A: felt, headline, three real boards</h2><span class="tag">Recommended</span></div>
+    <p class="lede">Designed at 5244x2950 (16:9, the one size App Store Connect accepts in both slots). Midgame in front, near-win and the spirograph celebration behind. The headline carries the differentiator, the subline the feature. No icon or app name inside the image: the card and header already show both right next to it.</p>
+  </div>
+  <div class="row">
+    <label class="toggle"><input type="checkbox" id="guidesA"> Show crop guides and safe area</label>
+    <span class="note">Yellow: 3:2 search crop (410 px off each side). Blue: 21:9 header crop (351 px off top and bottom). Shaded outside: never guaranteed visible. These are derived from the ratios, not from Apple's template file; the real template in App Store Connect may be a little tighter.</span>
+  </div>
+  <div class="stage" id="stageA">
+<!--CRE-A-START-->
+<div class="cre a" id="creA" aria-label="Creative A">
+  <div class="felt"></div><div class="weave"></div>
+  <div class="txt">
+    <div class="suits" aria-hidden="true"><span>&spades;</span><span class="r">&hearts;</span><span>&clubs;</span><span class="r">&diams;</span></div>
+    <h1 class="hl">Solitaire.<br>No&nbsp;ads.<br>Ever.</h1>
+    <p class="sub">Every deal is winnable.</p>
+  </div>
+  <div class="phone back pl"><img src="img/nearwin.jpg" width="1284" height="2778" alt="Soli near the end of a game, all cards face up"></div>
+  <div class="phone back pr"><img src="img/spiro.jpg" width="1284" height="2778" alt="Soli spirograph win celebration"></div>
+  <div class="phone pc"><img src="img/midgame.jpg" width="1284" height="2778" alt="Soli midgame board"></div>
+</div>
+<!--CRE-A-END-->
+    <div class="guides" id="guidesOverlayA" hidden>
+      <div class="gsafe"></div><div class="g32"></div><div class="g219"></div>
+      <span class="glabel y">3:2 search crop</span><span class="glabel b">21:9 header crop</span><span class="glabel w">safe: 4424x2248</span>
+    </div>
+  </div>
+  <div class="scroll"><table>
+    <tr><th>Property</th><th>Value</th><th>Why</th></tr>
+    <tr><td>Canvas</td><td>5244x2950 PNG, no alpha</td><td>Accepted for both header and search</td></tr>
+    <tr><td>Headline</td><td>268 px, 3 lines, left-aligned</td><td>Reads at ~350 pt card width (about 18 px per line there)</td></tr>
+    <tr><td>Screenshots</td><td>02-midgame-late (front), 03-nearwin-covered, 06-celebration-spirograph</td><td>Real product; midgame is the most legible board, spirograph the flashiest celebration</td></tr>
+    <tr><td>Background</td><td>Felt #3C6A52 to #2E5542, weave texture, vignette</td><td>Works on light and dark chrome; board green #6B8E5A in the phones stays brighter than the backdrop so the phones pop</td></tr>
+    <tr><td>Rendered file</td><td><code>creative-A-5244x2950.png</code></td><td>Same markup rendered by headless Chrome at scale 1</td></tr>
+  </table></div>
+</section>
+
+<!-- ============ 2. In-context previews ============ -->
+<section id="s2">
+  <div class="sec-head">
+    <p class="num">2 · IN CONTEXT</p>
+    <h2>Search result card and product page header</h2>
+    <p class="lede">Rough mockups of the iOS 27 App Store, both appearances. The image is the real render, cover-cropped the way the store would crop it (centered). The row below Soli stands in for a competitor still on three small screenshots. App subtitle text is a placeholder.</p>
+  </div>
+  <div class="row" role="group" aria-label="Variant shown in previews">
+    <span class="small muted">Preview variant:</span>
+    <button class="btn" id="pvA" aria-pressed="true">A · felt + boards</button>
+    <button class="btn" id="pvB" aria-pressed="false">B · celebration hero</button>
+  </div>
+  <div class="previews">
+    <div class="pv">
+      <div class="ios light">
+        <div class="sb"><span>9:41</span><span class="isl"></span><span>&#9679;&#9679;&#9679;</span></div>
+        <div class="search">&#9906; solitaire</div>
+        <div class="cell">
+          <div class="hd"><div class="appicon"><svg viewBox="0 0 1024 1024"><use href="#soli-default"/></svg></div><div class="nm"><b>Soli: Klondike Solitaire</b><span>No ads. Every deal winnable.</span></div><span class="get">Get</span></div>
+          <div class="hero32"><img class="pvimg" src="img/creative-A.jpg" alt="Creative in the 3:2 search card"></div>
+        </div>
+        <div class="competitor"><div class="hd"><div class="appicon"></div><div class="nm"><b></b><span></span></div><span class="get">Get</span></div><div class="shots"><i></i><i></i><i></i></div></div>
+      </div>
+      <p class="cap">Search result, light</p>
+    </div>
+    <div class="pv">
+      <div class="ios dark">
+        <div class="sb"><span>9:41</span><span class="isl"></span><span>&#9679;&#9679;&#9679;</span></div>
+        <div class="search">&#9906; solitaire</div>
+        <div class="cell">
+          <div class="hd"><div class="appicon"><svg viewBox="0 0 1024 1024"><use href="#soli-dark"/></svg></div><div class="nm"><b>Soli: Klondike Solitaire</b><span>No ads. Every deal winnable.</span></div><span class="get">Get</span></div>
+          <div class="hero32"><img class="pvimg" src="img/creative-A.jpg" alt="Creative in the 3:2 search card, dark"></div>
+        </div>
+        <div class="competitor"><div class="hd"><div class="appicon"></div><div class="nm"><b></b><span></span></div><span class="get">Get</span></div><div class="shots"><i></i><i></i><i></i></div></div>
+      </div>
+      <p class="cap">Search result, dark</p>
+    </div>
+    <div class="pv">
+      <div class="ios light">
+        <div class="hero219"><img class="pvimg" src="img/creative-A.jpg" alt="Creative as the 21:9 product page header"></div>
+        <div class="nav"><span>&lsaquo; Search</span><span>&#8942;</span></div>
+        <div class="pphead"><div class="appicon"><svg viewBox="0 0 1024 1024"><use href="#soli-default"/></svg></div><div class="meta"><b>Soli: Klondike Solitaire</b><span>No ads. Every deal winnable.</span><span class="get">Get</span></div></div>
+        <div class="stats"><div>Ratings<b>4.9 &#9733;</b></div><div>Age<b>4+</b></div><div>Category<b>Games</b></div><div>Size<b>31 MB</b></div></div>
+        <div class="sepline"></div>
+      </div>
+      <p class="cap">Product page header, light</p>
+    </div>
+    <div class="pv">
+      <div class="ios dark">
+        <div class="hero219"><img class="pvimg" src="img/creative-A.jpg" alt="Creative as the 21:9 product page header, dark"></div>
+        <div class="nav"><span>&lsaquo; Search</span><span>&#8942;</span></div>
+        <div class="pphead"><div class="appicon"><svg viewBox="0 0 1024 1024"><use href="#soli-dark"/></svg></div><div class="meta"><b>Soli: Klondike Solitaire</b><span>No ads. Every deal winnable.</span><span class="get">Get</span></div></div>
+        <div class="stats"><div>Ratings<b>4.9 &#9733;</b></div><div>Age<b>4+</b></div><div>Category<b>Games</b></div><div>Size<b>31 MB</b></div></div>
+        <div class="sepline"></div>
+      </div>
+      <p class="cap">Product page header, dark</p>
+    </div>
+  </div>
+  <p class="note"><b>What to look at:</b> in the 3:2 card the outer 410 px on each side disappear, so the back phones get clipped first; in the 21:9 header the top and bottom go, which only costs the phone bottoms. The headline stays whole in both. Stats row values are invented.</p>
+</section>
+
+<!-- ============ 3. Variant B ============ -->
+<section id="s3">
+  <div class="sec-head">
+    <p class="num">3 · ALTERNATIVE</p>
+    <div class="row"><h2>B: celebration hero</h2><span class="tag alt">For comparison</span></div>
+    <p class="lede">Same copy, but the spirograph win animation becomes the picture: one big burst of cards instead of phone frames. Louder and more unusual in a search list; shows less of the actual game and the source frame is a 1284 px screenshot scaled 2x, so it would need a higher-resolution capture for the final file.</p>
+  </div>
+  <div class="row">
+    <label class="toggle"><input type="checkbox" id="guidesB"> Show crop guides and safe area</label>
+  </div>
+  <div class="stage" id="stageB">
+<!--CRE-B-START-->
+<div class="cre b" id="creB" aria-label="Creative B">
+  <div class="felt"></div><div class="weave"></div>
+  <div class="glow"></div>
+  <img class="hero" src="img/spiro.jpg" width="1284" height="2778" alt="Spirograph win celebration, cards fanned in a spiral">
+  <div class="txt">
+    <div class="suits" aria-hidden="true"><span>&spades;</span><span class="r">&hearts;</span><span>&clubs;</span><span class="r">&diams;</span></div>
+    <h1 class="hl">Solitaire.<br>No&nbsp;ads.<br>Ever.</h1>
+    <p class="sub">Every deal is winnable.</p>
+  </div>
+</div>
+<!--CRE-B-END-->
+    <div class="guides" id="guidesOverlayB" hidden>
+      <div class="gsafe"></div><div class="g32"></div><div class="g219"></div>
+      <span class="glabel y">3:2 search crop</span><span class="glabel b">21:9 header crop</span><span class="glabel w">safe: 4424x2248</span>
+    </div>
+  </div>
+  <div class="scroll"><table>
+    <tr><th></th><th>A · felt + boards</th><th>B · celebration hero</th></tr>
+    <tr><td>Shows the real game</td><td>Yes, three states</td><td>Only the celebration</td></tr>
+    <tr><td>Stands out in search</td><td>Clean, product-like</td><td>Loud, unusual</td></tr>
+    <tr><td>Asset quality today</td><td>Final-ready (1284 px shots at ~1150 px)</td><td>Needs a 2x capture (iPad or 3x sim) for the final</td></tr>
+    <tr><td>Upgrade path</td><td>Swap a phone for a looping video later</td><td>Natural step to a video asset (approach C)</td></tr>
+  </table></div>
+</section>
+
+<!-- ============ 4. Liquid Glass icon ============ -->
+<section id="s4">
+  <div class="sec-head">
+    <p class="num">4 · LIQUID GLASS ICON</p>
+    <h2>Same icon, split into three layers</h2>
+    <p class="lede">The current flat PNG gets auto-glassed by iOS 26/27 as one slab. Splitting it into layers in Icon Composer gives the spade depth and lets the system render the Dark, Clear and Tinted appearances from the same file. Geometry below is a recreation of <code>assets/images/icon.png</code> as inline SVG so the layers can be recolored; the real <code>.icon</code> is built by Karim in Icon Composer (macOS 26.4+), then wired as <code>ios.icon</code> in <code>app.json</code>.</p>
+  </div>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <!-- Layer geometry (1024 canvas): spade bbox x316-716 y248-676, stem x416-616 y608-748, stripes ~44deg, 52 wide -->
+      <path id="g-spade" d="M516 248 C 445 365, 316 455, 316 568 C 316 648, 395 690, 462 652 C 492 634, 508 612, 516 596 C 524 612, 540 634, 570 652 C 637 690, 716 648, 716 568 C 716 455, 587 365, 516 248 Z"/>
+      <path id="g-stem" d="M516 600 C 508 690, 480 730, 416 748 L 616 748 C 552 730, 524 690, 516 600 Z"/>
+      <g id="g-stripes-shape">
+        <rect x="-312" y="-26" width="624" height="52" transform="translate(462 456) rotate(-43.7)"/>
+      </g>
+      <symbol id="soli-default" viewBox="0 0 1024 1024">
+        <rect width="1024" height="1024" fill="#416f57"/>
+        <use href="#g-spade" fill="#dbbd67"/><use href="#g-stem" fill="#0b0b0b"/>
+        <rect x="-312" y="-26" width="624" height="52" transform="translate(462 456) rotate(-43.7)" fill="#be5748"/>
+        <rect x="-312" y="-26" width="624" height="52" transform="translate(506 506) rotate(-43.7)" fill="#284b6c"/>
+      </symbol>
+      <symbol id="soli-dark" viewBox="0 0 1024 1024">
+        <defs><linearGradient id="dg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f3b2e"/><stop offset="1" stop-color="#122419"/></linearGradient></defs>
+        <rect width="1024" height="1024" fill="url(#dg)"/>
+        <use href="#g-spade" fill="#e3c876"/><use href="#g-stem" fill="#0b0b0b"/>
+        <rect x="-312" y="-26" width="624" height="52" transform="translate(462 456) rotate(-43.7)" fill="#cf6555"/>
+        <rect x="-312" y="-26" width="624" height="52" transform="translate(506 506) rotate(-43.7)" fill="#3a6690"/>
+      </symbol>
+      <symbol id="soli-clear" viewBox="0 0 1024 1024">
+        <use href="#g-spade" fill="rgba(255,255,255,.92)"/><use href="#g-stem" fill="rgba(255,255,255,.55)"/>
+        <rect x="-312" y="-26" width="624" height="52" transform="translate(462 456) rotate(-43.7)" fill="rgba(255,255,255,.6)"/>
+        <rect x="-312" y="-26" width="624" height="52" transform="translate(506 506) rotate(-43.7)" fill="rgba(255,255,255,.45)"/>
+      </symbol>
+      <symbol id="soli-tinted" viewBox="0 0 1024 1024">
+        <defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34363c"/><stop offset="1" stop-color="#1b1c20"/></linearGradient></defs>
+        <rect width="1024" height="1024" fill="url(#tg)"/>
+        <use href="#g-spade" fill="#dcdce2"/><use href="#g-stem" fill="#8d8e96"/>
+        <rect x="-312" y="-26" width="624" height="52" transform="translate(462 456) rotate(-43.7)" fill="#b4b5bd"/>
+        <rect x="-312" y="-26" width="624" height="52" transform="translate(506 506) rotate(-43.7)" fill="#9a9ba3"/>
+      </symbol>
+      <symbol id="ly-bg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="#416f57"/></symbol>
+      <symbol id="ly-spade" viewBox="0 0 1024 1024"><use href="#g-spade" fill="#dbbd67"/><use href="#g-stem" fill="#0b0b0b"/></symbol>
+      <symbol id="ly-stripes" viewBox="0 0 1024 1024">
+        <rect x="-312" y="-26" width="624" height="52" transform="translate(462 456) rotate(-43.7)" fill="#be5748"/>
+        <rect x="-312" y="-26" width="624" height="52" transform="translate(506 506) rotate(-43.7)" fill="#284b6c"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <div class="layers">
+    <div class="stack" aria-label="Exploded layers">
+      <div class="ly l1"><svg viewBox="0 0 1024 1024"><use href="#ly-bg"/></svg></div>
+      <div class="ly l2"><svg viewBox="0 0 1024 1024"><use href="#ly-spade"/></svg></div>
+      <div class="ly l3"><svg viewBox="0 0 1024 1024"><use href="#ly-stripes"/></svg></div>
+    </div>
+    <div class="ltable">
+      <div><b>Layer 3</b><span>Stripes (red + navy), top. Specular on, small shadow so they float over the spade.</span></div>
+      <div><b>Layer 2</b><span>Spade + stem, gold and black. Specular on, slight translucency off (keeps the gold solid).</span></div>
+      <div><b>Layer 1</b><span>Background, flat felt green #416F57. Icon Composer fills the rounded shape; no rounded corners in the source art.</span></div>
+      <div><b>Source</b><span>Export each layer as 1024 px SVG or PNG from the original icon file; the SVG here is a close recreation, not the source art.</span></div>
+    </div>
+  </div>
+
+  <div class="icons">
+    <div class="ico"><div class="home"><div class="sq"><svg viewBox="0 0 1024 1024"><use href="#soli-default"/></svg></div></div><p class="cap"><b>Default</b>as today, with glass highlights</p></div>
+    <div class="ico"><div class="home dark"><div class="sq"><svg viewBox="0 0 1024 1024"><use href="#soli-dark"/></svg></div></div><p class="cap"><b>Dark</b>deeper green background, glyph unchanged</p></div>
+    <div class="ico"><div class="home"><div class="sq clear"><svg viewBox="0 0 1024 1024"><use href="#soli-clear"/></svg></div></div><p class="cap"><b>Clear</b>frosted glass, glyph in white</p></div>
+    <div class="ico"><div class="home tint"><div class="sq"><svg viewBox="0 0 1024 1024"><use href="#soli-tinted"/></svg></div></div><p class="cap"><b>Tinted (mono)</b>system tint, layer luminance from the artwork</p></div>
+    <div class="ico"><div class="home"><div class="sq"><img src="img/icon-256.png" width="256" height="256" alt="Current flat Soli icon" style="display:block;width:100%;height:100%"></div></div><p class="cap"><b>Current PNG</b>for comparison with the SVG recreation</p></div>
+  </div>
+  <p class="note"><b>Note:</b> Dark, Clear and Tinted here are CSS approximations of what iOS derives automatically. In Icon Composer each appearance can still be tuned per layer (for example keep the gold spade colored in Tinted, or switch the Dark background to the HUD color #283736 for more contrast).</p>
+</section>
+
+<!-- ============ 5. Open questions ============ -->
+<section id="s5">
+  <div class="sec-head">
+    <p class="num">5 · OPEN QUESTIONS</p>
+    <h2>Answer by number</h2>
+  </div>
+  <ol class="q">
+    <li><div><b>Message</b>Round 3: "Free" removed. Apple treats "free" as a price reference (guideline 2.3.7), and the creative-asset rules ban pricing. "No ads" is a verifiable feature and is allowed (MobilityWare uses it in its subtitle). Now: "Solitaire. No ads. Ever." + "Every deal is winnable." (players say "winnable", not "solvable").</div></li>
+    <li><div><b>Visual</b>(a) real boards in phone frames on felt (variant A), (b) big celebration frame (variant B), (c) abstract large cards. <span class="rec"><strong>Recommendation:</strong> A now; B's celebration can become the looping video later.</span></div></li>
+    <li><div><b>Localization</b>English only, or also a German version of the headline? <span class="rec"><strong>Recommendation:</strong> English only, the app is English-only.</span></div></li>
+    <li><div><b>Icon</b>Keep the current design and only split into layers, or use the occasion for small tweaks (for example a touch more contrast between felt and gold)? <span class="rec"><strong>Recommendation:</strong> same design, no redesign.</span></div></li>
+    <li><div><b>Headline typeface</b>The mockup uses Bricolage Grotesque with a Fraunces italic subline. Alternative: plain SF/system bold for a more Apple-native look. <span class="rec"><strong>Recommendation:</strong> keep Bricolage, it reads well small and does not look like every other card.</span></div></li>
+    <li><div><b>Phones or bare screens</b>Thin dark phone frames as shown, or the screenshots as bare rounded rectangles without a bezel? <span class="rec"><strong>Recommendation:</strong> keep the thin frames; they separate the board green from the felt green.</span></div></li>
+    <li><div><b>Subline accuracy</b>"Every deal is solvable" is only true by default: <code>solvableGamesOnly</code> can be switched off, and Vegas turns it off. Options: (a) keep it, since it describes the default experience, (b) "Every deal can be won.", (c) "Solvable deals, hints, undo." <span class="rec"><strong>Recommendation:</strong> (a); App Review judges the default experience, and it's true there.</span></div></li>
+  </ol>
+</section>
+</div>
+
+<script>
+(function(){
+  // Scale the 5244x2950 creative to its stage width.
+  function fit(stageId, creId){
+    var stage=document.getElementById(stageId), cre=document.getElementById(creId);
+    if(!stage||!cre) return;
+    function apply(){ cre.style.transform='scale('+(stage.clientWidth/5244)+')'; }
+    if('ResizeObserver' in window){ new ResizeObserver(apply).observe(stage); } else { window.addEventListener('resize',apply); }
+    apply();
+  }
+  fit('stageA','creA'); fit('stageB','creB');
+  function guide(cbId, ovId){
+    var cb=document.getElementById(cbId), ov=document.getElementById(ovId);
+    if(!cb||!ov) return;
+    cb.addEventListener('change',function(){ ov.hidden=!cb.checked; });
+  }
+  guide('guidesA','guidesOverlayA'); guide('guidesB','guidesOverlayB');
+  // A/B switch for the in-context previews.
+  var a=document.getElementById('pvA'), b=document.getElementById('pvB');
+  function show(v){
+    document.querySelectorAll('.pvimg').forEach(function(img){ img.src='img/creative-'+v+'.jpg'; });
+    a.setAttribute('aria-pressed', v==='A'); b.setAttribute('aria-pressed', v==='B');
+  }
+  a.addEventListener('click',function(){show('A')}); b.addEventListener('click',function(){show('B')});
+})();
+</script>

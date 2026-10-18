@@ -1,6 +1,6 @@
 # React Native Teleport Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-10-17 (1.2.2 with Expo SDK 58)
 
 ## Scope
 
@@ -11,6 +11,19 @@ Last refreshed: 2026-07-03
 ## Current guidance
 
 Use this guide as the current source-backed reference for Soli work involving this package or tool.
+
+## Refresh check (2026-10-17, Expo SDK 58 upgrade)
+
+- Sources: https://www.npmjs.com/package/react-native-teleport?activeTab=versions,
+  `react-native-teleport@1.2.2/package.json` (read from the npm tarball)
+- Bumped `1.1.9` -> `1.2.2` (published 2026-09-10, latest at refresh time) in the same
+  install step as Expo SDK 58 / RN 0.88, because both need the same clean native rebuild.
+  Peers are `react`, `react-dom`, `react-native` at `*`; codegen spec `TeleportViewSpec`;
+  still New Architecture only, no Expo Go.
+- The package is not Expo-managed (`expo install --check` ignores it); bump it
+  deliberately with native releases. Fallback if portals misbehave: `1.1.9`.
+- Validate: Tamagui sheets/popovers that portal through Teleport (History preview sheet,
+  drawer) on both platforms after the fresh build.
 
 ## Source-backed notes
 

@@ -26,7 +26,7 @@ const UNLOCK_SCRIPT = path.join(__dirname, 'android-unlock-pattern.sh')
 const ANDROID_READY_SCRIPT = path.join(__dirname, 'android-ready.sh')
 const USAGE =
   "Usage: yarn deeplink <shortcut|'<soli:// url>'> [args] [--cold|--warm] [--ios|--android] [--serial <s>] [--no-retry] [--screenshot]\n" +
-  'Shortcuts: celebration [modeId] · scrubtest [steps] [scrub] · nearwin [left] · seedhistory [clear]\n' +
+  'Shortcuts: celebration [modeId] · scrubtest [steps] [scrub] · nearwin [left] · vegas [deal|lastpass|nearwin] [left] · seedhistory [clear]\n' +
   '--screenshot appends screenshot=1 (store-screenshot mode: dev mode forced OFF, no Demo button / celebration badge)'
 
 // Fixture shortcuts (scrubtest/nearwin) force-stop by DEFAULT: a stale demo
@@ -53,6 +53,15 @@ const SHORTCUTS = {
   seedhistory: {
     cold: false,
     build: ([action]) => `soli://?seedHistory=${action === 'clear' ? 'clear' : 'default'}`,
+  },
+  // Vegas fixtures (scoring plan round 3): `yarn vegas [deal|lastpass|nearwin] [left]`.
+  vegas: {
+    cold: true,
+    build: ([stage, left]) => {
+      const mode =
+        stage === 'lastpass' ? 'vegaslastpass' : stage === 'nearwin' ? 'vegasnearwin' : 'vegas'
+      return `soli://?demo=${mode}${left !== undefined ? `&left=${left}` : ''}`
+    },
   },
 }
 
@@ -111,8 +120,12 @@ const resolveUrlAndCold = (options) => {
       cold: options.cold ?? shortcut.cold,
     }
   }
-  if (!first.startsWith('soli://')) {
-    fail(`Not a shortcut or soli:// URL: "${first}".\n${USAGE}`)
+  // Public share links (retry-and-share-deal plan) are accepted too. Android: the
+  // explicit-component `am start` below delivers them even before App Links domain
+  // verification. iOS: `simctl openurl` on an https URL opens Safari unless the
+  // universal-link association is live — use the soli://soli/deal/… twin there.
+  if (!first.startsWith('soli://') && !first.startsWith('https://karimattia.ch/')) {
+    fail(`Not a shortcut, soli:// URL or https://karimattia.ch/ link: "${first}".\n${USAGE}`)
   }
   if (shortcutArgs.length) {
     fail(`Unexpected extra argument "${shortcutArgs[0]}" after a raw URL.`)

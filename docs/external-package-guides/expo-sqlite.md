@@ -1,6 +1,28 @@
 # Expo SQLite Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-10-17
+
+## Web setup (2026-10-17, Expo SDK 58, `expo-sqlite@58.0.13`)
+
+Sources: https://docs.expo.dev/versions/v58.0.0/sdk/sqlite/#web-setup (and its
+`static/diffs/sqlite-web-metro-config.diff`), installed `node_modules/expo-sqlite/web/*.ts`.
+
+- `expo-sqlite` on web runs SQLite in a Web Worker on `wa-sqlite.wasm`
+  (`web/SQLiteModule.ts` `new Worker(new URL('./worker', window.location.href))`), so it needs
+  Metro to treat `.wasm` as an asset: `config.resolver.assetExts.push('wasm')`.
+- Synchronous calls (`getFirstSync`, `kv-store`'s `getItemSync`, ...) busy-wait on a
+  `SharedArrayBuffer` + `Atomics` lock (`web/WorkerChannel.ts` `invokeWorkerSync`). Browsers
+  only expose `SharedArrayBuffer` under cross-origin isolation, so the dev server must send
+  `Cross-Origin-Embedder-Policy: credentialless` and `Cross-Origin-Opener-Policy: same-origin`
+  (Metro `server.enhanceMiddleware`). Expo's docs ship both lines as one diff.
+- Dev console shows one expected warning: "Using synchronous SQLite operations can cause
+  significant performance impact" (`__DEV__` only, once).
+- Static rendering (`web.output: "static"`) executes the route tree in Node, where neither
+  `window` nor `Worker` exist; any sync SQLite read during render crashes it. Soli therefore
+  uses `web.output: "single"` (client-only) — see `metro.config.js` comment.
+- Soli status: `src/state/settings.tsx` (and the other `expo-sqlite/kv-store` users) run on
+  web through this setup since 2026-10-17; the history repository is still the web stub
+  (`historyRepository.web.ts`), History is hidden on web via `Drawer.Protected`.
 
 ## Scope
 

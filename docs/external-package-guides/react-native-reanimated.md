@@ -1,6 +1,6 @@
 # React Native Reanimated Guide
 
-Last refreshed: 2026-07-04
+Last refreshed: 2026-10-17 (Reanimated 4.7.1 / Worklets 0.13.0, Expo SDK 58)
 
 ## Scope
 
@@ -11,12 +11,72 @@ Last refreshed: 2026-07-04
 ## Current guidance
 
 Use this for Reanimated and Worklets compatibility, feature flags, and animation-risk
-notes. Keep Reanimated and Worklets aligned with Expo bundled versions unless a captured
-upstream defect justifies a narrowly tested patch release override.
+notes. Keep Reanimated and Worklets aligned with Expo bundled versions (since SDK 58 there
+is no override: `expo.install.exclude` lists only `typescript`). Re-add a narrowly tested
+patch override only for a captured upstream defect, and retire it at the next SDK.
 
 ## Detailed guidance
 
 The sections below are the definitive combined notes for this package or tool. Keep version-specific context when it affects compatibility, but update this single file instead of adding task- or feature-prefixed guides.
+
+### Expo SDK 58 Reanimated 4.7 / Worklets 0.13 Notes
+
+- Package: `react-native-reanimated` and `react-native-worklets`
+- Retrieved: 2026-10-17
+- Primary docs:
+  - https://expo.dev/changelog/sdk-58
+  - https://docs.expo.dev/versions/latest/sdk/reanimated/
+  - https://github.com/software-mansion/react-native-reanimated/releases (4.6.0, 4.7.0, 4.7.1)
+  - https://github.com/software-mansion/react-native-reanimated/releases/tag/worklets-0.13.0
+  - https://docs.swmansion.com/react-native-reanimated/docs/guides/compatibility/
+  - https://docs.swmansion.com/react-native-worklets/docs/guides/testing/
+
+#### Target facts
+
+- Expo SDK 58 bundles exact Reanimated `4.7.1` (2026-10-02) and exact Worklets `0.13.0`.
+  Reanimated 4.7.x requires Worklets 0.13.x; Worklets 0.13.0 peers RN `0.86 - 0.88`.
+- `babel-preset-expo` still wires the Worklets Babel plugin automatically.
+- Soli is back on the Expo-managed pair. The `react-native-worklets` entry in
+  `expo.install.exclude` and the exact `0.10.1` pin were removed on 2026-10-17 (see the
+  retired-override note below).
+
+#### Changes that matter for Soli
+
+- Reanimated 4.7: a new layout-animation engine is the default (Soli uses no
+  `entering`/`exiting`/`layout` props). `measure()` on an unmounted animated ref now
+  returns `null` and logs a warning instead of throwing; Soli measures the undo-scrubber
+  track with `measureInWindow` (RN API), not Reanimated `measure`, so only watch logs.
+  `AnimatedRefOnUI` became a Shareable. 4.7.1 fixes a crash with `react-native-screens`
+  older than 4.27 (SDK 58 bundles 4.30).
+- Worklets 0.13: removed `FETCH_PREVIEW_ENABLED` and the Serializable handle;
+  `makeShareable` is eager.
+- Jest setup changed with 4.7 (2026-10-17): importing Reanimated under Jest threw
+  `setCSSEventHandler is not available in JSReanimated` because `IS_JEST` selects the JS
+  module and `initializers.native.ts` now registers the CSS event handler. The documented
+  fix is the official resolver, `"resolver": "react-native-reanimated/jest/resolver"` in the
+  Jest config, which resolves the web/JS implementations of Reanimated and Worklets (it
+  chains to `react-native-worklets/jest/resolver`). That slot used to hold
+  `jest-pnp-resolver`, which was removed (Soli uses `nodeLinker: node-modules`). With the
+  resolver in place the former `test/setup/mock-worklets.ts`
+  (`jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'))`) was
+  redundant (45 suites green with and without it) and was deleted. Trade-off: tests now run
+  the Worklets web implementation instead of the mock; if a test ever needs the mock's
+  behavior, re-add that one-line setup file.
+- Hermes V1 memory regression: fixed since `expo@57.0.9`; SDK 58 carries the fix. Do not
+  enable Worklets bundle mode and do not toggle Hermes V1 (upstream Expo skill guidance).
+
+#### Retired override: Worklets `0.10.1` over Expo SDK 57's `0.10.0` (2026-07 to 2026-10)
+
+The "Worklets 0.10.0 iOS remote-callback crash" section below is historical. Soli pinned
+`0.10.1` and excluded the package from Expo's checks because `0.10.1` fixed an
+`EXC_CRASH`/`SIGABRT` in `JSIWorkletsModuleProxy.cpp` seen after a 20-game iOS playlist.
+Expo SDK 58 bundles `0.13.0`, which is ahead of that fix, so the exclusion is gone and
+Expo tooling validates Worklets again. Rule going forward: pin Reanimated/Worklets only via
+`npx expo install --fix`; if a new upstream defect appears, prefer waiting for the Expo
+patch over re-adding an exclusion.
+
+A clean native rebuild (delete `ios/` and `android/`, plus the package-level
+`android/{.cxx,build}` caches listed below) is still mandatory after any Worklets change.
 
 ### Expo SDK 57 Reanimated / Worklets Notes
 
@@ -48,7 +108,7 @@ The sections below are the definitive combined notes for this package or tool. K
 - Because Soli is animation-heavy, native validation should include stock draw, drag/tap
   moves, undo, auto-up, settings/history sheets, and a quick repeated-game sanity pass.
 
-### Worklets 0.10.0 iOS remote-callback crash
+### Worklets 0.10.0 iOS remote-callback crash (historical: SDK 57 override, retired 2026-10-17)
 
 - Retrieved: 2026-07-04
 - Current Soli pair: Reanimated `4.5.0` and Worklets `0.10.1`; Worklets is an

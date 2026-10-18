@@ -120,11 +120,13 @@ const IconBadge = ({ size = 140 }: { size?: number }) => {
         boxShadow: '0 6px 16px rgba(4, 17, 9, 0.1225)',
       }}
     >
+      {/* RN 0.88 removed the deprecated `borderRadius` Image prop from its types; the
+          Tamagui Image prop type follows RN here, so round via `style` instead. */}
       <Image
         src={ICON_SOURCE}
         width={iconSize}
         height={iconSize}
-        borderRadius={iconRadius}
+        style={{ borderRadius: iconRadius }}
         objectFit="contain"
       />
     </View>

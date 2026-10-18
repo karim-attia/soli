@@ -191,6 +191,7 @@ describe('gamePersistence (payload v1: deal + move log + final snapshot + clock)
       exactId: state.exactId,
       drawCount: state.drawCount,
       revealInitialWaste: true,
+      vegasRules: false,
     })
     expect(payload.moveLog).toEqual([{ k: 'draw' }])
     expect(payload.finalSnapshot.moveCount).toBe(1)
@@ -320,6 +321,85 @@ describe('gamePersistence (payload v1: deal + move log + final snapshot + clock)
     const loaded = await loadGameState()
     expect(boardSignature(loaded!.state)).toBe(boardSignature(live))
     expect(loaded!.state.history).toHaveLength(0)
+  })
+
+  it('restores the score tally through replay and keeps the stored snapshot tally', async () => {
+    const live = playRandomGame(23, 60)
+    const { loaded } = await saveAndReload(live)
+    expect(loaded!.state.score).toEqual(live.score)
+    expect(loaded!.state.stockPasses).toBe(live.stockPasses)
+    // History snapshots carry their own tallies too (undo restores them).
+    loaded!.state.history.forEach((snapshot, index) => {
+      expect(snapshot.score).toEqual(live.history[index].score)
+    })
+  })
+
+  it('loads a pre-scoring payload (no score/stockPasses on the snapshot) without throwing', async () => {
+    const live = playRandomGame(29, 30, { allowScrub: false })
+    await saveGameStateWithHistory(live, null)
+    const [, serialized] = (Storage.setItem as jest.Mock).mock.calls[0]
+    const payload = JSON.parse(serialized as string)
+    delete payload.finalSnapshot.score
+    delete payload.finalSnapshot.stockPasses
+
+    // Replay path: the tally is recomputed from the log.
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+    const replayed = await loadGameState()
+    expect(replayed!.state.score).toEqual(live.score)
+
+    // Snapshot-fallback path (version bump): defaults to the deal-time tally.
+    payload.moveLogVersion = 999
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+    const fallback = await loadGameState()
+    expect(fallback!.state.score).toEqual({ standard: 0, vegas: -52 })
+    expect(fallback!.state.stockPasses).toBe(0)
+  })
+
+  // Vegas pass limits (scoring plan, Phase 2): the rule set is part of the deal.
+  it('loads a pre-Phase-2 payload (no vegasRules anywhere) as an unlimited game that replays identically', async () => {
+    const live = playRandomGame(31, 80, { allowScrub: false })
+    expect(live.vegasRules).toBe(false)
+    await saveGameStateWithHistory(live, null)
+    const [, serialized] = (Storage.setItem as jest.Mock).mock.calls[0]
+    const payload = JSON.parse(serialized as string)
+    expect(payload.deal.vegasRules).toBe(false)
+    delete payload.deal.vegasRules
+    delete payload.finalSnapshot.vegasRules
+
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+    const replayed = await loadGameState()
+    expect(replayed!.state.vegasRules).toBe(false)
+    expect(boardSignature(replayed!.state)).toBe(boardSignature(live))
+    expect(replayed!.state.history).toHaveLength(live.history.length)
+    expect(replayed!.state.stockPasses).toBe(live.stockPasses)
+
+    payload.moveLogVersion = 999
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+    const fallback = await loadGameState()
+    expect(fallback!.state.vegasRules).toBe(false)
+  })
+
+  it('round-trips a Vegas-rules game through replay AND the snapshot fallback', async () => {
+    let live = createInitialState(1, true)
+    for (let index = 0; index < 24; index += 1) {
+      live = klondikeReducer(live, { type: 'DRAW_OR_RECYCLE' })
+    }
+    // The 24th tap was a refused recycle: nothing logged, stock stays empty.
+    expect(live.moveLog).toHaveLength(23)
+    expect(live.stock).toHaveLength(0)
+
+    const { loaded } = await saveAndReload(live)
+    expect(loaded!.state.vegasRules).toBe(true)
+    expect(boardSignature(loaded!.state)).toBe(boardSignature(live))
+    expect(loaded!.state.history).toHaveLength(23)
+
+    const [, serialized] = (Storage.setItem as jest.Mock).mock.calls[0]
+    const payload = JSON.parse(serialized as string)
+    payload.moveLogVersion = 999
+    ;(Storage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(payload))
+    const fallback = await loadGameState()
+    expect(fallback!.state.vegasRules).toBe(true)
+    expect(boardSignature(fallback!.state)).toBe(boardSignature(live))
   })
 
   it('falls back to the final snapshot when the replayed depth mismatches the guard (R1)', async () => {

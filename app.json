@@ -8,12 +8,13 @@
     "icon": "./assets/images/icon.png",
     "scheme": "soli",
     "userInterfaceStyle": "automatic",
-    "assetBundlePatterns": ["**/*"],
     "ios": {
+      "icon": "./assets/app.icon",
       "supportsTablet": true,
       "bundleIdentifier": "ch.karimattia.soli",
       "buildNumber": "15",
       "deploymentTarget": "16.4",
+      "associatedDomains": ["applinks:karimattia.ch"],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -21,15 +22,30 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#0b8b3c"
+        "monochromeImage": "./assets/images/adaptive-icon-monochrome.png",
+        "backgroundColor": "#416F57"
       },
       "package": "ch.karimattia.soli",
       "versionCode": 16,
-      "permissions": []
+      "permissions": [],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "karimattia.ch",
+              "pathPrefix": "/soli/deal"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png",
       "backgroundColor": "#0b8b3c",
       "display": "standalone",

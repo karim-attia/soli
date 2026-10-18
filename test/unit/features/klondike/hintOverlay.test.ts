@@ -194,9 +194,14 @@ describe('notice bubble texts', () => {
     expect(UNWINNABLE_BUBBLE_TEXT).toContain('winning moves')
   })
 
+  // Standard wording only: the Hint button is hidden on Vegas-rules games (round
+  // 2), so the fallback notice never needs the Vegas result text.
   it('picks the stuck wording only when the stock is played out', () => {
-    expect(getHintFallbackNoticeText(0)).toBe(STUCK_BUBBLE_TEXT)
-    expect(getHintFallbackNoticeText(1)).toBe(NO_HINT_BUBBLE_TEXT)
-    expect(getHintFallbackNoticeText(24)).toBe(NO_HINT_BUBBLE_TEXT)
+    const board = (stockLength: number) => ({
+      stock: Array.from({ length: stockLength }, () => ({}) as never),
+    })
+    expect(getHintFallbackNoticeText(board(0))).toBe(STUCK_BUBBLE_TEXT)
+    expect(getHintFallbackNoticeText(board(1))).toBe(NO_HINT_BUBBLE_TEXT)
+    expect(getHintFallbackNoticeText(board(24))).toBe(NO_HINT_BUBBLE_TEXT)
   })
 })

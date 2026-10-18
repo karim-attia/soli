@@ -1,0 +1,149 @@
+{
+  "fill-specializations": [
+    {
+      "value": {
+        "solid": "extended-srgb:0.25490,0.43529,0.34118,1.00000"
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "solid": "extended-srgb:0.18039,0.33333,0.25882,1.00000"
+      }
+    }
+  ],
+  "groups": [
+    {
+      "name": "stripes",
+      "lighting": "combined",
+      "specular": true,
+      "blur-material": null,
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.2
+      },
+      "layers": [
+        {
+          "name": "stripe-navy",
+          "image-name": "stripe-navy.svg",
+          "glass": true,
+          "hidden": false,
+          "position": {
+            "scale": 1.15,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "fill-specializations": [
+            {
+              "value": "automatic"
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "extended-gray:0.550,1.000"
+              }
+            }
+          ]
+        },
+        {
+          "name": "stripe-red",
+          "image-name": "stripe-red.svg",
+          "glass": true,
+          "hidden": false,
+          "position": {
+            "scale": 1.15,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "fill-specializations": [
+            {
+              "value": "automatic"
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "extended-gray:0.750,1.000"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "spade",
+      "lighting": "combined",
+      "specular": true,
+      "blur-material": null,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.4
+      },
+      "layers": [
+        {
+          "name": "stem",
+          "image-name": "stem.svg",
+          "glass": true,
+          "hidden": false,
+          "position": {
+            "scale": 1.15,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "fill-specializations": [
+            {
+              "value": "automatic"
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "extended-gray:0.450,1.000"
+              }
+            }
+          ]
+        },
+        {
+          "name": "spade",
+          "image-name": "spade.svg",
+          "glass": true,
+          "hidden": false,
+          "position": {
+            "scale": 1.15,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "fill-specializations": [
+            {
+              "value": "automatic"
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "extended-gray:1.000,1.000"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared",
+    "circles": []
+  }
+}

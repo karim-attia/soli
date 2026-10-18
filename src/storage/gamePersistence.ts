@@ -72,6 +72,10 @@ interface PersistedGamePayload {
     exactId: string
     drawCount: DrawCount
     revealInitialWaste: boolean
+    // Vegas pass limit (Phase 2). Optional: payloads written before 2026-10-12
+    // lack it and load as unlimited games. Lives next to drawCount because the
+    // replay base needs it even when the stored snapshot is unusable.
+    vegasRules?: boolean
   }
   moveLog: MoveLogEntry[]
   finalSnapshot: GameSnapshot
@@ -111,6 +115,7 @@ const serializeState = (
     exactId: state.exactId,
     drawCount: state.drawCount,
     revealInitialWaste: state.initialWasteRevealed,
+    vegasRules: state.vegasRules,
   },
   // Demo board: custom 42-card layout, NOT reconstructible from its exactId — persist
   // an empty log so load takes the snapshot-fallback path by design (empty undo
@@ -283,6 +288,7 @@ const buildReplayedState = (
     const base = createGameStateFromExactId(payload.deal.exactId, drawCount, {
       revealInitialWaste: payload.deal.revealInitialWaste,
       autoUpEnabled: initialAutoUpFromMoveLog(payload.moveLog, payload.autoUpEnabled),
+      vegasRules: payload.deal.vegasRules === true,
     })
     replayed = replayMoveLog(base, payload.moveLog)
   } catch (error) {

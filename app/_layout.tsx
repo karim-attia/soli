@@ -1,11 +1,9 @@
 import '../tamagui-web.css'
 
-import { useEffect } from 'react'
 import { useColorScheme } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation'
-import { useFonts } from 'expo-font'
-import { SplashScreen, Stack } from 'expo-router'
+import { Stack } from 'expo-router'
 import { Provider } from 'components/Provider'
 import { isDarkTheme, resolveThemeName } from '../src/theme'
 
@@ -16,29 +14,25 @@ export {
 
 export const unstable_settings = {
   // Ensure that reloading on a nested route keeps a back button present.
-  initialRouteName: '(tabs)',
+  // `anchor` replaced `initialRouteName` in Expo Router 58 (SDK 57 -> 58 migration guide);
+  // same semantics, only the key changed.
+  anchor: '(tabs)',
 }
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync()
+// 2026-10-17: no font loading and no manual splash gating here on purpose. This layout
+// used to `useFonts` Inter-Medium/Inter-Bold (as `Inter`/`InterBold`) and hold the splash
+// screen until they loaded — a leftover from the Tamagui config v4 era. Since config v5
+// (June 2026) Tamagui's `body`/`heading` fonts are `createSystemFont()` (native family
+// "System", web CSS stack without Inter), and nothing in Soli sets `fontFamily: 'Inter'`
+// (cards use the embedded `CardTextAndroid` family via app.json's expo-font plugin), so
+// the two OTFs were loaded and never drawn. Embedding them with the expo-font plugin
+// (SDK 58 candidate C4) would only have embedded unused files. Expo Router holds the splash
+// itself (`_internal_preventAutoHideAsync` in renderRootComponent) and releases it once the
+// first route is mounted, so no `SplashScreen.preventAutoHideAsync`/`hideAsync` pair is
+// needed. If a custom UI font is ever wanted again: embed it via the expo-font config plugin
+// (not useFonts) and point Tamagui's font config at it per platform (iOS = PostScript name).
 
 export default function RootLayout() {
-  const [fontsLoaded, fontsError] = useFonts({
-    Inter: require('@tamagui/font-inter/otf/Inter-Medium.otf'),
-    InterBold: require('@tamagui/font-inter/otf/Inter-Bold.otf'),
-  })
-
-  useEffect(() => {
-    if (fontsLoaded || fontsError) {
-      // Hide the splash screen after the fonts have loaded (or an error was returned) and the UI is ready.
-      SplashScreen.hideAsync()
-    }
-  }, [fontsLoaded, fontsError])
-
-  if (!fontsLoaded && !fontsError) {
-    return null
-  }
-
   return (
     <Providers>
       <RootLayoutNav />

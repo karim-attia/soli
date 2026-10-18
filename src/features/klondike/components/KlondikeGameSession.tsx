@@ -3,27 +3,30 @@ import { useEffect } from 'react'
 import {
   type LaunchDemoGameOptions,
   type RequestNewGameFn,
+  type RequestPlayDealFn,
   useKlondikeGame,
 } from '../hooks/useKlondikeGame'
+import { setSessionControls } from '../state/sessionControlsStore'
 import { KlondikeGameView } from './KlondikeGameView'
 
 export type KlondikeGameSessionControls = {
   developerModeEnabled: boolean
   requestNewGame: RequestNewGameFn
+  requestPlayDeal: RequestPlayDealFn
   handleLaunchDemoGame: (options?: LaunchDemoGameOptions) => void
   resetUndoHintForTesting: () => void
   seedHistoryForTesting: (action: 'seed' | 'clear') => void
   startCelebrationPreview: (modeId?: number) => void
 }
 
-type KlondikeGameSessionProps = {
-  onControlsChange: (controls: KlondikeGameSessionControls | null) => void
-}
-
-export const KlondikeGameSession = ({ onControlsChange }: KlondikeGameSessionProps) => {
+// Publishes its controls into sessionControlsStore (read by the game screen's header
+// AND the History tab's Retry button) instead of an onControlsChange prop — see the
+// store for the reasoning.
+export const KlondikeGameSession = () => {
   const {
     developerModeEnabled,
     requestNewGame,
+    requestPlayDeal,
     handleLaunchDemoGame,
     resetUndoHintForTesting,
     seedHistoryForTesting,
@@ -32,9 +35,10 @@ export const KlondikeGameSession = ({ onControlsChange }: KlondikeGameSessionPro
   } = useKlondikeGame()
 
   useEffect(() => {
-    onControlsChange({
+    setSessionControls({
       developerModeEnabled,
       requestNewGame,
+      requestPlayDeal,
       handleLaunchDemoGame,
       resetUndoHintForTesting,
       seedHistoryForTesting,
@@ -42,13 +46,13 @@ export const KlondikeGameSession = ({ onControlsChange }: KlondikeGameSessionPro
     })
 
     return () => {
-      onControlsChange(null)
+      setSessionControls(null)
     }
   }, [
     developerModeEnabled,
     handleLaunchDemoGame,
-    onControlsChange,
     requestNewGame,
+    requestPlayDeal,
     resetUndoHintForTesting,
     seedHistoryForTesting,
     startCelebrationPreview,

@@ -1,6 +1,52 @@
 # Expo Font Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-10-17
+
+## Refresh (2026-10-17, Expo SDK 58, `expo-font@58.0.8`)
+
+Sources (read 2026-10-17):
+
+- https://docs.expo.dev/develop/user-interface/fonts/
+- https://docs.expo.dev/versions/v58.0.0/sdk/font/
+- Installed plugin source: `node_modules/expo-font/plugin/build/{withFonts,withFontsIos,withFontsAndroid,utils}.js`
+
+Config plugin facts (verified against the installed source):
+
+- Options: `fonts` (string paths, applied to BOTH platforms), `android.fonts`
+  (strings or `{ fontFamily, fontDefinitions: [{ path, weight, style?, axes? }] }` objects),
+  `ios.fonts` (strings only). `withFonts.js` concatenates `fonts` + per-platform lists.
+- Paths resolve relative to the project root first, then via `require.resolve` from
+  `package.json` (`utils.js` `resolveFontPaths`), so `node_modules/...` paths work. A
+  directory path embeds every file in it.
+- iOS (`withFontsIos.js`): copies files into the Xcode `Resources` group and lists the base
+  names in `UIAppFonts`. The usable `fontFamily` is whatever the font file declares (family
+  name or PostScript name, name IDs 1/6), NOT the file name. Example from the two Inter OTFs
+  Soli used to load: `Inter-Medium.otf` declares family "Inter Medium" / PostScript
+  `Inter-Medium` (typographic family "Inter", weight 500); `Inter-Bold.otf` declares family
+  "Inter" / PostScript `Inter-Bold`. Docs: "On iOS, the font family name is always taken
+  directly from the font file and may not be the same as the file name."
+- Android (`withFontsAndroid.js`): string entries are copied to
+  `app/src/main/assets/fonts` and the file name (without extension) is the family name.
+  Object entries become `res/font/xml_<family>.xml` plus a
+  `ReactFontManager.getInstance().addCustomFont(this, "<family>", R.font.xml_<family>)` call
+  in `MainApplication`, so one family can carry several weights/styles (`weight` is
+  required, 1-1000; duplicate weight/style pairs throw at prebuild; `.ttf`/`.otf` only).
+  SDK 58 adds `axes` for variable fonts (`fontVariationSettings` in the XML).
+- Web: the plugin does nothing. Docs: "Config plugins only run on native platforms (Android
+  and iOS). For web, use the `useFonts` hook instead." (`loadAsync` emits an `@font-face`
+  block in the browser.)
+- Expo's recommendation: plugin on native ("embed font files at build time which is more
+  efficient than `useFonts` or `loadAsync`"), `useFonts` only where the plugin cannot run
+  (web, Expo Go). `useFonts` returns `[loaded, error]`; a family loads once per app run.
+- `getLoadedFonts()` lists both plugin-embedded and runtime-loaded families (handy for a
+  device check).
+
+Soli decision (SDK 58 candidate C4, 2026-10-17): `app/_layout.tsx` no longer loads any
+font at runtime. The Inter `useFonts` call + splash gating were removed because Tamagui
+config v5 uses `createSystemFont()` and no Soli code referenced `Inter`/`InterBold`, so
+the fonts were loaded but never drawn. The only fonts Soli ships are the three
+`CardTextAndroid` files via this plugin (config below). Do not add `useFonts` back for a
+UI font; embed it with the plugin and address it by its per-platform name.
 
 ## Scope
 
