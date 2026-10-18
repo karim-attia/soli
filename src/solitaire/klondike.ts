@@ -71,7 +71,12 @@ export type MoveTarget =
 // logs replay through this exact reducer, and a version mismatch makes load fall
 // back to the stored final snapshot instead of replaying with drifted rules.
 // See docs/product/move-log-persistence/move-log-persistence-and-resumable-history.md
-export const MOVE_LOG_VERSION = 1
+// v1 → v2 (2026-09-09, auto-complete reliability): scheduleAutoQueue now gates on
+// the simulated outcome of the run instead of the old drawCount/empty-draw-area
+// proxy, so shipped 1.0 logs would replay with different auto-queue scheduling
+// (and therefore different history depths). Bumping makes those logs take the
+// stored-snapshot fallback instead of replaying under the drifted rules.
+export const MOVE_LOG_VERSION = 2
 
 // Terse keys (k/sel/tgt) keep a ~300-move log at ~15–25 KB serialized.
 // `rh: false` mirrors recordHistory === false (demo/auto flows skip undo snapshots).
@@ -376,7 +381,13 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
       const workingState = haltAutoQueue(state)
       const nextState = scrubToIndex(workingState, action.index)
       if (nextState === workingState) {
-        return workingState
+        // Same hazard as the rejected APPLY_MOVE below: a scrub that lands on the
+        // index the timeline is already at changes nothing, so it must not halt a
+        // running auto queue either — the halted state was returned without
+        // finalizing, leaving isAutoCompleting false, an empty queue and nothing to
+        // restart the run. The first scrub that actually moves the timeline halts,
+        // logs and finalizes normally.
+        return state
       }
       // Review fix R2a (Codex, 2026-07-06): coalescing may only replace the previous
       // scrub entry when that scrub cannot have scheduled an auto-queue.
@@ -386,8 +397,12 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
       // changes are always logged, so nothing changed it in between), so check
       // auto-schedulability there. Conservative: an auto-ready board whose plan came
       // up empty also appends — harmless, replay applies extra scrubs exactly.
+      // Deliberately the cheap precondition rather than the full scheduling
+      // decision: it is a superset of the boards that can schedule (so it stays on
+      // the conservative side), and a scrub drag dispatches dozens of these per
+      // second — none of them may run the auto-complete simulation.
       const previousScrubMayHaveScheduled =
-        state.autoUpEnabled && isAutoCompleteReady(workingState)
+        state.autoUpEnabled && isTableauFullyFaceUp(workingState)
       return finalizeState(
         appendMoveLogEntry(
           nextState,
@@ -420,6 +435,12 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
         hydratedState.autoUpEnabled ? hydratedState : haltAutoQueue(hydratedState)
       )
     }
+    // Dead reducer paths (2026-09-09): nothing in src/, app/ or components/
+    // dispatches SELECT_* or CLEAR_SELECTION any more — they are left over from the
+    // pre-hint selection UI. Deliberately NOT fixed, but note the hazard before
+    // reviving any of them: like the old APPLY_MOVE/SCRUB_TO_INDEX no-op paths they
+    // halt the auto queue and return without finalizing, so a selection that changes
+    // nothing would stop a running auto-complete for good.
     case 'SELECT_TABLEAU':
       return handleSelectTableau(
         haltAutoQueue(state),
@@ -473,7 +494,16 @@ export const klondikeReducer = (state: GameState, action: GameAction): GameState
         recordHistory: action.recordHistory,
       })
       if (!nextState) {
-        return workingState
+        // A rejected move is a reference-equal no-op — NOT the halted state.
+        // Returning `workingState` used to kill a running auto-complete queue and
+        // then return without finalizing, so nothing ever rescheduled and the run
+        // stopped mid-board (reachable when a tap resolves against a stale ref
+        // during the 25–35 ms auto cadence). Rescheduling here instead is not an
+        // option: scheduleAutoQueue pushes a history snapshot and this path appends
+        // no move-log entry, so replay would drift (see the R2 review batch). Not
+        // halting at all is both simpler and correct — the player did not actually
+        // change anything, so neither does the reducer.
+        return state
       }
       return finalizeState(
         appendMoveLogEntry(nextState, {
@@ -1016,31 +1046,69 @@ const maybeSetWinFlag = (state: GameState): GameState => {
 const scheduleAutoQueue = (state: GameState): GameState => {
   if (
     !state.autoUpEnabled ||
-    !isAutoCompleteReady(state) ||
+    // Cheap precondition only — see isTableauFullyFaceUp. finalizeState runs on
+    // almost every action, so the simulation below must stay off the hot path for
+    // the whole midgame.
+    !isTableauFullyFaceUp(state) ||
     state.isAutoCompleting ||
     state.autoQueue.length
   ) {
     return state
   }
 
-  const planned = planAutoActions(state)
-  if (!planned.length) {
+  // 2026-09-09: the readiness gate is the simulated OUTCOME of the run, not a proxy
+  // for it. It used to be `drawCount === 1 || (stock and waste both empty)`, which
+  // was wrong in both directions:
+  //   - Draw 2–5: a board with every tableau card face up and playable cards still
+  //     sitting in the waste/stock was refused, even when the run would finish it
+  //     ("sometimes the board does not auto-complete", user report).
+  //   - Draw 1: an all-face-up but unfinishable board passed the gate, so a plan of
+  //     up to MAX_AUTO_COMPLETE_ITERATIONS draws/recycles was queued, animated, and —
+  //     since the board was still "ready" at the end — scheduled again forever, each
+  //     schedule pushing another history snapshot.
+  // Gating on the plan's end board fixes both: a run is only ever started when it
+  // provably finishes the game, whatever the draw count.
+  //
+  // Honest limitation: planAutoActions is greedy and only knows tableau-top →
+  // foundation, waste-top → foundation and waste-top → tableau. Boards a human could
+  // still finish (e.g. one needing a tableau → tableau move first) are refused and
+  // must be played by hand. Every board whose run the old gate actually finished is
+  // still accepted (same planner, same plan), so this only ever adds boards — but it
+  // is a greedy planner, not a solver.
+  const { actions, endState } = planAutoActions(state)
+  if (!actions.length || !isBoardCleared(endState)) {
     return state
   }
 
   return {
     ...state,
-    autoQueue: planned,
+    autoQueue: actions,
     isAutoCompleting: true,
     history: pushHistory(state),
     future: [],
   }
 }
 
-const planAutoActions = (state: GameState): AutoAction[] => {
+type AutoCompletePlan = {
+  actions: AutoAction[]
+  // The board the greedy simulation ended on. Returned so scheduleAutoQueue can
+  // gate on the real outcome instead of guessing from the starting position.
+  endState: GameState
+}
+
+const planAutoActions = (state: GameState): AutoCompletePlan => {
   let workingState: GameState = state
   const planned: AutoAction[] = []
   let steps = 0
+  // A stock pass with no move in it is a perfect no-op: drawing the whole stock
+  // leaves the waste as the exact reverse of the stock, and recycling reverses it
+  // back — so every following pass would repeat identically. The first recycle is
+  // always allowed (with draw 2–5 a partially played pass regroups the pile and
+  // surfaces different waste tops on the next one); a second one without a move in
+  // between cannot lead anywhere new. Keeps a hopeless plan at ~2 stock passes
+  // instead of MAX_AUTO_COMPLETE_ITERATIONS, which matters now that every action on
+  // an all-face-up board runs this simulation.
+  let plannedMoveSinceRecycle = true
 
   while (steps < MAX_AUTO_COMPLETE_ITERATIONS) {
     const selection = findAutoCompleteSource(workingState)
@@ -1059,6 +1127,7 @@ const planAutoActions = (state: GameState): AutoAction[] => {
 
       planned.push({ type: 'move', selection, target })
       workingState = nextState
+      plannedMoveSinceRecycle = true
       steps += 1
       continue
     }
@@ -1081,15 +1150,17 @@ const planAutoActions = (state: GameState): AutoAction[] => {
           target: supportMove.target,
         })
         workingState = nextState
+        plannedMoveSinceRecycle = true
         steps += 1
         continue
       }
     }
 
     if (!workingState.stock.length) {
-      if (workingState.waste.length) {
+      if (workingState.waste.length && plannedMoveSinceRecycle) {
         workingState = recycleWasteToStock(workingState, { recordHistory: false })
         planned.push({ type: 'recycle' })
+        plannedMoveSinceRecycle = false
         steps += 1
         continue
       }
@@ -1104,7 +1175,7 @@ const planAutoActions = (state: GameState): AutoAction[] => {
     steps += 1
   }
 
-  return planned
+  return { actions: planned, endState: workingState }
 }
 
 const findTableauSupportMove = (
@@ -1149,18 +1220,22 @@ const advanceAutoQueue = (state: GameState): GameState => {
   }
 }
 
-const isAutoCompleteReady = (state: GameState): boolean => {
-  const tableauIsFaceUp = state.tableau.every((column) =>
-    column.every((card) => card.faceUp)
-  )
+// Cheap precondition for auto-complete, NOT the readiness decision (that is the
+// simulated outcome in scheduleAutoQueue): with a face-down card left in the
+// tableau the run can never clear the board anyway, and this check is a handful of
+// comparisons instead of a full simulation. Keeping it in front matters because
+// finalizeState — and therefore scheduleAutoQueue — runs on almost every action.
+const isTableauFullyFaceUp = (state: GameState): boolean =>
+  state.tableau.every((column) => column.every((card) => card.faceUp))
 
-  // Draw 1 keeps its established early trigger. Higher draw rules wait until the
-  // whole top-right draw area is empty: no face-down stock and no face-up waste.
-  return (
-    tableauIsFaceUp &&
-    (state.drawCount === 1 || (!state.stock.length && !state.waste.length))
-  )
-}
+// "The planned run finishes the game": nothing is left outside the foundations.
+// Equivalent to all four foundations being complete for a real 52-card deal, but
+// phrased over the piles the run empties, so it also holds for the partial-deck
+// fixtures the unit tests build.
+const isBoardCleared = (state: GameState): boolean =>
+  !state.stock.length &&
+  !state.waste.length &&
+  state.tableau.every((column) => !column.length)
 
 const findAutoCompleteSource = (state: GameState): Selection | null => {
   for (let columnIndex = 0; columnIndex < state.tableau.length; columnIndex += 1) {

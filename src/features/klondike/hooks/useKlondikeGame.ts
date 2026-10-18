@@ -911,6 +911,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     dispatchGameAction,
     moveDelayMs: AUTO_QUEUE_MOVE_DELAY_MS,
     intervalMs: AUTO_QUEUE_INTERVAL_MS,
+    // dispatchGameAction swallows every action while the board is locked, so the
+    // runner has to see the lock as well — otherwise its dispatch disappears and the
+    // queue never re-arms (see useAutoQueueRunner).
+    boardLocked,
   })
 
   // Stable per-position tableau press handler so the absolute card layer's memoized

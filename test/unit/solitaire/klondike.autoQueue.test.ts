@@ -142,6 +142,90 @@ describe('ADVANCE_AUTO_QUEUE', () => {
     expect(afterSecond.isAutoCompleting).toBe(false)
   })
 
+  // 2026-09-09 (auto-complete reliability): both actions used to halt the queue
+  // FIRST and then return the halted state without finalizing when they turned out
+  // to be no-ops, so the run stopped mid-board and nothing ever restarted it.
+  // Rescheduling instead of not halting was not an option: scheduleAutoQueue pushes
+  // a history snapshot and neither path appends a move-log entry, which is the
+  // replay drift the R2 review batch fixed. An action that changes nothing now
+  // changes nothing at all — including the queue.
+  it('keeps a running auto queue alive when a move is rejected', () => {
+    const state = createTestState({
+      tableau: tableauWith([card('hearts', 5)]),
+      autoQueue: [{ type: 'draw' }],
+      isAutoCompleting: true,
+    })
+
+    // 5♥ cannot go to an empty hearts foundation.
+    const next = klondikeReducer(state, {
+      type: 'APPLY_MOVE',
+      selection: { source: 'tableau', columnIndex: 0, cardIndex: 0 },
+      target: { type: 'foundation', suit: 'hearts' },
+    })
+
+    expect(next).toBe(state)
+    expect(next.autoQueue).toEqual([{ type: 'draw' }])
+    expect(next.isAutoCompleting).toBe(true)
+  })
+
+  it('keeps a running auto queue alive when a scrub lands on the current index', () => {
+    const state = createTestState({
+      tableau: tableauWith([card('hearts', 5)]),
+      autoQueue: [{ type: 'draw' }],
+      isAutoCompleting: true,
+    })
+
+    const next = klondikeReducer(state, { type: 'SCRUB_TO_INDEX', index: 0 })
+
+    expect(next).toBe(state)
+    expect(next.autoQueue).toEqual([{ type: 'draw' }])
+    expect(next.isAutoCompleting).toBe(true)
+  })
+
+  // "pops a queued move that is no longer valid" above covers the drop itself, but
+  // only on a one-item queue, where "dropped it and carried on" and "gave up" look
+  // identical. Two things are pinned here instead: the run keeps going through a
+  // dropped step, and the state identity changes when it does — a bail-out that
+  // returned `state` would leave useAutoQueueRunner's effect deps untouched, so no
+  // new timeout is ever armed and the run freezes at isAutoCompleting: true (the
+  // same shape as the board-lock freeze). Plus the move-log parity below.
+  it('drops a queued move that no longer applies and keeps advancing', () => {
+    const state = createTestState({
+      tableau: tableauWith([card('hearts', 1)]),
+      autoQueue: [
+        // Column 1 is empty, so this queued move can never apply.
+        {
+          type: 'move',
+          selection: { source: 'tableau', columnIndex: 1, cardIndex: 0 },
+          target: { type: 'foundation', suit: 'hearts' },
+        },
+        {
+          type: 'move',
+          selection: { source: 'tableau', columnIndex: 0, cardIndex: 0 },
+          target: { type: 'foundation', suit: 'hearts' },
+        },
+      ],
+      isAutoCompleting: true,
+    })
+
+    const afterDrop = advance(state)
+
+    expect(afterDrop).not.toBe(state)
+    expect(afterDrop.autoQueue).toHaveLength(1)
+    expect(afterDrop.isAutoCompleting).toBe(true)
+    expect(afterDrop.foundations.hearts).toHaveLength(0)
+    // The dropped step still has to be logged: replay advances the queue by counting
+    // 'adv' entries, so skipping one here would desync every later entry.
+    expect(afterDrop.moveLog).toEqual([{ k: 'adv' }])
+
+    const afterRest = advance(afterDrop)
+
+    expect(afterRest.autoQueue).toHaveLength(0)
+    expect(afterRest.isAutoCompleting).toBe(false)
+    expect(afterRest.foundations.hearts).toHaveLength(1)
+    expect(afterRest.autoCompleteRuns).toBe(1)
+  })
+
   it('sets the win flag when the queue completes all foundations', () => {
     const state = createTestState({
       foundations: {
