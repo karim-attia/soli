@@ -1,7 +1,6 @@
 import React from 'react'
-import { Pressable, View } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
 import Animated from 'react-native-reanimated'
-import { Text } from 'tamagui'
 
 import type { Card, Suit } from '../../../../solitaire/klondike'
 import type { CardMetrics } from '../../types'

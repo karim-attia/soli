@@ -1,8 +1,8 @@
 import type { LayoutRectangle } from 'react-native'
 
 // resolveHintRects moved to cards/utils in F8: HintOverlayLayer now renders a
-// ghost CardVisual (tamagui import chain), so tests import the pure resolver
-// from the geometry module instead of the component module.
+// ghost CardVisual (RN/react-native-svg component import chain), so tests import
+// the pure resolver from the geometry module instead of the component module.
 import {
   computeTableauStackOffsets,
   computeWasteFanGeometry,

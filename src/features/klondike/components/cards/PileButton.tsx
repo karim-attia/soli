@@ -1,8 +1,8 @@
 import React from 'react'
-import { Pressable, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import type { PropsWithChildren } from 'react'
-import { Text, YStack } from 'tamagui'
 
+import { SPACE, usePalette } from '../../../../theme/tokens'
 import { styles } from './styles'
 
 export type PileButtonProps = PropsWithChildren<{
@@ -26,6 +26,7 @@ export const PileButton = ({
   testID,
   children,
 }: PileButtonProps) => {
+  const palette = usePalette()
   // Task 1-8: Fix pile alignment (labels must not change pile width / column alignment).
   const baseStyle = [
     styles.pilePressable,
@@ -49,18 +50,31 @@ export const PileButton = ({
   )
 
   return (
-    <YStack gap="$1" items="center" style={containerStyle}>
+    <View style={[localStyles.container, containerStyle]}>
       {body}
+      {/* Count label under the pile: theme `color8` at 45 % opacity, exactly what the
+          Tamagui `Text color="$color8"` rendered (board pixel parity, 2026-10-18). */}
       <Text
-        color="$color8"
-        fontSize={11}
-        fontWeight="400"
-        style={{ width: '100%', textAlign: 'center', opacity: 0.45 }}
+        style={[localStyles.label, { color: palette.color8 }]}
         numberOfLines={1}
         ellipsizeMode="clip"
       >
         {label}
       </Text>
-    </YStack>
+    </View>
   )
 }
+
+const localStyles = StyleSheet.create({
+  container: {
+    gap: SPACE[1],
+    alignItems: 'center',
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '400',
+    width: '100%',
+    textAlign: 'center',
+    opacity: 0.45,
+  },
+})

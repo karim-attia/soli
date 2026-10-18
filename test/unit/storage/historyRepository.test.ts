@@ -100,7 +100,7 @@ const sampleEntry = (overrides: Partial<HistoryEntry> = {}): HistoryEntry => ({
   ...overrides,
 })
 
-type Repository = typeof import('../../../src/storage/historyRepository.native')
+type Repository = typeof import('../../../src/storage/historyRepository')
 
 const loadRepository = (fake: ReturnType<typeof createFakeDatabase>): Repository => {
   let repository: Repository
@@ -109,12 +109,12 @@ const loadRepository = (fake: ReturnType<typeof createFakeDatabase>): Repository
     const sqlite = require('expo-sqlite') as { openDatabaseAsync: jest.Mock }
     sqlite.openDatabaseAsync.mockResolvedValue(fake.database)
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    repository = require('../../../src/storage/historyRepository.native') as Repository
+    repository = require('../../../src/storage/historyRepository') as Repository
   })
   return repository!
 }
 
-describe('historyRepository.native (v1 baseline schema + migration scaffold)', () => {
+describe('historyRepository (v1 baseline schema + migration scaffold)', () => {
   it('creates the frozen v1 baseline with CHECK constraints and no solved column', async () => {
     const fake = createFakeDatabase()
     const repository = loadRepository(fake)
@@ -137,7 +137,9 @@ describe('historyRepository.native (v1 baseline schema + migration scaffold)', (
     expect(schemaSql).toContain(') STRICT;')
     expect(schemaSql).toContain('CHECK (json_valid(preview_json))')
     expect(schemaSql).toContain('CHECK (moves_json IS NULL OR json_valid(moves_json))')
-    expect(schemaSql).toContain('CHECK ((moves_json IS NULL) = (move_log_version IS NULL))')
+    expect(schemaSql).toContain(
+      'CHECK ((moves_json IS NULL) = (move_log_version IS NULL))'
+    )
     // The v1 baseline must stay frozen: scoring columns arrive via the v2 ALTER step.
     expect(schemaSql).not.toContain('standard_score')
     expect(fake.getUserVersion()).toBe(2)
@@ -192,7 +194,9 @@ describe('historyRepository.native (v1 baseline schema + migration scaffold)', (
     expect(insert.params.slice(-4, -2)).toEqual([65, -37])
 
     fake.runCalls.length = 0
-    await repository.updateHistoryEntry(sampleEntry({ standardScore: null, vegasScore: null }))
+    await repository.updateHistoryEntry(
+      sampleEntry({ standardScore: null, vegasScore: null })
+    )
     const update = fake.runCalls.find(({ sql }) => sql.includes('UPDATE'))!
     expect(update.sql).toContain('standard_score = ?')
     expect(update.params.slice(-3)).toEqual([null, null, 'hist_test_1'])
@@ -518,7 +522,9 @@ describe('historyRepository.native (v1 baseline schema + migration scaffold)', (
         row('live', 'active', 999)
 
         const summary = (
-          db as unknown as { prepare: (sql: string) => { get: () => Record<string, number> } }
+          db as unknown as {
+            prepare: (sql: string) => { get: () => Record<string, number> }
+          }
         )
           .prepare(summarySql)
           .get()

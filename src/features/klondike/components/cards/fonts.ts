@@ -7,7 +7,9 @@
 // Do not remove native registration: falling back makes card text vary by device font.
 export const CARD_FONT_FAMILY = 'CardTextAndroid'
 export const CARD_RANK_FONT_FAMILY = CARD_FONT_FAMILY
-export const CARD_RANK_FONT_WEIGHT = '700'
+// `as const`: RN `TextStyle.fontWeight` wants the literal union; without it the weights
+// widen to `string` inside CardVisual's style objects (Tamagui's Text accepted strings).
+export const CARD_RANK_FONT_WEIGHT = '700' as const
 export const CARD_SUIT_FONT_FAMILY = CARD_FONT_FAMILY
-export const CARD_SUIT_FONT_WEIGHT = '600'
-export const CARD_CENTER_SUIT_FONT_WEIGHT = '600'
+export const CARD_SUIT_FONT_WEIGHT = '600' as const
+export const CARD_CENTER_SUIT_FONT_WEIGHT = '600' as const

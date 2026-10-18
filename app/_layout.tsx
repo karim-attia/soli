@@ -1,5 +1,3 @@
-import '../tamagui-web.css'
-
 import { useColorScheme } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation'
@@ -30,7 +28,8 @@ export const unstable_settings = {
 // itself (`_internal_preventAutoHideAsync` in renderRootComponent) and releases it once the
 // first route is mounted, so no `SplashScreen.preventAutoHideAsync`/`hideAsync` pair is
 // needed. If a custom UI font is ever wanted again: embed it via the expo-font config plugin
-// (not useFonts) and point Tamagui's font config at it per platform (iOS = PostScript name).
+// (not useFonts) and set its `fontFamily` in components/AppText.tsx (iOS = PostScript name).
+// (Tamagui itself was removed on 2026-10-18; UI text is plain RN `Text` via AppText.)
 
 export default function RootLayout() {
   return (

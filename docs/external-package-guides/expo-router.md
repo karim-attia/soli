@@ -126,6 +126,11 @@ the SDK 58 upgrade plan's Follow-ups). Do not restructure the Drawer to adopt it
 - React Navigation's `HeaderButton` provides platform press behavior, horizontal padding,
   and Android hit slop, but no iOS hit slop or guaranteed 44pt minimum. Keep explicit
   44pt iOS and 48dp Android control minima for clear accessible geometry.
+- Text actions in the header ("New Game", dev "Demo") are `components/navigation/
+  HeaderTextButton.tsx` = `HeaderButton` (`pressOpacity 0.65`, 44 pt min height, 6 px side
+  padding) + `AppText` 17/400 in the theme colour, on BOTH platforms since 2026-10-18 (Android
+  used Tamagui `Button` pills before). `HeaderButton` already is the native bar-item pattern,
+  so no Expo UI Host is used for header text actions.
 - Use Expo UI `Icon` inside the header button for the visual symbol: SF Symbol on iOS,
   Material Symbol XML on Android.
 - Expo UI `Icon.size` is optional. The installed SwiftUI Image bridge defaults to 24pt,
@@ -283,7 +288,8 @@ Official SDK 55 to 56 migration guide mappings:
 - Current migrated imports:
   - `app/_layout.tsx`: `DarkTheme`, `DefaultTheme`, `ThemeProvider` from
     `expo-router/react-navigation`.
-  - `app/(tabs)/index.tsx`: `HeaderButton` from `expo-router/react-navigation`.
+  - `components/navigation/{HeaderMenuButton,HeaderTextButton}.tsx`: `HeaderButton` from
+    `expo-router/react-navigation` (moved out of `app/(tabs)/index.tsx` on 2026-10-18).
   - `src/navigation/useDrawerOpener.ts`: drawer/navigation helpers from
     `expo-router/react-navigation`.
   - `src/features/klondike/hooks/useKlondikeTimer.ts`: `useFocusEffect` from

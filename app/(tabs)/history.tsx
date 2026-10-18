@@ -1,19 +1,20 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react'
-import { FlatList, Platform, Pressable, Share, useWindowDimensions } from 'react-native'
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation, useRouter } from 'expo-router'
-import {
-  Button,
-  Paragraph,
-  Separator,
-  Spinner,
-  Text,
-  XStack,
-  YStack,
-  useTheme,
-} from 'tamagui'
 
+import { AppButton } from '../../components/AppButton'
 import { AppSheet } from '../../components/AppSheet'
+import { AppText } from '../../components/AppText'
 import {
   HeaderMenuButton,
   HEADER_MENU_LEADING_PADDING,
@@ -29,6 +30,7 @@ import {
   useHistory,
 } from '../../src/state/history'
 import { useSettings, type ScoringMode } from '../../src/state/settings'
+import { SPACE, usePalette, type Palette } from '../../src/theme/tokens'
 import { devLog } from '../../src/utils/devLogger'
 import { formatElapsedDuration } from '../../src/utils/time'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
@@ -37,6 +39,7 @@ import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
 function HistoryScreen() {
   const navigation = useNavigation()
   const openDrawer = useDrawerOpener()
+  const palette = usePalette()
   // Pagination totals come from storage so the stats do not change as pages are loaded.
   const {
     entries,
@@ -81,13 +84,23 @@ function HistoryScreen() {
     ]
 
     return (
-      <YStack gap="$4" px="$3" pt="$4" pb="$4">
+      <View style={styles.listHeader}>
         <HistoryStatsRow stats={stats} />
 
-        <Separator />
-      </YStack>
+        {/* Tamagui's Separator drew its hairline in `backgroundFocus` (not `borderColor`). */}
+        <View style={[styles.separator, { backgroundColor: palette.backgroundFocus }]} />
+      </View>
     )
-  }, [incompleteCount, solvedCount, totalCount])
+  }, [incompleteCount, palette.backgroundFocus, solvedCount, totalCount])
+
+  const loadingFooter = useMemo(
+    () => (
+      <View style={styles.loadingFooter}>
+        <ActivityIndicator size="small" color={palette.color10} />
+      </View>
+    ),
+    [palette.color10]
+  )
 
   return (
     <>
@@ -103,7 +116,7 @@ function HistoryScreen() {
         )}
         ItemSeparatorComponent={ListSpacer}
         // RN 0.88 FlatList types no longer accept null here (undefined only).
-        ListFooterComponent={loadingMore ? LoadingFooter : undefined}
+        ListFooterComponent={loadingMore ? loadingFooter : undefined}
         contentContainerStyle={{ paddingBottom: 64 }}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}
@@ -127,37 +140,26 @@ type HistoryListItemProps = {
   onSelect: (entry: HistoryEntry) => void
 }
 
-// Task 10-6: Map status to display labels and colors.
+// Task 10-6: Map status to display labels and colors (palette keys).
 const STATUS_DISPLAY: Record<
   HistoryEntryStatus,
-  { label: string; colorKey: 'green' | 'yellow' | 'blue' }
+  { label: string; colorKey: 'green10' | 'yellow11' | 'blue10' }
 > = {
-  solved: { label: 'Solved', colorKey: 'green' },
-  incomplete: { label: 'Incomplete', colorKey: 'yellow' },
-  active: { label: 'Active', colorKey: 'blue' },
+  solved: { label: 'Solved', colorKey: 'green10' },
+  incomplete: { label: 'Incomplete', colorKey: 'yellow11' },
+  active: { label: 'Active', colorKey: 'blue10' },
 }
 
 // Feedback round 2: plain colored text instead of Badge pills — the pills were
 // "too aggressive and colorful". Shared by list rows and the sheet header.
 const StatusText = ({ status }: { status: HistoryEntryStatus }) => {
-  const theme = useTheme()
+  const palette = usePalette()
   const display = STATUS_DISPLAY[status] ?? STATUS_DISPLAY.incomplete
-  const color = useMemo(() => {
-    switch (display.colorKey) {
-      case 'green':
-        return theme.green10?.val ?? '#15803d'
-      case 'blue':
-        return theme.blue10?.val ?? '#1d4ed8'
-      case 'yellow':
-      default:
-        return theme.yellow11?.val ?? '#854d0e'
-    }
-  }, [display.colorKey, theme.blue10?.val, theme.green10?.val, theme.yellow11?.val])
 
   return (
-    <Text fontSize={14} fontWeight="600" style={{ color, flexShrink: 0 }}>
+    <AppText variant="plain" color={palette[display.colorKey]} style={styles.statusText}>
       {display.label}
-    </Text>
+    </AppText>
   )
 }
 
@@ -173,7 +175,7 @@ const formatEntryTimeLabel = (entry: HistoryEntry) =>
 // so the only break opportunities are the regular spaces after a "·" — an
 // overflowing line moves whole sections down instead of splitting "80 moves" or
 // the date mid-way.
-const NBSP = '\u00A0'
+const NBSP = ' '
 const joinWrappingSegments = (segments: string[]): string =>
   segments.map((segment) => segment.split(' ').join(NBSP)).join(`${NBSP}· `)
 
@@ -204,21 +206,31 @@ const formatEntryMetadata = (entry: HistoryEntry, scoring: ScoringMode): string 
   return joinWrappingSegments(segments)
 }
 
+// Row title + status line, shared by the list card and the sheet header.
+const EntryHeading = ({
+  entry,
+  scoring,
+}: {
+  entry: HistoryEntry
+  scoring: ScoringMode
+}) => (
+  <>
+    <View style={styles.headingRow}>
+      <AppText variant="title" numberOfLines={1} style={styles.flex1}>
+        {entry.displayName}
+      </AppText>
+      <StatusText status={entry.status} />
+    </View>
+
+    <AppText variant="caption">{formatEntryMetadata(entry, scoring)}</AppText>
+  </>
+)
+
 // History-entries-cleanup B4: memoized so FlatList re-renders (pagination, sheet
 // open/close) don't re-render unchanged rows.
 const HistoryListItem = memo(({ entry, scoring, onSelect }: HistoryListItemProps) => {
-  const theme = useTheme()
+  const palette = usePalette()
   const onPress = useCallback(() => onSelect(entry), [entry, onSelect])
-
-  const cardStyle = useMemo(
-    () => ({
-      padding: 14,
-      borderRadius: 16,
-      borderWidth: 0.5,
-      borderColor: theme.color4?.val ?? '#cbd5f5',
-    }),
-    [theme.color4?.val]
-  )
 
   return (
     <Pressable
@@ -226,33 +238,20 @@ const HistoryListItem = memo(({ entry, scoring, onSelect }: HistoryListItemProps
       onPress={onPress}
       style={({ pressed }) => ({ width: '100%', opacity: pressed ? 0.7 : 1 })}
     >
-      <YStack gap="$2" style={cardStyle} mx="$3" bg="$color3">
-        <XStack
-          gap="$2"
-          style={{ alignItems: 'center', justifyContent: 'space-between' }}
-        >
-          <Text fontSize={16} fontWeight="700" flex={1} numberOfLines={1}>
-            {entry.displayName}
-          </Text>
-          <StatusText status={entry.status} />
-        </XStack>
-
-        <Paragraph color="$color10" fontSize={14}>
-          {formatEntryMetadata(entry, scoring)}
-        </Paragraph>
-      </YStack>
+      <View
+        style={[
+          styles.card,
+          { borderColor: palette.color4, backgroundColor: palette.color3 },
+        ]}
+      >
+        <EntryHeading entry={entry} scoring={scoring} />
+      </View>
     </Pressable>
   )
 })
 HistoryListItem.displayName = 'HistoryListItem'
 
-const ListSpacer = () => <YStack height="$2" />
-
-const LoadingFooter = () => (
-  <YStack py="$3" style={{ alignItems: 'center' }}>
-    <Spinner size="small" color="$color10" />
-  </YStack>
-)
+const ListSpacer = () => <View style={styles.listSpacer} />
 
 const EmptyHistory = ({
   hydrated,
@@ -262,18 +261,21 @@ const EmptyHistory = ({
   hydrated: boolean
   paddingHorizontal: number
   paddingVertical: number
-}) => (
-  <YStack gap="$3" style={{ paddingHorizontal, paddingVertical }}>
-    <Text fontSize={18} fontWeight="600">
-      {hydrated ? 'No games recorded yet' : 'Loading history…'}
-    </Text>
-    <Paragraph color="$color10">
-      {hydrated
-        ? 'Play a game of Klondike to start building your history. Completed games and their deals will appear here.'
-        : 'Please wait while we retrieve your recent games.'}
-    </Paragraph>
-  </YStack>
-)
+}) => {
+  const palette = usePalette()
+  return (
+    <View style={[styles.empty, { paddingHorizontal, paddingVertical }]}>
+      <AppText variant="plain" style={styles.emptyTitle}>
+        {hydrated ? 'No games recorded yet' : 'Loading history…'}
+      </AppText>
+      <AppText color={palette.color10}>
+        {hydrated
+          ? 'Play a game of Klondike to start building your history. Completed games and their deals will appear here.'
+          : 'Please wait while we retrieve your recent games.'}
+      </AppText>
+    </View>
+  )
+}
 
 const isSameCalendarDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() &&
@@ -331,61 +333,38 @@ type HistoryStat = {
 }
 
 const HistoryStatsRow = ({ stats }: { stats: HistoryStat[] }) => (
-  <XStack gap="$3" flexWrap="wrap">
+  <View style={styles.statsRow}>
     {stats.map((stat) => (
       <HistoryStatTile key={stat.label} stat={stat} />
     ))}
-  </XStack>
+  </View>
 )
 
-const HistoryStatTile = ({ stat }: { stat: HistoryStat }) => {
-  const theme = useTheme()
-  const { backgroundColor, borderColor, textColor } = useMemo(() => {
-    switch (stat.tone) {
-      case 'success':
-        return {
-          backgroundColor: theme.green3?.val ?? '#dcfce7',
-          borderColor: theme.green7?.val ?? '#15803d',
-          textColor: theme.green11?.val ?? '#14532d',
-        }
-      case 'warning':
-        return {
-          backgroundColor: theme.yellow3?.val ?? '#fef9c3',
-          borderColor: theme.yellow7?.val ?? '#a16207',
-          textColor: theme.yellow11?.val ?? '#713f12',
-        }
-      default:
-        return {
-          backgroundColor: theme.color3?.val ?? '#f1f5f9',
-          borderColor: theme.color7?.val ?? '#334155',
-          textColor: theme.color11?.val ?? '#0f172a',
-        }
-    }
-  }, [stat.tone, theme])
+// Tile colours per tone: [background, border, text] palette keys.
+const STAT_TONE_COLORS: Record<
+  HistoryStat['tone'],
+  [keyof Palette, keyof Palette, keyof Palette]
+> = {
+  success: ['green3', 'green7', 'green11'],
+  warning: ['yellow3', 'yellow7', 'yellow11'],
+  neutral: ['color3', 'color7', 'color11'],
+}
 
-  const tileStyle = useMemo(
-    () => ({
-      minWidth: 100,
-      flex: 1,
-      paddingVertical: 16,
-      paddingHorizontal: 16,
-      borderRadius: 16,
-      backgroundColor,
-      borderWidth: 1,
-      borderColor,
-    }),
-    [backgroundColor, borderColor]
+const HistoryStatTile = ({ stat }: { stat: HistoryStat }) => {
+  const palette = usePalette()
+  const [backgroundColor, borderColor, textColor] = STAT_TONE_COLORS[stat.tone].map(
+    (key) => palette[key]
   )
 
   return (
-    <YStack gap="$1" style={tileStyle}>
-      <Text fontSize={13} fontWeight="600" style={{ color: textColor, opacity: 0.8 }}>
+    <View style={[styles.tile, { backgroundColor, borderColor }]}>
+      <AppText variant="plain" color={textColor} style={styles.tileLabel}>
         {stat.label}
-      </Text>
-      <Text fontSize={24} fontWeight="800" style={{ color: textColor }}>
+      </AppText>
+      <AppText variant="plain" color={textColor} style={styles.tileValue}>
         {stat.value}
-      </Text>
-    </YStack>
+      </AppText>
+    </View>
   )
 }
 
@@ -448,54 +427,89 @@ const HistoryPreviewSheet = ({ entry, onDismiss }: HistoryPreviewSheetProps) => 
     <AppSheet isPresented onDismiss={onDismiss}>
       {/* Expo UI's content-sized sheet doesn't apply a bottom safe-area inset to the
           RN content, so pad manually (home-indicator devices need more than 16). */}
-      <YStack gap="$3" width={contentWidth} pb={Math.max(16, insets.bottom)}>
-        <YStack gap="$1">
-          <XStack
-            gap="$2"
-            style={{ alignItems: 'center', justifyContent: 'space-between' }}
-          >
-            <Text fontSize={16} fontWeight="700" flex={1} numberOfLines={1}>
-              {entry.displayName}
-            </Text>
-            <StatusText status={entry.status} />
-          </XStack>
-          <Paragraph color="$color10" fontSize={14}>
-            {formatEntryMetadata(entry, scoring)}
-          </Paragraph>
-        </YStack>
+      <View
+        style={[
+          styles.sheet,
+          { width: contentWidth, paddingBottom: Math.max(16, insets.bottom) },
+        ]}
+      >
+        <View style={styles.sheetHeading}>
+          <EntryHeading entry={entry} scoring={scoring} />
+        </View>
 
         <BoardPreview tableau={entry.preview.tableau} availableWidth={contentWidth} />
 
         {/* "Retry" = this deal from scratch (not resume — see plan Follow-ups); "Share"
-            = public link to the same deal. Plain tamagui Buttons like the demo sheet:
+            = public link to the same deal. AppButton (RN Pressable) like the demo sheet:
             Expo UI controls inside a sheet had unreliable gestures on Android. a11y
             handles: label (Android) + testID (iOS). Both shown for every status. */}
-        <XStack gap="$2">
-          <Button
-            size="$3"
-            flex={1}
+        <View style={styles.buttonRow}>
+          <AppButton
+            label="Retry"
+            style={styles.flex1}
             disabled={!canRetry}
-            opacity={canRetry ? 1 : 0.5}
             onPress={handleRetry}
             accessibilityLabel="Retry this deal"
             testID="history-retry"
-          >
-            Retry
-          </Button>
-          <Button
-            size="$3"
-            flex={1}
+          />
+          <AppButton
+            label="Share"
+            style={styles.flex1}
             onPress={handleShare}
             accessibilityLabel="Share this deal"
             testID="history-share"
-          >
-            Share
-          </Button>
-        </XStack>
-      </YStack>
+          />
+        </View>
+      </View>
     </AppSheet>
   )
 }
+
+// Gaps/paddings are the Tamagui space tokens this screen used ($1..$4); heights that
+// used the `$2` token resolved against the SIZE scale (28), not space (7).
+const styles = StyleSheet.create({
+  flex1: { flex: 1 },
+  listHeader: {
+    gap: SPACE[4],
+    paddingHorizontal: SPACE[3],
+    paddingTop: SPACE[4],
+    paddingBottom: SPACE[4],
+  },
+  separator: { height: 1 },
+  loadingFooter: { paddingVertical: SPACE[3], alignItems: 'center' },
+  statusText: { fontSize: 14, fontWeight: '600', flexShrink: 0 },
+  headingRow: {
+    flexDirection: 'row',
+    gap: SPACE[2],
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  card: {
+    gap: SPACE[2],
+    marginHorizontal: SPACE[3],
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 0.5,
+  },
+  listSpacer: { height: 28 },
+  empty: { gap: SPACE[3] },
+  emptyTitle: { fontSize: 18, fontWeight: '600' },
+  statsRow: { flexDirection: 'row', gap: SPACE[3], flexWrap: 'wrap' },
+  tile: {
+    gap: SPACE[1],
+    minWidth: 100,
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  tileLabel: { fontSize: 13, fontWeight: '600', opacity: 0.8 },
+  tileValue: { fontSize: 24, fontWeight: '800' },
+  sheet: { gap: SPACE[3] },
+  sheetHeading: { gap: SPACE[1] },
+  buttonRow: { flexDirection: 'row', gap: SPACE[2] },
+})
 
 // PBI-17: Memoize the entire screen component to prevent re-renders
 export default memo(HistoryScreen)

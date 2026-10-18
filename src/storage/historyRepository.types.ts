@@ -26,6 +26,5 @@ export type SolvableDealHistoryStats = {
 }
 
 // Note: a `HistoryRepository` interface used to live here as an (unenforced)
-// contract for the .native/.web split; it was never referenced, so it was removed
-// in the clean-code review. The web stub must still mirror the native module's
-// exports manually — typecheck catches missing exports at the import sites.
+// contract for the former .native/.web split; it was never referenced, so it was
+// removed in the clean-code review (and the web stub itself went on 2026-10-18).

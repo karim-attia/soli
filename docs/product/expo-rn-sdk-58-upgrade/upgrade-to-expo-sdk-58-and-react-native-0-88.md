@@ -866,7 +866,7 @@ Android on-device findings (2026-10-17 18:05-18:20 UTC, second testing agent):
   Fix (used twice today): `adb disconnect` both aliases, `adb connect 192.168.1.12:5555`
   (the phone keeps `service.adb.tcp.port=5555`; `adb -s <alias> shell ip -4 addr show
   wlan0` gives the IP). Added to the soli-testing skill's troubleshooting table.
-- `yarn agent-device open ch.karimattia.soli` without `--platform android` opens the iOS
+- `yarn ad open ch.karimattia.soli` without `--platform android` opens the iOS
   simulator even when the phone is connected (agent-device picks iOS first); always pass
   `--platform android` for phone sessions. Added to the skill.
 - After `yarn release` the phone dozed within a minute (60 s screen timeout); the first
@@ -1276,7 +1276,7 @@ Cleanup done: Scoring restored to Vegas via `soli://?set=scoring:vegas` (draw co
 
 Android RAM method used (reproducible): `adb shell am force-stop ch.karimattia.soli`, `am start
 -W -a android.intent.action.VIEW -d 'soli:///' ch.karimattia.soli/.MainActivity`, 15 s, then
-`yarn agent-device perf memory sample --json --session <s>` (wraps `dumpsys meminfo`) plus two
+`yarn ad perf memory sample --json --session <s>` (wraps `dumpsys meminfo`) plus two
 more `dumpsys meminfo | grep "TOTAL PSS"` 8 s apart; `yarn deeplink 'soli:///?demo=playlist&games=20'`
 (warm); `until grep -q "Playlist completed" <logcat>` then sample immediately; `adb shell am
 send-trim-memory ch.karimattia.soli RUNNING_CRITICAL`, 10 s, sample again.
@@ -1591,6 +1591,10 @@ reads on cold start; -20 LOC; no font-name mapping risk. Visual risk: none expec
 removed fonts were never referenced — the device check below exists to prove that.
 
 ### D5. Web: keep as a dev tool, repaired (Prompt 4, 2026-10-17 20:05 UTC)
+
+**Superseded 2026-10-18** by `docs/product/tamagui-3-upgrade/tamagui-major-upgrade.md`: the web
+target, `metro.config.js`, `react-native-web`/`react-dom`, `yarn web` and the feature graphic were
+removed one day later together with Tamagui. The notes below describe the state in between.
 
 How the web flow is wired: `yarn web` = `expo start --web --port 8081` (Metro, `web.bundler:
 metro`); `app/feature-graphic.tsx` is a `__DEV__`-only stub that requires

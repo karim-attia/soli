@@ -1168,7 +1168,10 @@ export const useDemoGameLauncher = ({
               ? resolveVegasLastPassTapsLeft(leftParam)
               : resolveNearWinMovesLeft(leftParam)
           if (resolved.clamped) {
-            devLog('warn', `[Demo] ${vegasDemoMode} link param clamped: ${JSON.stringify(resolved)}.`)
+            devLog(
+              'warn',
+              `[Demo] ${vegasDemoMode} link param clamped: ${JSON.stringify(resolved)}.`
+            )
           }
           setTimeout(() => {
             handleLaunchDemoGame({
@@ -1176,7 +1179,8 @@ export const useDemoGameLauncher = ({
               force: true,
               screenshotMode,
               nearWinMovesLeft: 'movesLeft' in resolved ? resolved.movesLeft : undefined,
-              vegasLastPassTapsLeft: 'tapsLeft' in resolved ? resolved.tapsLeft : undefined,
+              vegasLastPassTapsLeft:
+                'tapsLeft' in resolved ? resolved.tapsLeft : undefined,
             })
           }, DEMO_AUTO_STEP_INTERVAL_MS)
           return

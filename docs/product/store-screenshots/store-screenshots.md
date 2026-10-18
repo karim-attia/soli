@@ -22,6 +22,12 @@ Round 2 decisions (orchestrator recommendations, accepted by default):
 
 ## Summary
 
+Note 2026-10-18: the Play Store feature graphic generator (`src/dev/FeatureGraphicScreen.tsx` +
+`app/feature-graphic.tsx`, web-only, `expo-linear-gradient`) was removed together with the web
+target and Tamagui (`docs/product/tamagui-3-upgrade/tamagui-major-upgrade.md`). If a new feature
+graphic is ever needed, recover it from git history (last commit before that removal) or make it
+with any image tool — it was not used since 2025.
+
 Round 3 capture DONE (2026-08-02): 10 shots at **1284x2778** (App Store Connect 6.5-inch slot) in `.test-artifacts/store-screenshots/r3-ios-1284x2778/`, captured natively on an iPhone 14 Plus sim (`ASC-65-1284`), alpha-stripped, all conformance-verified. Cause of the ASC rejection was a wrong SLOT, not wrong files — see "Round 3 capture" below. Synthetic celebration stats device-verified (every mode matched its documented pair).
 
 Round 3 code change DONE (2026-08-02): screenshot-mode celebration previews now render deterministic synthetic MOVES/TIME (120–180 moves / 4:00–7:00, derived from the mode id) instead of MOVES 0 / TIME 0:00. Display-only — nothing enters game state, persistence or history. Optional `&moves=N&time=SECONDS` override. See "Round 3 steps" below.
@@ -259,7 +265,7 @@ None (artifact-only task). Output: `.test-artifacts/store-screenshots/`.
   - Timer nudge: a single tap on empty green felt (~540,2150, below the tableau) started the scrubbed-fixture timer — no card interaction needed, no board risk. The nearwin fixture timer ticked on its own (0:07 right after load), same as round-2 iOS.
   - `yarn seedhistory clear` WITHOUT `--screenshot` re-enabled developer mode (Demo button reappeared during cleanup — it's a demo link like any other). Re-firing with `--screenshot` forced it back off. Cleanup links should carry `--screenshot` too.
   - Seed-clear verification without logs: History summary counts — Games 153→145 / Solved 57→52 / Incomplete 95→92 after clear = exactly the 8 seed rows.
-  - `yarn agent-device session close` is NOT a command — it's `yarn agent-device close` (ends the active session); `session` only supports `list`/`state-dir`.
+  - `yarn ad session close` is NOT a command — it's `yarn ad close` (ends the active session); `session` only supports `list`/`state-dir`.
   - Android drawer navigation: same as iOS — tap hamburger @ref → fresh snapshot → tap tab @ref. Tapping by label (`tap "Open navigation menu"`) did nothing; tap by @ref worked.
 
 ## Identified issues

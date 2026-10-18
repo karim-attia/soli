@@ -14,6 +14,27 @@ Use this for native Expo UI controls. Prefer app-owned wrappers in `components/`
 reused controls or meaningful behavior boundaries; keep screen-specific, one-use Expo UI
 composition in its route.
 
+Where Expo UI is used after the 2026-10-18 Tamagui removal (audit in
+`docs/product/tamagui-3-upgrade/tamagui-major-upgrade.md`, "Expo UI audit"):
+
+- `components/NativeIcon.tsx` = `<View pointerEvents="none"><Host matchContents><Icon/></Host></View>`
+  for the header hamburger and all drawer rows (`components/navigation/drawerIcons.ts` holds the
+  `Icon.select` constants: SF Symbols on iOS, `@expo/material-symbols` XML on Android). `color`
+  is required; omit `size` for the intrinsic 24. iOS gotcha (2026-10-18): SF Symbols with an
+  `.inverse` twin (`face.smiling`, `eyes`, `moonphase.*`, `printer`, …) ship a separate DARK
+  rendition in the system catalog — for `face.smiling` the filled face — and no
+  `symbolRenderingMode`/`symbolVariant` changes that; NativeIcon pins the glyph with
+  `modifiers={[environment({ key: 'colorScheme', value: 'light' })]}` (`@expo/ui/swift-ui/
+  modifiers`, SwiftUI `.environment(\.colorScheme, .light)`) so every glyph keeps its
+  light-scheme shape while the explicit `color` still follows the app theme.
+- Settings (`FieldGroup`/`Switch`/`Picker`), both sheets (`BottomSheet` + `RNHostView` via
+  `components/AppSheet.tsx`) — unchanged.
+- NOT Expo UI, on purpose: buttons inside the sheets (`components/AppButton.tsx`, RN `Pressable`,
+  because nested Hosts inside the sheet had unreliable Android gestures — re-try Expo UI `Button`
+  there once, SDK 58 fixed hosted-view touches in `BottomSheet`), header text actions (router
+  `HeaderButton`), everything on the board/scrubber/hint path (gesture + perf), Hello/not-found
+  text (`components/AppText.tsx`), History list (Expo UI `List` has no pagination callback yet).
+
 ## Detailed guidance
 
 The sections below are the definitive combined notes for this package or tool. Keep version-specific context when it affects compatibility, but update this single file instead of adding task- or feature-prefixed guides.

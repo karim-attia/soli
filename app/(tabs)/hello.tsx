@@ -1,16 +1,22 @@
 // Pls don't suggest to rename from hello to about, it's intentional.
 import { useLayoutEffect } from 'react'
+import { Linking, StyleSheet, View } from 'react-native'
 import { useNavigation } from 'expo-router'
-import { Anchor, Paragraph, View, XStack, YStack } from 'tamagui'
+
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
+import { SPACE, usePalette } from '../../src/theme/tokens'
+import { AppText } from '../../components/AppText'
 import {
   HeaderMenuButton,
   HEADER_MENU_LEADING_PADDING,
 } from '../../components/navigation/HeaderMenuButton'
 
+const openUrl = (url: string) => () => void Linking.openURL(url)
+
 export default function HelloScreen() {
   const navigation = useNavigation()
   const openDrawer = useDrawerOpener()
+  const palette = usePalette()
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -23,46 +29,69 @@ export default function HelloScreen() {
     })
   }, [navigation, openDrawer])
 
+  // Plain RN here on purpose (Tamagui removal 2026-10-18, Expo UI audit): static copy with
+  // inline links; Expo UI's universal Text has no inline links and a Host adds nothing.
+  // The links keep Tamagui `Anchor`'s look: Paragraph metrics (`body`) + a link colour.
   return (
-    <View
-      flex={1}
-      px="$4"
-      py="$4"
-      style={{ alignItems: 'center', justifyContent: 'center' }}
-    >
-      <YStack gap="$5" width="100%" style={{ maxWidth: 560, alignItems: 'center' }}>
-        <XStack
-          gap="$2"
-          style={{ flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}
-        >
-          <Paragraph style={{ textAlign: 'center' }}>Made by</Paragraph>
-          <Anchor color="$blue10" href="https://x.com/carimatia" target="_blank">
+    <View style={styles.screen}>
+      <View style={styles.column}>
+        <View style={styles.byline}>
+          <AppText style={styles.centered}>Made by</AppText>
+          <AppText color={palette.blue10} onPress={openUrl('https://x.com/carimatia')}>
             @carimatia
-          </Anchor>
-          <Paragraph style={{ textAlign: 'center' }}>
+          </AppText>
+          <AppText style={styles.centered}>
             For my girlfriend T because she always had to look at ads when playing
             Solitaire.
-          </Paragraph>
-        </XStack>
+          </AppText>
+        </View>
 
-        <YStack gap="$2" style={{ maxWidth: 560 }}>
-          <Paragraph style={{ textAlign: 'center' }}>
+        <View style={styles.paragraphs}>
+          <AppText style={styles.centered}>
             Free and{' '}
-            <Anchor
-              color="$accent10"
-              href="https://github.com/karim-attia/soli"
-              target="_blank"
-              rel="noreferrer"
+            <AppText
+              color={palette.accent10}
+              onPress={openUrl('https://github.com/karim-attia/soli')}
             >
               open source
-            </Anchor>{' '}
+            </AppText>{' '}
             Solitaire app.
-          </Paragraph>
-          <Paragraph style={{ textAlign: 'center' }}>
+          </AppText>
+          <AppText style={styles.centered}>
             No ads, in-app purchases, or gamification to get you to play more.
-          </Paragraph>
-        </YStack>
-      </YStack>
+          </AppText>
+        </View>
+      </View>
     </View>
   )
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    paddingHorizontal: SPACE[4],
+    paddingVertical: SPACE[4],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  column: {
+    gap: SPACE[5],
+    width: '100%',
+    maxWidth: 560,
+    alignItems: 'center',
+  },
+  byline: {
+    flexDirection: 'row',
+    gap: SPACE[2],
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paragraphs: {
+    gap: SPACE[2],
+    maxWidth: 560,
+  },
+  centered: {
+    textAlign: 'center',
+  },
+})

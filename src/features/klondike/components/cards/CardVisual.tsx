@@ -3,11 +3,11 @@ import {
   Animated as NativeAnimated,
   Easing as NativeEasing,
   Pressable,
+  Text,
   View,
 } from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
-import { Text } from 'tamagui'
-import { Ban, RefreshCcw } from '@tamagui/lucide-icons-2'
+import { Ban, RefreshCcw } from 'lucide-react-native'
 
 import type { Card } from '../../../../solitaire/klondike'
 import {
@@ -100,6 +100,11 @@ export const CardVisual = ({ card, metrics, onPress, disabled }: CardVisualProps
     },
   ]
 
+  // Plain RN `Text` (2026-10-18, Tamagui removal): the Tamagui `Text` only ever added a
+  // theme colour default, overridden here by the suit colour, and passed `fontFamily`
+  // (CardTextAndroid, embedded on both platforms) through untouched — so the glyphs are
+  // byte-for-byte the same. Keep `allowFontScaling={false}`: the card contract is
+  // geometry-driven (cardScale), never OS font scale.
   const body = (
     <>
       {/* Small rank label | top left */}

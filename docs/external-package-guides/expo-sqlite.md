@@ -1,28 +1,16 @@
 # Expo SQLite Guide
 
-Last refreshed: 2026-10-17
+Last refreshed: 2026-10-18
 
-## Web setup (2026-10-17, Expo SDK 58, `expo-sqlite@58.0.13`)
+## Web: not a target (2026-10-18)
 
-Sources: https://docs.expo.dev/versions/v58.0.0/sdk/sqlite/#web-setup (and its
-`static/diffs/sqlite-web-metro-config.diff`), installed `node_modules/expo-sqlite/web/*.ts`.
-
-- `expo-sqlite` on web runs SQLite in a Web Worker on `wa-sqlite.wasm`
-  (`web/SQLiteModule.ts` `new Worker(new URL('./worker', window.location.href))`), so it needs
-  Metro to treat `.wasm` as an asset: `config.resolver.assetExts.push('wasm')`.
-- Synchronous calls (`getFirstSync`, `kv-store`'s `getItemSync`, ...) busy-wait on a
-  `SharedArrayBuffer` + `Atomics` lock (`web/WorkerChannel.ts` `invokeWorkerSync`). Browsers
-  only expose `SharedArrayBuffer` under cross-origin isolation, so the dev server must send
-  `Cross-Origin-Embedder-Policy: credentialless` and `Cross-Origin-Opener-Policy: same-origin`
-  (Metro `server.enhanceMiddleware`). Expo's docs ship both lines as one diff.
-- Dev console shows one expected warning: "Using synchronous SQLite operations can cause
-  significant performance impact" (`__DEV__` only, once).
-- Static rendering (`web.output: "static"`) executes the route tree in Node, where neither
-  `window` nor `Worker` exist; any sync SQLite read during render crashes it. Soli therefore
-  uses `web.output: "single"` (client-only) — see `metro.config.js` comment.
-- Soli status: `src/state/settings.tsx` (and the other `expo-sqlite/kv-store` users) run on
-  web through this setup since 2026-10-17; the history repository is still the web stub
-  (`historyRepository.web.ts`), History is hidden on web via `Drawer.Protected`.
+Soli dropped its web target with the Tamagui removal
+(`docs/product/tamagui-3-upgrade/tamagui-major-upgrade.md`): `metro.config.js` (which carried
+the `.wasm` asset extension + COOP/COEP headers Expo documents for `expo-sqlite` on web) is
+deleted, and there is one `src/storage/historyRepository.ts` for both native platforms. If web
+ever comes back, Expo's setup is at https://docs.expo.dev/versions/v58.0.0/sdk/sqlite/#web-setup
+(the 2026-10-17 notes on `SharedArrayBuffer`/cross-origin isolation and `web.output: "single"`
+are in this file's git history).
 
 ## Scope
 
@@ -61,15 +49,14 @@ plugin in `app.json`; no SQLCipher, FTS, libSQL, or custom build options are nee
 
 `expo-sqlite` supports Android and iOS and persists its database across app restarts.
 Its web support is marked alpha and requires WASM bundling plus cross-origin isolation
-headers. This app does not need web history, so the repository is split outside the
-route directory:
+headers. Soli is native-only, so there is a single implementation:
 
 ```text
-src/storage/historyRepository.native.ts
-src/storage/historyRepository.web.ts
+src/storage/historyRepository.ts
 ```
 
-Metro resolves the correct implementation for each platform.
+(Until 2026-10-18 this was a `.native.ts`/`.web.ts` pair with an `isHistorySupported` flag
+gating every HistoryProvider write; both went with the web target.)
 
 ## Opening and initializing the database
 

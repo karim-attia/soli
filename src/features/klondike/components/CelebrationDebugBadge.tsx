@@ -1,7 +1,8 @@
 import { memo } from 'react'
-import { Pressable } from 'react-native'
-import { Paragraph, YStack } from 'tamagui'
+import { Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+
+import { AppText } from '../../../../components/AppText'
 
 type CelebrationDebugBadgeProps = {
   label: string
@@ -28,28 +29,31 @@ export const CelebrationDebugBadge = memo(
           right: insets.right + BADGE_BASE_OFFSET,
         }}
       >
-        <YStack
-          style={{
-            paddingVertical: 6,
-            paddingHorizontal: 10,
-            borderRadius: 8,
-            backgroundColor: 'rgba(15, 23, 42, 0.7)',
-            borderWidth: 1,
-            borderColor: 'rgba(148, 163, 184, 0.45)',
-          }}
-        >
-          <Paragraph
-            color="#f8fafc"
-            fontSize={BADGE_BASE_OFFSET}
-            fontWeight="600"
-            letterSpacing={0.3}
-          >
+        <View style={styles.badge}>
+          {/* `body` keeps the Paragraph line height (23) this label always had. */}
+          <AppText color="#f8fafc" style={styles.label}>
             {label}
-          </Paragraph>
-        </YStack>
+          </AppText>
+        </View>
       </Pressable>
     )
   }
 )
 
 CelebrationDebugBadge.displayName = 'CelebrationDebugBadge'
+
+const styles = StyleSheet.create({
+  badge: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.45)',
+  },
+  label: {
+    fontSize: BADGE_BASE_OFFSET,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+})

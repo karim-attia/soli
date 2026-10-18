@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useRef, type PropsWithChildren } from 'react'
-import { Animated as NativeAnimated, Easing as NativeEasing } from 'react-native'
+import {
+  Animated as NativeAnimated,
+  Easing as NativeEasing,
+  StyleSheet,
+  View,
+} from 'react-native'
 import type { LayoutChangeEvent, LayoutRectangle } from 'react-native'
-import { View, XStack } from 'tamagui'
 
 import {
   FOUNDATION_SUIT_ORDER,
@@ -132,13 +136,7 @@ export const TopRow = React.memo(
     const stockColumnIndex = TABLEAU_COLUMN_COUNT - 1
 
     return (
-      <XStack
-        width="100%"
-        items="flex-start"
-        justify="flex-start"
-        flexWrap="nowrap"
-        onLayout={handleRowLayout}
-      >
+      <View style={styles.row} onLayout={handleRowLayout}>
         {Array.from({ length: TABLEAU_COLUMN_COUNT }, (_, columnIndex) => {
           const isFirstColumn = columnIndex === 0
           const isLastColumn = columnIndex === TABLEAU_COLUMN_COUNT - 1
@@ -187,7 +185,7 @@ export const TopRow = React.memo(
                     disablePress
                     width={cardMetrics.width}
                   >
-                    <View width={cardMetrics.width} items="flex-end" overflow="visible">
+                    <View style={[styles.wasteSlot, { width: cardMetrics.width }]}>
                       {/* Empty-placeholder audit rule (outline-audit story, user
                           2026-07-09): EVERY dashed empty-state placeholder hides while
                           a celebration is active — same rule as FoundationPile's
@@ -285,9 +283,23 @@ export const TopRow = React.memo(
 
           return <View key={`empty-${columnIndex}`} style={slotStyle} />
         })}
-      </XStack>
+      </View>
     )
   }
 )
 
 TopRow.displayName = 'TopRow'
+
+const styles = StyleSheet.create({
+  row: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    flexWrap: 'nowrap',
+  },
+  wasteSlot: {
+    alignItems: 'flex-end',
+    overflow: 'visible',
+  },
+})

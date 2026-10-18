@@ -22,7 +22,7 @@ const { DatabaseSync } = require('node:sqlite') as {
   }
 }
 
-type Repository = typeof import('../../../src/storage/historyRepository.native')
+type Repository = typeof import('../../../src/storage/historyRepository')
 type Seeds = typeof import('../../../src/storage/historySeeds')
 type DevLogger = typeof import('../../../src/utils/devLogger')
 
@@ -59,9 +59,9 @@ const loadModulesWithRealDatabase = () => {
     const sqlite = require('expo-sqlite') as { openDatabaseAsync: jest.Mock }
     sqlite.openDatabaseAsync.mockResolvedValue(adapter)
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    repository = require('../../../src/storage/historyRepository.native') as Repository
-    // Resolves to historyRepository.native via the jest-expo haste platform, so
-    // the seeds module writes through the same repository instance.
+    repository = require('../../../src/storage/historyRepository') as Repository
+    // Same isolated module registry, so the seeds module writes through the same
+    // repository instance.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     seeds = require('../../../src/storage/historySeeds') as Seeds
     // eslint-disable-next-line @typescript-eslint/no-require-imports

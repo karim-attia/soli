@@ -1,5 +1,9 @@
 # Appium Guide
 
+> **Status 2026-10-18: legacy.** agent-device 0.21.28 drives the iOS undo-scrubber pan itself
+> (`yarn ad gesture pan …`, see soli-testing SKILL.md §6), so Appium is no longer needed for
+> scrubber coverage. Kept as the fallback recipe only.
+
 Last refreshed: 2026-07-06 (scrubber-test-automation planning; see refresh section at the bottom)
 
 ## Scope
@@ -284,7 +288,7 @@ The script's DEFAULT parameters worked on the FIRST attempt, no tuning needed:
   timeline densities.
 - Timings: first session per simulator boot ≈ 40 s (WDA build/launch); later
   sessions ≈ 4–5 s. Whole drag+session cycle after warmup ≈ 8 s.
-- Serialization with agent-device that actually worked: `yarn agent-device
+- Serialization with agent-device that actually worked: `yarn ad
   close --session <name>` and kill any idle
   `xcodebuild test-without-building … AgentDeviceRunner` process BEFORE creating
   the Appium session; recreate the agent-device session after the drag. With

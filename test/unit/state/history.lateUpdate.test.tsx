@@ -2,7 +2,11 @@ import { act } from 'react'
 import type { MutableRefObject } from 'react'
 import TestRenderer from 'react-test-renderer'
 
-import { HistoryProvider, useHistory, type HistoryEntry } from '../../../src/state/history'
+import {
+  HistoryProvider,
+  useHistory,
+  type HistoryEntry,
+} from '../../../src/state/history'
 
 // G8 regression (scoring plan, round 3): a result written BEFORE history hydration
 // finished (relaunch + auto-complete win) targets a row that is not loaded yet, so
@@ -12,7 +16,6 @@ import { HistoryProvider, useHistory, type HistoryEntry } from '../../../src/sta
 // stale copy until the next restart.
 jest.mock('../../../src/storage/historyRepository', () => ({
   HISTORY_PAGE_SIZE: 50,
-  isHistorySupported: true,
   initializeHistoryRepository: jest.fn(),
   getHistoryPage: jest.fn(),
   getHistorySummary: jest.fn(),
@@ -74,7 +77,11 @@ const flush = async () => {
   }
 }
 
-const Probe = ({ latest }: { latest: MutableRefObject<ReturnType<typeof useHistory> | null> }) => {
+const Probe = ({
+  latest,
+}: {
+  latest: MutableRefObject<ReturnType<typeof useHistory> | null>
+}) => {
   latest.current = useHistory()
   return null
 }
@@ -91,7 +98,9 @@ describe('HistoryProvider · updateEntry before hydration (G8)', () => {
     repository.getHistorySummary.mockResolvedValue(summary)
     repository.getHistoryEntryById.mockResolvedValue(staleRow)
 
-    const latest: MutableRefObject<ReturnType<typeof useHistory> | null> = { current: null }
+    const latest: MutableRefObject<ReturnType<typeof useHistory> | null> = {
+      current: null,
+    }
     act(() => {
       TestRenderer.create(
         <HistoryProvider>

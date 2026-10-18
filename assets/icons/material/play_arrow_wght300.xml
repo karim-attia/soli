@@ -1,0 +1,19 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="680"
+    android:viewportHeight="680"
+    android:tint="?attr/colorControlNormal">
+  <!-- Material Symbols Outlined `play_arrow` wght 300, HAND-EDITED (2026-10-18): the viewport is
+       cropped from 960 to 680 units and every path coordinate shifted by -140 (NOT a <group
+       translate>: Expo UI's runtime ImageLoader.kt parses only <path>, "groups not yet supported")
+       so the triangle fills the 24 dp slot like the other drawer glyphs. Material draws play_arrow
+       with a large built-in margin (ink 9.5x11.8 dp vs 17-19 dp for mood/history/settings/star),
+       which Karim found too small for the drawer's older target group. Cropping keeps the slot,
+       Host and label alignment untouched; a bigger `size` would have overflowed the 24 dp slot.
+       Re-running `npx add-material-symbols` overwrites this file - re-apply the crop. Resulting
+       ink ~ 13.3x16.7 dp (~0.92x the others' mean; a triangle reads bigger than its box). -->
+  <path
+      android:fillColor="@android:color/white"
+      android:pathData="M200,583.84L200,96.16L583.07,340L200,583.84ZM260,340L260,340L260,340ZM260,474L470.77,340L260,206L260,474Z"/>
+</vector>

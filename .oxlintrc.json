@@ -14,7 +14,19 @@
     "no-unassigned-import": "off",
     "react-in-jsx-scope": "off",
     "react/no-unstable-nested-components": ["warn", { "allowAsProps": true }],
-    "style-prop-object": "off"
+    "style-prop-object": "off",
+    // React Compiler diagnostics (oxlint 1.79 split react/react-compiler into these
+    // per-category rules). Off on purpose: Soli's board code deliberately writes
+    // Reanimated shared values (`sv.value = x`), mutates "latest" refs during render
+    // and derives state in effects — ~40 sites, all reviewed as intentional. They
+    // are exactly the compiler's bail-out list, so re-enable them as a report when
+    // the React Compiler experiment (docs/product/next-steps-after-sdk-58, A11) runs.
+    "react/capitalized-calls": "off",
+    "react/exhaustive-effect-dependencies": "off",
+    "react/globals": "off",
+    "react/immutability": "off",
+    "react/refs": "off",
+    "react/set-state-in-effect": "off"
   },
   "ignorePatterns": ["dist/**", "build/**"]
 }

@@ -1,29 +1,29 @@
 import { Drawer } from 'expo-router/drawer'
-import { Platform } from 'react-native'
-import { useTheme } from 'tamagui'
-import { Atom, Clock, Settings, Smile } from '@tamagui/lucide-icons-2'
 
 import { AppDrawerContent } from '../../components/navigation/AppDrawerContent'
+import { NativeIcon } from '../../components/NativeIcon'
+import { DRAWER_ICONS } from '../../components/navigation/drawerIcons'
+import { usePalette } from '../../src/theme/tokens'
 
 export default function DrawerLayout() {
-  const theme = useTheme()
+  const palette = usePalette()
   const headerRightPadding = 16
 
   return (
     <Drawer
       drawerContent={(props) => <AppDrawerContent {...props} />}
       screenOptions={{
-        drawerActiveTintColor: theme.red10?.val,
-        drawerInactiveTintColor: theme.color?.val,
+        drawerActiveTintColor: palette.red10,
+        drawerInactiveTintColor: palette.color,
         swipeEnabled: false,
         drawerStyle: {
-          backgroundColor: theme.background?.val,
+          backgroundColor: palette.background,
         },
         headerStyle: {
-          backgroundColor: theme.background?.val,
-          borderBottomColor: theme.borderColor?.val,
+          backgroundColor: palette.background,
+          borderBottomColor: palette.borderColor,
         },
-        headerTintColor: theme.color?.val,
+        headerTintColor: palette.color,
         // `headerStatusBarHeight: insets.top` removed on SDK 58 (2026-10-17): it was
         // identical to Expo Router's header default (`isParentHeaderShown ? 0 :
         // insets.top`; the root Stack hides its header, so the drawer header gets
@@ -34,13 +34,20 @@ export default function DrawerLayout() {
         },
       }}
     >
+      {/* Drawer glyphs are native symbols (NativeIcon, see drawerIcons.ts); react-navigation
+          hands us the tint and size per row, and `size` is also the fixed glyph slot that keeps
+          the labels aligned (NativeIcon); the spread entry adds the glyph's optical `scale`.
+          The History route used to sit behind a `Drawer.Protected guard={Platform.OS !==
+          'web'}` — gone with the web target (2026-10-18). */}
       <Drawer.Screen
         name="index"
         options={{
           title: 'Soli',
           headerTitle: 'Soli',
           drawerLabel: 'Play',
-          drawerIcon: ({ color, size }) => <Atom color={color as any} size={size} />,
+          drawerIcon: ({ color, size }) => (
+            <NativeIcon {...DRAWER_ICONS.play} color={color} size={size} />
+          ),
         }}
       />
       <Drawer.Screen
@@ -48,25 +55,29 @@ export default function DrawerLayout() {
         options={{
           title: 'Hello',
           drawerLabel: 'Hello',
-          drawerIcon: ({ color, size }) => <Smile color={color as any} size={size} />,
+          drawerIcon: ({ color, size }) => (
+            <NativeIcon {...DRAWER_ICONS.hello} color={color} size={size} />
+          ),
         }}
       />
-      <Drawer.Protected guard={Platform.OS !== 'web'}>
-        <Drawer.Screen
-          name="history"
-          options={{
-            title: 'History',
-            drawerLabel: 'History',
-            drawerIcon: ({ color, size }) => <Clock color={color as any} size={size} />,
-          }}
-        />
-      </Drawer.Protected>
+      <Drawer.Screen
+        name="history"
+        options={{
+          title: 'History',
+          drawerLabel: 'History',
+          drawerIcon: ({ color, size }) => (
+            <NativeIcon {...DRAWER_ICONS.history} color={color} size={size} />
+          ),
+        }}
+      />
       <Drawer.Screen
         name="settings"
         options={{
           title: 'Settings',
           drawerLabel: 'Settings',
-          drawerIcon: ({ color, size }) => <Settings color={color as any} size={size} />,
+          drawerIcon: ({ color, size }) => (
+            <NativeIcon {...DRAWER_ICONS.settings} color={color} size={size} />
+          ),
         }}
       />
     </Drawer>

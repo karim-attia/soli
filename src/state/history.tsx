@@ -22,7 +22,6 @@ import {
   getSolvableDealHistoryStats,
   initializeHistoryRepository,
   insertHistoryEntry,
-  isHistorySupported,
   updateHistoryEntry,
 } from '../storage/historyRepository'
 import type {
@@ -279,9 +278,6 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
   const recordResult = useCallback(
     (input: RecordGameResultInput): string => {
       const entry = createEntry(input)
-      if (!isHistorySupported) {
-        return entry.id
-      }
       const combined = [entry, ...entriesRef.current]
       const normalized =
         entry.status === 'active'
@@ -300,9 +296,6 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
   // Task 10-6: updateEntry allows updating an existing entry by its ID
   const updateEntry = useCallback(
     (id: string, updates: UpdateEntryInput) => {
-      if (!isHistorySupported) {
-        return
-      }
       const existingIndex = entriesRef.current.findIndex((entry) => entry.id === id)
       if (existingIndex === -1) {
         queueRepositoryTask(async () => {
@@ -360,9 +353,6 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
   // in-memory list so the History tab reflects the change without an app restart.
   const seedHistoryForTesting = useCallback(
     (action: 'seed' | 'clear') => {
-      if (!isHistorySupported) {
-        return
-      }
       queueRepositoryTask(async () => {
         if (action === 'clear') {
           await clearSeededHistoryEntries()
@@ -376,9 +366,6 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
   )
 
   const getActiveEntry = useCallback(async (): Promise<HistoryEntry | null> => {
-    if (!isHistorySupported) {
-      return null
-    }
     await (readyPromiseRef.current ?? Promise.resolve())
     // Wait out queued writes so a just-inserted or just-completed row is visible
     // before we decide whether an active row exists.
@@ -387,7 +374,7 @@ export const HistoryProvider = ({ children }: PropsWithChildren) => {
   }, [])
 
   const loadMore = useCallback(async () => {
-    if (!hydrated || !hasMore || loadingMoreRef.current || !isHistorySupported) {
+    if (!hydrated || !hasMore || loadingMoreRef.current) {
       return
     }
 

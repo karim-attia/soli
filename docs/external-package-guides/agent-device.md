@@ -1,6 +1,6 @@
 # Agent Device Guide
 
-Last refreshed: 2026-07-17
+Last refreshed: 2026-10-18
 
 ## Scope
 
@@ -11,52 +11,72 @@ Last refreshed: 2026-07-17
 ## Current guidance
 
 Use this for real-device/simulator automation. Soli owns an exact CLI version through
-its dev dependencies and `yarn.lock`; run it as `yarn agent-device ...`. Prefer
+its dev dependencies and `yarn.lock`; run it as `yarn ad ...`. Prefer
 explicit device selection and confirm the installed build before reporting native
 smoke results.
 
 ## Repository-controlled CLI
 
-- Package: `agent-device@0.19.3`, pinned exactly in `devDependencies`.
-- Invocation: `yarn agent-device <command>` from the repository root.
-- Soli's package script sets `AGENT_DEVICE_IOS_RUNNER_IDLE_STOP_MS=0` so a
-  normal `close` retains the iOS XCTest runner instead of stopping it after five
-  idle minutes.
-- Upgrade by changing the exact dependency version and committing both
-  `package.json` and `yarn.lock`.
-- Do not use a global installation or `npx` for Soli automation, because either can
-  bypass the version selected by the repository.
-- The daemon and generated runner state remain machine-local under
-  `~/.agent-device`; only the CLI package version is controlled by Git.
-- Yarn already exposes dependency binaries, so a duplicate package script is not
-  needed for resolution; Soli intentionally has one only to apply the iOS runner
-  retention workaround.
+- Package: `agent-device@0.21.28`, pinned exactly in `devDependencies` (bumped 2026-10-18 from
+  0.19.3).
+- Invocation: `yarn ad <command>` from the repository root. The script is named `ad`, not
+  `agent-device`: a package script with the same name as a dependency binary makes
+  `expo-doctor` fail its "scripts conflict with node_modules/.bin" check (was 19/20).
+- The `ad` script sets `AGENT_DEVICE_IOS_RUNNER_IDLE_STOP_MS=0` so a normal `close` retains the
+  iOS XCTest runner instead of stopping it after five idle minutes. 0.21.28 still reads the
+  variable (`dist/src/runner-retention.js`: default 300000 ms, `0` disables; also documented in
+  `yarn ad help physical-device`). Caveat unchanged: the variable reaches the daemon only when
+  OUR CLI spawns it — a daemon started by another repo's CLI keeps its own setting.
+- Upgrade by changing the exact dependency version and committing both `package.json` and
+  `yarn.lock`.
+- Do not use a global installation or `npx` for Soli automation, because either can bypass the
+  version selected by the repository.
+- The daemon and generated runner state remain machine-local under `~/.agent-device`; only the
+  CLI package version is controlled by Git. **One daemon per machine (per
+  `AGENT_DEVICE_STATE_DIR`)**: a CLI of a different version replaces a reachable daemon
+  (0.21.x clients refuse to replace a NEWER daemon, 0.19.x clients do not). The invent repo
+  pins `^0.19.3` — while the two repos differ, each repo's first command can kill the other
+  repo's live sessions. Keep both repos on the same version.
 
-## iOS 26.5 SpringBoard teardown workaround
+## What changed 0.19.3 -> 0.21.28 (release notes, read 2026-10-18)
 
-On this Mac, every recent SpringBoard crash has the same Apple frame,
-`XCTAutomationSession initWithAccessibilityFramework:dataSource:`, and the most
-recent reports occur about five minutes after the final agent-device command,
-when the default retained-runner idle timer fires. The app under test is not in
-the crashing stack.
+Sources: https://github.com/callstack/agent-device/releases (v0.20.0 … v0.21.28).
 
-Keep the idle-stop override at `0`: agent-device documents that this disables the
-runner's automatic idle stop. Version 0.19.3 also lets an idle daemon exit while
-detaching a healthy simulator runner for later adoption. The trade-off is one
-long-lived XCTest runner per active simulator; Soli keeps one simulator, so this
-is preferable to repeated SpringBoard crash notifications. Forced runner
-shutdown, simulator shutdown, or handoff to Appium may still exercise Apple's
-faulty teardown path.
-
-Within one testing assignment, reuse a single named session for every command
-and close it only after the final verification. This reduces lifecycle churn even
-when runner retention is enabled.
-
-Sources refreshed 2026-07-17:
-
-- [agent-device v0.19.3 tag](https://github.com/callstack/agent-device/tree/v0.19.3)
-- [Daemon idle reaping and retained-runner handoff](https://github.com/callstack/agent-device/pull/1169)
-- Version-matched installed guidance: `yarn agent-device help workflow`
+- **Gestures redesigned (0.20.0)**: one planning model for pan/fling/swipe/pinch/rotate on CLI,
+  Android and iOS; every planned point is validated against the viewport
+  (`INVALID_ARGS: Gesture trajectory does not fit inside the viewport` when a pan would leave
+  the screen — start nearer the opposite edge). Timed `swipe`/`fling` positionals and the
+  `rotate` alias are gone: `gesture pan x y dx dy durationMs` is the timed form, `orientation`
+  rotates the device. iOS simulator pans are synthesized through XCTest with the authored
+  duration (0.20.6 "preserve timed pan duration") — **the RNGH undo-scrubber pan now works on
+  iOS** (verified 2026-10-18: `gesture pan 298 788 -130 0 1500` landed exactly on index 20,
+  same as Android), so Appium is no longer required for scrubber coverage. Android gestures run
+  through the persistent helper (no more ADB `input swipe` fallback; the old
+  `MultiTouchInstrumentation` teardown crash did not reproduce).
+- **Refs expire after every mutation (0.20.0)** and selectors that match several distinct
+  elements are refused (0.20.7) — re-snapshot after each press, or use `id=`/`label=` selectors.
+- **Fail-closed CLI (0.20.2)**: extra positional arguments are `INVALID_ARGS`.
+- **Device selection**: with two adb entries for the same phone (TCP serial + mDNS alias) 0.21.28
+  answers `AMBIGUOUS_MATCH` even with `ANDROID_SERIAL` set — pass `--serial <ip>:5555`.
+  `open --foreground` (0.20.7) returns the first interactive snapshot immediately.
+- **`--settle`** on press/click/fill/scroll/back waits for a quiet tree and prints the UI diff
+  (0.20.6). Useless on the Soli board: the game timer mutates the tree every second, so it times
+  out after ~10 s ("not settled") although the tap landed. Leave it off on the board.
+- **Snapshots**: Android collapses helper nodes in the text form (`--raw`/`--json` keep them);
+  repeated identical Android snapshots return a compact "unchanged" acknowledgement
+  (`--force-full` re-emits); a covered app is diagnosed explicitly ("A system surface … covers
+  the app" = the phone re-locked, run `scripts/android-ready.sh`). iOS: faster cold opens
+  (0.21.0), `--observe-only`, `--actions`, `--depth` honoured. `snapshot --diff`.
+- **Daemon/sessions (0.21.x)**: a stale iOS runner lease whose owner process died is reclaimed
+  automatically; the daemon self-exits after 5 idle minutes without sessions
+  (`AGENT_DEVICE_DAEMON_IDLE_TIMEOUT_MS`); optional `AGENT_DEVICE_SESSION_IDLE_TIMEOUT_MS`
+  expires idle sessions holding a device claim; `open --wait <ms>` blocks on `DEVICE_IN_USE`.
+- **Breaking for SDK/Node users only** (Soli uses the CLI): batch steps take structured `input`
+  and `perf` needs an operation (0.21.0); `SnapshotNode.ref` became optional (0.21.28 #3547);
+  the replay `readinessTimeoutMs` option was retired (0.21.28 #3599 — add an explicit `wait`).
+- New but unused here: `scroll <dir> --until <selector>`, `fill --record-as`, `.ad` script
+  recording/replay/repair, Maestro engine, HarmonyOS/Vega/web/macOS targets, MCP + AI SDK
+  integrations, cloud providers.
 
 ## Detailed guidance
 
@@ -84,17 +104,17 @@ The sections below are the definitive combined notes for this package or tool. K
 
 ## Core commands used in this task
 
-Note (2026-07-07): examples updated from `npx -y agent-device` to `yarn agent-device` —
+Note (2026-07-07): examples updated from `npx -y agent-device` to `yarn ad` —
 the CLI is pinned in devDependencies and must be invoked through yarn (see
 "Repository-controlled CLI" above).
 
 - Discover Android targets:
-  - `yarn agent-device devices --platform android --json`
+  - `yarn ad devices --platform android --json`
 - Launch/relaunch the app on explicit device:
-  - `yarn agent-device open ch.karimattia.soli --platform android --serial 192.168.1.12:37635 --relaunch --json`
+  - `yarn ad open ch.karimattia.soli --platform android --serial 192.168.1.12:37635 --relaunch --json`
 - Capture UI state:
-  - `yarn agent-device snapshot -i --platform android --serial 192.168.1.12:37635 --json`
-  - `yarn agent-device screenshot .agents/skills/agent-device-after-fix.png --platform android --serial 192.168.1.12:37635 --json`
+  - `yarn ad snapshot -i --platform android --serial 192.168.1.12:37635 --json`
+  - `yarn ad screenshot .agents/skills/agent-device-after-fix.png --platform android --serial 192.168.1.12:37635 --json`
 
 ## Notes for this repository
 - When mDNS device names include spaces/parentheses, prefer direct TCP serials from `adb connect` (for example `192.168.1.12:37635`) to avoid selector truncation in downstream tooling.

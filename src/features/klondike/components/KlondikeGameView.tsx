@@ -1,6 +1,5 @@
 import React from 'react'
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native'
-import { YStack } from 'tamagui'
 
 import type { CelebrationState } from '../hooks/useCelebrationController'
 import { StatisticsHud, StatisticsPlaceholder, type StatisticsRow } from './StatisticsHud'
@@ -16,6 +15,7 @@ import { UndoScrubber, type UndoScrubberProps } from './UndoScrubber'
 import { DemoPlaylistHud } from './DemoPlaylistHud'
 import type { CelebrationBindings } from '../types'
 import { EDGE_GUTTER, STACK_PADDING } from '../constants'
+import { SPACE } from '../../../theme/tokens'
 
 const BOARD_MARGIN_ADJUSTMENT = 6
 
@@ -59,7 +59,7 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
   const hasStats = statisticsRows.length > 0
 
   return (
-    <YStack flex={1} px="$2" pb="$2" gap="$3" style={{ backgroundColor: feltBackground }}>
+    <View style={[styles.root, { backgroundColor: feltBackground }]}>
       <FeltBackground />
 
       <View
@@ -75,22 +75,22 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
         {hasStats ? <StatisticsHud rows={statisticsRows} /> : <StatisticsPlaceholder />}
       </View>
 
-      <YStack
-        flex={1}
+      <View
         onLayout={onBoardLayout}
         style={[
           styles.boardShell,
           {
             marginTop: EDGE_GUTTER + BOARD_MARGIN_ADJUSTMENT,
-            // Task 1-8: cancel root px="$2" so the board can reach safe-area edges,
-            // without changing header/undo spacing.
+            // Task 1-8: cancel the root's horizontal padding so the board can reach
+            // safe-area edges, without changing header/undo spacing. NOTE (2026-10-18,
+            // Tamagui removal): STACK_PADDING is 8 but the root padding was Tamagui's
+            // `px="$2"` = 7, so this over-cancels by 1 px. Pre-existing and part of the
+            // approved board geometry — kept as-is for pixel parity (plan Follow-ups).
             marginHorizontal: -STACK_PADDING,
             paddingLeft: boardSafeArea.left,
             paddingRight: boardSafeArea.right,
           },
         ]}
-        py="$3"
-        gap="$3"
       >
         <TopRow {...topRowProps} />
 
@@ -125,7 +125,7 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
             onPress={onCelebrationBadgePress}
           />
         ) : null}
-      </YStack>
+      </View>
 
       {/* Shared relative wrapper so the demo HUD (absolute, left half) aligns
           exactly with the Undo button's bottom dock without duplicating the
@@ -135,19 +135,30 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
         <UndoScrubber {...undoScrubProps} />
         <DemoPlaylistHud />
       </View>
-    </YStack>
+    </View>
   )
 }
 
+// Paddings/gaps are the former Tamagui space tokens ($2 = 7, $3 = 13) — the board is
+// pixel-matched against the pre-removal screenshots, so keep these literals.
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    paddingHorizontal: SPACE[2],
+    paddingBottom: SPACE[2],
+    gap: SPACE[3],
+  },
   headerRow: {
     width: '100%',
     alignItems: 'flex-end',
     justifyContent: 'flex-end',
   },
   boardShell: {
+    flex: 1,
     alignSelf: 'stretch',
     position: 'relative',
+    paddingVertical: SPACE[3],
+    gap: SPACE[3],
   },
   bottomDock: {
     alignSelf: 'stretch',

@@ -168,13 +168,14 @@ export const resolveStockRect = (
 // should not happen for a fresh solved response — render nothing rather than
 // a misplaced ring). The source rect's top-left is always the hinted card's
 // own position (the ghost glide starts there card-sized), even when the rect
-// spans a whole run. Exported for unit tests.
+// spans a whole run. `landing` is where the moved card will actually sit — the
+// ghost glides there (see the tableau branch). Exported for unit tests.
 export const resolveHintRects = (
   hint: SolverMoveHint,
   board: HintBoard,
   layouts: AbsoluteCardLayerLayouts,
   metrics: CardMetrics
-): { source: HintRect; target: HintRect } | null => {
+): { source: HintRect; target: HintRect; landing: HintRect } | null => {
   let source: HintRect | null = null
   if (hint.from.type === 'tableau') {
     const columnPosition = resolveTableauPosition(
@@ -220,6 +221,7 @@ export const resolveHintRects = (
   }
 
   let target: HintRect | null = null
+  let landing: HintRect | null = null
   if (hint.to.type === 'tableau') {
     const columnPosition = resolveTableauPosition(
       layouts.tableauRow,
@@ -234,11 +236,20 @@ export const resolveHintRects = (
         { x: columnPosition.x, y: columnPosition.y + topOffset },
         metrics
       )
+      // The ring stays on the card being dropped ONTO, but the ghost must land
+      // one face-up stack offset below it, where the card will actually rest.
+      // Gliding onto the ring itself made the ghost cover the existing top card
+      // (user feedback, 2026-10-18). A legal tableau target's top card is
+      // always face up, so the full face-up offset applies.
+      landing = column.length
+        ? { ...target, y: target.y + metrics.stackOffset }
+        : target
     }
   } else {
     // Target foundation is implied by the hinted card's suit (FFI contract).
     target = foundationRect(parseSolverCardCode(hint.card).suit, layouts, metrics)
+    landing = target
   }
 
-  return source && target ? { source, target } : null
+  return source && target && landing ? { source, target, landing } : null
 }

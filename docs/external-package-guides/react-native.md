@@ -14,6 +14,15 @@ Use this for React Native version compatibility and upgrade notes. The app moved
 RN 0.86.0 (Expo SDK 57) to RN 0.88.0 (Expo SDK 58) on 2026-10-17; native validation
 remains required for upgrade work.
 
+RN primitives are the UI layer since the 2026-10-18 Tamagui removal. Screens do not style raw
+`Text`/`Pressable` where a wrapper exists: `components/AppText.tsx` (RN `Text` + theme colour
+from `usePalette()`; variants `body` 15/23/400, `caption` 14/23 muted, `title` 16/700, `plain`
+= colour only), `components/AppButton.tsx` (RN `Pressable`, 36 px / radius 7 / pressed
+background+border, `accessibilityRole="button"`), `src/theme/tokens.ts` (`PALETTE` light/dark
+literals, `usePalette()` on `useColorScheme()`, `SPACE` = the former `$1..$5` space tokens).
+Layout is RN `View` + `StyleSheet` (`flexDirection: 'row'`, numeric `gap`); no Stack/Row wrapper
+on purpose. `TextStyle.fontWeight` is a literal union — type weight constants `as const`.
+
 ## Detailed guidance
 
 The sections below are the definitive combined notes for this package or tool. Keep version-specific context when it affects compatibility, but update this single file instead of adding task- or feature-prefixed guides.

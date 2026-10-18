@@ -109,7 +109,7 @@ Two deliverables:
 - [x] A3. Slim AGENTS.md Testing section; keep policy (sub-agent testing, budget judgement, one build / one device driver, cheap gates, yarn release/ios summary), point to skill for recipes. DONE — a11y/uiautomator bullets replaced by a bold skill pointer; Commands scrub one-liner slimmed to a skill pointer; AGENTS.md net −3 lines.
 - [x] A4. Fix `.cursor/commands/prod.md` (`npx expo run:android --variant release` → `yarn release`). DONE — rewritten around yarn release/yarn ios + skill pointer.
 - [x] A5. Update or fold `.cursor/rules/testing.mdc` into skill pointer (it's Android-only and stale). DONE — now a thin pointer + 4-line quick reference (both platforms), frontmatter intact.
-- [x] A6. `docs/external-package-guides/agent-device.md`: `npx -y agent-device` examples → `yarn agent-device`. DONE — with dated note.
+- [x] A6. `docs/external-package-guides/agent-device.md`: `npx -y agent-device` examples → `yarn ad`. DONE — with dated note.
 - [x] A7. `docs/external-package-guides/react-native-jest-preset.md`: note SDK 57 / RN 0.86 / preset ^0.86.0 (repo state). DONE — dated note at top; versions verified in package.json (`react-native@0.86.0`, `@react-native/jest-preset@^0.86.0`, `expo@^57.0.0`).
 - [x] A8. `docs/product/demo-autosolve-playlist/20-game-solved-demo-playlist.md` (+ demo-sheet doc): mark `scripts/run-demo-autosolve.js` / `yarn demo:auto-solve` as superseded by `yarn release --auto-solve` (short note near top; don't rewrite history). DONE — both docs.
 - [x] A9. Document in skill: undo-hint reset (demo sheet button — recent, previously undocumented), scrubbed mid-game deep link incl. force-stop caveat, history seeding (interface below), `[SoliDev]`-on-iOS trigger recipe, `ch.karimattia.soli` as the one true package/bundle id. DONE — all in SKILL.md sections 3, 4, and 7.
@@ -164,7 +164,7 @@ Workstream A (2026-07-07):
 - `.agents/skills/soli-testing/SKILL.md` (new) + `.cursor/skills/soli-testing` (new relative symlink)
 - `AGENTS.md` (Testing section slimmed, Commands scrub line → skill pointer)
 - `.cursor/commands/prod.md` (rewritten: yarn release/yarn ios), `.cursor/rules/testing.mdc` (thin pointer + quick reference)
-- `docs/external-package-guides/agent-device.md` (npx → yarn agent-device, dated note)
+- `docs/external-package-guides/agent-device.md` (npx → yarn ad, dated note)
 - `docs/external-package-guides/react-native-jest-preset.md` (SDK 57 / RN 0.86 note)
 - `docs/product/demo-autosolve-playlist/20-game-solved-demo-playlist.md` + `demo-sheet-undo-probes-info-hud.md` (superseded-command notes at top)
 

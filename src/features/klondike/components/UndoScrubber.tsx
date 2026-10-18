@@ -8,7 +8,9 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated'
 import { GestureDetector, type GestureType } from 'react-native-gesture-handler'
-import { Lightbulb, Shuffle, Undo2 } from '@tamagui/lucide-icons-2'
+// lucide-react-native (plain react-native-svg, no native Host) is deliberate here: this
+// dock sits inside the scrubber's GestureDetector — see the no-Tamagui/Expo-UI note below.
+import { Lightbulb, Shuffle, Undo2 } from 'lucide-react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {

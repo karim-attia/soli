@@ -1,0 +1,5 @@
+// Injected into local `yarn ios` builds via XCODE_XCCONFIG_FILE (see
+// scripts/build-install-ios.js). Release defaults to ONLY_ACTIVE_ARCH = NO,
+// which compiled every target for an unused x86_64 simulator slice too
+// (~2x native compile time + RAM on Apple Silicon). EAS builds don't use this.
+ONLY_ACTIVE_ARCH = YES

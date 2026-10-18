@@ -31,12 +31,20 @@
 >
 > pls challenge everything, i am not super experienced with this build stuff
 
+> (2026-10-18) One thing I noticed: the soli build is compiling Intel (x86_64) code for the simulator as well, which roughly doubles build time and RAM. That's worth a look at some point.
+> -> recommendation?
+
+> Yes, please go.
+
 ## Summary
 
-Research complete. Benchmark of single-ABI (arm64-v8a) local release builds vs the current
-4-ABI default is in progress. Decision: Karim keeps the real `release` variant for daily
-phone playtesting (animation feel must match production); `debugOptimized`+Metro is NOT
-adopted for playtesting, at most later as an option for agent functional smoke loops.
+Android: single-ABI release loop + Gradle caching shipped (steps 1-3; warm loop ~47.6s → ~37s).
+iOS (2026-10-18, steps 7-8): `yarn ios` now builds the active arch only — clean build
+10:54 → 4:21 (−60%), app binary arm64-only, DerivedData 5.5 → 2.3 GB; smoke-tested on the
+simulator. Decision: Karim keeps the real `release` variant for daily phone playtesting
+(animation feel must match production); `debugOptimized`+Metro is NOT adopted for
+playtesting, at most later as an option for agent functional smoke loops. Open: ccache
+(step 4), AGENTS.md clean-build rule (step 5), incremental-vs-clean iOS numbers (step 6).
 
 ## Description
 
@@ -133,6 +141,22 @@ being tested (production-fidelity release variant on Android).
 - [ ] 5. AGENTS.md: remove blanket iOS clean-build rule; add freshness-verification steps and
   "clean scoped native dirs only after native dep changes" guidance.
 - [ ] 6. Re-benchmark iOS loop (incremental vs clean) to quantify.
+- [done] 7. (2026-10-18) iOS simulator: build only the active arch (arm64) in `yarn ios`.
+  Cause: `yarn ios` builds Release; Xcode's Release default is `ONLY_ACTIVE_ARCH = NO`, so all
+  28 compiled targets (incl. heavy C++: Reanimated, Skia, Gesture Handler) were built for
+  arm64 AND x86_64 sim (verified in DerivedData `Objects-normal/x86_64`). Fix:
+  `scripts/ios-active-arch-only.xcconfig` (`ONLY_ACTIVE_ARCH = YES`) passed via the
+  `XCODE_XCCONFIG_FILE` env var from `scripts/build-install-ios.js` — applies to every target
+  incl. Pods, survives `prebuild --clean` (ios/ is gitignored/generated), and does not touch
+  EAS/production (`yarn build:ios`). Rejected: Podfile post_install/config plugin (more code,
+  also affects archives). Kept the Rust solver's x86_64 sim slice (prebuilt + cached, zero
+  per-build cost; keeps a Release sim build from Xcode GUI linking).
+- [done] 8. Benchmark clean `yarn ios` before/after step 7 (sub-agent) + verify app runs and
+  DerivedData has no new x86_64 objects. Result 2026-10-18 (clean DerivedData each run, same
+  booted iPhone 17 Pro sim, sequential): **10:54 → 4:21 wall (−60%)**; x86_64 dirs 28 → 0
+  (object files 814 → 0), arm64 unchanged (28 dirs / 814 objects); app binary `x86_64 arm64`
+  → `arm64`; DerivedData 5.5 GB → 2.3 GB; Soli.app 139 MB → 75 MB. Install verified, board
+  renders, Rust solver linked. Table under Testing.
 
 ## Plan: Files to modify
 
@@ -152,6 +176,9 @@ being tested (production-fidelity release variant on Android).
 - app.json (registered the plugin)
 - android/gradle.properties (manual sync until next prebuild; gitignored/generated)
 - ~/.gradle/gradle.properties (deleted — replaced by the in-repo plugin)
+- scripts/ios-active-arch-only.xcconfig (created, step 7 — `ONLY_ACTIVE_ARCH = YES`)
+- scripts/build-install-ios.js (step 7 — passes `XCODE_XCCONFIG_FILE` to `expo run:ios`
+  unless pre-set)
 
 ## Intermediary learnings
 
@@ -193,6 +220,21 @@ being tested (production-fidelity release variant on Android).
   expo-modules-core → C++ recompile), NDK/AGP/SDK upgrades, and the scoped native-dir cleanup
   from the reanimated guide. Note: Gradle's build cache does not cover CMake/ninja C++ state
   in .cxx — only ccache would. Decision: cold builds are rare here → ccache deprioritized.
+- iOS clean-build benchmark 2026-10-18 (step 8): the x86_64 slice cost ~6.5 of ~11 min —
+  more than half, because the simulator sim-arch compile is embarrassingly parallel and the
+  8-core/16 GB machine was saturated either way. The remaining 4:21 is arm64 compile of the
+  ~28 source-built pods (Reanimated/Worklets, Skia, Gesture Handler, Screens, …) plus
+  bundling/install; ccache (step 4) is now the only lever left for the clean case. Summed
+  RSS of compiler/linker/node processes peaked at ~3.0 GB in the arm64-only run (baseline not
+  sampled). To override locally: `XCODE_XCCONFIG_FILE=<file> yarn ios` (an EMPTY xcconfig
+  restores the fat build — that is how the baseline was measured).
+- Benchmark hygiene learned the hard way: (1) the agent shell has no UTF-8 locale, so both
+  runs exported `LANG/LC_ALL=en_US.UTF-8` (pods did not reinstall anyway — DerivedData wipe
+  keeps `ios/Pods`); (2) `yarn ios`'s preflight kills ANY `xcodebuild` process, which includes
+  the retained agent-device XCTest runner of another agent's simulator session (killed twice
+  here; the other agent recreated it — survivable, but expect it); (3) another session's
+  `yarn release` grabbed the shared lock between the two runs — wait on `/tmp/soli-build.lock`
+  (it is a directory with a `pid` file) instead of starting and failing fast.
 
 ## Identified issues
 
@@ -218,3 +260,20 @@ Gradle-settings verification 2026-07-06 (single ABI + new ~/.gradle/gradle.prope
 |---|---|---|---|---|
 | 1 (stores cache) | 48.4s | 26s | stored, 5 non-fatal warnings | yes |
 | 2 (reuses cache) | 37.2s | 13s | reused | yes |
+
+iOS active-arch benchmark 2026-10-18 (step 7/8; clean `yarn ios` = `rm -rf DerivedData/Soli-*`
+before each run, `ios/Pods` kept, Release, booted iPhone 17 Pro / iOS 27.0 sim, 8-core 16 GB
+Apple Silicon, runs sequential; build logs `.test-artifacts/builds/20261018-120201-ios.log`
+and `20261018-121632-ios.log`):
+
+| Scenario | Wall time | x86_64 dirs | arm64 dirs | app binary archs | DerivedData | Soli.app | Result |
+|---|---|---|---|---|---|---|---|
+| Before: `XCODE_XCCONFIG_FILE=<empty>.xcconfig yarn ios` (fat, old default) | 10:54 (655s) | 28 (814 .o) | 28 (814 .o) | `x86_64 arm64` | 5.5 GB | 139 MB | build OK, install verified |
+| After: plain `yarn ios` (`ONLY_ACTIVE_ARCH=YES`) | 4:21 (262s) | 0 | 28 (814 .o) | `arm64` | 2.3 GB | 75 MB | build OK, install verified, smoke OK |
+
+Smoke test after the arm64-only build: app process running, installed `Soli` md5 == DerivedData
+build, all 8 embedded frameworks arm64-only, Klondike board rendered in a simulator screenshot
+(no crash/red screen), Rust solver linked (`SoliSolver.xcframework` copied, solver symbols in the
+binary). Both build logs: `› Build Succeeded`, no errors, one benign "Bundler cache is empty"
+warning. Anomaly worth a look later: both logs print `Waiting on http://localhost:8081` although
+`--no-bundler` is passed (no visible delay, build proceeded).

@@ -1541,7 +1541,7 @@ All hides are instant conditional renders (FoundationPile pattern), so abort res
 ## Intermediary learnings
 
 - The nearwin fixture is the perfect outline repro: empty stock (recycle outline), all 7 columns empty, waste holding the final K — the exact board class in the user's screenshot. Fresh boards cover the waste + foundation placeholders (a fresh deal auto-draws one card, so the waste EmptySlot needs a full draw-through + recycle to appear).
-- `adb shell input tap` is unusable while `screenrecord` runs alongside a 120 fps celebration: injections got delayed 10+ s (two recordings showed the tap landing only after the clip ended). `yarn agent-device click <x> <y>` injects promptly under the same load — use it for any recorded-interaction capture.
+- `adb shell input tap` is unusable while `screenrecord` runs alongside a 120 fps celebration: injections got delayed 10+ s (two recordings showed the tap landing only after the clip ended). `yarn ad click <x> <y>` injects promptly under the same load — use it for any recorded-interaction capture.
 - **Abort had its own 2-frame flicker (found by the frame capture, then fixed):** `handleCelebrationAbort` ran an eager `runOnUI(active = 0)` that hid all Skia sprites 1–2 frames BEFORE the React commit unmounting the overlay/restoring the board — device frames showed a fully empty board in between. Fix: drop the eager hide; the `celebrationState` effect cleanup sets `active = 0` at unmount, making abort a single-commit swap. The natural 60 s completion never had this problem (end fade reaches alpha 0 before the unmount).
 - The win→celebration handoff is pixel-continuous on device: frame captures show the four real Kings until the Skia frame takes over with kings at the same spots (brief brightness bump from the sprite shadows/underlays overlapping), then the cards animate away. No empty-foundation frame (per-frame luma scan of the foundation row: card-level values until the cards legitimately fly off).
 
@@ -1570,7 +1570,7 @@ Two fresh `yarn release` builds (16:37 initial, 17:09 after the abort fix; insta
 | 9 | Regression: idle boards show placeholders as usual | PASS — outlines present when not celebrating on near-win and fresh boards | `00`, `04`, `17`, `19` |
 | 10 | Celebration sanity on fixed build (mode 45 + mode 0 run + abort) | PASS | `16-newbuild-mode45.png`, `18-newbuild-mode0.png`, `17/19-newbuild-*.png` |
 
-Learnings for future testers: `adb shell input tap` gets delayed 10+ s while screenrecord runs alongside a celebration (two wasted clips) — `yarn agent-device click <x> <y>` injects promptly under the same load. A real win via nearwin + one a11y-guided tap is far easier to co-time with a recording than an autosolve run.
+Learnings for future testers: `adb shell input tap` gets delayed 10+ s while screenrecord runs alongside a celebration (two wasted clips) — `yarn ad click <x> <y>` injects promptly under the same load. A real win via nearwin + one a11y-guided tap is far easier to co-time with a recording than an autosolve run.
 
 ## Follow-ups
 

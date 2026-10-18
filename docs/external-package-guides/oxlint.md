@@ -1,6 +1,6 @@
 # oxlint Guide
 
-Last refreshed: 2026-07-03
+Last refreshed: 2026-10-18
 
 ## Scope
 
@@ -18,6 +18,7 @@ Use this guide as the current source-backed reference for Soli work involving th
 
 - 2026-06-15 (Europe/Zurich)
 - Refresh checked 2026-07-03 (Europe/Zurich)
+- Refreshed 2026-10-18 (1.88.0 bump; sources: https://github.com/oxc-project/oxc/blob/main/apps/oxlint/CHANGELOG.md, `node_modules/oxlint/configuration_schema.json`)
 
 ## Primary sources
 
@@ -43,7 +44,22 @@ Use this guide as the current source-backed reference for Soli work involving th
 - Configure `react/no-unstable-nested-components` with `allowAsProps` for navigation APIs that intentionally receive icon/render components as props.
 - Prefer CLI `-A` overrides for strict mode when needed; oxlint applies CLI rule/category flags left-to-right.
 - Type-aware linting is now documented directly in Oxlint via `options.typeAware` / `--type-aware` and experimental `options.typeCheck` / `--type-check`, powered by `tsgo`. It was assessed but not enabled because broad category activation creates a separate assertion/promise policy migration; `tsgo` remains the authoritative checker for this repo.
-- The repository currently pins `oxlint@1.69.0`; latest npm registry check on 2026-07-03 shows `1.72.0`.
+- The repository pins `oxlint@1.88.0` (bumped 2026-10-18 from 1.73.0).
+- **React Compiler diagnostics (since 1.79.0)**: oxlint split the single `react/react-compiler`
+  rule into per-category rules (`react/immutability`, `react/refs`, `react/set-state-in-effect`,
+  `react/exhaustive-effect-dependencies`, `react/capitalized-calls`, `react/globals`,
+  `react/purity`, `react/preserve-manual-memoization`, ...; changelog 1.79.0 #25500/#25830).
+  They sit in the default `correctness`/`suspicious` categories, so a plain bump surfaced ~40
+  warnings in Soli — all intentional React Native / Reanimated / Gesture Handler patterns
+  (`sharedValue.value = x`, latest-ref writes during render, `Gesture.Pan()`, deliberate
+  derived-state effects). Six of them are therefore `off` in `.oxlintrc.json` with a JSONC
+  comment; re-enable them as a report when the React Compiler experiment runs — they are the
+  compiler's bail-out list.
+- `.oxlintrc.json` accepts JSONC comments (verified on 1.88.0).
+- `lint:strict` is config-driven: `oxlint --deny-warnings ...`. CLI category flags
+  (`-D correctness`) re-enable rules the config sets to `off`, so the earlier
+  `-D correctness -D suspicious -A rule...` form would have needed one `-A` per disabled rule;
+  the trade-off is that strict coverage now follows the config's categories exactly.
 
 ## Recommended script pattern
 
@@ -52,7 +68,7 @@ Use this guide as the current source-backed reference for Soli work involving th
   "scripts": {
     "lint": "oxlint --tsconfig tsconfig.json app components modules src scripts test",
     "lint:fix": "oxlint --fix --tsconfig tsconfig.json app components modules src scripts test",
-    "lint:strict": "oxlint -D correctness -D suspicious -A react-in-jsx-scope -A no-unassigned-import --deny-warnings --tsconfig tsconfig.json app components modules src scripts test"
+    "lint:strict": "oxlint --deny-warnings --tsconfig tsconfig.json app components modules src scripts test"
   }
 }
 ```

@@ -13,7 +13,7 @@
 
 ## About the codebase
 
-- Native-only Expo/React Native solitaire app.
+- Native-only Expo/React Native solitaire app (iOS + Android). No web target: no `react-native-web`, no `yarn web`, no `.web.tsx` files; dev tooling that needs a browser is out of scope.
 - Pure game engine (reducer, rules, deal identity) in src/solitaire/; Klondike UI/hooks in src/features/klondike/
 - Shared components in components/
 - Implementation plans in docs/product/<feature>/
@@ -104,9 +104,9 @@ The small code comments from above are especially important for simplifications:
 
 ## Components
 
-- Use expo ui (preferred if available) or tamagui components for all UI elements.
+- Use Expo UI (preferred where a native Host fits: forms, sheets, icons, native controls) or React Native primitives wrapped with defaults in `components/` (`AppText`, `AppButton`, `NativeIcon`, `HeaderTextButton`; colors/spacing from `src/theme/tokens.ts`). The game board stays RN `StyleSheet` + Reanimated.
 - Components in `components/`
-- Wrap component there with defaults instead of directly using expo ui/tamagui components raw in screens.
+- No raw `Text`/`Pressable` styling in screens where a wrapper exists.
 
 # Testing
 

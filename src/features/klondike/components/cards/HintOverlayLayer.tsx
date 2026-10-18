@@ -345,7 +345,7 @@ export const HintOverlayLayer = React.memo(
           <HintGhost
             hint={hint}
             source={rects.source}
-            target={rects.target}
+            target={rects.landing}
             metrics={cardMetrics}
           />
         ) : null}

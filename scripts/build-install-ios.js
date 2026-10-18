@@ -63,6 +63,19 @@ const RUN_START_MS = Date.now()
 const IOS_BUILD_FALLBACK_DURATION_MS = 300000 // Release simulator builds are slow.
 const INSTALL_FRESHNESS_WINDOW_MS = 5 * 60 * 1000
 
+// Simulator builds compile only the active arch (arm64 on Apple Silicon):
+// Release defaults to ONLY_ACTIVE_ARCH=NO, which also compiled an unused
+// x86_64 slice for every target. xcodebuild reads XCODE_XCCONFIG_FILE as an
+// override for ALL targets (incl. Pods) — chosen over a Podfile/config-plugin
+// tweak because ios/ is generated and EAS builds must stay untouched.
+// Overridable via a pre-set env var.
+const IOS_BUILD_ENV = {
+  ...process.env,
+  XCODE_XCCONFIG_FILE:
+    process.env.XCODE_XCCONFIG_FILE ??
+    path.join(__dirname, 'ios-active-arch-only.xcconfig'),
+}
+
 // Demo sizing — kept in sync with scripts/build-install-android.js.
 const DEMO_GAME_LIMIT = Number(process.env.DEMO_GAME_LIMIT ?? '')
 const DEMO_PLAYLIST_MAX_GAMES = 20
@@ -204,7 +217,7 @@ const buildIosApp = async ({ udid, debug }) => {
       {
         silent: true,
         onOutput: (chunk) => logStream.write(chunk),
-        spawnOptions: { cwd: REPOSITORY_ROOT, env: process.env },
+        spawnOptions: { cwd: REPOSITORY_ROOT, env: IOS_BUILD_ENV },
       },
       {
         expectedDurationMs: getExpectedBuildDuration(
@@ -512,7 +525,7 @@ const main = async () => {
     await runCommand(
       'npx',
       ['expo', 'run:ios', '--device', device.udid, '--configuration', 'Debug'],
-      { spawnOptions: { cwd: REPOSITORY_ROOT, env: process.env } }
+      { spawnOptions: { cwd: REPOSITORY_ROOT, env: IOS_BUILD_ENV } }
     )
     process.exit(0)
   }
