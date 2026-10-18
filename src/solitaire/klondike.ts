@@ -966,7 +966,12 @@ export const canDropOnFoundation = (card: Card, pile: Card[], suit: Suit): boole
   return topCard.rank + 1 === card.rank
 }
 
-const previewSelectionStack = (
+// Exported (card drag) so the drag lift, the drop-hint mask and the reducer all
+// agree on what a selection lifts — same rationale as canDropOnTableau above.
+// A drag renders exactly these cards in its overlay and hides exactly these card
+// ids in the card layer; a drifted reimplementation there would lift a different
+// set than the applyMove that follows the drop.
+export const previewSelectionStack = (
   state: DropHintsInput,
   selection: Selection | null
 ): Card[] => {

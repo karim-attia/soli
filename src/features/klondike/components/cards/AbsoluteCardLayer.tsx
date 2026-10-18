@@ -3,7 +3,6 @@ import { Animated as NativeAnimated, Pressable, StyleSheet, View } from 'react-n
 import type { StyleProp, ViewStyle } from 'react-native'
 
 import {
-  FOUNDATION_SUIT_ORDER,
   type Card,
   type Foundations,
   type Suit,
@@ -16,25 +15,17 @@ import {
   WIGGLE_OFFSET_PX,
   WIGGLE_SEGMENT_DURATION_MS,
 } from '../../constants'
-import {
-  computeTableauStackOffsets,
-  computeWasteFanGeometry,
-  resolveTableauPosition,
-  resolveTopRowPosition,
-  type AbsoluteCardLayerLayouts,
-} from './utils'
+import type { AbsoluteCardLayerLayouts } from './utils'
 import type { CardMetrics, InvalidWiggleConfig } from '../../types'
+import { WASTE_TEST_ID } from './accessibility'
 import {
-  getCardTestID,
-  getFaceDownCardLabel,
-  getFoundationLabel,
-  getFoundationTestID,
-  getStockLabel,
-  getTableauCardLabel,
-  getWasteLabel,
-  STOCK_TEST_ID,
-  WASTE_TEST_ID,
-} from './accessibility'
+  areAbsoluteLayerCardPropsEqual,
+  buildCardLayerItems,
+  resolveWasteTapTarget,
+  type AbsoluteLayerCardProps,
+  type WasteTapTarget,
+} from './cardLayerItems'
+import type { CardTransformRegistry } from './dragGeometry'
 import { CardBack, CardVisual } from './CardVisual'
 import { styles as cardStyles } from './styles'
 
@@ -42,13 +33,15 @@ import { styles as cardStyles } from './styles'
 // a slightly stronger invalid feedback offset to keep the motion readable on device.
 const ABSOLUTE_LAYER_WIGGLE_OFFSET_PX = Math.max(8, WIGGLE_OFFSET_PX * 1.6)
 
-// Layouts type + creator + slot-position resolvers moved to ./utils (pure
-// geometry, jest-importable without this component's tamagui-heavy imports);
-// re-exported here so existing consumers keep one canonical import site.
+// Layouts type + creator + slot-position resolvers live in ./utils, the card item
+// model + memo comparator in ./cardLayerItems (both pure geometry/data, importable
+// by jest without this component's tamagui-heavy CardVisual chain); re-exported
+// here so existing consumers keep one canonical import site.
 export {
   createEmptyAbsoluteCardLayerLayouts,
   type AbsoluteCardLayerLayouts,
 } from './utils'
+export { type CardLayerItem } from './cardLayerItems'
 
 export type AbsoluteCardLayerProps = {
   // Perf (A2): pile slices instead of the full GameState so React.memo on this layer
@@ -64,210 +57,16 @@ export type AbsoluteCardLayerProps = {
   animationResetKey: number
   interactionsLocked: boolean
   celebrationActive: boolean
+  // Card drag (card-drag-and-drop plan). All three are identity-stable while no
+  // drag is running (null / memoized gesture), so this layer's React.memo is
+  // unaffected during normal play.
+  hiddenCardIds: ReadonlySet<string> | null
+  cardTransforms?: CardTransformRegistry | null
   onDraw: () => void
   onWasteTap: () => void
   onFoundationPress: (suit: Suit) => void
   onTableauCardPress: (columnIndex: number, cardIndex: number) => void
   onCardSettled?: (cardId: string) => void
-}
-
-// Perf (P3): press targets are plain data instead of per-item closures so the card
-// memo comparator can compare them by value; the actual (stable, ref-based) handlers
-// are passed to AbsoluteLayerCard separately.
-type CardLayerPress =
-  | { type: 'draw' }
-  | { type: 'foundation'; suit: Suit }
-  | { type: 'tableau'; columnIndex: number; cardIndex: number }
-
-type CardLayerItem = {
-  card: Card
-  x: number
-  y: number
-  zIndex: number
-  press?: CardLayerPress
-  disabled?: boolean
-  backLabel?: string
-  // A11y/automation handles are precomputed stable strings on the item (not derived in
-  // AbsoluteLayerCard) so face-down cards get column context and the memo comparator
-  // can compare them cheaply by value.
-  accessibilityLabel?: string
-  testID?: string
-}
-
-type WasteTapTarget = {
-  x: number
-  y: number
-  accessibilityLabel: string
-}
-
-const resolveWasteTapTarget = ({
-  waste,
-  cardMetrics,
-  layouts,
-  interactionsLocked,
-  celebrationActive,
-}: Pick<
-  AbsoluteCardLayerProps,
-  'waste' | 'cardMetrics' | 'layouts' | 'interactionsLocked' | 'celebrationActive'
->): WasteTapTarget | null => {
-  if (interactionsLocked || celebrationActive) {
-    return null
-  }
-
-  const visibleWaste = waste.slice(-3)
-  const wastePosition = resolveTopRowPosition(layouts.topRow, layouts.waste)
-  if (!visibleWaste.length || !wastePosition) {
-    return null
-  }
-
-  const fan = computeWasteFanGeometry(visibleWaste.length, cardMetrics.width)
-
-  return {
-    x: wastePosition.x + fan.baseXOffset + (visibleWaste.length - 1) * fan.overlap,
-    y: wastePosition.y,
-    // The tap zone owns the waste's a11y node (the fan visuals stay unlabeled to
-    // avoid duplicate focus targets), so it carries the top card's name.
-    accessibilityLabel: getWasteLabel(visibleWaste[visibleWaste.length - 1]),
-  }
-}
-
-const buildCardLayerItems = ({
-  stock,
-  waste,
-  foundations,
-  tableau,
-  cardMetrics,
-  layouts,
-  drawLabel,
-  interactionsLocked,
-  celebrationActive,
-}: Pick<
-  AbsoluteCardLayerProps,
-  | 'stock'
-  | 'waste'
-  | 'foundations'
-  | 'tableau'
-  | 'cardMetrics'
-  | 'layouts'
-  | 'drawLabel'
-  | 'interactionsLocked'
-  | 'celebrationActive'
->): CardLayerItem[] => {
-  if (celebrationActive) {
-    return []
-  }
-
-  const items: CardLayerItem[] = []
-  const stockPosition = resolveTopRowPosition(layouts.topRow, layouts.stock)
-  const stockTop = stock[stock.length - 1]
-  if (stockTop && stockPosition) {
-    items.push({
-      card: stockTop,
-      x: stockPosition.x,
-      y: stockPosition.y,
-      zIndex: 100 + stock.length,
-      press: interactionsLocked ? undefined : { type: 'draw' },
-      disabled: interactionsLocked,
-      backLabel: drawLabel,
-      // Count in the label lets device tests assert draws without coordinates; the
-      // item already re-renders on every draw (zIndex depends on stock length).
-      accessibilityLabel: getStockLabel(stock.length),
-      testID: STOCK_TEST_ID,
-    })
-  }
-
-  const visibleWaste = waste.slice(-3)
-  const wastePosition = resolveTopRowPosition(layouts.topRow, layouts.waste)
-  if (visibleWaste.length && wastePosition) {
-    const fan = computeWasteFanGeometry(visibleWaste.length, cardMetrics.width)
-    const baseX = wastePosition.x + fan.baseXOffset
-    visibleWaste.forEach((card, index) => {
-      const isTop = index === visibleWaste.length - 1
-      items.push({
-        card,
-        x: baseX + index * fan.overlap,
-        y: wastePosition.y,
-        zIndex: 300 + index,
-        // Waste taps are owned by one stable slot target below. Keeping the
-        // visual card non-pressable lets fast second taps land while this card
-        // is shifting to its new fan position. The visuals also stay unlabeled:
-        // the WasteTapZone carries the a11y node (avoids duplicate focus targets).
-        press: undefined,
-        disabled: interactionsLocked || !isTop,
-      })
-    })
-  }
-
-  FOUNDATION_SUIT_ORDER.forEach((suit, suitIndex) => {
-    const foundation = foundations[suit]
-    const topCard = foundation[foundation.length - 1]
-    const foundationPosition = resolveTopRowPosition(
-      layouts.topRow,
-      layouts.foundations[suit] ?? null
-    )
-    if (!topCard || !foundationPosition) {
-      return
-    }
-
-    const foundationDepth = foundation.length
-    const underlayCard = foundationDepth > 1 ? foundation[foundationDepth - 2] : null
-    if (underlayCard) {
-      items.push({
-        card: underlayCard,
-        x: foundationPosition.x,
-        y: foundationPosition.y,
-        zIndex: 480 + suitIndex * 20 + foundationDepth,
-        disabled: true,
-      })
-    }
-
-    // Only the top card gets an a11y label; the underlay is visual-only (a second
-    // labeled node per foundation would duplicate focus targets).
-    items.push({
-      card: topCard,
-      x: foundationPosition.x,
-      y: foundationPosition.y,
-      zIndex: 500 + suitIndex * 20 + foundationDepth,
-      press: interactionsLocked ? undefined : { type: 'foundation', suit },
-      disabled: interactionsLocked,
-      accessibilityLabel: getFoundationLabel(suit, topCard),
-      testID: getFoundationTestID(suit),
-    })
-  })
-
-  tableau.forEach((column, columnIndex) => {
-    const columnPosition = resolveTableauPosition(
-      layouts.tableauRow,
-      layouts.tableauColumns[columnIndex] ?? null
-    )
-    if (!columnPosition) {
-      return
-    }
-
-    const cardOffsets = computeTableauStackOffsets(column, cardMetrics.stackOffset)
-    column.forEach((card, cardIndex) => {
-      items.push({
-        card,
-        x: columnPosition.x,
-        y: columnPosition.y + cardOffsets[cardIndex],
-        zIndex: 1000 + columnIndex * 100 + cardIndex,
-        press:
-          card.faceUp && !interactionsLocked
-            ? { type: 'tableau', columnIndex, cardIndex }
-            : undefined,
-        disabled: interactionsLocked || !card.faceUp,
-        // Face-down cards are labeled too: hidden-card counts per column are real game
-        // state for screen-reader players and device tests. If narration proves too
-        // noisy, dropping the label here is a one-line revert.
-        accessibilityLabel: card.faceUp
-          ? getTableauCardLabel(card, columnIndex)
-          : getFaceDownCardLabel(columnIndex),
-        testID: getCardTestID(card),
-      })
-    })
-  })
-
-  return items
 }
 
 // Perf (A2): memoized so per-second TIMER_TICK renders (piles keep referential
@@ -285,6 +84,8 @@ export const AbsoluteCardLayer = React.memo(
     animationResetKey,
     interactionsLocked,
     celebrationActive,
+    hiddenCardIds,
+    cardTransforms,
     onDraw,
     onWasteTap,
     onFoundationPress,
@@ -316,12 +117,14 @@ export const AbsoluteCardLayer = React.memo(
           drawLabel,
           interactionsLocked,
           celebrationActive,
+          hiddenCardIds,
         }),
       [
         cardMetrics,
         celebrationActive,
         drawLabel,
         foundations,
+        hiddenCardIds,
         interactionsLocked,
         layouts,
         stock,
@@ -330,7 +133,7 @@ export const AbsoluteCardLayer = React.memo(
       ]
     )
 
-    return (
+    const plane = (
       <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
         {items.map((item) => (
           <AbsoluteLayerCard
@@ -341,6 +144,7 @@ export const AbsoluteCardLayer = React.memo(
             animationResetKey={animationResetKey}
             movementEnabled={cardFlightsEnabled}
             flipEnabled={cardFlipEnabled}
+            cardTransforms={cardTransforms}
             onDraw={onDraw}
             onFoundationPress={onFoundationPress}
             onTableauCardPress={onTableauCardPress}
@@ -356,96 +160,28 @@ export const AbsoluteCardLayer = React.memo(
         ) : null}
       </View>
     )
+
+    // The drag pan is deliberately NOT attached here, even though this plane's
+    // origin IS the card coordinate space. This root is pointerEvents="box-none",
+    // and on Android RNGH's orchestrator only collects handlers on a BOX_NONE view
+    // when a DESCENDANT became a touch target — a childless, background-less view
+    // does not qualify (see docs/external-package-guides/react-native-gesture-handler.md
+    // §5). The waste top card is exactly that case: its visual is pointerEvents="none"
+    // and WasteTapZone has no background.
+    //
+    // VERIFIED on an Android emulator (2026-09-09, API 36 arm64): with the detector
+    // here, tableau drags logged [Drag] Begin but THREE consecutive waste drags logged
+    // nothing at all. iOS was unaffected (UIKit delivers touches to recognizers on the
+    // whole superview chain). The detector therefore lives on the boardShell YStack in
+    // KlondikeGameView, whose pointerEvents is `auto` so handlers are always collected.
+    // No coordinate change was needed: an absoluteFill child and its parent's onLayout
+    // children share one origin — which is why cards already line up with the
+    // structural slots today.
+    return plane
   }
 )
 
 AbsoluteCardLayer.displayName = 'AbsoluteCardLayer'
-
-type AbsoluteLayerCardProps = {
-  item: CardLayerItem
-  metrics: CardMetrics
-  invalidWiggle: InvalidWiggleConfig
-  animationResetKey: number
-  movementEnabled: boolean
-  flipEnabled: boolean
-  onDraw: () => void
-  onFoundationPress: (suit: Suit) => void
-  onTableauCardPress: (columnIndex: number, cardIndex: number) => void
-  onCardSettled?: (cardId: string) => void
-}
-
-const arePressTargetsEqual = (
-  prev: CardLayerPress | undefined,
-  next: CardLayerPress | undefined
-): boolean => {
-  if (!prev || !next) {
-    return prev === next
-  }
-  if (prev.type === 'draw') {
-    return next.type === 'draw'
-  }
-  if (prev.type === 'foundation') {
-    return next.type === 'foundation' && next.suit === prev.suit
-  }
-  return (
-    next.type === 'tableau' &&
-    next.columnIndex === prev.columnIndex &&
-    next.cardIndex === prev.cardIndex
-  )
-}
-
-// Perf (P3): items are rebuilt as fresh objects on every board change, so compare by
-// value exactly the fields that affect a card's render or its animation effects
-// (position targets, face, z-order, press target, wiggle membership). Function props
-// are deliberately ignored: all handlers read live state through refs in
-// useKlondikeGame, so a newer function identity never changes behavior — comparing
-// them would silently defeat this memo (e.g. onCardSettled changes identity whenever
-// foundations change). History note: an earlier comparator on the old pile-local card
-// surfaces regressed correctness via stale press closures (see animation-audit plan);
-// that hazard is avoided here by comparing press *data* and keeping handlers ref-based.
-// WARNING: any new CardLayerItem field that affects rendering MUST be compared here,
-// or updates to it will be silently swallowed by the memo (pattern: backLabel,
-// accessibilityLabel, testID).
-const areAbsoluteLayerCardPropsEqual = (
-  prev: AbsoluteLayerCardProps,
-  next: AbsoluteLayerCardProps
-): boolean => {
-  const prevItem = prev.item
-  const nextItem = next.item
-  if (
-    prevItem.card.id !== nextItem.card.id ||
-    prevItem.card.faceUp !== nextItem.card.faceUp ||
-    prevItem.x !== nextItem.x ||
-    prevItem.y !== nextItem.y ||
-    prevItem.zIndex !== nextItem.zIndex ||
-    prevItem.disabled !== nextItem.disabled ||
-    prevItem.backLabel !== nextItem.backLabel ||
-    prevItem.accessibilityLabel !== nextItem.accessibilityLabel ||
-    prevItem.testID !== nextItem.testID ||
-    !arePressTargetsEqual(prevItem.press, nextItem.press)
-  ) {
-    return false
-  }
-
-  if (
-    prev.metrics !== next.metrics ||
-    prev.animationResetKey !== next.animationResetKey ||
-    prev.movementEnabled !== next.movementEnabled ||
-    prev.flipEnabled !== next.flipEnabled
-  ) {
-    return false
-  }
-
-  // Wiggle changes only need to re-render cards that are (or were) wiggling.
-  if (prev.invalidWiggle.key !== next.invalidWiggle.key) {
-    const cardId = nextItem.card.id
-    if (prev.invalidWiggle.lookup.has(cardId) || next.invalidWiggle.lookup.has(cardId)) {
-      return false
-    }
-  }
-
-  return true
-}
 
 const AbsoluteLayerCard = React.memo(
   ({
@@ -455,6 +191,7 @@ const AbsoluteLayerCard = React.memo(
     animationResetKey,
     movementEnabled,
     flipEnabled,
+    cardTransforms,
     onDraw,
     onFoundationPress,
     onTableauCardPress,
@@ -477,7 +214,30 @@ const AbsoluteLayerCard = React.memo(
     // In Fabric/native-driver moves, the visual transform and React pressability can briefly
     // disagree. Disable touches in the render that first observes a new target so rapid stock
     // taps cannot hit the just-opened waste card before the settling effect runs.
-    const pressDisabled = item.disabled || isSettling || targetChangedBeforeEffect
+    const pressDisabled =
+      item.disabled || item.hidden || isSettling || targetChangedBeforeEffect
+
+    // Card drag: expose this card's position values so a legal drop can SEED them to
+    // the drop point while the card is still hidden. The existing flight below then
+    // runs from the drop point to the destination, which is the whole handoff — no
+    // second animation, no timer. previousTargetRef is deliberately NOT touched: it
+    // tracks committed targets, not values, so the next commit still sees
+    // targetChanged and starts the flight.
+    useEffect(() => {
+      if (!cardTransforms) {
+        return
+      }
+      const handle = {
+        setPosition: (x: number, y: number) => {
+          // setValue is supported under useNativeDriver: true (it forwards to the
+          // native animated node); starting a JS-driven animation on one is not.
+          translateX.setValue(x)
+          translateY.setValue(y)
+        },
+      }
+      cardTransforms.register(item.card.id, handle)
+      return () => cardTransforms.unregister(item.card.id, handle)
+    }, [cardTransforms, item.card.id, translateX, translateY])
 
     useEffect(() => {
       const resetChanged = previousResetKeyRef.current !== animationResetKey
@@ -608,6 +368,11 @@ const AbsoluteLayerCard = React.memo(
       {
         width: metrics.width,
         height: metrics.height,
+        // Card drag: the lifted copy in DragOverlayLayer stands in for this card, so
+        // hide it rather than unmounting it — its Animated.Values must survive the
+        // drag so the drop can seed them. opacity 0 also drops it from the iOS a11y
+        // tree for the ~1 s of a drag, which is acceptable (VoiceOver cannot drag).
+        opacity: item.hidden ? 0 : 1,
         // Boost must include targetChangedBeforeEffect, not just isSettling: isSettling
         // only flips in the post-commit effect, so the first committed frame(s) of a
         // flight would otherwise carry the *destination* zIndex un-boosted. For moves to
