@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+// React Compiler (option D, 2026-10-19): this hook carried 33 manual useCallback/useMemo
+// wrappers. 23 were removed — the compiler memoizes each with the same dependencies
+// (verified slot-by-slot in the compiled output, docs/product/next-steps-after-sdk-58).
+// The 10 remaining useCallbacks are KEPT on purpose: each is a (transitive) dependency of
+// a useEffect (requestPlayDeal/requestNewGame/attemptAutoMoveFromState and the chain
+// under them), the case react.dev names for keeping useCallback, and
+// react-hooks/exhaustive-deps flags a plain function in an effect dependency list as
+// "changes every render" (the rule cannot see compiler memoization). The "stays stable"
+// comments below still hold: they describe what the compiler guarantees and WHY handlers
+// read `stateRef` instead of `state` (a `state` read would re-create them per action).
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { Alert, LayoutChangeEvent, LayoutRectangle, useColorScheme } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -168,17 +178,12 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     useState<AbsoluteCardLayerLayouts>(() => createEmptyAbsoluteCardLayerLayouts())
 
   const safeArea = useSafeAreaInsets()
-  const boardAvailableWidth = useMemo(() => {
-    if (!boardLayout.width || boardLayout.width <= 0) {
-      return null
-    }
-    // Task 1-8: size board columns using the safe-area width (not under notches).
-    return boardLayout.width - safeArea.left - safeArea.right
-  }, [boardLayout.width, safeArea.left, safeArea.right])
-  const cardMetrics = useMemo(
-    () => computeCardMetrics(boardAvailableWidth),
-    [boardAvailableWidth]
-  )
+  // Task 1-8: size board columns using the safe-area width (not under notches).
+  const boardAvailableWidth =
+    boardLayout.width && boardLayout.width > 0
+      ? boardLayout.width - safeArea.left - safeArea.right
+      : null
+  const cardMetrics = computeCardMetrics(boardAvailableWidth)
   const colorScheme = useColorScheme()
   const feltBackground = colorScheme === 'dark' ? COLOR_FELT_DARK : COLOR_FELT_LIGHT
 
@@ -231,28 +236,21 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     celebrations: celebrationAnimationsEnabled,
   } = animationToggles
 
-  // Precomputes drop targets for auto-move and hint rendering. Memoized on the state
-  // slices getDropHints reads (not the whole state) so hints keep identity across
-  // TIMER_TICK and memoized board components can skip re-renders (perf, A2).
-  const dropHints = useMemo(
-    () =>
-      getDropHints({
-        selected: state.selected,
-        tableau: state.tableau,
-        foundations: state.foundations,
-        waste: state.waste,
-      }),
-    [state.selected, state.tableau, state.foundations, state.waste]
-  )
+  // Precomputes drop targets for auto-move and hint rendering. The compiler caches it on
+  // the state slices getDropHints reads (not the whole state), so hints keep identity
+  // across TIMER_TICK and the board components' cached JSX stays valid (perf, A2).
+  const dropHints = getDropHints({
+    selected: state.selected,
+    tableau: state.tableau,
+    foundations: state.foundations,
+    waste: state.waste,
+  })
 
-  const headerPadding = useMemo(
-    () => ({
-      top: EDGE_GUTTER,
-      left: safeArea.left + COLUMN_MARGIN,
-      right: safeArea.right + COLUMN_MARGIN,
-    }),
-    [safeArea.left, safeArea.right]
-  )
+  const headerPadding = {
+    top: EDGE_GUTTER,
+    left: safeArea.left + COLUMN_MARGIN,
+    right: safeArea.right + COLUMN_MARGIN,
+  }
 
   const autoCompleteRunsRef = useRef(state.autoCompleteRuns)
   const winCelebrationsRef = useRef(state.winCelebrations)
@@ -280,30 +278,27 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Shared "merge one measured slot into absoluteCardLayerLayouts" step for all
   // layout handlers below (clean-code review #10: was six copies of the same
   // compare-then-merge pattern).
-  const mergeCardLayerLayout = useCallback(
-    (key: 'topRow' | 'stock' | 'waste' | 'tableauRow', layout: LayoutRectangle) => {
-      setAbsoluteCardLayerLayouts((previous) => {
-        if (areLayoutsEquivalent(previous[key], layout)) {
-          return previous
-        }
+  const mergeCardLayerLayout = (
+    key: 'topRow' | 'stock' | 'waste' | 'tableauRow',
+    layout: LayoutRectangle
+  ) => {
+    setAbsoluteCardLayerLayouts((previous) => {
+      if (areLayoutsEquivalent(previous[key], layout)) {
+        return previous
+      }
 
-        return { ...previous, [key]: layout }
-      })
-    },
-    []
-  )
+      return { ...previous, [key]: layout }
+    })
+  }
 
   // Stores the top-row layout for later celebration positioning.
-  const handleTopRowLayout = useCallback(
-    (layout: LayoutRectangle) => {
-      topRowLayoutRef.current = layout
-      mergeCardLayerLayout('topRow', layout)
-    },
-    [mergeCardLayerLayout]
-  )
+  const handleTopRowLayout = (layout: LayoutRectangle) => {
+    topRowLayoutRef.current = layout
+    mergeCardLayerLayout('topRow', layout)
+  }
 
   // Caches foundation layouts so celebration trajectories know their origins.
-  const handleFoundationLayout = useCallback((suit: Suit, layout: LayoutRectangle) => {
+  const handleFoundationLayout = (suit: Suit, layout: LayoutRectangle) => {
     foundationLayoutsRef.current[suit] = layout
     setAbsoluteCardLayerLayouts((previous) => {
       if (areLayoutsEquivalent(previous.foundations[suit], layout)) {
@@ -318,37 +313,28 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         },
       }
     })
-  }, [])
+  }
 
-  const handleStockLayout = useCallback(
-    (layout: LayoutRectangle) => mergeCardLayerLayout('stock', layout),
-    [mergeCardLayerLayout]
-  )
+  const handleStockLayout = (layout: LayoutRectangle) =>
+    mergeCardLayerLayout('stock', layout)
 
-  const handleWasteLayout = useCallback(
-    (layout: LayoutRectangle) => mergeCardLayerLayout('waste', layout),
-    [mergeCardLayerLayout]
-  )
+  const handleWasteLayout = (layout: LayoutRectangle) =>
+    mergeCardLayerLayout('waste', layout)
 
-  const handleTableauRowLayout = useCallback(
-    (layout: LayoutRectangle) => mergeCardLayerLayout('tableauRow', layout),
-    [mergeCardLayerLayout]
-  )
+  const handleTableauRowLayout = (layout: LayoutRectangle) =>
+    mergeCardLayerLayout('tableauRow', layout)
 
-  const handleTableauColumnLayout = useCallback(
-    (columnIndex: number, layout: LayoutRectangle) => {
-      setAbsoluteCardLayerLayouts((previous) => {
-        if (areLayoutsEquivalent(previous.tableauColumns[columnIndex], layout)) {
-          return previous
-        }
+  const handleTableauColumnLayout = (columnIndex: number, layout: LayoutRectangle) => {
+    setAbsoluteCardLayerLayouts((previous) => {
+      if (areLayoutsEquivalent(previous.tableauColumns[columnIndex], layout)) {
+        return previous
+      }
 
-        const tableauColumns = [...previous.tableauColumns]
-        tableauColumns[columnIndex] = layout
-        return { ...previous, tableauColumns }
-      })
-    },
-    []
-  )
+      const tableauColumns = [...previous.tableauColumns]
+      tableauColumns[columnIndex] = layout
+      return { ...previous, tableauColumns }
+    })
+  }
 
   // Hook: drive the Klondike timer lifecycle (start/pause/tick) away from the main component.
   useKlondikeTimer({ state, dispatch, stateRef })
@@ -507,13 +493,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // the provider keeps the in-memory copy of a row current even when the write
   // raced history hydration. Only the SQL sum lags the write by one queue task
   // (accepted ~1-frame gap, plan § P-H gap note).
-  const boardRowSettled = useMemo(
-    () =>
-      boardEntryId !== null &&
-      typeof historyEntries.find((entry) => entry.id === boardEntryId)?.vegasScore ===
-        'number',
-    [boardEntryId, historyEntries]
-  )
+  const boardRowSettled =
+    boardEntryId !== null &&
+    typeof historyEntries.find((entry) => entry.id === boardEntryId)?.vegasScore ===
+      'number'
   const vegasTotal =
     vegasTotalEnabled && state.vegasRules
       ? settledVegasTotal - vegasTotalOffset + (boardRowSettled ? 0 : score.vegas)
@@ -521,35 +504,21 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
 
   // Scoring (2026-10-11): the former `!showMoves && !showTime → []` early return
   // was dropped — buildStatisticsRows returns [] itself when nothing is enabled.
-  const statisticsRows: StatisticsRow[] = useMemo(() => {
-    return buildStatisticsRows({
-      showMoves,
-      showTime,
-      scoring,
-      vegasRules: state.vegasRules,
-      score,
-      vegasTotal,
-      moveCount: celebrationPreviewStats?.moveCount ?? moveCount,
-      elapsedMs: celebrationPreviewStats?.elapsedMs ?? elapsedMs,
-      // Frozen while previewing: 'paused' + no start timestamp make
-      // computeElapsedWithReference return elapsedMs verbatim, so re-firing the
-      // same link reproduces the exact same screenshot.
-      timerState: celebrationPreviewStats ? 'paused' : timerState,
-      timerStartedAt: celebrationPreviewStats ? null : timerStartedAt,
-    })
-  }, [
-    celebrationPreviewStats,
-    elapsedMs,
-    moveCount,
-    score,
-    scoring,
+  const statisticsRows: StatisticsRow[] = buildStatisticsRows({
     showMoves,
     showTime,
-    state.vegasRules,
-    timerStartedAt,
-    timerState,
+    scoring,
+    vegasRules: state.vegasRules,
+    score,
     vegasTotal,
-  ])
+    moveCount: celebrationPreviewStats?.moveCount ?? moveCount,
+    elapsedMs: celebrationPreviewStats?.elapsedMs ?? elapsedMs,
+    // Frozen while previewing: 'paused' + no start timestamp make
+    // computeElapsedWithReference return elapsedMs verbatim, so re-firing the
+    // same link reproduces the exact same screenshot.
+    timerState: celebrationPreviewStats ? 'paused' : timerState,
+    timerStartedAt: celebrationPreviewStats ? null : timerStartedAt,
+  })
 
   const [invalidWiggle, setInvalidWiggle] = useState<InvalidWiggleConfig>(
     createEmptyInvalidWiggle
@@ -613,27 +582,24 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   )
 
   // ?reset=game (agent-testing-skill C4): New Game without the UI confirmation.
-  const dealNewGameForTesting = useCallback(() => {
+  const dealNewGameForTesting = () => {
     performDealAgain({ logContext: { reason: 'deepLink-reset' } })
-  }, [performDealAgain])
+  }
 
   // ?deal=<exactId>&draw=N (agent-testing-skill C2): bug-report repro and
   // hand-crafted scenario deals. The launcher validates the id before calling.
   // Exact-deal paths (?deal= and Retry) take the CURRENT Scoring setting's rules,
   // same as the draw count fallback: the deal id fixes the cards, not the rule set.
-  const startGameFromExactDeal = useCallback(
-    (exactId: ExactDealId, drawCount?: DrawCount) => {
-      performDealAgain({
-        stateOverride: createGameStateFromExactId(
-          exactId,
-          drawCount ?? preferredDrawCount,
-          { vegasRules }
-        ),
-        logContext: { reason: 'deepLink-deal', exactId, drawCount },
-      })
-    },
-    [performDealAgain, preferredDrawCount, vegasRules]
-  )
+  const startGameFromExactDeal = (exactId: ExactDealId, drawCount?: DrawCount) => {
+    performDealAgain({
+      stateOverride: createGameStateFromExactId(
+        exactId,
+        drawCount ?? preferredDrawCount,
+        { vegasRules }
+      ),
+      logContext: { reason: 'deepLink-deal', exactId, drawCount },
+    })
+  }
 
   const { handleLaunchDemoGame } = useDemoGameLauncher({
     stateRef,
@@ -715,7 +681,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   const drawLabel = state.stock.length ? 'Draw' : ''
 
   // Captures board dimensions for card metrics and celebration sizing.
-  const handleBoardLayout = useCallback((event: LayoutChangeEvent) => {
+  const handleBoardLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout
     setBoardLayout((previous) => {
       if (previous.width === width && previous.height === height) {
@@ -724,20 +690,20 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       void saveBoardMetrics({ width, height })
       return { width, height }
     })
-  }, [])
+  }
 
   // Handles draw/recycle presses, validating availability before dispatching.
-  const handleDraw = useCallback(() => {
+  const handleDraw = () => {
     const current = stateRef.current
     if (!current.stock.length && !current.waste.length) {
       notifyInvalidMove()
       return
     }
     dispatchGameAction({ type: 'DRAW_OR_RECYCLE' })
-  }, [dispatchGameAction, notifyInvalidMove])
+  }
 
   // Initiates an undo action when the board is unlocked and history exists.
-  const handleUndo = useCallback(() => {
+  const handleUndo = () => {
     const current = stateRef.current
     if (!current.history.length || boardLockedRef.current) {
       // Failed undo taps break the streak too — the user isn't walking back through
@@ -757,7 +723,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       noteUndoSuccess()
     }
     dispatchGameAction({ type: 'UNDO' })
-  }, [dispatchGameAction, noteStreakBreak, noteUndoSuccess, notifyInvalidMove])
+  }
 
   // Presents a confirmation dialog and seeds state for a newly dealt game.
   const requestNewGame = useCallback<RequestNewGameFn>(
@@ -822,10 +788,14 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         play()
         return
       }
-      Alert.alert(prompt.title, 'Your current game will end and be recorded as incomplete.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: prompt.confirm, style: 'destructive', onPress: play },
-      ])
+      Alert.alert(
+        prompt.title,
+        'Your current game will end and be recorded as incomplete.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: prompt.confirm, style: 'destructive', onPress: play },
+        ]
+      )
     },
     [clearCelebrationDialogTimer, performDealAgain, vegasRules]
   )
@@ -883,14 +853,11 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // Attempts to auto-move a selection and falls back to invalid feedback on failure.
   // Uses stateRef (only ever called from user events, which fire after the ref sync
   // effect) so the callback stays stable for memoized card layers (perf, P3/A2).
-  const attemptAutoMove = useCallback(
-    (selection: Selection) => {
-      attemptAutoMoveFromState(selection, stateRef.current)
-    },
-    [attemptAutoMoveFromState]
-  )
+  const attemptAutoMove = (selection: Selection) => {
+    attemptAutoMoveFromState(selection, stateRef.current)
+  }
 
-  const handleWasteTap = useCallback(() => {
+  const handleWasteTap = () => {
     const current = stateRef.current
     const topWaste = current.waste[current.waste.length - 1]
     const activeWasteMove = lastWasteAutoMoveRef.current
@@ -918,7 +885,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     }
 
     bufferedWasteTapCountRef.current = 0
-  }, [attemptAutoMoveFromState])
+  }
 
   useEffect(() => {
     const topWaste = state.waste[state.waste.length - 1]
@@ -970,30 +937,27 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   // the callback stays stable for memoized board components. Depending on the
   // render-time `dropHints`/`state.selected` here previously gave every selection
   // change a new handler identity, defeating card-layer memoization (perf, P3/A2).
-  const handleFoundationPress = useCallback(
-    (suit: Suit) => {
-      if (boardLockedRef.current) {
-        return
+  const handleFoundationPress = (suit: Suit) => {
+    if (boardLockedRef.current) {
+      return
+    }
+    const current = stateRef.current
+    if (!current.selected) {
+      if (current.foundations[suit].length) {
+        attemptAutoMove({ source: 'foundation', suit })
       }
-      const current = stateRef.current
-      if (!current.selected) {
-        if (current.foundations[suit].length) {
-          attemptAutoMove({ source: 'foundation', suit })
-        }
-        return
-      }
-      if (getDropHints(current).foundations[suit]) {
-        dispatchGameAction({
-          type: 'APPLY_MOVE',
-          selection: current.selected,
-          target: { type: 'foundation', suit },
-        })
-      } else {
-        notifyInvalidMove({ selection: current.selected })
-      }
-    },
-    [attemptAutoMove, dispatchGameAction, notifyInvalidMove]
-  )
+      return
+    }
+    if (getDropHints(current).foundations[suit]) {
+      dispatchGameAction({
+        type: 'APPLY_MOVE',
+        selection: current.selected,
+        target: { type: 'foundation', suit },
+      })
+    } else {
+      notifyInvalidMove({ selection: current.selected })
+    }
+  }
 
   // Hint button + background warnings (hints plan; warning-mode select since
   // F14). Dispatchless since feedback round 1 (2026-07-23): hint visuals are a
@@ -1050,16 +1014,14 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
 
   // Stable per-position tableau press handler so the absolute card layer's memoized
   // cards never see a new function identity (perf, P3).
-  const handleTableauCardPress = useCallback(
-    (columnIndex: number, cardIndex: number) => {
-      attemptAutoMove({ source: 'tableau', columnIndex, cardIndex })
-    },
-    [attemptAutoMove]
-  )
+  const handleTableauCardPress = (columnIndex: number, cardIndex: number) => {
+    attemptAutoMove({ source: 'tableau', columnIndex, cardIndex })
+  }
 
   // Perf (A2): the board components receive narrow state slices instead of the whole
-  // GameState so their React.memo can skip re-renders when piles kept identity
-  // (TIMER_TICK, selection-only changes, moves that don't touch a given pile).
+  // GameState so the compiler can cache these prop objects (and KlondikeGameView the
+  // child elements) when piles kept identity (TIMER_TICK, selection-only changes,
+  // moves that don't touch a given pile). Formerly React.memo on each component.
   const topRowProps: TopRowProps = {
     stockCount: state.stock.length,
     wasteCount: state.waste.length,
@@ -1111,10 +1073,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
     !celebrationState &&
     state.stock.length === 0 &&
     recyclesLeft(state) === 0
-  const requestNewGameFromDock = useCallback(
-    () => requestNewGame({ reason: 'manual' }),
-    [requestNewGame]
-  )
+  const requestNewGameFromDock = () => requestNewGame({ reason: 'manual' })
 
   // requirement 20-6: onUndoPress removed - tap is handled by composed gesture
   const undoScrubProps: UndoScrubberProps = {

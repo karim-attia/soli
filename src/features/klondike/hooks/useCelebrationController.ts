@@ -4,11 +4,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   Easing,
   cancelAnimation,
-  runOnJS,
-  runOnUI,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated'
+// `scheduleOnUI(worklet)` / `scheduleOnRN(fn, ...args)` replace the deprecated
+// `runOnUI(worklet)()` / `runOnJS(fn)(...args)` (which are one-line wrappers around them).
+// Reanimated does not re-export the new names; they live in react-native-worklets.
+import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets'
 
 import {
   CELEBRATION_DURATION_MS,
@@ -396,14 +398,17 @@ export const useCelebrationController = ({
     pendingWinningCardSettledRef.current = false
     setCelebrationPending(false)
     setCelebrationOverlayReady(false)
-    celebrationTotal.value = 0
-    celebrationMode.value = 0
-    celebrationBoard.value = { width: 0, height: 0, floorY: 0 }
-    runOnUI(() => {
+    // Shared-value writes use `.set()` (Reanimated's React Compiler-compliant API, same as
+    // `.value =` underneath): a `.value =` store after `useAnimatedReaction`/`scheduleOnUI`
+    // captured the value makes the compiler skip this whole hook.
+    celebrationTotal.set(0)
+    celebrationMode.set(0)
+    celebrationBoard.set({ width: 0, height: 0, floorY: 0 })
+    scheduleOnUI(() => {
       'worklet'
-      celebrationActive.value = 0
+      celebrationActive.set(0)
       cancelAnimation(celebrationProgress)
-    })()
+    })
     clearCelebrationStartTimer()
     clearCelebrationFallbackTimer()
     clearCelebrationDialogTimer()
@@ -418,7 +423,7 @@ export const useCelebrationController = ({
     clearCelebrationStartTimer,
   ])
 
-  // JS-side receiver for the overlay's texture-ready signal (runOnJS from the
+  // JS-side receiver for the overlay's texture-ready signal (scheduleOnRN from the
   // overlay's launchAnchor reaction — see CelebrationOverlayLayer.onOverlayReady).
   const handleCelebrationOverlayReady = useCallback(() => {
     setCelebrationOverlayReady(true)
@@ -430,7 +435,7 @@ export const useCelebrationController = ({
     celebrationHoldRef.current = false
     celebrationPreviewRef.current = false
     devLog('info', '[Celebration] abort requested', { preview: wasPreview })
-    // Deliberately NO eager runOnUI(active = 0) here (outline-audit/flicker story,
+    // Deliberately NO eager scheduleOnUI(active = 0) here (outline-audit/flicker story,
     // user 2026-07-09): hiding the sprites on the UI thread runs 1-2 frames BEFORE
     // the React commit that unmounts the overlay and restores the board — device
     // frame captures showed an empty board in between (same flicker class as the
@@ -528,13 +533,13 @@ export const useCelebrationController = ({
     celebrationDialogShownRef.current = false
     clearCelebrationDialogTimer()
 
-    celebrationTotal.value = celebrationState.cards.length
-    celebrationMode.value = celebrationState.modeId
-    celebrationBoard.value = {
+    celebrationTotal.set(celebrationState.cards.length)
+    celebrationMode.set(celebrationState.modeId)
+    celebrationBoard.set({
       width: celebrationState.boardWidth,
       height: celebrationState.boardHeight,
       floorY: celebrationState.floorY,
-    }
+    })
 
     devLog('info', '[Celebration] start', {
       cards: celebrationState.cards.length,
@@ -545,20 +550,18 @@ export const useCelebrationController = ({
     // capture the duration first. Mutual recursion (run ↔ finish) needs hoisting.
     const durationMs = celebrationState.durationMs
     function startProgressRun() {
-      runOnUI(() => {
+      scheduleOnUI(() => {
         'worklet'
-        celebrationActive.value = 1
-        celebrationProgress.value = 0
-        celebrationProgress.value = withTiming(
-          1,
-          { duration: durationMs, easing: Easing.linear },
-          (finished) => {
+        celebrationActive.set(1)
+        celebrationProgress.set(0)
+        celebrationProgress.set(
+          withTiming(1, { duration: durationMs, easing: Easing.linear }, (finished) => {
             if (finished && !celebrationAbortRef.current) {
-              runOnJS(handleRunFinished)()
+              scheduleOnRN(handleRunFinished)
             }
-          }
+          })
         )
-      })()
+      })
     }
 
     function handleRunFinished() {
@@ -586,11 +589,11 @@ export const useCelebrationController = ({
     return () => {
       celebrationAbortRef.current = true
       clearCelebrationDialogTimer()
-      runOnUI(() => {
+      scheduleOnUI(() => {
         'worklet'
-        celebrationActive.value = 0
+        celebrationActive.set(0)
         cancelAnimation(celebrationProgress)
-      })()
+      })
     }
   }, [
     celebrationActive,

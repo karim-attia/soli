@@ -1,4 +1,3 @@
-import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated'
 
@@ -18,45 +17,47 @@ const CARET_SIZE = 6
 // 50px above the undo button — exactly where an X would sit — so a tappable X would
 // steal touches from the very gesture the hint teaches. The 10s auto-dismiss covers
 // the "more time to read" motivation instead.
-export const UndoHintBubble = React.memo(
-  ({ visible, bottom }: { visible: boolean; bottom: number }) => {
-    // Always mounted while the dock is visible; fade like the scrub overlay does. No
-    // useAnimationToggles() gating: a 140ms functional fade is not a decorative
-    // animation (same precedent as the scrub overlay's fade).
-    const animatedStyle = useAnimatedStyle(() => {
-      return {
-        opacity: withTiming(visible ? 1 : 0, HINT_TRANSITION),
-        transform: [
-          { scale: withTiming(visible ? 1 : HINT_HIDDEN_SCALE, HINT_TRANSITION) },
-        ],
-      }
-    }, [visible])
+export const UndoHintBubble = ({
+  visible,
+  bottom,
+}: {
+  visible: boolean
+  bottom: number
+}) => {
+  // Always mounted while the dock is visible; fade like the scrub overlay does. No
+  // useAnimationToggles() gating: a 140ms functional fade is not a decorative
+  // animation (same precedent as the scrub overlay's fade).
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: withTiming(visible ? 1 : 0, HINT_TRANSITION),
+      transform: [
+        { scale: withTiming(visible ? 1 : HINT_HIDDEN_SCALE, HINT_TRANSITION) },
+      ],
+    }
+  }, [visible])
 
-    return (
-      // The layer spans the dock's full width so the caret's percent offset references
-      // the dock: the Undo button fills the right 50%, so its center is 25% from the
-      // right edge. pointerEvents="none" on the whole subtree (caret included) — it
-      // must never compete with the undo tap/pan gesture underneath (same reasoning
-      // as the scrub overlay's pointerEvents="none").
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.layer, { bottom }, animatedStyle]}
-        accessible
-        accessibilityLabel={UNDO_HINT_COPY}
-        accessibilityLiveRegion="polite"
-        testID="undo-hint"
-      >
-        <View style={styles.bubble}>
-          <Text style={styles.text}>{UNDO_HINT_COPY}</Text>
-        </View>
-        {/* v2: downward caret pointing at the Undo button (border-trick triangle). */}
-        <View style={styles.caret} />
-      </Animated.View>
-    )
-  }
-)
-
-UndoHintBubble.displayName = 'UndoHintBubble'
+  return (
+    // The layer spans the dock's full width so the caret's percent offset references
+    // the dock: the Undo button fills the right 50%, so its center is 25% from the
+    // right edge. pointerEvents="none" on the whole subtree (caret included) — it
+    // must never compete with the undo tap/pan gesture underneath (same reasoning
+    // as the scrub overlay's pointerEvents="none").
+    <Animated.View
+      pointerEvents="none"
+      style={[styles.layer, { bottom }, animatedStyle]}
+      accessible
+      accessibilityLabel={UNDO_HINT_COPY}
+      accessibilityLiveRegion="polite"
+      testID="undo-hint"
+    >
+      <View style={styles.bubble}>
+        <Text style={styles.text}>{UNDO_HINT_COPY}</Text>
+      </View>
+      {/* v2: downward caret pointing at the Undo button (border-trick triangle). */}
+      <View style={styles.caret} />
+    </Animated.View>
+  )
+}
 
 const styles = StyleSheet.create({
   layer: {

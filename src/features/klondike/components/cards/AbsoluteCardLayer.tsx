@@ -1,5 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Animated as NativeAnimated, Pressable, StyleSheet, View } from 'react-native'
+import {
+  Animated as NativeAnimated,
+  Pressable,
+  StyleSheet,
+  View,
+  useAnimatedValue,
+} from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
 
 import {
@@ -51,8 +57,8 @@ export {
 } from './utils'
 
 export type AbsoluteCardLayerProps = {
-  // Perf (A2): pile slices instead of the full GameState so React.memo on this layer
-  // can skip re-renders when the piles kept referential identity (e.g. TIMER_TICK).
+  // Perf (A2): pile slices instead of the full GameState so the compiled parent keeps
+  // this layer's element cached when the piles kept referential identity (TIMER_TICK).
   stock: Card[]
   waste: Card[]
   foundations: Foundations
@@ -270,96 +276,93 @@ const buildCardLayerItems = ({
   return items
 }
 
-// Perf (A2): memoized so per-second TIMER_TICK renders (piles keep referential
-// identity through the reducer) skip the whole layer, including the items rebuild.
-export const AbsoluteCardLayer = React.memo(
-  ({
-    stock,
+// Perf (A2): per-second TIMER_TICK renders (piles keep referential identity through the
+// reducer) skip the whole layer, including the items rebuild — formerly React.memo, now
+// the compiled KlondikeGameView caches this element and the compiler caches `items`.
+export const AbsoluteCardLayer = ({
+  stock,
+  waste,
+  foundations,
+  tableau,
+  cardMetrics,
+  layouts,
+  drawLabel,
+  invalidWiggle,
+  animationResetKey,
+  interactionsLocked,
+  celebrationActive,
+  onDraw,
+  onWasteTap,
+  onFoundationPress,
+  onTableauCardPress,
+  onCardSettled,
+}: AbsoluteCardLayerProps) => {
+  const { cardFlights: cardFlightsEnabled, cardFlip: cardFlipEnabled } =
+    useAnimationToggles()
+  const wasteTapTarget = resolveWasteTapTarget({
     waste,
-    foundations,
-    tableau,
     cardMetrics,
     layouts,
-    drawLabel,
-    invalidWiggle,
-    animationResetKey,
     interactionsLocked,
     celebrationActive,
-    onDraw,
-    onWasteTap,
-    onFoundationPress,
-    onTableauCardPress,
-    onCardSettled,
-  }: AbsoluteCardLayerProps) => {
-    const { cardFlights: cardFlightsEnabled, cardFlip: cardFlipEnabled } =
-      useAnimationToggles()
-    const wasteTapTarget = useMemo(
-      () =>
-        resolveWasteTapTarget({
-          waste,
-          cardMetrics,
-          layouts,
-          interactionsLocked,
-          celebrationActive,
-        }),
-      [cardMetrics, celebrationActive, interactionsLocked, layouts, waste]
-    )
-    const items = useMemo(
-      () =>
-        buildCardLayerItems({
-          stock,
-          waste,
-          foundations,
-          tableau,
-          cardMetrics,
-          layouts,
-          drawLabel,
-          interactionsLocked,
-          celebrationActive,
-        }),
-      [
-        cardMetrics,
-        celebrationActive,
-        drawLabel,
-        foundations,
-        interactionsLocked,
-        layouts,
+  })
+  // useMemo KEPT with the React Compiler on (option D): without it the compiler merges the
+  // items rebuild into the `items.map(...)` JSX scope, whose deps also include
+  // invalidWiggle / animationResetKey / the handlers — so every invalid-move wiggle and
+  // every new deal would rebuild all 52 items. The manual memo pins the finer scope.
+  const items = useMemo(
+    () =>
+      buildCardLayerItems({
         stock,
-        tableau,
         waste,
-      ]
-    )
+        foundations,
+        tableau,
+        cardMetrics,
+        layouts,
+        drawLabel,
+        interactionsLocked,
+        celebrationActive,
+      }),
+    [
+      cardMetrics,
+      celebrationActive,
+      drawLabel,
+      foundations,
+      interactionsLocked,
+      layouts,
+      stock,
+      tableau,
+      waste,
+    ]
+  )
 
-    return (
-      <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-        {items.map((item) => (
-          <AbsoluteLayerCard
-            key={item.card.id}
-            item={item}
-            metrics={cardMetrics}
-            invalidWiggle={invalidWiggle}
-            animationResetKey={animationResetKey}
-            movementEnabled={cardFlightsEnabled}
-            flipEnabled={cardFlipEnabled}
-            onDraw={onDraw}
-            onFoundationPress={onFoundationPress}
-            onTableauCardPress={onTableauCardPress}
-            onCardSettled={onCardSettled}
-          />
-        ))}
-        {wasteTapTarget ? (
-          <WasteTapZone
-            target={wasteTapTarget}
-            metrics={cardMetrics}
-            onPress={onWasteTap}
-          />
-        ) : null}
-      </View>
-    )
-  }
-)
-
-AbsoluteCardLayer.displayName = 'AbsoluteCardLayer'
+  return (
+    <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      {items.map((item) => (
+        <AbsoluteLayerCard
+          key={item.card.id}
+          item={item}
+          metrics={cardMetrics}
+          invalidWiggle={invalidWiggle}
+          animationResetKey={animationResetKey}
+          movementEnabled={cardFlightsEnabled}
+          flipEnabled={cardFlipEnabled}
+          onDraw={onDraw}
+          onFoundationPress={onFoundationPress}
+          onTableauCardPress={onTableauCardPress}
+          onCardSettled={onCardSettled}
+        />
+      ))}
+      {wasteTapTarget ? (
+        <WasteTapZone
+          target={wasteTapTarget}
+          metrics={cardMetrics}
+          onPress={onWasteTap}
+        />
+      ) : null}
+    </View>
+  )
+}
 
 type AbsoluteLayerCardProps = {
   item: CardLayerItem
@@ -406,6 +409,9 @@ const arePressTargetsEqual = (
 // WARNING: any new CardLayerItem field that affects rendering MUST be compared here,
 // or updates to it will be silently swallowed by the memo (pattern: backLabel,
 // accessibilityLabel, testID).
+// React.memo KEPT with the React Compiler on (option D): AbsoluteLayerCard is compiler-
+// skipped (render-time ref reads, see below) AND rendered inside `items.map`, so this
+// comparator is the only thing sparing 51 unchanged cards per board change.
 const areAbsoluteLayerCardPropsEqual = (
   prev: AbsoluteLayerCardProps,
   next: AbsoluteLayerCardProps
@@ -460,10 +466,14 @@ const AbsoluteLayerCard = React.memo(
     onTableauCardPress,
     onCardSettled,
   }: AbsoluteLayerCardProps) => {
-    const translateX = useRef(new NativeAnimated.Value(item.x)).current
-    const translateY = useRef(new NativeAnimated.Value(item.y)).current
-    const wiggle = useRef(new NativeAnimated.Value(0)).current
-    const flipScale = useRef(new NativeAnimated.Value(1)).current
+    // RN's `useAnimatedValue` (not `useRef(new Animated.Value()).current`): same lazy ref
+    // underneath, but a render-time `ref.current` read is a React Compiler bail-out. The
+    // `previous*Ref.current` reads below (targetChangedBeforeEffect) are a different story:
+    // a deliberate Fabric/pressability guard that still keeps this component uncompiled.
+    const translateX = useAnimatedValue(item.x)
+    const translateY = useAnimatedValue(item.y)
+    const wiggle = useAnimatedValue(0)
+    const flipScale = useAnimatedValue(1)
     const [renderFaceUp, setRenderFaceUp] = useState(item.card.faceUp)
     const [isSettling, setIsSettling] = useState(false)
     const previousTargetRef = useRef({ x: item.x, y: item.y })
@@ -698,7 +708,7 @@ type WasteTapZoneProps = {
   onPress: () => void
 }
 
-const WasteTapZone = React.memo(({ target, metrics, onPress }: WasteTapZoneProps) => (
+const WasteTapZone = ({ target, metrics, onPress }: WasteTapZoneProps) => (
   <Pressable
     onPress={onPress}
     accessibilityRole="button"
@@ -714,9 +724,7 @@ const WasteTapZone = React.memo(({ target, metrics, onPress }: WasteTapZoneProps
       },
     ]}
   />
-))
-
-WasteTapZone.displayName = 'WasteTapZone'
+)
 
 const layerStyles = StyleSheet.create({
   card: {

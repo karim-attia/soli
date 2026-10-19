@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'
+import React from 'react'
 import { View } from 'react-native'
 import type { LayoutChangeEvent, LayoutRectangle } from 'react-native'
 
@@ -17,8 +17,8 @@ import { styles } from './styles'
 import { computeTableauStackOffsets } from './utils'
 
 export type TableauSectionProps = {
-  // Perf (A2): narrow state slices instead of the full GameState so React.memo can
-  // skip re-renders when the relevant pieces kept identity (e.g. TIMER_TICK).
+  // Perf (A2): narrow state slices instead of the full GameState so the compiled parent
+  // can keep this element cached when the relevant pieces kept identity (e.g. TIMER_TICK).
   tableau: Tableau
   selected: Selection | null
   hasWon: boolean
@@ -31,53 +31,46 @@ export type TableauSectionProps = {
   onTableauColumnLayout?: (columnIndex: number, layout: LayoutRectangle) => void
 }
 
-export const TableauSection = React.memo(
-  ({
-    tableau,
-    selected,
-    hasWon,
-    cardMetrics,
-    dropHints,
-    interactionsLocked,
-    celebrationPending = false,
-    celebrationActive = false,
-    onTableauRowLayout,
-    onTableauColumnLayout,
-  }: TableauSectionProps) => {
-    const handleRowLayout = useCallback(
-      (event: LayoutChangeEvent) => {
-        onTableauRowLayout?.(event.nativeEvent.layout)
-      },
-      [onTableauRowLayout]
-    )
-    // Task 28-2: Keep the board stable until the final winning card finishes settling.
-    const showWinCleanup = hasWon && !celebrationPending
-
-    return (
-      <View style={styles.tableauRow} onLayout={handleRowLayout}>
-        {tableau.map((column, columnIndex) => (
-          <TableauColumn
-            key={`col-${columnIndex}`}
-            column={column}
-            columnIndex={columnIndex}
-            isSelected={
-              selected?.source === 'tableau' && selected.columnIndex === columnIndex
-            }
-            isLastColumn={columnIndex === tableau.length - 1}
-            showWinCleanup={showWinCleanup}
-            celebrationActive={celebrationActive}
-            cardMetrics={cardMetrics}
-            isDroppable={dropHints.tableau[columnIndex]}
-            disableInteractions={interactionsLocked}
-            onColumnLayout={onTableauColumnLayout}
-          />
-        ))}
-      </View>
-    )
+export const TableauSection = ({
+  tableau,
+  selected,
+  hasWon,
+  cardMetrics,
+  dropHints,
+  interactionsLocked,
+  celebrationPending = false,
+  celebrationActive = false,
+  onTableauRowLayout,
+  onTableauColumnLayout,
+}: TableauSectionProps) => {
+  const handleRowLayout = (event: LayoutChangeEvent) => {
+    onTableauRowLayout?.(event.nativeEvent.layout)
   }
-)
+  // Task 28-2: Keep the board stable until the final winning card finishes settling.
+  const showWinCleanup = hasWon && !celebrationPending
 
-TableauSection.displayName = 'TableauSection'
+  return (
+    <View style={styles.tableauRow} onLayout={handleRowLayout}>
+      {tableau.map((column, columnIndex) => (
+        <TableauColumn
+          key={`col-${columnIndex}`}
+          column={column}
+          columnIndex={columnIndex}
+          isSelected={
+            selected?.source === 'tableau' && selected.columnIndex === columnIndex
+          }
+          isLastColumn={columnIndex === tableau.length - 1}
+          showWinCleanup={showWinCleanup}
+          celebrationActive={celebrationActive}
+          cardMetrics={cardMetrics}
+          isDroppable={dropHints.tableau[columnIndex]}
+          disableInteractions={interactionsLocked}
+          onColumnLayout={onTableauColumnLayout}
+        />
+      ))}
+    </View>
+  )
+}
 
 export type TableauColumnProps = {
   column: Card[]
@@ -92,6 +85,9 @@ export type TableauColumnProps = {
   onColumnLayout?: (columnIndex: number, layout: LayoutRectangle) => void
 }
 
+// React.memo KEPT with the React Compiler on (option D): the column is rendered inside
+// `tableau.map(...)`, and the compiler does not memoize per-iteration JSX, so without memo
+// all 7 columns would re-run on every tableau change (cheap, but why).
 export const TableauColumn = React.memo(
   ({
     column,

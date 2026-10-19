@@ -1,11 +1,12 @@
 // Storage engine: expo-sqlite/kv-store (AsyncStorage-compatible API, backed by SQLite).
 import Storage from 'expo-sqlite/kv-store'
+// React Compiler (option D, 2026-10-19): the 12 setter useCallbacks and the context-value
+// useMemo were removed — the compiler hoists the setters (computed once) and caches the
+// value object on `state`, exactly what the manual memos did.
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type PropsWithChildren,
@@ -293,13 +294,13 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
     })
   }, [state])
 
-  const setDrawCount = useCallback((drawCount: DrawCount) => {
+  const setDrawCount = (drawCount: DrawCount) => {
     setState((previous) =>
       previous.drawCount === drawCount ? previous : { ...previous, drawCount }
     )
-  }, [])
+  }
 
-  const setGlobalAnimationsEnabled = useCallback((enabled: boolean) => {
+  const setGlobalAnimationsEnabled = (enabled: boolean) => {
     setState((previous) =>
       previous.animations.master === enabled
         ? previous
@@ -311,123 +312,115 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
             },
           }
     )
-  }, [])
+  }
 
-  const setAnimationPreference = useCallback(
-    (key: AnimationPreferenceKey, enabled: boolean) => {
-      setState((previous) => {
-        // If enabling an animation while master is off, turn on master first
-        if (enabled && !previous.animations.master) {
-          return {
-            ...previous,
-            animations: {
-              ...previous.animations,
-              master: true,
-              [key]: enabled,
-            },
-          }
-        }
-
-        // If disabling an animation, just update that preference
-        if (previous.animations[key] === enabled) {
-          return previous
-        }
-
+  const setAnimationPreference = (key: AnimationPreferenceKey, enabled: boolean) => {
+    setState((previous) => {
+      // If enabling an animation while master is off, turn on master first
+      if (enabled && !previous.animations.master) {
         return {
           ...previous,
           animations: {
             ...previous.animations,
+            master: true,
             [key]: enabled,
           },
         }
-      })
-    },
-    []
-  )
+      }
 
-  const setSolvableGamesOnly = useCallback((enabled: boolean) => {
+      // If disabling an animation, just update that preference
+      if (previous.animations[key] === enabled) {
+        return previous
+      }
+
+      return {
+        ...previous,
+        animations: {
+          ...previous.animations,
+          [key]: enabled,
+        },
+      }
+    })
+  }
+
+  const setSolvableGamesOnly = (enabled: boolean) => {
     setState((previous) =>
       previous.solvableGamesOnly === enabled
         ? previous
         : { ...previous, solvableGamesOnly: enabled }
     )
-  }, [])
+  }
 
-  const setAutoUpEnabled = useCallback((enabled: boolean) => {
+  const setAutoUpEnabled = (enabled: boolean) => {
     setState((previous) =>
       previous.autoUpEnabled === enabled
         ? previous
         : { ...previous, autoUpEnabled: enabled }
     )
-  }, [])
+  }
 
-  const setWarningMode = useCallback(
-    (mode: WarningMode | ((current: WarningMode) => WarningMode)) => {
-      setState((previous) => {
-        const next =
-          typeof mode === 'function' ? mode(previous.hints.warningMode) : mode
-        return previous.hints.warningMode === next
-          ? previous
-          : { ...previous, hints: { ...previous.hints, warningMode: next } }
-      })
-    },
-    []
-  )
+  const setWarningMode = (
+    mode: WarningMode | ((current: WarningMode) => WarningMode)
+  ) => {
+    setState((previous) => {
+      const next = typeof mode === 'function' ? mode(previous.hints.warningMode) : mode
+      return previous.hints.warningMode === next
+        ? previous
+        : { ...previous, hints: { ...previous.hints, warningMode: next } }
+    })
+  }
 
-  const setHintButtonEnabled = useCallback((enabled: boolean) => {
+  const setHintButtonEnabled = (enabled: boolean) => {
     setState((previous) =>
       previous.hints.hintButton === enabled
         ? previous
         : { ...previous, hints: { ...previous.hints, hintButton: enabled } }
     )
-  }, [])
+  }
 
   // Developer logging is synced by the state.developerMode effect below (which also
   // covers the hydrated-from-storage value), so no direct call here.
-  const setDeveloperMode = useCallback((enabled: boolean) => {
+  const setDeveloperMode = (enabled: boolean) => {
     setState((previous) =>
       previous.developerMode === enabled
         ? previous
         : { ...previous, developerMode: enabled }
     )
-  }, [])
+  }
 
-  const setStatisticsPreference = useCallback(
-    (key: StatisticsPreferenceKey, enabled: boolean) => {
-      setState((previous) => {
-        if (previous.statistics[key] === enabled) {
-          return previous
-        }
+  const setStatisticsPreference = (key: StatisticsPreferenceKey, enabled: boolean) => {
+    setState((previous) => {
+      if (previous.statistics[key] === enabled) {
+        return previous
+      }
 
-        return {
-          ...previous,
-          statistics: {
-            ...previous.statistics,
-            [key]: enabled,
-          },
-        }
-      })
-    },
-    []
-  )
+      return {
+        ...previous,
+        statistics: {
+          ...previous.statistics,
+          [key]: enabled,
+        },
+      }
+    })
+  }
 
-  const setScoringMode = useCallback((mode: ScoringMode) => {
+  const setScoringMode = (mode: ScoringMode) => {
     setState((previous) =>
       previous.statistics.scoring === mode
         ? previous
         : { ...previous, statistics: { ...previous.statistics, scoring: mode } }
     )
-  }, [])
+  }
 
-  const setVegasTotalEnabled = useCallback((enabled: boolean) => {
+  const setVegasTotalEnabled = (enabled: boolean) => {
     setState((previous) =>
       previous.statistics.vegasTotal === enabled
         ? previous
         : { ...previous, statistics: { ...previous.statistics, vegasTotal: enabled } }
     )
-  }, [])
+  }
 
-  const setVegasTotalOffset = useCallback((offset: number) => {
+  const setVegasTotalOffset = (offset: number) => {
     setState((previous) =>
       previous.statistics.vegasTotalOffset === offset
         ? previous
@@ -436,44 +429,27 @@ export const SettingsProvider = ({ children }: PropsWithChildren) => {
             statistics: { ...previous.statistics, vegasTotalOffset: offset },
           }
     )
-  }, [])
+  }
 
   useEffect(() => {
     setDeveloperLoggingEnabled(state.developerMode)
   }, [state.developerMode])
 
-  const value = useMemo<SettingsContextValue>(
-    () => ({
-      state,
-      setDrawCount,
-      setGlobalAnimationsEnabled,
-      setAnimationPreference,
-      setSolvableGamesOnly,
-      setAutoUpEnabled,
-      setWarningMode,
-      setHintButtonEnabled,
-      setDeveloperMode,
-      setStatisticsPreference,
-      setScoringMode,
-      setVegasTotalEnabled,
-      setVegasTotalOffset,
-    }),
-    [
-      setAnimationPreference,
-      setGlobalAnimationsEnabled,
-      setStatisticsPreference,
-      setScoringMode,
-      setVegasTotalEnabled,
-      setVegasTotalOffset,
-      setAutoUpEnabled,
-      setWarningMode,
-      setHintButtonEnabled,
-      setSolvableGamesOnly,
-      setDrawCount,
-      setDeveloperMode,
-      state,
-    ]
-  )
+  const value: SettingsContextValue = {
+    state,
+    setDrawCount,
+    setGlobalAnimationsEnabled,
+    setAnimationPreference,
+    setSolvableGamesOnly,
+    setAutoUpEnabled,
+    setWarningMode,
+    setHintButtonEnabled,
+    setDeveloperMode,
+    setStatisticsPreference,
+    setScoringMode,
+    setVegasTotalEnabled,
+    setVegasTotalOffset,
+  }
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>
 }
@@ -491,9 +467,9 @@ export function useAnimationToggles(): AnimationPreferences {
     state: { animations },
   } = useSettings()
 
-  return useMemo(() => {
-    if (!animations.master) {
-      return {
+  return animations.master
+    ? animations
+    : {
         ...animations,
         cardFlights: false,
         wasteFan: false,
@@ -502,10 +478,6 @@ export function useAnimationToggles(): AnimationPreferences {
         foundationGlow: false,
         celebrations: false,
       }
-    }
-
-    return animations
-  }, [animations])
 }
 
 // Exported for unit tests (defaults + migration assertions run on the pure

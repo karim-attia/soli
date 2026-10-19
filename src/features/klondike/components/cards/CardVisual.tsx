@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect } from 'react'
 import {
   Animated as NativeAnimated,
   Easing as NativeEasing,
   Pressable,
   Text,
   View,
+  useAnimatedValue,
 } from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
 import { Ban, RefreshCcw } from 'lucide-react-native'
@@ -211,8 +212,10 @@ export const EmptySlot = ({
   hidden?: boolean
   metrics: CardMetrics
 }) => {
-  const opacity = useRef(new NativeAnimated.Value(hidden ? 0 : 1)).current
-  const scale = useRef(new NativeAnimated.Value(hidden ? 0.985 : 1)).current
+  // RN's `useAnimatedValue` instead of `useRef(new Animated.Value()).current`: same lazy
+  // ref underneath, but reading `ref.current` during render is a React Compiler bail-out.
+  const opacity = useAnimatedValue(hidden ? 0 : 1)
+  const scale = useAnimatedValue(hidden ? 0.985 : 1)
 
   useEffect(() => {
     NativeAnimated.parallel([

@@ -34,7 +34,72 @@ I think 8 chint device would make sense to upgrade if there's no drawback, right
 round's implementation work is oxlint (E1), expo-doctor / A15, and agent-device (A14) — see
 "Steps to implement".)
 
+Round 3 (2026-10-18, after the React Compiler deep dive + C5/D1 risk assessment):
+
+```text
+Yes: first do C5 (runOnJS to scheduleOnRN) plus the Reanimated set() and useAnimatedValue fixes, then the measured React Compiler experiment (option C, infer app-wide, keep memos) with baseline vs flipped numbers on Android. Also remove the obsolete Appium scrub script and guide. Leave D1 for later.
+```
+
+Round 4 (2026-10-19, after S11 left the compiler ON):
+
+```text
+can you tell me a little bit more about what the compiler even does? And yes please go on with the next step. Thank you very much
+```
+
+("the next step" = option D, manual memo removal — see "Option D: manual memo removal (prompt 3)".)
+
 ## Summary
+
+S16 (2026-10-19, testing agent): **option D measured on the phone and kept — no memo
+restored.** Android Release (bundle regenerated, compiler proof identical to config B:
+sentinel ×86 / `CompilerRuntime` ×117), 2 × 20-game playlists vs the S11 config B means:
+wall 190.4 vs 189.9 s, janky 8.08 vs 8.14 %, p50/p90/p95/p99 10/15/17/21 ms both, PSS fresh
+152.2 vs 155.1 MiB, PSS post 314.4 vs 330.8 MiB (−16 MiB, lower), 40/40 games, 0 crashes.
+Idle board 60 s = 60 frames (one per timer tick). Smoke identical to config B on Android and
+iOS (scrubber 20/0/80/79 exact on both, celebration preview + badge cycle, real win → dialog
+→ Deal Again, hint ring, wiggle on the tapped stack only, drawer, History sheet Retry/Share,
+Settings pickers + animations master, Demo sheet Seed history, iOS 5/5 playlist). Details in
+"S16 results" under Testing. Phone restored (Scoring = Vegas, Warnings = stuck, light, 60 s
+timeout, seeds cleared).
+
+Round 4 (2026-10-19, implementation sub-agent, code only — device measurement done in
+S16, see above): **option D done.** Of the 170 manual memo sites (`useCallback` 125, `useMemo` 31,
+`React.memo`/`memo` 14 — the deep dive's "162" missed 7 generic-typed calls and one nested
+one), **86 removed, 84 kept** with a reason each (inventory below). Kept: 58 inside the 8
+compiler-skipped functions, 4 `React.memo` on list rows / library-rendered roots, 21
+`useCallback`s that are (transitive) `useEffect` dependencies (react.dev's one named case
+for keeping `useCallback`; `react-hooks/exhaustive-deps` flags plain functions there), and
+2 reverted after the compiled-output check (`useSolvableDealSelector` would no longer be
+compiled at all; `AbsoluteCardLayer`'s `items` would merge into the JSX scope). Every
+removal was verified by compiling before/after: coverage stays **75 / 8**, every removed
+value still sits in a cache slot with the same guard, and `CelebrationAtlas` even lost its
+one pruned memo block (a hook call was reordered above the derived data). Net **−124 LOC**
+over 20 files; gates green (typecheck, lint 0, lint:strict, Jest 458/458, oxfmt). Behaviour
+is identical by construction, but Jest runs uncompiled code — the S16 device pass (same
+metrics as S11, against config B) is the real check.
+
+S11 (2026-10-18, testing agent): measured React Compiler A/B on the phone (2 × 20-game playlists
+per config, same state): janky 9.12 % → 8.14 %, p50/p90/p95/p99 10/15/17/21 ms both, PSS fresh
++2.3 MiB / post +5.6 MiB (inside run-to-run noise), playlist 193.5 → 189.9 s, 0 crashes;
+scrubber / celebration / real win / glow / hint / undo / drawer identical on Android and iOS.
+**`experiments.reactCompiler: true` stays ON in `app.json`** (rollback = delete that line +
+delete `android/app/build/generated/assets/react/release`, rebuild). Two tooling findings: the
+Release `index.android.bundle` is Hermes bytecode (the plan's grep marker cannot prove the flip —
+use a plain `expo export:embed` JS and count `react.memo_cache_sentinel`: A 2 / B 86), and
+`app.json` changes do NOT invalidate `:app:createBundleReleaseJsAndAssets` (first B build shipped
+the old bundle). Both recorded in SKILL.md §8. Gates with the flag on: typecheck/lint/Jest green.
+
+Round 3 (2026-10-18, code only — measurements pending): C5 done (6 `runOnJS` → `scheduleOnRN`,
+3 `runOnUI` → `scheduleOnUI`, imports from `react-native-worklets`), compiler-readiness done (39
+shared-value writes → `.set()`, 7 `useRef(new Animated.Value()).current` → `useAnimatedValue`,
+the two `eslint-disable` comments replaced by honest memo deps), Appium scrub path deleted. The
+installed `babel-plugin-react-compiler 1.0.0` now compiles **75 functions and skips 8** (was 70 /
+13): `useFoundationGlowAnimation`, `UndoScrubber`, `EmptySlot`, `WinCleanupPile` and
+`CelebrationAtlas` are newly compiled. `AbsoluteLayerCard` (the per-card hot path),
+`useUndoScrubber` and `useCelebrationController` stay skipped on deliberate render-time ref
+patterns — behaviour on the board is therefore unchanged by a flip. The compiler flag is still OFF;
+S11 (testing agent) runs the baseline-vs-flipped protocol in "Compiler experiment test plan".
+Gates: typecheck, lint, lint:strict, Jest 458/458 all green.
 
 Round 2 (2026-10-18): oxlint 1.88.0 (six React Compiler rules configured off, strict script
 simplified), expo-doctor 20/20 (`yarn ad` replaces `yarn agent-device`), agent-device 0.21.28 —
@@ -327,6 +392,81 @@ tooling items Karim picked; React Compiler / items 5-6 are a separate pass.
   (`.oxlintrc.json` is outside the format glob — and must stay so, oxfmt would strip its JSONC
   comment). oxfmt itself NOT bumped (Karim commits first).
 
+Round 3 (2026-10-18, implementation sub-agent — code only; the compiler flag stays OFF until S11):
+
+- [x] **S6 C5 `runOnJS` → `scheduleOnRN`, `runOnUI` → `scheduleOnUI`** (plan table rows 1-9).
+  6 `runOnJS(fn)(args)` → `scheduleOnRN(fn, args)` (`CelebrationOverlayLayer.tsx` 1,
+  `useUndoScrubber.ts` 4, `useCelebrationController.ts` 1) and 3 `runOnUI(w)()` →
+  `scheduleOnUI(w)` (`useCelebrationController.ts`). Imports from `react-native-worklets`
+  (direct dep 0.13.0; Reanimated 4.7.1 does not re-export the new names). Verified in
+  `react-native-worklets/src/threads.native.ts`: `runOnJS(f)` is `(...a) => scheduleOnRN(f, ...a)`
+  and `runOnUI(w)` is `(...a) => scheduleOnUI(w, ...a)` — zero behaviour change. GH's own
+  `Gesture.Tap().runOnJS(true)` is untouched (a Gesture Handler flag, not the worklets helper).
+- [x] **S7 compiler-readiness fixes.** 39 shared-value writes `.value = x` → `.set(x)`:
+  `useUndoScrubber.ts` 21, `useCelebrationController.ts` 11, `animations.ts` 6,
+  `UndoScrubber.tsx` 1. `.set()` is `.value =` underneath on both runtimes
+  (`mutables.native.ts`; the only extra branch is an updater-function call, guarded by
+  `__isAnimationDefinition`, so `.set(withTiming(...))`/`.set(withSequence(...))` behave as
+  before). 0 `.get()` conversions were needed: none of the four files reads a shared value on
+  the JS thread; reads inside worklets keep `.value` (the compiler only models stores and
+  `.get()` is a plain wrapper — a code comment in each file records this policy). 7
+  `useRef(new NativeAnimated.Value(x)).current` → RN `useAnimatedValue(x)` (`AbsoluteCardLayer`
+  4, `CardVisual` 2, `TopRow` 1; same lazy ref underneath, typed in RN 0.88 `types_generated`).
+  The two `// eslint-disable-next-line react-hooks/exhaustive-deps` comments in
+  `CelebrationOverlayLayer.tsx` were NOT dead: oxlint honours `eslint-disable` directives, so
+  deleting them surfaced 4 warnings (`react-hooks/exhaustive-deps` ×2, `react/memo-dependencies`
+  ×2) and the compiler then reported `PreserveManualMemo` (incomplete deps) instead of
+  `Suppression`. Fixed for real and behaviour-neutrally: `cellOrigin` wrapped in
+  `useCallback([cellWidth, cellHeight])`, and `faceWidth/faceHeight/shadowMargin/cardScale/
+  cellOrigin` added to the texture memo deps — every one is a pure derivation of `metrics` + `pd`
+  (already deps), so the texture is still rebuilt only on card list / metrics / fonts.
+- [x] **S8 coverage re-run** with the research agent's `scratchpad/rc/compile-report2.js` (installed
+  `babel-plugin-react-compiler 1.0.0`, `target 19`, `panicThreshold none`, `infer`):
+  **70 compiled / 13 skipped → 75 compiled / 8 skipped.** Remaining skips: see "React Compiler
+  deep dive → Status after round 3".
+- [x] **S9 Appium removal.** Deleted `scripts/ios-scrub.js` (291 LOC) and
+  `docs/external-package-guides/appium.md` (297 LOC). No package.json script or devDependency
+  referenced them (Appium was a global tool). Updated: `.agents/skills/soli-testing/SKILL.md`
+  (§6 wording, §9 XCTest handoff note, §10 reading list), `agent-device.md` (0.20 pan note),
+  `scrubber-test-automation.md` (retirement banner; its Appium sections stay as history).
+  Historical mentions in other plan docs (`tamagui-major-upgrade.md`, `scoring.md`,
+  `klondike-card-accessibility.md`, `expo-rn-sdk-58-upgrade`, `agent-testing-skill.md`,
+  `docs/delivery/20/20-6.md`) are test-log history and were left alone on purpose.
+- [x] **S10 gates.** `yarn typecheck` clean, `yarn lint` 0 warnings, `yarn lint:strict` exit 0,
+  `yarn jest --runInBand` 45 suites / 458 tests green. oxfmt: the 6 other touched files are
+  clean; `CelebrationOverlayLayer.tsx` and `useCelebrationController.ts` have PRE-EXISTING
+  oxfmt 0.54 wishes (same hunks at HEAD, none on the edited lines) — not reformatted, to keep
+  the diff to the change (B1: `yarn format` in its own commit after the oxfmt bump).
+- [x] **S11 measured compiler experiment** (testing agent, 2026-10-18 22:47-23:35): baseline →
+  flip → compare, per "Compiler experiment test plan" below. Result: no regression (janky
+  9.12 → 8.14 %, p50-p99 identical, PSS within noise, playlist −1.9 %), smoke identical on
+  Android + iOS, 0 crashes → **flag left ON**. Numbers + flip proof in "S11 results" under Testing.
+
+Round 4 (2026-10-19, implementation sub-agent — option D; details in "Option D: manual
+memo removal (prompt 3)"):
+
+- [x] **S12 research + removal rules** (react.dev: compiler intro FAQ, `useMemo`/`memo`
+  reference notes, debugging guide, `preserve-manual-memoization` lint reference) → rules
+  table in the option D section.
+- [x] **S13 inventory** of all 170 sites with enclosing function, compiled/skipped status
+  and decision (`scratchpad/rc/inventory.js`; table in the option D section, pre-change
+  line numbers).
+- [x] **S14 removal** via a splice codemod (`rc/codemod.js`: `useCallback(fn, deps)` → `fn`,
+  `useMemo(() => e, deps)` → `e`, `React.memo(fn)` → `fn`, generic type params → variable
+  annotations) + 6 multi-statement `useMemo`s rewritten by hand (`boardAvailableWidth`,
+  `listHeader`, `atlasSize`, `drawOrder`, `avalancheLaunch` → `computeAvalancheLaunch`
+  helper, `useAnimationToggles`), unused imports and 9 `displayName` lines dropped, comments
+  updated, KEEP reasons commented at every kept site inside compiled code.
+- [x] **S15 verification**: per-file before/after compile (`rc/memo-map.js` = value → cache
+  guard; `rc/compile-file.js --events` = slots / pruned blocks / skips) → 3 reverts
+  (`useSolvableDealSelector`, `AbsoluteCardLayer.items`, hook order in `CelebrationAtlas`)
+  and 21 lint-driven re-wraps; coverage 75 / 8 unchanged; gates green; LOC −124.
+- [x] **S16 device pass** (testing agent, 2026-10-19 07:17-07:55) per "Option D test plan"
+  under Testing — Android 20-game playlist ×2 vs the S11 config B numbers (all within
+  tolerance, PSS post even −16 MiB), 60 s idle = 60 frames, smoke on both platforms
+  identical to config B, 0 crashes → **option D kept, no memo restored.** Numbers + smoke
+  log in "S16 results".
+
 ## Files actually modified
 
 - `docs/product/next-steps-after-sdk-58/next-steps-after-sdk-58.md` (this file).
@@ -336,6 +476,36 @@ tooling items Karim picked; React Compiler / items 5-6 are a separate pass.
   `agent-device.md`, `appium.md` (legacy note), `yarn agent-device` → `yarn ad` in
   `docs/product/{store-screenshots,tamagui-3-upgrade,celebration-skia-atlas,expo-rn-sdk-58-upgrade,agent-testing-skill}/*.md`.
   Evidence screenshots: `.test-artifacts/agent-device-upgrade/`.
+- Round 3 (code): `src/features/klondike/hooks/useUndoScrubber.ts`,
+  `src/features/klondike/hooks/useCelebrationController.ts`,
+  `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx`,
+  `src/features/klondike/components/cards/animations.ts`,
+  `src/features/klondike/components/UndoScrubber.tsx`,
+  `src/features/klondike/components/cards/AbsoluteCardLayer.tsx`,
+  `src/features/klondike/components/cards/CardVisual.tsx`,
+  `src/features/klondike/components/cards/TopRow.tsx`. Deleted: `scripts/ios-scrub.js`,
+  `docs/external-package-guides/appium.md`. Docs: `.agents/skills/soli-testing/SKILL.md`,
+  `docs/external-package-guides/agent-device.md`,
+  `docs/product/scrubber-test-automation/scrubber-test-automation.md`, this file. NOT touched:
+  `babel.config.js`, `package.json`, `.oxlintrc.json`.
+- S11 (testing agent): `app.json` (`"reactCompiler": true` added — the only source/config change),
+  this file, `.agents/skills/soli-testing/SKILL.md` (§2 preflight-kill note, §8 two rows),
+  `docs/external-package-guides/react-native-reanimated.md` and `expo.md` (dated compiler note +
+  rollback). Raw measurement outputs: session scratchpad `rc/ab/` (not in the repo).
+- Round 4 (option D, code): `src/features/klondike/hooks/useKlondikeGame.ts` (23 of 33 memos
+  removed), `src/state/settings.tsx` (14), `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx`
+  (9 + `useSafeAreaInsets` hoisted + `computeAvalancheLaunch` helper),
+  `app/(tabs)/history.tsx` (6), `app/(tabs)/index.tsx` (5), `src/features/klondike/hooks/useUndoHint.ts`
+  (7), `src/features/klondike/components/UndoScrubber.tsx` (3), `AbsoluteCardLayer.tsx` (3),
+  `TopRow.tsx` (3), `TableauSection.tsx` (2), `HintOverlayLayer.tsx` (2),
+  `useKlondikeTimer.ts` (3), `GameNoticeBubble.tsx`, `UndoHintBubble.tsx`,
+  `CelebrationDebugBadge.tsx`, `BoardPreview.tsx`, `src/navigation/useDrawerOpener.ts`,
+  `app/(tabs)/settings.tsx` (1 each). Comment-only: `useDemoGameLauncher.ts` (all 9 kept,
+  file-top note), `useSolvableDealSelector.ts` (kept, note). Plan: this file. NOT touched:
+  `app.json`, `babel.config.js`, `.oxlintrc.json`, the 8 skipped functions' files beyond the
+  above (`useHint.ts`, `useKlondikeHistoryEntry.ts`, `useKlondikePersistence.ts`,
+  `useCelebrationController.ts`, `useUndoScrubber.ts`, `src/state/history.tsx` unchanged).
+  Scratch tooling (not in the repo): `scratchpad/rc/{inventory,codemod,repair,rewrap,memo-map,compile-file}.js`.
 
 ## Intermediary learnings
 
@@ -374,6 +544,68 @@ Round 2 (tooling bumps):
 - zsh gotcha bit this run too: `for spec in "298 788 -130 0 1500"; yarn ad gesture pan $spec`
   passes ONE argument. Spell arguments out (already in SKILL.md §8).
 
+Round 3 (C5 + compiler readiness):
+
+- **oxlint honours `eslint-disable` comments.** The deep dive called the two
+  `eslint-disable-next-line react-hooks/exhaustive-deps` comments "dead since the move to oxlint";
+  they were live suppressions of 4 warnings. Lesson: removing a suppression needs a lint run, and
+  the compiler's `PreserveManualMemo` diagnostic is the precise reading of what such a comment
+  hides (a memo whose deps are incomplete).
+- **Compiler validation is staged per function**: once the Immutability errors were gone,
+  `useUndoScrubber` (9 sites) and `useCelebrationController` (5 sites) surfaced Refs errors that
+  the first run never reached. The same effect raised the oxlint React Compiler rule-group count
+  from 40 to 49 (`react/immutability` 25 → 11, `react/refs` 13 → 24, `set-state-in-effect` 4 → 6,
+  `exhaustive-effect-dependencies` 3 → 4) — more functions are validated further, not more
+  problems. The six rules therefore stay `off` in `.oxlintrc.json`.
+- **`.set()` ≡ `.value =`** on the RN and UI runtimes (`react-native-reanimated/src/mutables.native.ts`,
+  `mutables.ts`): the only difference is an updater branch for plain functions, guarded by
+  `__isAnimationDefinition`, so animation definitions pass through. Reanimated's docs call
+  `get`/`set` the compiler-compliant API and show `.get()` inside `useAnimatedStyle` too, but the
+  compiler only models stores — worklet reads were left on `.value` (hot pan path, no wrapper call).
+- `scheduleOnRN`/`scheduleOnUI` live in `react-native-worklets` only; Reanimated 4.7.1 re-exports
+  just the deprecated names. `runOnJS`/`runOnUI` are literal one-line wrappers (verified).
+- RN's `useAnimatedValue` is typed in `react-native/types_generated` (the RN 0.88 strict types) and
+  is the same lazy-ref implementation as the old idiom.
+- `yarn oxfmt …` does not work under Yarn Berry (prints the yarn usage); call
+  `./node_modules/.bin/oxfmt` directly.
+- Process slip: `git rm --cached` was used to delete the two Appium files, which staged the
+  deletions; reverted immediately with `git reset -- <files>` so the tree is uniformly unstaged
+  (AGENTS.md: never stage/unstage). Plain `rm` is the right tool for deletions.
+
+S11 (compiler A/B, testing agent):
+
+- **Hermes bytecode defeats string-count markers.** `android/app/build/generated/assets/react/release/index.android.bundle`
+  is HBC (`c6 1f bc 03`); its string table stores each literal once, so
+  `react.memo_cache_sentinel` counts 1 in both configs and `react/compiler-runtime` 0 (Metro
+  replaced the module path by a numeric id). Proof that works: `expo export:embed --platform
+  android --dev false --minify false --entry-file node_modules/expo-router/entry.js
+  --bundle-output <file> --assets-dest <dir>` (same CLI/flag path as the Gradle task) and count
+  `react.memo_cache_sentinel` / `CompilerRuntime` in the JS. One minute per config.
+- **`app.json` is not an input of `:app:createBundleReleaseJsAndAssets`.** After the flip the
+  Gradle task was `UP-TO-DATE` and the APK shipped the old bundle (mtime unchanged). Any
+  app.json / babel.config.js-only change needs `rm -rf android/app/build/generated/assets/react/release`
+  (plus the `intermediates/assets/release/mergeReleaseAssets` copy) before `yarn release`. iOS
+  is unaffected: the Xcode script phase re-bundles on every `yarn ios`.
+- `yarn release` / `yarn ios` preflight-kill EVERY `xcodebuild`, `expo run:` and Gradle client on
+  the Mac — this run killed a stale `expo run:android --device Pixel_9_API_36` + gradlew from the
+  **invent** repo (23:02) and would also kill agent-device's retained iOS XCTest runner. Close iOS
+  agent-device sessions before an Android build, and expect that message in the build log.
+- The playlist's per-game lines are `[DemoPlaylist] Game N/20 loaded/completed`; `[Demo] Game
+  loaded` appears once (first game). Wall time = first `[Demo] Game loaded` → `[DemoPlaylist]
+  Playlist completed (games=20)`.
+- `I/AndroidRuntime(<pid>): VM exiting with result code 0, cleanup skipped.` appears once per
+  deep-link delivery (the `am start` shell VM exiting) — it matches the `AndroidRuntime` crash
+  grep but is not Soli's pid; always attribute pids before counting.
+- agent-device selector values with spaces need inner quotes: `press 'label="Waste, King of
+  spades"'` (unquoted → `INVALID_ARGS`). Tapping a waste card that has a legal foundation move
+  auto-plays it (tap-to-move), so the near-win's last move is a single tap.
+- Foundation glow oracle: `adb shell input tap` then an immediate `exec-out screencap`; crop the
+  slot (`crop=200:260:<x>:<y>`) and read `signalstats` YAVG — the halo lifts it by ~4 (spades
+  slot 165.3 → 169.6). Good enough to assert the pulse without video.
+- Interesting side observation (not a metric): "Janky frames (legacy)" rose 32 → 36 % while the
+  deadline-based janky % fell 9.1 → 8.1 % and the percentiles stayed identical — the compiled
+  tree seems to shift a few frames across the 16 ms line without missing deadlines.
+
 - `expo-router 58` now depends on `expo-glass-effect` directly (`node_modules/expo-router/package.json`),
   used by its native-stack header (`useHeaderConfigProps.js`); Soli's Drawer headers do not go
   through that path.
@@ -384,12 +616,89 @@ Round 2 (tooling bumps):
   RN 0.86.
 - `@expo/material-symbols` ships only weight 400; Karim's drawer decision is weight 300, vendored.
 
+Round 4 (option D):
+
+- **The compiler already drops manual `useMemo`s whose result is a primitive used only in
+  expressions.** `boardAvailableWidth` and `boardRowSettled` (`historyEntries.find(...)`)
+  were recomputed on every render in the compiled output *before* option D — the compiler
+  memoizes for identity, not for CPU, and a primitive that never reaches JSX/hooks/returns
+  does not escape. Removing those `useMemo`s changed nothing in the bundle.
+- **A `use*` function is only compiled in `infer` mode if it calls a hook.** Removing the
+  only hook call (`useCallback`) from `useSolvableDealSelector` silently un-compiled it
+  (coverage 75 → 74, no "skip" event) — the hook returned a fresh function per render and
+  would have cascaded through `createFreshGameState → dealNewGame → requestNewGame`. Caught
+  by the coverage count, reverted. Lesson: the per-function coverage number is a required
+  gate for every memo removal, not just the skip list.
+- **A hook call inside a compiler scope prunes that scope.** In `CelebrationAtlas` the
+  `.sort(comparator)` closures capture `assignments`, which the compiler treats as a
+  possible mutation, so `assignments…sprites…avalancheLaunch` became one scope — and with
+  `useSafeAreaInsets()` sitting inside it the whole block was pruned (`prunedMemoValues`
+  1 → 11, everything recomputed per render). Hoisting the hook call above the derived data
+  fixed it (0 pruned, better than before). Lesson: keep hook calls at the top of a
+  component; `compile-file.js --events` shows `prunedMemoValues` per function.
+- **Scope merging is real but was harmless here.** The same `CelebrationAtlas` block is now
+  guarded by 15 deps (incl. `windowOffset`, `state.modeId`) instead of per-value deps; every
+  extra trigger already re-registered the mapper worklets through their `board`/`modeId`
+  captures, so no observable change. In `AbsoluteCardLayer`, `items` merged into the
+  `items.map` JSX scope (deps incl. `invalidWiggle`, `animationResetKey`, handlers) — there
+  the manual `useMemo` was restored because wiggles/new deals would rebuild 52 items.
+  `BoardPreview.metrics` merged into the column map (static sheet, accepted).
+- **`react-hooks/exhaustive-deps` cannot see compiler memoization.** oxlint flags a plain
+  function declared in the component body as "changes every render" when it is a `useEffect`
+  dep — and, unlike upstream ESLint, also when it is a `useCallback` dep — so the
+  requirement cascades down the dependency chain (10 of `useKlondikeGame`'s 33, all 9 of
+  `useDemoGameLauncher`'s). This matches react.dev's one named reason to keep
+  `useCallback` ("a memoized value is used as an effect dependency"), so those stay.
+- **Codemod gotcha**: textual splicing of nested edits (a `React.memo(` wrapper around inner
+  `useCallback`s) must be applied inner-first in separate passes — one pass with
+  pre-computed offsets swallowed text after the outer call (repaired from HEAD +
+  `rc/repair.js`; `git diff` + typecheck confirmed the three files). Plain `rm`/`git show
+  HEAD:path > path` were the only git interactions (no index changes).
+- The inventory regex (`\b(useCallback|useMemo)(<[^(]*>)?\(`) finds 170 sites; the deep
+  dive's 162 missed `useCallback<RequestNewGameFn>(`-style generic calls (7) and the
+  `useFocusEffect(useCallback(…))` nesting.
+
+- S16 (2026-10-19, testing agent): (a) The S11 result table had the two B runs' PSS fresh
+  values swapped between rows (raw kB: run 1 157,990 = 154.3 MiB, run 2 159,604 = 155.9 MiB);
+  the mean 155.1 MiB is right, and the S16 table uses the raw-kB order. (b) Option D's PSS
+  post-run came out 16 MiB BELOW config B in both runs (312.2 / 316.5 vs 329.9 / 331.7 MiB)
+  while fresh PSS is unchanged — plausible (86 fewer deps arrays + closures captured per
+  render tree across 20 games) but the phone was on battery this time, so it is recorded as
+  "not a regression", not as a win. (c) The idle-board oracle is the frame COUNT (1 per
+  tick): a lost `React.memo` would not change that count (one commit per tick either way),
+  it would change frame duration / playlist jank — which is why the playlist numbers remain
+  the primary gate and the idle count is only the "no storm" sanity check. (d) Testing-recipe
+  learnings (Compose switches without a11y labels → knob coordinate taps; iOS picker menu
+  cells colliding with the button label → `[cell]` refs; iOS UISwitch toggles only when the
+  knob is tapped; History Retry skips its prompt on a 0-move game) went into SKILL.md §5/§8.
+
 ## Identified issues
 
 - None new; see A20 for the pre-existing dev Demo sheet layout bug on Android.
+- S16: none in the app. The Android dev Demo sheet still hides the "Undo hint" row below
+  the detent fold (A20, pre-existing) — `?reset=undoHint` is the working route.
 - Round 2: cross-repo agent-device version split (soli 0.21.28 vs invent ^0.19.3) — see learnings;
   resolve by bumping invent. SKILL.md still cites the iOS 26.5 sim in one troubleshooting row
   (devicectl install quirk) — left as history, the row's advice (install by hand) still holds.
+- Round 3: none blocking. (a) The oxlint React Compiler rule group is at 49 hits (up from 40, see
+  learnings) — not re-enabled. (b) `CelebrationOverlayLayer.tsx` / `useCelebrationController.ts`
+  carry pre-existing oxfmt 0.54 formatting wishes (also at HEAD); left for the post-commit
+  `yarn format`. (c) `AbsoluteLayerCard`, `useUndoScrubber`, `useCelebrationController` remain
+  compiler-skipped on deliberate render-time ref reads/writes (Fabric pressability guard,
+  latest-value refs, `celebrationQueuedThisRender`) — converting them is NOT behaviour-neutral
+  (effect-time vs render-time) and is left for option D / D1.
+- S11: none in the app. Process: (a) the Soli Android build preflight killed a foreign (invent)
+  `expo run:android` + gradlew at 23:02 — if that was a live invent build, it needs a rerun;
+  (b) the plan's flip-proof grep was unusable (Hermes bytecode) and the first B build shipped the
+  old bundle (Gradle UP-TO-DATE) — both fixed in SKILL.md §8 so no future agent measures a
+  stale bundle; (c) `useKlondikeHistoryEntry` etc. remain compiler-skipped (unchanged list).
+- Round 4 (option D): none open in the code. (a) `CelebrationOverlayLayer.tsx` is now fully
+  oxfmt-formatted (it was touched, so the pre-existing 0.54 wishes went with it — the only
+  deviation from "format only your lines"; `useCelebrationController.ts` still carries its
+  pre-existing wishes). (b) The 21 lint-kept `useCallback`s are redundant with the compiler
+  but required by `react-hooks/exhaustive-deps`; removing them means either turning that
+  rule off (loses the missing-deps check) or waiting for a compiler-aware lint — LATER.
+  (c) Device-verified in S16 (2026-10-19): no regression, option D kept.
 
 ## Testing
 
@@ -412,6 +721,314 @@ Restored: phone screen timeout 60000 ms, `/tmp/android-device.lock` removed, no 
 Gates after all changes: typecheck clean, lint 0 warnings, lint:strict exit 0, jest 458/458. Gates to run after any DO NEXT item: `yarn typecheck && yarn lint && yarn jest`,
 plus the device smoke described in the item's own plan.
 
+### Compiler experiment test plan (S11 — for the testing agent)
+
+Read `.agents/skills/soli-testing/SKILL.md` first (Android phone A065 = Karim's main phone:
+data guardrail, `/tmp/android-device.lock`, `scripts/android-ready.sh --keep-awake`, `--serial`
+mandatory). One build at a time, one agent on the phone. iOS simulator = correctness only.
+
+**Configurations.** A = baseline: the current tree (C5 + `.set()` + `useAnimatedValue` already
+in, compiler OFF). B = flipped: the ONE-line change in `app.json` (lines 94-96 today):
+
+```json
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+```
+
+Rollback = delete the `"reactCompiler": true` line and rebuild; no source file is touched by the
+flip. Run A completely (build once, ≥2 measurement runs), then B (build once, ≥2 runs). Add a
+third run to a configuration when its two runs differ by more than the pass tolerance below.
+Jest/typecheck/lint are unaffected by the flag by design (Jest never sets
+`supportsReactCompiler`) — run them once after the flip anyway.
+
+**Build + prove the flip took.** `yarn release` (Release APK, Metro bundle inside). For B, verify
+the bundle was compiled before measuring: `grep -c "react/compiler-runtime"
+android/app/build/generated/assets/createBundleReleaseJsAndAssets/index.android.bundle` must be
+> 0 (A: 0). If the path differs, `find android/app/build -name 'index.android.bundle'`. If the
+count is 0 in B, the flag did not reach `babel-preset-expo` — stop and report.
+
+**One measurement run** (same order for A and B; `SERIAL=192.168.1.12:5555` or whatever
+`android-ready.sh` prints):
+
+- [ ] 1. Cold start on a fresh deal: `adb -s $SERIAL shell am force-stop ch.karimattia.soli`,
+  then `yarn deeplink 'soli:///' --cold` (or tap the icon). Wait ~10 s on the board.
+- [ ] 2. **PSS fresh**: `adb -s $SERIAL shell dumpsys meminfo ch.karimattia.soli | grep -E
+  "TOTAL PSS|TOTAL RSS"` → record TOTAL PSS (kB). Optional cross-check with the SDK 58 method:
+  `yarn ad perf memory sample --json --platform android --serial $SERIAL` (baseline 155.0 MiB).
+- [ ] 3. **Reset frame stats**: `adb -s $SERIAL shell dumpsys gfxinfo ch.karimattia.soli reset`.
+- [ ] 4. **20-game playlist**: start `adb -s $SERIAL logcat -v time | grep -E "SoliDev|Demo|FATAL|
+  AndroidRuntime|Reanimated|Worklets|mismatch"` in the background, then
+  `yarn deeplink 'soli:///?demo=playlist&games=20'`. Wall time = logcat timestamp of the first
+  `[Demo] Game loaded` to the playlist-complete line (grep `useDemoGameLauncher.ts` for the exact
+  completion log string before the first run). Alternative for the first run per configuration:
+  `yarn release --auto-solve` builds + runs the playlist with a pass/fail exit (SDK 58 baseline
+  3 m 20-21 s). Record: games completed (expect 20/20), wall time, crash tokens (expect 0).
+- [ ] 5. **Frame pacing** right after the playlist: `adb -s $SERIAL shell dumpsys gfxinfo
+  ch.karimattia.soli` → record Total frames rendered, Janky frames (count + %), 50th / 90th /
+  95th / 99th percentile ms. (`gfxinfo` counts the whole process since the reset — do not touch
+  the phone during the playlist.)
+- [ ] 6. **PSS post-run**: step 2's `dumpsys meminfo` again (SDK 58 baseline post-20 330.6 MiB,
+  post-GC 273.9 MiB via agent-device). Optional: `yarn ad perf memory sample --json` for parity.
+- [ ] 7. **Scrubber**: `yarn scrubtest` (cold; fixture index 40 of 80: `Moves, 80`,
+  `Stock, 10 cards`, `Waste, Six of hearts`). `yarn ad snapshot -i --json` for the Undo center,
+  then `yarn ad gesture pan <undoX> <undoY> -339 0 1500 --platform android --serial $SERIAL` →
+  expect index 20 (`Stock, 7 cards`, `Waste, Two of spades`; `--raw` label
+  `Undo scrubber, position 20 of 80`). Then a right pan (full redo → 80) and one tap on Undo →
+  79. Landing within ±1 passes. This exercises every C5 line in `useUndoScrubber.ts`
+  (`scheduleOnRN` begin/update/finish) and the `.set()` writes.
+- [ ] 8. **Celebration**: `yarn nearwin` (left=1) → make the last move → real win → overlay plays
+  → the 30 s dialog or Karim's dismiss; logcat shows `[Celebration] start` and the completion path
+  (`handleRunFinished` → win dialog) — this is the `scheduleOnUI`/`scheduleOnRN` path in
+  `useCelebrationController.ts` and the `onOverlayReady` signal in `CelebrationOverlayLayer.tsx`.
+  Also `yarn celebration` (preview) once: overlay appears without a board flash. Crash tokens 0.
+- [ ] 9. **Glow + hint**: on a fresh deal move an Ace to a foundation → the foundation glow pulse
+  plays (`useFoundationGlowAnimation` is newly compiled in B); tap Hint → ring/pulse visible.
+- [ ] 10. iOS (B only, after A/B on Android): `yarn ios`, `yarn scrubtest --ios`,
+  `yarn ad gesture pan 298 788 -130 0 1500` → 20; `yarn nearwin --ios` → win → celebration. No
+  numbers, correctness only.
+
+**Record** per run in a table here: config, run #, games, wall time, total frames, janky %, p50 /
+p90 / p95 / p99, PSS fresh / post-run, scrubber landing, celebration OK, crash tokens, APK/bundle
+compiled marker.
+
+#### S11 results (testing agent, 2026-10-18 22:47-… , phone A065 Android 16, charging, battery 76 %, thermal status 0, auto-brightness, no battery saver, light mode; raw outputs in the session scratchpad `rc/ab/`)
+
+Measurement runs (script `rc/ab/measure.sh`: force-stop → `soli:///` cold → 12 s → `dumpsys meminfo` →
+`gfxinfo reset` → `?demo=playlist&games=20` → wait for `[DemoPlaylist] Playlist completed` →
+`gfxinfo` → `meminfo`; wall time = logcat `[Demo] Game loaded` → `Playlist completed (games=20)`):
+
+| Config | Run | Games | Wall time | Frames | Janky | p50 / p90 / p95 / p99 | PSS fresh / post (MiB) | Crash tokens | Bundle marker |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A (off) | 1 | 20/20 | 193.3 s | 20059 | 1792 (8.93 %) | 10 / 15 / 17 / 21 ms | 152.2 / 319.4 | 0 (1 benign `VM exiting with result code 0` from the `am start` shell pid, not Soli's) | `react/compiler-runtime` ×0 |
+| A (off) | 2 | 20/20 | 193.7 s | 20027 | 1865 (9.31 %) | 10 / 15 / 17 / 22 ms | 153.4 / 331.0 | 0 (same benign line) | ×0 |
+| B (on) | 1 | 20/20 | 190.5 s | 20113 | 1644 (8.17 %) | 10 / 15 / 17 / 21 ms | 155.9 / 331.7 | 0 (same benign line) | sentinel ×86 / `CompilerRuntime` ×117 in the JS export |
+| B (on) | 2 | 20/20 | 189.3 s | 19951 | 1619 (8.11 %) | 10 / 15 / 17 / 21 ms | 154.3 / 329.9 | 0 (same benign line) | same build |
+
+| Metric (mean of 2) | A off | B on | Δ (B − A) | Pass tolerance | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| Playlist wall time | 193.5 s | 189.9 s | −3.6 s (−1.9 %) | — | B slightly faster (A spread 0.4 s, B spread 1.2 s — beyond spread, small) |
+| Janky frames | 9.12 % | 8.14 % | −0.98 pt | ±1 pt | within tolerance, in the good direction (A spread 0.38 pt, B 0.06 pt) |
+| p50 / p90 / p95 / p99 | 10 / 15 / 17 / 21.5 ms | 10 / 15 / 17 / 21 ms | 0 / 0 / 0 / −0.5 ms | p95 ±2 ms | identical |
+| PSS fresh restart | 152.8 MiB | 155.1 MiB | +2.3 MiB | ±10 MiB | within noise (the compiled bundle is +28 KB HBC) |
+| PSS post-20-games | 325.2 MiB | 330.8 MiB | +5.6 MiB | ±10 MiB | within noise (A's own two runs differ by 11.6 MiB) |
+| Games / crash tokens | 20/20 · 0 | 20/20 · 0 | — | — | pass |
+| "Janky frames (legacy)" | 32.3 % | 36.0 % | +3.7 pt | not a plan metric | the legacy counter flags every frame > 16 ms regardless of deadline; the deadline-based counter above is the one Android 12+ reports as jank. Mentioned for completeness, not treated as a regression (p-percentiles are identical) |
+
+Noise estimate from the A pair: wall ±0.2 s, janky ±0.2 pt, PSS post ±6 MiB; the B pair is
+tighter still. Conditions identical for all four runs: phone charging at 76 %, thermal status 0
+throughout (battery 23 → 27 °C over the hour), auto-brightness, battery saver off, light mode,
+phone untouched during each playlist, app force-stopped and cold-started before each run, an
+iOS build running on the Mac concurrently in both configurations (irrelevant to the phone).
+
+**Decision (2026-10-18): compiler LEFT ON** (`app.json` → `expo.experiments.reactCompiler: true`).
+No metric moved beyond the pass tolerance, every smoke path (scrubber C5 lines, celebration
+`scheduleOnUI`/`scheduleOnRN`, glow, hint, undo, drawer) behaves identically on both platforms,
+0 crashes in 4 × 20 + 2 × 5 games. Rollback = delete the `"reactCompiler": true` line in
+`app.json`, then delete `android/app/build/generated/assets/react/release` (see flip proof) and
+rebuild; iOS rebuilds the bundle on every `yarn ios`.
+
+Config B iOS smoke (incremental `yarn ios` 2 min, `main.jsbundle` 10,281,913 bytes, rebuilt
+23:23): scrubbed fixture exact; pans `-130` → 20, `-290` → 0, `+100` → 80 (all EXACT); Undo tap
+from 80 → 79; `yarn celebration --ios` → overlay (mode 26); 5-game playlist 5/5; 0 crash/fatal
+lines; session closed normally, no DiagnosticReports for Soli/SpringBoard.
+
+Config A smoke (Android, Release APK built 22:48, bundle 8,739,204 bytes): scrubber fixture exact
+(`Moves, 80` / `Stock, 10` / `Waste, Six of hearts`), `gesture pan 801 2150 -339` → 20 EXACT,
+`-696` → 0 EXACT, `700 2150 +275` → 80 EXACT, Undo tap → 79; `yarn celebration` → overlay
+(mode 39 Fireworks) with `[Celebration] start { cards: 52 }`; `yarn nearwin` → tapping the waste
+King auto-played to the foundation → `hasWon set true (moves=244)` → celebration (mode 8 Ring
+Cascade) → "Start a new game? Nice win!" dialog after ~45 s → Deal Again OK; Hint → amber ring on
+A♠ + ghost on the spades slot; A♠ drop → foundation glow visible (luma oracle: crop
+`200:260:440:590` YAVG 169.6 during the pulse vs 165.3 at rest); Undo returns the Ace; drawer
+opens (Play/Hello/History/Settings/Rate Soli). 0 crash tokens attributable to Soli.
+
+Config A iOS smoke (iPhone 17 Pro, iOS 27.0, Release, `LANG=en_US.UTF-8 … yarn ios` 16 min
+incl. pods): scrubbed fixture exact; `gesture pan 298 788 -130` → 20 EXACT, `-290` → 0 EXACT,
+`+100` → 80 EXACT; Undo tap → 79 (`Stock, 11`, `Waste, Six of spades`); `yarn celebration --ios`
+→ overlay (mode 41 Dominoes); `?demo=playlist&games=5` → 5/5 completed; 0 crash/fatal lines in
+the `log stream --level debug` capture.
+
+**Flip proof (B).** The plan's marker was wrong for this project: `index.android.bundle` under
+`android/app/build/generated/assets/react/release/` is **Hermes bytecode** (magic `c6 1f bc 03`),
+whose string table dedupes every literal, so `grep -c "react/compiler-runtime"` is 0 in both
+configs and proves nothing. Proof used instead: a plain-JS `expo export:embed --platform android
+--dev false --minify false` of the same tree with the flag on and (temporarily) off —
+`Symbol.for("react.memo_cache_sentinel")` occurrences **A = 2 vs B = 86**, `CompilerRuntime`
+identifiers **A = 0 vs B = 117**, JS size 15,584,670 → 15,650,393 bytes (+65.7 KB); the HBC
+bundle grew 8,739,204 → 8,767,700 bytes (+28.5 KB). Second finding: the first B `yarn release`
+after the flip reported `:app:createBundleReleaseJsAndAssets UP-TO-DATE` and shipped the OLD
+bundle (mtime unchanged) — `app.json` is not an input of the RN Gradle bundle task. Fix: delete
+`android/app/build/generated/assets/react/release` (+ the `mergeReleaseAssets` copy and
+`generated/sourcemaps/react/release`) and rebuild (56 s). Recorded in SKILL.md §8.
+
+Config B Android smoke (APK built 23:16, bundle regenerated): scrubber fixture exact, pans
+`-339` → 20 EXACT, `-696` → 0 EXACT, `+275` → 80 EXACT, Undo → 79; `yarn celebration` → overlay
+(mode 2 Pendulum Cascade); `yarn nearwin` → waste King auto-play → `hasWon set true (moves=244)`
+→ `[Celebration] start` (mode 0 Spiral Bloom) → "Start a new game? Nice win!" dialog → Deal
+Again; Hint → ring on 2♣ + ghost on 3♦; A♦ drop (Vegas fixture, column 7) → foundation glow
+halo visible in the in-flight capture; Undo returns the Ace; drawer opens/closes. Gates with the
+flag on: typecheck clean, lint exit 0, Jest 45 suites / 458 tests (unchanged by design).
+
+**Pass criteria (B vs A, medians of the runs)**: 20/20 games, 0 crash tokens, janky % within 1
+point, p95 within 2 ms, PSS within 10 MiB, scrubber lands within ±1, celebration + glow + hint
+visually unchanged (Karim 2-minute look if the tester is unsure). Fail → rollback (delete the
+flag line, rebuild) and report which metric moved. Note for interpretation: the per-card
+`AbsoluteLayerCard` is still skipped in B, so a frame-time change on the playlist would come from
+the compiled parents (`TableauSection`, `FoundationPile`, `useKlondikeGame`, `KlondikeGameView`),
+not from the card itself.
+
+### Option D test plan (S16 — for the testing agent)
+
+Read `.agents/skills/soli-testing/SKILL.md` first (phone A065 guardrails, `--serial`,
+`android-ready.sh --keep-awake`, §8 flip-proof + Gradle `UP-TO-DATE` notes). One build at a
+time, one agent per device. **Baseline = the S11 config B rows above** (compiler ON, memos
+still in place): janky 8.14 %, p50/p90/p95/p99 10/15/17/21 ms, PSS fresh 155.1 / post 330.8
+MiB, playlist 189.9 s. Pass tolerance as in S11: janky ±1 pt, p95 ±2 ms, PSS ±10 MiB, 20/20
+games, 0 crash tokens, scrubber ±1, visuals unchanged. **Build note:** only source files
+changed, so Gradle re-bundles by itself — but confirm the bundle mtime moved; if in doubt
+delete `android/app/build/generated/assets/react/release` before `yarn release`.
+
+- [x] 1. `yarn typecheck && yarn lint && yarn jest --runInBand` once (all green at hand-off:
+  458/458). Jest runs UNcompiled code, so this proves nothing about the compiler — it is a
+  sanity gate only. → S16 (2026-10-19 07:17): typecheck clean, lint 0, Jest 45 / 458 green.
+- [x] 2. Android Release build (`yarn release`), then **two measurement runs** with the S11
+  script shape (`rc/ab/measure.sh` if still in the scratchpad, else S11 steps 1-6): force-stop
+  → cold `soli:///` → 12 s → `dumpsys meminfo` (PSS fresh) → `gfxinfo reset` →
+  `?demo=playlist&games=20` → wait for `[DemoPlaylist] Playlist completed (games=20)` →
+  `gfxinfo` (frames, janky %, p50/p90/p95/p99) → `meminfo` (PSS post). Record in a table
+  under "S16 results" next to the S11 B numbers. Third run if the two differ by more than
+  the tolerance. → Done 2026-10-19 07:19-07:28 (build 51 s after deleting the generated
+  release assets; bundle regenerated, mtime 07:19, HBC 8,768,100 B). Two runs agree within
+  tolerance (janky spread 0.35 pt, PSS post spread 4.3 MiB) → no third run. Table in "S16
+  results".
+- [x] 3. **Smoke, Android** — PASS 2026-10-19 07:29-07:45, details in "S16 results → Android
+  smoke". (a) `yarn scrubtest` → pans
+  `-339` → 20, `-696` → 0, `+275` → 80 (EXACT within ±1), Undo tap → 79 — exercises
+  `UndoScrubber`/`GestureWrapper` (memo removed; element now cached by the compiled parent)
+  and the kept `measureTrack`; the track label must still update per step. (b) `yarn
+  celebration` → overlay without board flash; `yarn nearwin` → last move → real win →
+  `[Celebration] start` → dialog → Deal Again — exercises `CelebrationAtlas` (9 memos removed,
+  hook reorder) and `AbsoluteCardLayer`/`TopRow`/`TableauSection` (memo removed). Watch
+  for a celebration that stutters at start or restarts on badge-cycle (would mean the
+  worklets re-register more often than before). (c) Hint → ring + ghost
+  (`HintOverlayLayer` memo removed); then Undo → ring clears. (d) Invalid move → wiggle on
+  the tapped stack only (the kept `items` memo). (e) Drawer open/close; History tab →
+  scroll to pagination, open a row → preview sheet (BoardPreview memo removed) → Retry
+  (confirm dialog) and Share (sheet appears) — `history.tsx` lost 6 memos. (f) Settings:
+  flip Draw count, Animations master OFF/ON (`useAnimationToggles` memo removed — board
+  animations must stop/resume), Warning mode picker, Scoring picker → Vegas, Reset Vegas
+  total dialog (`confirmResetVegasTotal`), then back to Standard. (g) Dev Demo sheet (dev
+  mode ON): open, pick a demo, Reset undo hint, Seed history — `index.tsx` lost 5 memos.
+  (h) TIMER sanity: play two moves, watch MOVES/TIME tick for 10 s with the phone otherwise
+  idle; `adb shell dumpsys gfxinfo ch.karimattia.soli` after 60 s idle should show only a
+  handful of frames per second (the per-second tick must not re-render the card layer —
+  that is the one place a lost `React.memo` would show).
+- [x] 4. **iOS** (`yarn ios`, simulator, correctness only): `yarn scrubtest --ios` → pans
+  `-130` → 20, `-290` → 0, `+100` → 80; `yarn celebration --ios`; `?demo=playlist&games=5`
+  → 5/5; Settings pickers once; History sheet once; 0 crash/fatal lines. → PASS 2026-10-19
+  07:46-07:55, details in "S16 results → iOS smoke".
+- [x] 5. Crash tokens 0 on both platforms (attribute pids first — the `am start` shell
+  `VM exiting` line is benign, see S11). → 0 on both (Android: only `am` shell VMs, uid 2000;
+  iOS: 0 crash/fatal/uncaught lines in 627k log lines, no Soli/SpringBoard DiagnosticReports).
+
+**S16 decision (2026-10-19): option D KEPT — no memo restored.** No metric moved beyond the
+S11 noise bands (janky −0.06 pt, percentiles identical, wall +0.3 %, PSS fresh −2.9 MiB; PSS
+post −16 MiB i.e. lower), the idle board renders exactly one frame per timer tick, and every
+smoke path on both platforms behaves as in config B.
+
+#### S16 results (testing agent, 2026-10-19 07:17-…, phone A065 Android 16, battery 94→92 % NOT charging (S11 was charging), thermal status 0 throughout (20→24 °C), light mode, screen timeout raised to 600 s by `android-ready.sh --keep-awake`, phone untouched during each playlist; raw outputs in the session scratchpad `rc/d/`: `D1/`, `D2/`, `build-D.log`, `js-D.js`, `bundle-D.hbc`)
+
+Same script as S11 (`rc/d/measure.sh` = `rc/ab/measure.sh` with the output dir changed).
+Compiler proof for the D tree (plain-JS `expo export:embed --dev false --minify false`):
+`react.memo_cache_sentinel` ×86, `CompilerRuntime` ×117 — identical to config B (coverage
+75 / 8 unchanged, one sentinel per compiled function); JS 15,652,057 B (B 15,650,393), HBC
+8,768,100 B (B 8,767,700).
+
+| Config | Run | Games | Wall time | Frames | Janky | p50 / p90 / p95 / p99 | PSS fresh / post (MiB) | Crash tokens |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| B (S11, memos in) | 1 | 20/20 | 190.5 s | 20113 | 1644 (8.17 %) | 10 / 15 / 17 / 21 ms | 154.3 / 329.9 | 0 |
+| B (S11, memos in) | 2 | 20/20 | 189.3 s | 19951 | 1619 (8.11 %) | 10 / 15 / 17 / 21 ms | 155.9 / 331.7 | 0 |
+| D (option D) | 1 | 20/20 | 190.5 s | 20212 | 1668 (8.25 %) | 10 / 15 / 17 / 21 ms | 149.3 / 312.2 | 0 (1 benign `VM exiting` from the `am start` shell pid 23690; Soli pid 24051) |
+| D (option D) | 2 | 20/20 | 190.3 s | 20301 | 1604 (7.90 %) | 10 / 15 / 17 / 21 ms | 155.0 / 316.5 | 0 (same benign line, pid 24480 vs Soli 24471) |
+
+| Metric (mean of 2) | B (S11) | D | Δ (D − B) | Tolerance | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| Playlist wall time | 189.9 s | 190.4 s | +0.5 s (+0.3 %) | — | identical (D spread 0.2 s) |
+| Janky frames | 8.14 % | 8.08 % | −0.06 pt | ±1 pt | identical (D spread 0.35 pt) |
+| p50 / p90 / p95 / p99 | 10 / 15 / 17 / 21 ms | 10 / 15 / 17 / 21 ms | 0 | p95 ±2 ms | identical |
+| PSS fresh | 155.1 MiB | 152.2 MiB | −2.9 MiB | ±10 MiB | within noise |
+| PSS post-20-games | 330.8 MiB | 314.4 MiB | −16.4 MiB | ±10 MiB | outside the band but in the GOOD direction (less memory); both D runs sit below all four S11 runs (319.4-331.7). Plausible (86 fewer closures/deps arrays per render tree) but the phone was not charging this time, so not claimed as a win — in any case not a regression |
+| Janky (legacy) | 36.0 % | 36.3 % | +0.3 pt | not a metric | unchanged |
+| Games / crash tokens | 20/20 · 0 | 20/20 · 0 | — | — | pass |
+
+**Idle re-render oracle (step 3h):** scrubbed board (timer running), `gfxinfo reset` → 60 s
+untouched → **60 frames rendered in 60 s = exactly one frame per TIMER_TICK**, no re-render
+storm from any removed `React.memo` (frame p50 25 ms / GPU 11 ms — the single wake-up frame
+per second from idle clocks; the frame COUNT is the oracle, a lost memo boundary would not
+change the count but would show up in the playlist janky %/p99 above, which did not move).
+No config-B idle number exists (no B build at hand) — absolute numbers only.
+
+**Android smoke (D build, agent-device session `d-and`, `--serial 192.168.1.12:5555`):**
+(a) scrubbed fixture exact (`Moves, 80` / `Stock, 10 cards` / `Waste, Six of hearts`), Undo
+center 801 2150; pans `-339` → **20** (`Stock, 7`, `Waste, Two of spades`), `-696` → **0**
+(`Stock, 24`), `700 +275` → **80** (`Stock, 13`, `Waste, Ten of hearts`), Undo tap → **79**
+(`Waste, Six of clubs`) — all EXACT, `Undo scrubber, position K of 80` label updated after every
+step. (b) `yarn celebration` → overlay (mode 20 Fountain) with `[Celebration] start`; badge tap
+→ mode 21 Card Rain, exactly one `[Celebration] start` per cycle (no restart/stutter), tap
+elsewhere → board untouched (`Stock, 13` / `Waste, Six of clubs` / `Moves, 80`). `yarn nearwin`
+→ tap `Waste, King of spades` → `hasWon set true (moves=244)` → handoff queued / selected /
+settled / start → `[Celebration] start` (mode 13 Aurora Twist, screenshot `D-realwin-5s.png`)
+→ `[Celebration] complete` at +60.0 s → "Start a new game?" dialog → Deal Again → fresh deal
+(`Moves, 0`, `Stock, 23`, Hint button present on the Standard game). (c) Hint → amber ring on
+10♠ + 9♥ ghost (`D-hint.png`), solver `status=solved ms=2.0`; Undo tap fine. (d) Tap 4♠
+(no legal target) → wiggle: pixel diff of the 4♠ column between two consecutive screencaps
+YAVG 27.9 vs **0** in two control columns — only the tapped stack moved; `Moves` unchanged.
+(e) Drawer opens (Play/Hello/History/Settings/Rate Soli); History → row → preview sheet with
+BoardPreview (`D-history-sheet.png`) → Retry → "Retry this deal?" → Cancel; Share → Android
+chooser → dismissed; scrolling 8 pages loads older rows (yesterday's entries visible →
+`loadMore` works). (f) Settings: Draw 1 → 3 → 1 (field text follows), Warnings → Unwinnable
+game → No more useful moves, Scoring → Vegas (`reset-vegas-total` row appears) → Reset Vegas
+total → dialog → Cancel → Standard; "All animations" OFF → the six detail switches report
+`enabled=false`, a Draw on the board still works (`Moves 2`, `Stock 22`) → ON → all seven
+switches checked/enabled again. (g) Demo sheet: Seed history → `Inserted 8 seed history
+entries` (cleared again afterwards); the "Undo hint" row is NOT reachable on Android — it sits
+below the default detent fold (pre-existing A20 layout bug, comment in `index.tsx`), so
+`?reset=undoHint` was used instead (`[Demo] Reset link: undo hint.`); `handleResetUndoHint`
+itself is a 2-line wrapper around the same hook call. (h) see idle oracle above. Crash scan of
+the whole 37k-line smoke logcat: 0 `FATAL EXCEPTION` / tombstone / SIG*; every `AndroidRuntime`
+line belongs to `am` shell VMs (uid 2000), Soli pids 24471 / 25005 / 26224 clean.
+
+**iOS smoke (iPhone 17 Pro, iOS 27.0, Release, incremental `LANG=en_US.UTF-8 … yarn ios`
+58 s, bundle updated 07:25, agent-device session `d-ios`, `log stream --level debug` capture
+`rc/d/ios-D-log.txt`):** scrubbed fixture exact, Undo center 298 789; pans `-130` → **20**,
+`-290` → **0**, `+100` → **80**, Undo tap → **79** — all EXACT and the same board states as
+Android (`Stock, 7` / `Two of spades`, `Stock, 24`, `Stock, 13` / `Ten of hearts`, `Six of
+clubs`). `yarn celebration --ios` → mode 10 Comet Halo, badge tap → 12 Column Glide (one
+`[Celebration] start` each), dismiss clean. `yarn nearwin --ios` → waste King tap → `hasWon
+set true (moves=244)` → `[Celebration] start` (mode 36) → "Start a new game?" after ≈30 s →
+Deal Again → fresh deal. History: row → sheet → Retry on a 0-move current game retries
+immediately (no prompt — same rule as the shared-deal prompt), on a 1-move game → "Retry this
+deal?" → Cancel; Share → iOS share sheet (`ShareSheet.RemoteContainerView`, Copy) → dismissed.
+Settings: Draw 1 → 3 → 1, Scoring Off → Vegas (`Keep Vegas total` row appears) → Off, Warnings
+→ Unwinnable game → No more useful moves, "All animations" OFF → the six detail switches
+report `[disabled]` → ON → all enabled again. `?demo=playlist&games=5` → `Game 5/5 completed`,
+`Playlist completed (games=5)` in 51 s. Crash scan 0 (see step 5). Session closed normally,
+sim appearance left `light`.
+
+**Cheap re-render check — decision:** React DevTools is not available on the Release
+phone build, and a temporary render counter would be dev-only code in the hot path that
+the compiler also rewrites (and Karim asked for no overkill). Instead use two free
+oracles: (1) the 60 s idle `gfxinfo` frame count in step 3(h) — the TIMER_TICK path is the
+only per-second render, and a lost memo boundary would multiply frames there; (2) the
+playlist janky % / p99 vs S11 B. If either moves, the testing agent can add
+`console.count('<Component> render')` in `AbsoluteCardLayer`/`TopRow` on a dev build for
+one playlist and compare counts with a `"use no memo"` directive on the same component —
+only then, not by default. Pass → mark S16 done in Steps and leave the memos out; fail →
+report which metric/smoke moved and which component (the per-file KEEP/REMOVE list makes a
+partial rollback a one-file `git diff` revert of the offending component).
+
 ## Follow-ups
 
 See sections A-E; this document *is* the follow-up list. Added by round 2:
@@ -419,11 +1036,25 @@ See sections A-E; this document *is* the follow-up list. Added by round 2:
 - **Delete the Appium iOS scrub path** (`scripts/ios-scrub.js` ~250 LOC, `appium.md`, SKILL
   mentions): agent-device 0.21.28 scrubs on iOS. Pro: -1 tool, -1 guide, simpler §6. Con: no
   fallback if a future agent-device regresses iOS pans (would be caught by the next
-  scrubber-touching task). Recommendation: delete at the next scrubber task.
+  scrubber-touching task). Recommendation: delete at the next scrubber task. → **DONE in round 3
+  (2026-10-18, S9).**
 - **Bump invent to agent-device 0.21.28** so both repos share one daemon version (hazard above).
 - **React Compiler pass (A11)**: start from the six disabled oxlint rules — run
   `yarn oxlint -W react/immutability -W react/refs -W react/set-state-in-effect -W react/exhaustive-effect-dependencies -W react/capitalized-calls -W react/globals src` for the bail-out map.
 - **oxfmt 0.54 → 0.73** right after Karim's commit (B1), own commit for the reformat.
+- **Option D follow-ups (2026-10-19):** (a) the 21 lint-kept `useCallback`s could go once a
+  compiler-aware `exhaustive-deps` exists (or if Karim accepts turning the rule off — not
+  recommended, it is the only missing-deps check left; the compiler validates memo deps
+  only where memos exist). (b) The 8 skipped functions hold 58 more manual memos; compiling
+  them needs the D1 scrubber hook migration (`useUndoScrubber` refs), a `useState`-based
+  "previous props" rewrite in `AbsoluteLayerCard` (hot path — measure), and small
+  `try/finally` helper extractions in `useHint`/`useKlondikeHistoryEntry`/
+  `useKlondikePersistence`/`useHistory`. The last group is cheap and risk-free; LATER with
+  the next touch of each file. (c) `CascadeImprintLayer`'s `for` header rewrite would
+  compile it (2 memos). (d) `docs/external-package-guides/react-compiler.md` is still not
+  written — the deep dive + this section are its seed; write it when the compiler work
+  stabilises (recommendation: now that D landed, a 1-page guide with the three verification
+  scripts is worth it).
 
 ## React Compiler deep dive (prompt 2)
 
@@ -488,6 +1119,21 @@ was modified; the compiler was run from the scratchpad with a logger only.
 | `useKlondikePersistence` (`:59`) | Todo | `try/finally` at 98 | helper, or leave | Persistence |
 | `useHistory` provider (`state/history.tsx:157`) | Todo | `try/finally` at 178, 383 | helper, or leave | History |
 
+**Status after round 3 (2026-10-18, same script, same plugin): 75 compiled / 8 skipped.** Newly
+compiled: `useFoundationGlowAnimation`, `UndoScrubber`, `EmptySlot` (`CardVisual.tsx`),
+`WinCleanupPile` (`TopRow.tsx`), `CelebrationAtlas` (deps completed, see S7). Remaining skips:
+
+| Skipped function | Category | Cause now | Why left |
+| --- | --- | --- | --- |
+| `AbsoluteLayerCard` (`AbsoluteCardLayer.tsx:457`) | Refs | `previousResetKeyRef/previousTargetRef.current` read in render (`targetChangedBeforeEffect`, lines 485-486) | Deliberate Fabric/pressability guard (comment in code); moving it to state/effect changes WHEN touches re-enable — not behaviour-neutral. Hot path stays as today (safe for the flip, zero perf gain) |
+| `useUndoScrubber` (`:157`) | Refs | latest-value refs written in render (`onScrubBeginRef`, `onScrubEndRef`, `canUndoRef`, `handleUndoRef`, lines 308-341) and ref reads inside gesture-builder callbacks the compiler cannot classify as handlers (353-427) | Surfaced only after the Immutability fix; `useEffectEvent` or the D1 hooks migration would fix it — D1 territory, deliberately not bundled |
+| `useCelebrationController` (`:123`) | Refs | `pendingCelebrationActiveRef.current` / `winCelebrationsRef.current` read in render for `celebrationQueuedThisRender` (721-728, 793) | Deliberate "treat the winning render as pending" guard (comment in code); not neutral to move |
+| `CascadeImprintLayer` (`CelebrationOverlayLayer.tsx:904`) | Todo | `for (…)` non-variable initializer (1126) | Compiler limitation; cosmetic rewrite, later |
+| `useHint` (`:154`) | Todo | `try` without `catch` (224) | Helper extraction, later |
+| `useKlondikeHistoryEntry` (`:91`) | Todo | optional chaining inside `try/catch` (305) | later |
+| `useKlondikePersistence` (`:59`) | Todo | `try/finally` (98) | later |
+| `useHistory` provider (`state/history.tsx:157`) | Todo | `try/finally` (178, 383) | later |
+
 Honest reading: the board's per-card component is skipped, so flipping the flag today changes
 nothing on the hottest path (good for safety, zero for perf). The compiler's value for Soli is
 code simplicity (deleting ~100 memo lines), and that only arrives after the `.set()` and
@@ -541,6 +1187,10 @@ option `.runOnJS(true)` at `useUndoScrubber.ts:343`, which is Gesture Handler's 
 | 6 | `src/features/klondike/hooks/useCelebrationController.ts:557` | `runOnJS(handleRunFinished)()` | `scheduleOnRN(handleRunFinished)` |
 | 7-9 | `useCelebrationController.ts:402, 548, 589` | `runOnUI(() => { 'worklet' ... })()` | `scheduleOnUI(() => { ... })` — same deprecation (`workletFunctions.ts:59`), same mechanical shape |
 | imports | `CelebrationOverlayLayer.tsx:28`, `useUndoScrubber.ts:5`, `useCelebrationController.ts:7-8` | from `react-native-reanimated` | `import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets'` (direct dependency 0.13.0; Reanimated does NOT re-export the new names) |
+
+**Done in round 3 (2026-10-18, S6): all 9 rows swapped exactly as listed; imports from
+`react-native-worklets`. Device verification is part of the S11 protocol (scrubber + celebration
+steps run in configuration A, i.e. before the compiler flip).**
 
 Semantics, verified in `react-native-worklets 0.13.0` (`src/threads.native.ts:229-282`):
 `runOnJS(fun)` is literally `(...args) => scheduleOnRN(fun, ...args)` — a one-line wrapper.
@@ -624,3 +1274,248 @@ diagonal-start feel check by Karim.
 | C5 `runOnJS` -> `scheduleOnRN` (+ `runOnUI` -> `scheduleOnUI`) | Very low (one-line wrapper underneath) | None | 20 min (`scrubtest` + `celebration`) | Bundle with the compiler `.set()` edit, or do after the tree is committed |
 | D1 GH hooks for the scrubber | Low for the renames, **high for `minDistance` -> `activeOffsetX`** (hook throws otherwise) | Yes: activation geometry | 1-2 h on two platforms (Appium on iOS) | LATER, standalone |
 | React Compiler flag (E5) | Low (13 functions skipped = unchanged, 70 compiled with memos kept) | Possible: effects depending on unstable identities | Half a day (two Release builds + two playlists + gfxinfo/PSS) | Measured experiment only if the memo cleanup (D) is wanted; no perf problem today |
+
+## Option D: manual memo removal (prompt 3)
+
+Implementation sub-agent, 2026-10-19. Compiler ON since S11 (`app.json`
+`experiments.reactCompiler: true`). Goal: delete the manual `useCallback`/`useMemo`/
+`React.memo` the compiler makes redundant, keep behaviour identical, prove it in the
+compiled output.
+
+### What the compiler does — the short answer to "what does it even do?"
+
+React re-runs a component function on every state change and, by default, re-runs all its
+children too. Manual `useMemo`/`useCallback`/`React.memo` are the hand-written "only redo
+this when its inputs changed" notes that stop that. The React Compiler is a Babel step that
+writes those notes for you at build time: it splits each component/hook into "reactive
+scopes" (a value and the inputs it is computed from), stores every scope's result in a
+per-component cache array (`$[n]`), and on the next render re-computes a scope only if one
+of its inputs changed (`Object.is`). JSX elements are values too, so a child whose props did
+not change receives the very same element object and React skips it — that is what makes
+`React.memo` redundant under a compiled parent. It does not make a single render faster,
+does not touch Reanimated worklets or native code, and leaves any function that breaks the
+Rules of React exactly as written (8 of Soli's 83 functions). The full deep dive is above
+("React Compiler deep dive (prompt 2)").
+
+### Removal rules (from react.dev, applied here)
+
+| # | Rule | Source | How it was applied |
+| --- | --- | --- | --- |
+| R1 | Existing memoization may stay — the compiler preserves `useMemo`/`useCallback`/`React.memo` and only compiles a function if its inference "matches or exceeds" them; removal "can change compilation output", so remove only with testing | react.dev compiler intro FAQ "What should I do about useMemo, useCallback, and React.memo?"; `preserve-manual-memoization` lint reference | Every removal verified by compiling before/after (method below); device pass S16 |
+| R2 | Keep `useMemo`/`useCallback` when the value is a `useEffect` dependency ("to ensure that an effect does not fire repeatedly") | same FAQ | 21 `useCallback`s kept — all (transitive) effect deps; `react-hooks/exhaustive-deps` enforces the same |
+| R3 | `React.memo` is redundant when the parent is compiled: the parent caches the `<Child …/>` element, React bails out on identical elements | react.dev `memo` reference, "Do I still need React.memo if I use React Compiler?" | Removed on 10 single-instance components whose parents are compiled (`KlondikeGameView` → `TopRow`, `TableauSection`, `AbsoluteCardLayer`, `HintOverlayLayer`, `UndoScrubber`, `CelebrationDebugBadge`; `UndoScrubber` → `GestureWrapper`, `UndoHintBubble`, `GameNoticeBubble`; `AbsoluteCardLayer` → `WasteTapZone`) |
+| R4 | Keep `React.memo` where no compiled parent caches the element: items created inside `.map`/`renderItem` (the compiler does not memoize per-iteration JSX), roots rendered by libraries | derived from R3's mechanism; react.dev `memo` "Skipping re-rendering" | Kept: `TableauColumn` (in `tableau.map`), `AbsoluteLayerCard` (skipped AND in `items.map`), `HistoryListItem` (FlatList row), `memo(HistoryScreen)` (expo-router) |
+| R5 | Nothing inside a compiler-skipped function changes — there is no compiler memoization there | compiler `panicThreshold: none` semantics (deep dive) | 58 sites kept in `useUndoScrubber`, `useCelebrationController`, `useHint`, `useKlondikeHistoryEntry`, `useHistory` provider, `CascadeImprintLayer`, `AbsoluteLayerCard` |
+| R6 | Values whose identity feeds non-React code (Reanimated hook args, worklet captures, GH gesture objects) must keep the same invalidation | debugging guide "code that relies on memoization for correctness" | Verified in compiled output: `CelebrationAtlas` worklet captures (`board`, `drawOrder`, `assignments`, `avalancheLaunch`, `sprites`) are cached; gesture objects live in the skipped `useUndoScrubber` (kept) |
+| R7 | Expensive computations: fine to remove where the compiled output shows a cache slot; a primitive used only in expressions is NOT memoized by the compiler (and was not before either) | probe compile (`rc/probe/Probe.tsx`) + `useKlondikeGame` compiled output | `boardAvailableWidth`, `boardRowSettled`, `scrubSliderMax`-style primitives: removal is a no-op in the bundle |
+| R8 | Lint stays green without rule changes: `react-hooks/exhaustive-deps` + `react/memo-dependencies` were clean before, so manual deps == inferred deps (no "extra dep to force re-run" tricks hide in memos) | oxlint probe | Confirms equivalence of invalidation after removal; the cascade in R2 is the one place lint pushes back |
+
+### Verification method
+
+1. `rc/compile-report2.js` — app-wide coverage (compiled / skipped) before and after:
+   **75 / 8 → 75 / 8** (an intermediate 74 / 8 exposed `useSolvableDealSelector`, reverted).
+2. `rc/compile-file.js <file> --events` — per function: `memoSlots`, `memoValues`,
+   `prunedMemoBlocks/Values`, skips. After: no new skips, no new pruned blocks;
+   `CelebrationAtlas` 1 → 0 pruned (hook reorder), `useUndoHint` keeps its pre-existing 1.
+3. `rc/memo-map.js <file>` — every named value that lands in a cache slot with its guard
+   (= inferred deps), diffed before/after per file. `useKlondikeGame`: 46 named values, all
+   guards identical (only temp numbering shifted); `settings.tsx`, `useKlondikeTimer`
+   (`useFocusEffect` arg cached on `pauseTimer || resumeTimerIfNeeded`), `useUndoHint`,
+   `TopRow`, `TableauSection`, `HintOverlayLayer`, `UndoScrubber`, the bubbles, the app
+   screens, `KlondikeGameView`/`Session`: identical. Deviations, each inspected in the raw
+   compiled output: `BoardPreview.metrics` merged into the column-map scope (accepted);
+   `CelebrationAtlas` `assignments/board/drawOrder/sprites/avalancheLaunch` cached in one
+   15-dep scope (accepted — every extra trigger already re-registered the worklets);
+   `AbsoluteCardLayer.items` merged into the JSX scope (REVERTED, memo restored);
+   `useSolvableDealSelector` uncompiled (REVERTED).
+4. Gates after every pass: `yarn typecheck`, `yarn lint` (0), `yarn lint:strict` (exit 0),
+   `yarn jest --runInBand` (45 suites / 458), `oxfmt --check` on the 20 touched files.
+
+### Numbers
+
+- Sites: 170 = 125 `useCallback` + 31 `useMemo` + 14 `React.memo`/`memo`.
+- **Removed 86**: 56 `useCallback`, 20 `useMemo`, 10 `React.memo`.
+- **Kept 84**: 58 in skipped functions (47 `useCallback`, 10 `useMemo`, 1 `React.memo`);
+  3 `React.memo` on list rows / router root (R4); 21 `useCallback` as effect-dep chains
+  (R2 / lint: `useKlondikeGame` 10, `useDemoGameLauncher` 9, `UndoScrubber.measureTrack`,
+  `index.tsx openDemoChoice`); 2 reverted after verification (`useSolvableDealSelector`,
+  `AbsoluteCardLayer.items`).
+- LOC: `git diff HEAD --numstat` over the 20 option-D files = +1,189 / −1,313, **net −124**
+  (includes ~+35 lines of KEEP/why comments and the round-3 hunks in 4 shared files;
+  pure memo-removal is roughly −170).
+- Coverage 75 / 8 before and after. Gates green.
+
+### Inventory (pre-change line numbers; decisions as finally applied)
+
+| # | Site | Kind | Value | Enclosing fn | Compiler | Decision | Reason |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `src/features/klondike/components/BoardPreview.tsx:30` | useMemo | `metrics` | `BoardPreview` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 2 | `src/features/klondike/components/CelebrationDebugBadge.tsx:15` | memo | `CelebrationDebugBadge` | `CelebrationDebugBadge` | compiled | **REMOVE** | compiled component, single instance under a compiled parent (parent caches the element) |
+| 3 | `src/features/klondike/components/GameNoticeBubble.tsx:36` | memo | `GameNoticeBubble` | `GameNoticeBubble` | compiled | **REMOVE** | compiled component, single instance under a compiled parent (parent caches the element) |
+| 4 | `src/features/klondike/components/UndoHintBubble.tsx:21` | memo | `UndoHintBubble` | `UndoHintBubble` | compiled | **REMOVE** | compiled component, single instance under a compiled parent (parent caches the element) |
+| 5 | `src/features/klondike/components/UndoScrubber.tsx:107` | memo | `GestureWrapper` | `GestureWrapper` | compiled | **REMOVE** | compiled component, single instance under a compiled parent (parent caches the element) |
+| 6 | `src/features/klondike/components/UndoScrubber.tsx:154` | memo | `UndoScrubber` | `UndoScrubber` | compiled | **REMOVE** | compiled component, single instance under a compiled parent (parent caches the element) |
+| 7 | `src/features/klondike/components/UndoScrubber.tsx:179` | useCallback | `measureTrack` | `UndoScrubber` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 8 | `src/features/klondike/components/UndoScrubber.tsx:192` | useCallback | `handleTrackLayout` | `UndoScrubber` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 9 | `src/features/klondike/components/cards/AbsoluteCardLayer.tsx:281` | memo | `AbsoluteCardLayer` | `AbsoluteCardLayer` | compiled | **REMOVE** | compiled component, single instance under a compiled parent (parent caches the element) |
+| 10 | `src/features/klondike/components/cards/AbsoluteCardLayer.tsx:302` | useMemo | `wasteTapTarget` | `AbsoluteCardLayer` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 11 | `src/features/klondike/components/cards/AbsoluteCardLayer.tsx:313` | useMemo | `items` | `AbsoluteCardLayer` | compiled | **KEEP** | KEPT after verification: the compiler merged the items rebuild into the `items.map` JSX scope (deps incl. invalidWiggle/animationResetKey/handlers) — every wiggle or new deal would rebuild 52 items; the manual memo pins the finer scope |
+| 12 | `src/features/klondike/components/cards/AbsoluteCardLayer.tsx:456` | memo | `AbsoluteLayerCard` | `AbsoluteLayerCard` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 13 | `src/features/klondike/components/cards/AbsoluteCardLayer.tsx:711` | memo | `WasteTapZone` | `WasteTapZone` | compiled | **REMOVE** | compiled component, single instance under a compiled parent (parent caches the element) |
+| 14 | `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx:218` | useCallback | `handleWrapperLayout` | `CelebrationAtlas` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 15 | `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx:254` | useMemo | `atlasSize` | `CelebrationAtlas` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 16 | `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx:266` | useCallback | `cellOrigin` | `CelebrationAtlas` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 17 | `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx:274` | useMemo | `atlasElement` | `CelebrationAtlas` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 18 | `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx:425` | useMemo | `assignments` | `CelebrationAtlas` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 19 | `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx:463` | useMemo | `board` | `CelebrationAtlas` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 20 | `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx:492` | useMemo | `drawOrder` | `CelebrationAtlas` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 21 | `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx:512` | useMemo | `sprites` | `CelebrationAtlas` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 22 | `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx:525` | useMemo | `avalancheLaunch` | `CelebrationAtlas` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 23 | `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx:940` | useMemo | `slotByLaunchOrder` | `CascadeImprintLayer` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 24 | `src/features/klondike/components/cards/CelebrationOverlayLayer.tsx:956` | useMemo | `stampState` | `CascadeImprintLayer` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 25 | `src/features/klondike/components/cards/HintOverlayLayer.tsx:294` | memo | `HintOverlayLayer` | `HintOverlayLayer` | compiled | **REMOVE** | compiled component, single instance under a compiled parent (parent caches the element) |
+| 26 | `src/features/klondike/components/cards/HintOverlayLayer.tsx:300` | useMemo | `rects` | `HintOverlayLayer` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 27 | `src/features/klondike/components/cards/TableauSection.tsx:34` | memo | `TableauSection` | `TableauSection` | compiled | **REMOVE** | compiled component, single instance under a compiled parent (parent caches the element) |
+| 28 | `src/features/klondike/components/cards/TableauSection.tsx:47` | useCallback | `handleRowLayout` | `TableauSection` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 29 | `src/features/klondike/components/cards/TableauSection.tsx:95` | memo | `TableauColumn` | `TableauColumn` | compiled | **KEEP** | rendered inside tableau.map — the compiler does not memoize per-iteration JSX, so memo still spares 7 column renders per tableau change |
+| 30 | `src/features/klondike/components/cards/TopRow.tsx:88` | memo | `TopRow` | `TopRow` | compiled | **REMOVE** | compiled component, single instance under a compiled parent (parent caches the element) |
+| 31 | `src/features/klondike/components/cards/TopRow.tsx:109` | useCallback | `handleRowLayout` | `TopRow` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 32 | `src/features/klondike/components/cards/TopRow.tsx:116` | useCallback | `createFoundationLayoutHandler` | `TopRow` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 33 | `src/features/klondike/hooks/useCelebrationController.ts:192` | useMemo | `celebrationBindings` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 34 | `src/features/klondike/hooks/useCelebrationController.ts:209` | useCallback | `clearCelebrationDialogTimer` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 35 | `src/features/klondike/hooks/useCelebrationController.ts:216` | useCallback | `clearCelebrationStartTimer` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 36 | `src/features/klondike/hooks/useCelebrationController.ts:223` | useCallback | `clearCelebrationFallbackTimer` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 37 | `src/features/klondike/hooks/useCelebrationController.ts:230` | useCallback | `logCelebrationHandoff` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 38 | `src/features/klondike/hooks/useCelebrationController.ts:237` | useCallback | `openCelebrationDialog` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 39 | `src/features/klondike/hooks/useCelebrationController.ts:246` | useCallback | `handleCelebrationComplete` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 40 | `src/features/klondike/hooks/useCelebrationController.ts:271` | useCallback | `computeCelebrationCardBase` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 41 | `src/features/klondike/hooks/useCelebrationController.ts:288` | useCallback | `buildCelebrationState` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 42 | `src/features/klondike/hooks/useCelebrationController.ts:346` | useCallback | `startPendingCelebration` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 43 | `src/features/klondike/hooks/useCelebrationController.ts:390` | useCallback | `clearCelebrationAnimations` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 44 | `src/features/klondike/hooks/useCelebrationController.ts:428` | useCallback | `handleCelebrationOverlayReady` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 45 | `src/features/klondike/hooks/useCelebrationController.ts:432` | useCallback | `handleCelebrationAbort` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 46 | `src/features/klondike/hooks/useCelebrationController.ts:456` | useCallback | `scheduleCelebrationStart` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 47 | `src/features/klondike/hooks/useCelebrationController.ts:472` | useCallback | `scheduleCelebrationFallback` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 48 | `src/features/klondike/hooks/useCelebrationController.ts:488` | useCallback | `handleWinningCardFlightSettled` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 49 | `src/features/klondike/hooks/useCelebrationController.ts:614` | useCallback | `cycleCelebrationMode` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 50 | `src/features/klondike/hooks/useCelebrationController.ts:644` | useCallback | `startCelebrationPreview` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 51 | `src/features/klondike/hooks/useCelebrationController.ts:713` | useMemo | `celebrationLabel` | `useCelebrationController` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 52 | `src/features/klondike/hooks/useDemoGameLauncher.ts:377` | useCallback | `clearPlaylistTimers` | `useDemoGameLauncher` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 53 | `src/features/klondike/hooks/useDemoGameLauncher.ts:384` | useCallback | `schedulePlaylistTimer` | `useDemoGameLauncher` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 54 | `src/features/klondike/hooks/useDemoGameLauncher.ts:408` | useCallback | `resetDemoRuntimeState` | `useDemoGameLauncher` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 55 | `src/features/klondike/hooks/useDemoGameLauncher.ts:422` | useCallback | `failPlaylist` | `useDemoGameLauncher` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 56 | `src/features/klondike/hooks/useDemoGameLauncher.ts:436` | useCallback | `waitForPlaylistState` | `useDemoGameLauncher` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 57 | `src/features/klondike/hooks/useDemoGameLauncher.ts:470` | useCallback | `runDemoPlaylist` | `useDemoGameLauncher` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 58 | `src/features/klondike/hooks/useDemoGameLauncher.ts:715` | useCallback | `runDemoSequence` | `useDemoGameLauncher` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 59 | `src/features/klondike/hooks/useDemoGameLauncher.ts:805` | useCallback | `handleLaunchDemoGame` | `useDemoGameLauncher` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 60 | `src/features/klondike/hooks/useDemoGameLauncher.ts:924` | useCallback | `processDemoLink` | `useDemoGameLauncher` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 61 | `src/features/klondike/hooks/useHint.ts:196` | useCallback | `setDeadEra` | `useHint` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 62 | `src/features/klondike/hooks/useHint.ts:219` | useCallback | `drainSolveQueue` | `useHint` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 63 | `src/features/klondike/hooks/useHint.ts:235` | useCallback | `enqueueSolve` | `useHint` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 64 | `src/features/klondike/hooks/useHint.ts:250` | useCallback | `makeSolveTask` | `useHint` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 65 | `src/features/klondike/hooks/useHint.ts:282` | useCallback | `showNotice` | `useHint` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 66 | `src/features/klondike/hooks/useHint.ts:299` | useCallback | `fireWarning` | `useHint` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 67 | `src/features/klondike/hooks/useHint.ts:315` | useCallback | `applyHintHighlight` | `useHint` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 68 | `src/features/klondike/hooks/useHint.ts:331` | useCallback | `showClassicFallback` | `useHint` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 69 | `src/features/klondike/hooks/useHint.ts:411` | useCallback | `requestHint` | `useHint` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 70 | `src/features/klondike/hooks/useHint.ts:499` | useCallback | `handleBackgroundResult` | `useHint` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 71 | `src/features/klondike/hooks/useHint.ts:643` | useMemo | `warningText` | `useHint` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 72 | `src/features/klondike/hooks/useKlondikeGame.ts:171` | useMemo | `boardAvailableWidth` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 73 | `src/features/klondike/hooks/useKlondikeGame.ts:178` | useMemo | `cardMetrics` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 74 | `src/features/klondike/hooks/useKlondikeGame.ts:237` | useMemo | `dropHints` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 75 | `src/features/klondike/hooks/useKlondikeGame.ts:248` | useMemo | `headerPadding` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 76 | `src/features/klondike/hooks/useKlondikeGame.ts:275` | useCallback | `updateBoardLocked` | `useKlondikeGame` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 77 | `src/features/klondike/hooks/useKlondikeGame.ts:283` | useCallback | `mergeCardLayerLayout` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 78 | `src/features/klondike/hooks/useKlondikeGame.ts:297` | useCallback | `handleTopRowLayout` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 79 | `src/features/klondike/hooks/useKlondikeGame.ts:306` | useCallback | `handleFoundationLayout` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 80 | `src/features/klondike/hooks/useKlondikeGame.ts:323` | useCallback | `handleStockLayout` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 81 | `src/features/klondike/hooks/useKlondikeGame.ts:328` | useCallback | `handleWasteLayout` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 82 | `src/features/klondike/hooks/useKlondikeGame.ts:333` | useCallback | `handleTableauRowLayout` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 83 | `src/features/klondike/hooks/useKlondikeGame.ts:338` | useCallback | `handleTableauColumnLayout` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 84 | `src/features/klondike/hooks/useKlondikeGame.ts:381` | useCallback | `createFreshGameState` | `useKlondikeGame` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 85 | `src/features/klondike/hooks/useKlondikeGame.ts:442` | useCallback | `dealNewGame` | `useKlondikeGame` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 86 | `src/features/klondike/hooks/useKlondikeGame.ts:510` | useMemo | `boardRowSettled` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 87 | `src/features/klondike/hooks/useKlondikeGame.ts:524` | useMemo | — | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 88 | `src/features/klondike/hooks/useKlondikeGame.ts:570` | useCallback | `dispatchGameAction` | `useKlondikeGame` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 89 | `src/features/klondike/hooks/useKlondikeGame.ts:591` | useCallback | `performDealAgain` | `useKlondikeGame` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 90 | `src/features/klondike/hooks/useKlondikeGame.ts:616` | useCallback | `dealNewGameForTesting` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 91 | `src/features/klondike/hooks/useKlondikeGame.ts:624` | useCallback | `startGameFromExactDeal` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 92 | `src/features/klondike/hooks/useKlondikeGame.ts:675` | useCallback | `triggerInvalidSelectionWiggle` | `useKlondikeGame` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 93 | `src/features/klondike/hooks/useKlondikeGame.ts:700` | useCallback | `notifyInvalidMove` | `useKlondikeGame` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 94 | `src/features/klondike/hooks/useKlondikeGame.ts:718` | useCallback | `handleBoardLayout` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 95 | `src/features/klondike/hooks/useKlondikeGame.ts:730` | useCallback | `handleDraw` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 96 | `src/features/klondike/hooks/useKlondikeGame.ts:740` | useCallback | `handleUndo` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 97 | `src/features/klondike/hooks/useKlondikeGame.ts:763` | useCallback | `requestNewGame` | `useKlondikeGame` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 98 | `src/features/klondike/hooks/useKlondikeGame.ts:805` | useCallback | `requestPlayDeal` | `useKlondikeGame` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 99 | `src/features/klondike/hooks/useKlondikeGame.ts:862` | useCallback | `attemptAutoMoveFromState` | `useKlondikeGame` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 100 | `src/features/klondike/hooks/useKlondikeGame.ts:886` | useCallback | `attemptAutoMove` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 101 | `src/features/klondike/hooks/useKlondikeGame.ts:893` | useCallback | `handleWasteTap` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 102 | `src/features/klondike/hooks/useKlondikeGame.ts:973` | useCallback | `handleFoundationPress` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 103 | `src/features/klondike/hooks/useKlondikeGame.ts:1053` | useCallback | `handleTableauCardPress` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 104 | `src/features/klondike/hooks/useKlondikeGame.ts:1114` | useCallback | `requestNewGameFromDock` | `useKlondikeGame` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 105 | `src/features/klondike/hooks/useKlondikeHistoryEntry.ts:119` | useCallback | `clearPendingSolvedResultTimer` | `useKlondikeHistoryEntry` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 106 | `src/features/klondike/hooks/useKlondikeHistoryEntry.ts:129` | useCallback | `recordStartedGame` | `useKlondikeHistoryEntry` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 107 | `src/features/klondike/hooks/useKlondikeHistoryEntry.ts:211` | useCallback | `recordCurrentGameResult` | `useKlondikeHistoryEntry` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 108 | `src/features/klondike/hooks/useKlondikeHistoryEntry.ts:351` | useCallback | `flushPendingSolvedResultAfterHandoff` | `useKlondikeHistoryEntry` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 109 | `src/features/klondike/hooks/useKlondikeHistoryEntry.ts:376` | useCallback | `clearCurrentGameEntryLink` | `useKlondikeHistoryEntry` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 110 | `src/features/klondike/hooks/useKlondikeTimer.ts:27` | useCallback | `pauseTimer` | `useKlondikeTimer` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 111 | `src/features/klondike/hooks/useKlondikeTimer.ts:34` | useCallback | `resumeTimerIfNeeded` | `useKlondikeTimer` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 112 | `src/features/klondike/hooks/useKlondikeTimer.ts:55` | useCallback | — | `useKlondikeTimer` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 113 | `src/features/klondike/hooks/useSolvableDealSelector.ts:62` | useCallback | — | `useSolvableDealSelector` | compiled | **KEEP** | KEPT after verification: a `use*` function with no other hook call is not compiled in `infer` mode — without the useCallback the hook was left uncompiled (coverage 75 → 74) and returned a fresh function per render |
+| 114 | `src/features/klondike/hooks/useUndoHint.ts:42` | useCallback | `persistTracker` | `useUndoHint` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 115 | `src/features/klondike/hooks/useUndoHint.ts:52` | useCallback | `dismissUndoHint` | `useUndoHint` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 116 | `src/features/klondike/hooks/useUndoHint.ts:68` | useCallback | `noteUndoSuccess` | `useUndoHint` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 117 | `src/features/klondike/hooks/useUndoHint.ts:91` | useCallback | `noteStreakBreak` | `useUndoHint` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 118 | `src/features/klondike/hooks/useUndoHint.ts:101` | useCallback | `noteScrubEnd` | `useUndoHint` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 119 | `src/features/klondike/hooks/useUndoHint.ts:115` | useCallback | `noteNewDeal` | `useUndoHint` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 120 | `src/features/klondike/hooks/useUndoHint.ts:123` | useCallback | `resetUndoHintForTesting` | `useUndoHint` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 121 | `src/features/klondike/hooks/useUndoScrubber.ts:234` | useCallback | `cancelScheduledScrub` | `useUndoScrubber` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 122 | `src/features/klondike/hooks/useUndoScrubber.ts:261` | useMemo | `scrubSliderMax` | `useUndoScrubber` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 123 | `src/features/klondike/hooks/useUndoScrubber.ts:263` | useCallback | `handleTrackMetrics` | `useUndoScrubber` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 124 | `src/features/klondike/hooks/useUndoScrubber.ts:274` | useCallback | `scheduleScrubDispatch` | `useUndoScrubber` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 125 | `src/features/klondike/hooks/useUndoScrubber.ts:315` | useCallback | `beginScrubSession` | `useUndoScrubber` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 126 | `src/features/klondike/hooks/useUndoScrubber.ts:326` | useCallback | `finishScrubSession` | `useUndoScrubber` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 127 | `src/features/klondike/hooks/useUndoScrubber.ts:343` | useCallback | `handleTapEnd` | `useUndoScrubber` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 128 | `src/features/klondike/hooks/useUndoScrubber.ts:349` | useMemo | `undoTapGesture` | `useUndoScrubber` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 129 | `src/features/klondike/hooks/useUndoScrubber.ts:358` | useMemo | `undoPanGesture` | `useUndoScrubber` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 130 | `src/features/klondike/hooks/useUndoScrubber.ts:457` | useMemo | `undoScrubGesture` | `useUndoScrubber` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 131 | `src/navigation/useDrawerOpener.ts:17` | useCallback | — | `useDrawerOpener` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 132 | `src/state/history.tsx:217` | useCallback | `refreshMetadata` | `HistoryProvider` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 133 | `src/state/history.tsx:231` | useCallback | `reconcileLoadedHistory` | `HistoryProvider` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 134 | `src/state/history.tsx:250` | useCallback | `queueRepositoryTask` | `HistoryProvider` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 135 | `src/state/history.tsx:278` | useCallback | `recordResult` | `HistoryProvider` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 136 | `src/state/history.tsx:297` | useCallback | `updateEntry` | `HistoryProvider` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 137 | `src/state/history.tsx:341` | useCallback | `clearHistory` | `HistoryProvider` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 138 | `src/state/history.tsx:354` | useCallback | `seedHistoryForTesting` | `HistoryProvider` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 139 | `src/state/history.tsx:368` | useCallback | `getActiveEntry` | `HistoryProvider` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 140 | `src/state/history.tsx:376` | useCallback | `loadMore` | `HistoryProvider` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 141 | `src/state/history.tsx:408` | useMemo | `value` | `HistoryProvider` | SKIPPED | **KEEP** | inside a compiler-skipped function (no compiler memoization there) |
+| 142 | `src/state/settings.tsx:296` | useCallback | `setDrawCount` | `SettingsProvider` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 143 | `src/state/settings.tsx:302` | useCallback | `setGlobalAnimationsEnabled` | `SettingsProvider` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 144 | `src/state/settings.tsx:316` | useCallback | `setAnimationPreference` | `SettingsProvider` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 145 | `src/state/settings.tsx:348` | useCallback | `setSolvableGamesOnly` | `SettingsProvider` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 146 | `src/state/settings.tsx:356` | useCallback | `setAutoUpEnabled` | `SettingsProvider` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 147 | `src/state/settings.tsx:364` | useCallback | `setWarningMode` | `SettingsProvider` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 148 | `src/state/settings.tsx:377` | useCallback | `setHintButtonEnabled` | `SettingsProvider` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 149 | `src/state/settings.tsx:387` | useCallback | `setDeveloperMode` | `SettingsProvider` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 150 | `src/state/settings.tsx:395` | useCallback | `setStatisticsPreference` | `SettingsProvider` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 151 | `src/state/settings.tsx:414` | useCallback | `setScoringMode` | `SettingsProvider` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 152 | `src/state/settings.tsx:422` | useCallback | `setVegasTotalEnabled` | `SettingsProvider` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 153 | `src/state/settings.tsx:430` | useCallback | `setVegasTotalOffset` | `SettingsProvider` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 154 | `src/state/settings.tsx:445` | useMemo | `value` | `SettingsProvider` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 155 | `src/state/settings.tsx:494` | useMemo | — | `useAnimationToggles` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 156 | `app/(tabs)/history.tsx:70` | useCallback | `handleEndReached` | `HistoryScreen` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 157 | `app/(tabs)/history.tsx:79` | useMemo | `listHeader` | `HistoryScreen` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 158 | `app/(tabs)/history.tsx:96` | useMemo | `loadingFooter` | `HistoryScreen` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 159 | `app/(tabs)/history.tsx:231` | memo | `HistoryListItem` | `HistoryListItem` | compiled | **KEEP** | FlatList renderItem row — created by RN VirtualizedList internals (non-compiled), memo is the only bailout |
+| 160 | `app/(tabs)/history.tsx:233` | useCallback | `onPress` | `HistoryListItem` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 161 | `app/(tabs)/history.tsx:393` | useCallback | `handleRetry` | `HistoryPreviewSheet` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 162 | `app/(tabs)/history.tsx:413` | useCallback | `handleShare` | `HistoryPreviewSheet` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 163 | `app/(tabs)/history.tsx:515` | memo | `HistoryScreen` | `(anon)` | no fn | **KEEP** | screen root rendered by expo-router (non-compiled parent) |
+| 164 | `app/(tabs)/index.tsx:33` | useCallback | `openDemoChoice` | `TabOneScreen` | compiled | **KEEP** | KEPT after verification: (transitive) dependency of a useEffect/useLayoutEffect — react.dev names effect deps as the case to keep useCallback, and react-hooks/exhaustive-deps flags a plain function in a dependency list as "changes every render" |
+| 165 | `app/(tabs)/index.tsx:37` | useCallback | `handleDemoChoice` | `TabOneScreen` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 166 | `app/(tabs)/index.tsx:45` | useCallback | `handleStartCelebration` | `TabOneScreen` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 167 | `app/(tabs)/index.tsx:58` | useCallback | `handleResetUndoHint` | `TabOneScreen` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 168 | `app/(tabs)/index.tsx:63` | useCallback | `handleSeedHistory` | `TabOneScreen` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 169 | `app/(tabs)/index.tsx:71` | useCallback | `closeDemoChoice` | `TabOneScreen` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |
+| 170 | `app/(tabs)/settings.tsx:56` | useCallback | `confirmResetVegasTotal` | `SettingsScreen` | compiled | **REMOVE** | compiled function; compiler memoizes it with the same deps (lint-verified complete, no extra deps) |

@@ -2,7 +2,10 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState } fr
 import { Dimensions } from 'react-native'
 import { Gesture } from 'react-native-gesture-handler'
 import type { GestureType } from 'react-native-gesture-handler'
-import { runOnJS, useSharedValue } from 'react-native-reanimated'
+import { useSharedValue } from 'react-native-reanimated'
+// `scheduleOnRN(fn, ...args)` replaces the deprecated `runOnJS(fn)(...args)`; Reanimated does
+// not re-export the new name, it lives in react-native-worklets (a direct dependency).
+import { scheduleOnRN } from 'react-native-worklets'
 
 import type { GameAction, GameState } from '../../../solitaire/klondike'
 import { UNDO_SCRUBBER_OVERLAY_HORIZONTAL_PADDING } from '../constants'
@@ -171,6 +174,11 @@ export const useUndoScrubber = ({
   const scrubPendingIndexRef = useRef<number | null>(null)
   const lastDispatchedScrubIndexRef = useRef(state.history.length)
 
+  // Shared-value WRITES use `.set()` (Reanimated's React Compiler-compliant API, identical to
+  // `.value =` underneath on both runtimes); a `.value =` store after the value became an
+  // effect dep / hook arg makes the compiler skip this whole hook. Reads inside the gesture
+  // worklets keep `.value` on purpose: the compiler only models stores and `.get()` is a
+  // plain wrapper call on the hot pan path.
   const timelineRangeShared = useSharedValue(timelineRange)
   const historyLengthShared = useSharedValue(state.history.length)
   const boardLockedShared = useSharedValue(boardLocked ? 1 : 0)
@@ -185,32 +193,32 @@ export const useUndoScrubber = ({
   const isScrubbingShared = useSharedValue(0)
 
   useEffect(() => {
-    timelineRangeShared.value = timelineRange
+    timelineRangeShared.set(timelineRange)
   }, [timelineRange, timelineRangeShared])
 
   useEffect(() => {
-    historyLengthShared.value = state.history.length
+    historyLengthShared.set(state.history.length)
     if (!isScrubbing) {
-      scrubAnimatedIndex.value = state.history.length
+      scrubAnimatedIndex.set(state.history.length)
     }
   }, [historyLengthShared, isScrubbing, scrubAnimatedIndex, state.history.length])
 
   useEffect(() => {
-    boardLockedShared.value = boardLocked ? 1 : 0
+    boardLockedShared.set(boardLocked ? 1 : 0)
   }, [boardLocked, boardLockedShared])
 
   useEffect(() => {
-    shouldShowUndoShared.value = shouldShowUndo ? 1 : 0
+    shouldShowUndoShared.set(shouldShowUndo ? 1 : 0)
   }, [shouldShowUndo, shouldShowUndoShared])
 
   useEffect(() => {
-    safeAreaLeftShared.value = safeArea.left
-    safeAreaRightShared.value = safeArea.right
+    safeAreaLeftShared.set(safeArea.left)
+    safeAreaRightShared.set(safeArea.right)
   }, [safeArea.left, safeArea.right, safeAreaLeftShared, safeAreaRightShared])
 
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
-      windowWidthShared.value = window.width || 1
+      windowWidthShared.set(window.width || 1)
     })
     return () => {
       subscription.remove()
@@ -236,9 +244,9 @@ export const useUndoScrubber = ({
   useEffect(() => {
     if (!shouldShowUndo && isScrubbing) {
       cancelScheduledScrub()
-      isScrubbingShared.value = 0
-      scrubOriginShared.value = null
-      scrubAnimatedIndex.value = 0
+      isScrubbingShared.set(0)
+      scrubOriginShared.set(null)
+      scrubAnimatedIndex.set(0)
       setIsScrubbing(false)
     }
   }, [
@@ -257,8 +265,8 @@ export const useUndoScrubber = ({
       if (metrics.right <= metrics.left) {
         return
       }
-      trackLeftShared.value = metrics.left
-      trackRightShared.value = metrics.right
+      trackLeftShared.set(metrics.left)
+      trackRightShared.set(metrics.right)
     },
     [trackLeftShared, trackRightShared]
   )
@@ -374,10 +382,10 @@ export const useUndoScrubber = ({
           })
           const pointer = historyLengthShared.value
 
-          scrubOriginShared.value = createScrubOrigin(pointer, event.absoluteX, bounds)
-          scrubAnimatedIndex.value = pointer
-          isScrubbingShared.value = 1
-          runOnJS(beginScrubSession)(pointer)
+          scrubOriginShared.set(createScrubOrigin(pointer, event.absoluteX, bounds))
+          scrubAnimatedIndex.set(pointer)
+          isScrubbingShared.set(1)
+          scheduleOnRN(beginScrubSession, pointer)
         })
         .onUpdate((event) => {
           if (isScrubbingShared.value === 0) {
@@ -403,8 +411,8 @@ export const useUndoScrubber = ({
             return
           }
 
-          scrubAnimatedIndex.value = nextIndex
-          runOnJS(scheduleScrubDispatch)(nextIndex)
+          scrubAnimatedIndex.set(nextIndex)
+          scheduleOnRN(scheduleScrubDispatch, nextIndex)
         })
         .onEnd(() => {
           if (isScrubbingShared.value === 0) {
@@ -412,9 +420,9 @@ export const useUndoScrubber = ({
           }
 
           const finalIndex = scrubAnimatedIndex.value
-          isScrubbingShared.value = 0
-          scrubOriginShared.value = null
-          runOnJS(finishScrubSession)(finalIndex)
+          isScrubbingShared.set(0)
+          scrubOriginShared.set(null)
+          scheduleOnRN(finishScrubSession, finalIndex)
         })
         .onFinalize(() => {
           if (isScrubbingShared.value === 0) {
@@ -422,9 +430,9 @@ export const useUndoScrubber = ({
           }
 
           const finalIndex = scrubAnimatedIndex.value
-          isScrubbingShared.value = 0
-          scrubOriginShared.value = null
-          runOnJS(finishScrubSession)(finalIndex)
+          isScrubbingShared.set(0)
+          scrubOriginShared.set(null)
+          scheduleOnRN(finishScrubSession, finalIndex)
         })
         .maxPointers(1)
     )

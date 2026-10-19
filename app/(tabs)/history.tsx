@@ -1,4 +1,4 @@
-import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react'
+import { memo, useLayoutEffect, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -67,39 +67,33 @@ function HistoryScreen() {
     })
   }, [navigation, openDrawer])
 
-  const handleEndReached = useCallback(() => {
+  const handleEndReached = () => {
     // The provider owns the in-flight state and prevents repeated end events from overlapping.
     if (!hasMore || loadingMore) {
       return
     }
 
     void loadMore()
-  }, [hasMore, loadMore, loadingMore])
+  }
 
-  const listHeader = useMemo(() => {
-    const stats: HistoryStat[] = [
-      { label: 'Games', value: totalCount, tone: 'neutral' },
-      { label: 'Solved', value: solvedCount, tone: 'success' },
-      { label: 'Incomplete', value: incompleteCount, tone: 'warning' },
-    ]
+  const stats: HistoryStat[] = [
+    { label: 'Games', value: totalCount, tone: 'neutral' },
+    { label: 'Solved', value: solvedCount, tone: 'success' },
+    { label: 'Incomplete', value: incompleteCount, tone: 'warning' },
+  ]
+  const listHeader = (
+    <View style={styles.listHeader}>
+      <HistoryStatsRow stats={stats} />
 
-    return (
-      <View style={styles.listHeader}>
-        <HistoryStatsRow stats={stats} />
+      {/* Tamagui's Separator drew its hairline in `backgroundFocus` (not `borderColor`). */}
+      <View style={[styles.separator, { backgroundColor: palette.backgroundFocus }]} />
+    </View>
+  )
 
-        {/* Tamagui's Separator drew its hairline in `backgroundFocus` (not `borderColor`). */}
-        <View style={[styles.separator, { backgroundColor: palette.backgroundFocus }]} />
-      </View>
-    )
-  }, [incompleteCount, palette.backgroundFocus, solvedCount, totalCount])
-
-  const loadingFooter = useMemo(
-    () => (
-      <View style={styles.loadingFooter}>
-        <ActivityIndicator size="small" color={palette.color10} />
-      </View>
-    ),
-    [palette.color10]
+  const loadingFooter = (
+    <View style={styles.loadingFooter}>
+      <ActivityIndicator size="small" color={palette.color10} />
+    </View>
   )
 
   return (
@@ -227,10 +221,12 @@ const EntryHeading = ({
 )
 
 // History-entries-cleanup B4: memoized so FlatList re-renders (pagination, sheet
-// open/close) don't re-render unchanged rows.
+// open/close) don't re-render unchanged rows. KEPT with the React Compiler on (option D):
+// rows are created by RN's VirtualizedList internals from renderItem, which the compiler
+// cannot cache per item — memo is the only bailout here.
 const HistoryListItem = memo(({ entry, scoring, onSelect }: HistoryListItemProps) => {
   const palette = usePalette()
-  const onPress = useCallback(() => onSelect(entry), [entry, onSelect])
+  const onPress = () => onSelect(entry)
 
   return (
     <Pressable
@@ -390,7 +386,7 @@ const HistoryPreviewSheet = ({ entry, onDismiss }: HistoryPreviewSheetProps) => 
   // malformed one would throw inside createGameStateFromExactId — disable instead.
   const { exactId, drawCount } = entry
   const canRetry = Boolean(sessionControls) && isExactDealId(exactId)
-  const handleRetry = useCallback(() => {
+  const handleRetry = () => {
     if (!sessionControls || !isExactDealId(exactId)) {
       return
     }
@@ -404,13 +400,13 @@ const HistoryPreviewSheet = ({ entry, onDismiss }: HistoryPreviewSheetProps) => 
         router.navigate('/')
       },
     })
-  }, [drawCount, exactId, onDismiss, router, sessionControls])
+  }
 
   // Share = the public https link (dealShareLink.ts). iOS gets `url` separately so
   // the share sheet shows a proper link preview and apps that take only URLs still
   // work; Android's share intent only reads `message`, so the URL goes inline there.
   // Fire-and-forget: a dismissed sheet resolves normally, a failure is only devLogged.
-  const handleShare = useCallback(() => {
+  const handleShare = () => {
     if (!isExactDealId(exactId)) {
       return
     }
@@ -421,7 +417,7 @@ const HistoryPreviewSheet = ({ entry, onDismiss }: HistoryPreviewSheetProps) => 
     ).catch((error) => {
       devLog('warn', '[history] Share failed', error)
     })
-  }, [drawCount, exactId])
+  }
 
   return (
     <AppSheet isPresented onDismiss={onDismiss}>
@@ -511,5 +507,7 @@ const styles = StyleSheet.create({
   buttonRow: { flexDirection: 'row', gap: SPACE[2] },
 })
 
-// PBI-17: Memoize the entire screen component to prevent re-renders
+// PBI-17: Memoize the entire screen component to prevent re-renders. KEPT with the React
+// Compiler on (option D): the screen is rendered by expo-router (non-compiled code), so
+// nothing upstream caches this element.
 export default memo(HistoryScreen)

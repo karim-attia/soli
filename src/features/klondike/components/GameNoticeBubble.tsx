@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, {
   useAnimatedStyle,
@@ -33,68 +33,64 @@ const EMPHASIS_DOWN = { duration: 180 } as const
 // warning start AND on hint presses that re-affirm an outstanding warning
 // (the bubble is persistent while a dead era lasts, so the pulse is the only
 // per-press feedback).
-export const GameNoticeBubble = React.memo(
-  ({
-    text,
-    bottom,
-    emphasisNonce = 0,
-  }: {
-    text: string | null
-    bottom: number
-    emphasisNonce?: number
-  }) => {
-    const visible = text !== null
-    // Keep the last shown copy during the fade-out so the pill doesn't
-    // collapse into an empty shell mid-animation.
-    const [lastText, setLastText] = useState('')
-    useEffect(() => {
-      if (text !== null) {
-        setLastText(text)
-      }
-    }, [text])
-    const displayText = text ?? lastText
+export const GameNoticeBubble = ({
+  text,
+  bottom,
+  emphasisNonce = 0,
+}: {
+  text: string | null
+  bottom: number
+  emphasisNonce?: number
+}) => {
+  const visible = text !== null
+  // Keep the last shown copy during the fade-out so the pill doesn't
+  // collapse into an empty shell mid-animation.
+  const [lastText, setLastText] = useState('')
+  useEffect(() => {
+    if (text !== null) {
+      setLastText(text)
+    }
+  }, [text])
+  const displayText = text ?? lastText
 
-    const emphasisScale = useSharedValue(1)
-    useEffect(() => {
-      // Nonce 0 = nothing fired yet (mount) — don't pulse an empty bubble.
-      if (emphasisNonce === 0) {
-        return
-      }
-      emphasisScale.value = withSequence(
-        withTiming(EMPHASIS_SCALE, EMPHASIS_UP),
-        withTiming(1, EMPHASIS_DOWN)
-      )
-    }, [emphasisNonce, emphasisScale])
-
-    const animatedStyle = useAnimatedStyle(() => {
-      return {
-        opacity: withTiming(visible ? 1 : 0, TRANSITION),
-        // Two scale entries multiply: entry/exit transition × emphasis pulse.
-        transform: [
-          { scale: withTiming(visible ? 1 : HIDDEN_SCALE, TRANSITION) },
-          { scale: emphasisScale.value },
-        ],
-      }
-    }, [visible])
-
-    return (
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.layer, { bottom }, animatedStyle]}
-        accessible
-        accessibilityLabel={displayText}
-        accessibilityLiveRegion="polite"
-        testID="hint-bubble"
-      >
-        <View style={styles.bubble}>
-          <Text style={styles.text}>{displayText}</Text>
-        </View>
-      </Animated.View>
+  const emphasisScale = useSharedValue(1)
+  useEffect(() => {
+    // Nonce 0 = nothing fired yet (mount) — don't pulse an empty bubble.
+    if (emphasisNonce === 0) {
+      return
+    }
+    emphasisScale.value = withSequence(
+      withTiming(EMPHASIS_SCALE, EMPHASIS_UP),
+      withTiming(1, EMPHASIS_DOWN)
     )
-  }
-)
+  }, [emphasisNonce, emphasisScale])
 
-GameNoticeBubble.displayName = 'GameNoticeBubble'
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: withTiming(visible ? 1 : 0, TRANSITION),
+      // Two scale entries multiply: entry/exit transition × emphasis pulse.
+      transform: [
+        { scale: withTiming(visible ? 1 : HIDDEN_SCALE, TRANSITION) },
+        { scale: emphasisScale.value },
+      ],
+    }
+  }, [visible])
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[styles.layer, { bottom }, animatedStyle]}
+      accessible
+      accessibilityLabel={displayText}
+      accessibilityLiveRegion="polite"
+      testID="hint-bubble"
+    >
+      <View style={styles.bubble}>
+        <Text style={styles.text}>{displayText}</Text>
+      </View>
+    </Animated.View>
+  )
+}
 
 const styles = StyleSheet.create({
   layer: {

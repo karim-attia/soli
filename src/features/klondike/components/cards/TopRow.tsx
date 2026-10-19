@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useRef, type PropsWithChildren } from 'react'
+import { useEffect, type PropsWithChildren } from 'react'
 import {
   Animated as NativeAnimated,
   Easing as NativeEasing,
   StyleSheet,
   View,
+  useAnimatedValue,
 } from 'react-native'
 import type { LayoutChangeEvent, LayoutRectangle } from 'react-native'
 
@@ -38,7 +39,9 @@ const WinCleanupPile = ({
 }: PropsWithChildren<{
   hidden: boolean
 }>) => {
-  const opacity = useRef(new NativeAnimated.Value(hidden ? 0 : 1)).current
+  // RN's `useAnimatedValue` (not `useRef(new Animated.Value()).current`): same lazy ref,
+  // but a render-time `ref.current` read is a React Compiler bail-out.
+  const opacity = useAnimatedValue(hidden ? 0 : 1)
 
   useEffect(() => {
     NativeAnimated.timing(opacity, {
@@ -58,8 +61,8 @@ const WinCleanupPile = ({
 }
 
 export type TopRowProps = {
-  // Perf (A2): narrow state slices instead of the full GameState so React.memo can
-  // skip re-renders when the relevant pieces kept identity (e.g. TIMER_TICK).
+  // Perf (A2): narrow state slices instead of the full GameState so the compiled parent
+  // can keep this element cached when the relevant pieces kept identity (e.g. TIMER_TICK).
   stockCount: number
   wasteCount: number
   // Recycles the game still has (scoring.ts recyclesLeft): Infinity on unlimited
@@ -82,111 +85,104 @@ export type TopRowProps = {
   celebrationPending?: boolean
 }
 
-export const TopRow = React.memo(
-  ({
-    stockCount,
-    wasteCount,
-    recyclesLeft,
-    foundations,
-    selected,
-    hasWon,
-    drawLabel,
-    onDraw,
-    onFoundationPress,
-    cardMetrics,
-    dropHints,
-    interactionsLocked,
-    onTopRowLayout,
-    onFoundationLayout,
-    onStockLayout,
-    onWasteLayout,
-    celebrationActive = false,
-    celebrationPending = false,
-  }: TopRowProps) => {
-    const handleRowLayout = useCallback(
-      (event: LayoutChangeEvent) => {
-        onTopRowLayout?.(event.nativeEvent.layout)
-      },
-      [onTopRowLayout]
-    )
+export const TopRow = ({
+  stockCount,
+  wasteCount,
+  recyclesLeft,
+  foundations,
+  selected,
+  hasWon,
+  drawLabel,
+  onDraw,
+  onFoundationPress,
+  cardMetrics,
+  dropHints,
+  interactionsLocked,
+  onTopRowLayout,
+  onFoundationLayout,
+  onStockLayout,
+  onWasteLayout,
+  celebrationActive = false,
+  celebrationPending = false,
+}: TopRowProps) => {
+  const handleRowLayout = (event: LayoutChangeEvent) => {
+    onTopRowLayout?.(event.nativeEvent.layout)
+  }
 
-    const createFoundationLayoutHandler = useCallback(
-      (suit: Suit) => (layout: LayoutRectangle) => {
-        onFoundationLayout?.(suit, layout)
-      },
-      [onFoundationLayout]
-    )
+  const createFoundationLayoutHandler = (suit: Suit) => (layout: LayoutRectangle) => {
+    onFoundationLayout?.(suit, layout)
+  }
 
-    const showRecycle = !stockCount && wasteCount > 0
-    // Vegas pass limits: a recycle slot with no pass left is the 'exhausted' mark —
-    // disabled, so a tap never reaches the reducer (which would refuse it anyway).
-    const exhausted = showRecycle && recyclesLeft === 0
-    const stockDisabled = (!stockCount && !wasteCount) || exhausted || interactionsLocked
-    const drawVariant: 'stock' | 'recycle' | 'empty' | 'exhausted' = exhausted
-      ? 'exhausted'
-      : showRecycle
-        ? 'recycle'
-        : stockCount
-          ? 'stock'
-          : 'empty'
-    // Task 28-2: Keep the board stable until the final winning card finishes settling.
-    const showWinCleanup = hasWon && !celebrationPending
+  const showRecycle = !stockCount && wasteCount > 0
+  // Vegas pass limits: a recycle slot with no pass left is the 'exhausted' mark —
+  // disabled, so a tap never reaches the reducer (which would refuse it anyway).
+  const exhausted = showRecycle && recyclesLeft === 0
+  const stockDisabled = (!stockCount && !wasteCount) || exhausted || interactionsLocked
+  const drawVariant: 'stock' | 'recycle' | 'empty' | 'exhausted' = exhausted
+    ? 'exhausted'
+    : showRecycle
+      ? 'recycle'
+      : stockCount
+        ? 'stock'
+        : 'empty'
+  // Task 28-2: Keep the board stable until the final winning card finishes settling.
+  const showWinCleanup = hasWon && !celebrationPending
 
-    const wasteColumnIndex = TABLEAU_COLUMN_COUNT - 2
-    const stockColumnIndex = TABLEAU_COLUMN_COUNT - 1
+  const wasteColumnIndex = TABLEAU_COLUMN_COUNT - 2
+  const stockColumnIndex = TABLEAU_COLUMN_COUNT - 1
 
-    return (
-      <View style={styles.row} onLayout={handleRowLayout}>
-        {Array.from({ length: TABLEAU_COLUMN_COUNT }, (_, columnIndex) => {
-          const isFirstColumn = columnIndex === 0
-          const isLastColumn = columnIndex === TABLEAU_COLUMN_COUNT - 1
-          const slotStyle = {
-            width: cardMetrics.width,
-            // Task 1-8: Match tableau column spacing; edge gutters should equal a full column gap.
-            marginLeft: isFirstColumn ? BOARD_COLUMN_GAP : BOARD_COLUMN_MARGIN,
-            marginRight: isLastColumn ? BOARD_COLUMN_GAP : BOARD_COLUMN_MARGIN,
-            overflow: 'visible' as const,
-          }
+  return (
+    <View style={styles.row} onLayout={handleRowLayout}>
+      {Array.from({ length: TABLEAU_COLUMN_COUNT }, (_, columnIndex) => {
+        const isFirstColumn = columnIndex === 0
+        const isLastColumn = columnIndex === TABLEAU_COLUMN_COUNT - 1
+        const slotStyle = {
+          width: cardMetrics.width,
+          // Task 1-8: Match tableau column spacing; edge gutters should equal a full column gap.
+          marginLeft: isFirstColumn ? BOARD_COLUMN_GAP : BOARD_COLUMN_MARGIN,
+          marginRight: isLastColumn ? BOARD_COLUMN_GAP : BOARD_COLUMN_MARGIN,
+          overflow: 'visible' as const,
+        }
 
-          if (columnIndex < FOUNDATION_SUIT_ORDER.length) {
-            const suit = FOUNDATION_SUIT_ORDER[columnIndex] as Suit
-            const handleFoundationSlotLayout = createFoundationLayoutHandler(suit)
-            return (
-              <View
-                key={`foundation-${suit}`}
-                style={slotStyle}
-                onLayout={(event) => handleFoundationSlotLayout(event.nativeEvent.layout)}
-              >
-                <FoundationPile
-                  suit={suit}
-                  cards={foundations[suit]}
-                  cardMetrics={cardMetrics}
-                  isDroppable={dropHints.foundations[suit]}
-                  isSelected={selected?.source === 'foundation' && selected.suit === suit}
-                  onPress={() => onFoundationPress(suit)}
-                  disableInteractions={interactionsLocked}
-                  celebrationActive={celebrationActive}
-                />
-              </View>
-            )
-          }
+        if (columnIndex < FOUNDATION_SUIT_ORDER.length) {
+          const suit = FOUNDATION_SUIT_ORDER[columnIndex] as Suit
+          const handleFoundationSlotLayout = createFoundationLayoutHandler(suit)
+          return (
+            <View
+              key={`foundation-${suit}`}
+              style={slotStyle}
+              onLayout={(event) => handleFoundationSlotLayout(event.nativeEvent.layout)}
+            >
+              <FoundationPile
+                suit={suit}
+                cards={foundations[suit]}
+                cardMetrics={cardMetrics}
+                isDroppable={dropHints.foundations[suit]}
+                isSelected={selected?.source === 'foundation' && selected.suit === suit}
+                onPress={() => onFoundationPress(suit)}
+                disableInteractions={interactionsLocked}
+                celebrationActive={celebrationActive}
+              />
+            </View>
+          )
+        }
 
-          if (columnIndex === wasteColumnIndex) {
-            return (
-              <View
-                key="waste"
-                style={slotStyle}
-                onLayout={(event) => onWasteLayout?.(event.nativeEvent.layout)}
-              >
-                <WinCleanupPile hidden={showWinCleanup}>
-                  <PileButton
-                    label={`${wasteCount}`}
-                    disabled={!wasteCount || interactionsLocked}
-                    disablePress
-                    width={cardMetrics.width}
-                  >
-                    <View style={[styles.wasteSlot, { width: cardMetrics.width }]}>
-                      {/* Empty-placeholder audit rule (outline-audit story, user
+        if (columnIndex === wasteColumnIndex) {
+          return (
+            <View
+              key="waste"
+              style={slotStyle}
+              onLayout={(event) => onWasteLayout?.(event.nativeEvent.layout)}
+            >
+              <WinCleanupPile hidden={showWinCleanup}>
+                <PileButton
+                  label={`${wasteCount}`}
+                  disabled={!wasteCount || interactionsLocked}
+                  disablePress
+                  width={cardMetrics.width}
+                >
+                  <View style={[styles.wasteSlot, { width: cardMetrics.width }]}>
+                    {/* Empty-placeholder audit rule (outline-audit story, user
                           2026-07-09): EVERY dashed empty-state placeholder hides while
                           a celebration is active — same rule as FoundationPile's
                           outline. They showed through the transparent celebration
@@ -194,101 +190,98 @@ export const TopRow = React.memo(
                           via the win-cleanup fade instead). A same-size spacer keeps
                           the slot layout/measurements stable; the conditional render
                           (no fade) restores the placeholder instantly on abort. */}
-                      {wasteCount || celebrationActive ? (
-                        <View
-                          style={{ width: cardMetrics.width, height: cardMetrics.height }}
-                        />
-                      ) : (
-                        <EmptySlot highlight={false} metrics={cardMetrics} />
-                      )}
-                    </View>
-                  </PileButton>
-                </WinCleanupPile>
-              </View>
-            )
-          }
+                    {wasteCount || celebrationActive ? (
+                      <View
+                        style={{ width: cardMetrics.width, height: cardMetrics.height }}
+                      />
+                    ) : (
+                      <EmptySlot highlight={false} metrics={cardMetrics} />
+                    )}
+                  </View>
+                </PileButton>
+              </WinCleanupPile>
+            </View>
+          )
+        }
 
-          if (columnIndex === stockColumnIndex) {
-            return (
-              <View
-                key="stock"
-                style={slotStyle}
-                onLayout={(event) => onStockLayout?.(event.nativeEvent.layout)}
-              >
-                <WinCleanupPile hidden={showWinCleanup}>
-                  <PileButton
-                    label={`${stockCount}`}
-                    onPress={onDraw}
-                    disabled={stockDisabled}
-                    // Absolute-card mode gives the visible stock card its own press target.
-                    // Keep recycle on this structural slot, but never duplicate stock draw
-                    // underneath the absolute stock card during rapid taps.
-                    disablePress={drawVariant === 'stock'}
-                    width={cardMetrics.width}
-                    // The 'stock' variant is disablePress (absolute stock card owns the
-                    // a11y node); only recycle/empty states are labeled here.
-                    accessibilityLabel={
-                      drawVariant === 'recycle'
-                        ? getStockRecycleLabel(recyclesLeft)
-                        : drawVariant === 'exhausted'
-                          ? STOCK_EXHAUSTED_LABEL
-                          : drawVariant === 'empty'
-                            ? STOCK_EMPTY_LABEL
-                            : undefined
-                    }
-                    testID={STOCK_RECYCLE_TEST_ID}
-                  >
-                    {/* Empty-placeholder audit rule (outline-audit story, user
+        if (columnIndex === stockColumnIndex) {
+          return (
+            <View
+              key="stock"
+              style={slotStyle}
+              onLayout={(event) => onStockLayout?.(event.nativeEvent.layout)}
+            >
+              <WinCleanupPile hidden={showWinCleanup}>
+                <PileButton
+                  label={`${stockCount}`}
+                  onPress={onDraw}
+                  disabled={stockDisabled}
+                  // Absolute-card mode gives the visible stock card its own press target.
+                  // Keep recycle on this structural slot, but never duplicate stock draw
+                  // underneath the absolute stock card during rapid taps.
+                  disablePress={drawVariant === 'stock'}
+                  width={cardMetrics.width}
+                  // The 'stock' variant is disablePress (absolute stock card owns the
+                  // a11y node); only recycle/empty states are labeled here.
+                  accessibilityLabel={
+                    drawVariant === 'recycle'
+                      ? getStockRecycleLabel(recyclesLeft)
+                      : drawVariant === 'exhausted'
+                        ? STOCK_EXHAUSTED_LABEL
+                        : drawVariant === 'empty'
+                          ? STOCK_EMPTY_LABEL
+                          : undefined
+                  }
+                  testID={STOCK_RECYCLE_TEST_ID}
+                >
+                  {/* Empty-placeholder audit rule (outline-audit story, user
                         2026-07-09): the recycle/empty CardBack is a dashed outline
                         (+ recycle icon) that showed through the celebration canvas —
                         the exact outline in the user's Gravity Flip screenshot. Hide
                         it while a celebration is active by rendering the same
                         invisible spacer the 'stock' variant uses (layout stays
                         stable; conditional render restores it instantly on abort). */}
-                    {drawVariant === 'stock' || celebrationActive ? (
-                      <View
-                        pointerEvents="none"
-                        style={[
-                          cardStyles.stockContainer,
-                          {
-                            width: cardMetrics.width,
-                            height: cardMetrics.height,
-                            borderRadius: cardMetrics.radius,
-                          },
-                        ]}
-                      />
-                    ) : (
-                      <CardBack
-                        label={stockCount ? drawLabel : undefined}
-                        caption={
-                          drawVariant === 'recycle' && Number.isFinite(recyclesLeft)
-                            ? formatRecyclesLeft(recyclesLeft)
-                            : undefined
-                        }
-                        metrics={cardMetrics}
-                        variant={drawVariant}
-                      />
-                    )}
-                  </PileButton>
-                </WinCleanupPile>
-                {/* The solver "draw" hint ring rendered here from F8 to F13.
+                  {drawVariant === 'stock' || celebrationActive ? (
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        cardStyles.stockContainer,
+                        {
+                          width: cardMetrics.width,
+                          height: cardMetrics.height,
+                          borderRadius: cardMetrics.radius,
+                        },
+                      ]}
+                    />
+                  ) : (
+                    <CardBack
+                      label={stockCount ? drawLabel : undefined}
+                      caption={
+                        drawVariant === 'recycle' && Number.isFinite(recyclesLeft)
+                          ? formatRecyclesLeft(recyclesLeft)
+                          : undefined
+                      }
+                      metrics={cardMetrics}
+                      variant={drawVariant}
+                    />
+                  )}
+                </PileButton>
+              </WinCleanupPile>
+              {/* The solver "draw" hint ring rendered here from F8 to F13.
                     Do NOT move it back: this structural slot paints UNDER the
                     absolute card plane (Fabric hoists the card views and
                     sorts them by zIndex), so the absolute stock card clipped
                     the ring band. All hint rings incl. the stock one now live
                     in HintOverlayLayer's above-cards plane. */}
-              </View>
-            )
-          }
+            </View>
+          )
+        }
 
-          return <View key={`empty-${columnIndex}`} style={slotStyle} />
-        })}
-      </View>
-    )
-  }
-)
-
-TopRow.displayName = 'TopRow'
+        return <View key={`empty-${columnIndex}`} style={slotStyle} />
+      })}
+    </View>
+  )
+}
 
 const styles = StyleSheet.create({
   row: {

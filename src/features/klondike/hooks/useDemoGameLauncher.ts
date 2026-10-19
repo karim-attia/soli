@@ -1,3 +1,9 @@
+// React Compiler (option D, 2026-10-19): all 9 useCallbacks deliberately KEPT. Every one
+// is a transitive dependency of the deep-link useEffect at the bottom (processDemoLink ->
+// handleLaunchDemoGame -> runDemoPlaylist -> ...), and react-hooks/exhaustive-deps flags
+// a plain function used as an effect dependency as "changes every render" (the lint rule
+// cannot see compiler memoization). react.dev also names effect dependencies as the one
+// case to keep useCallback for. The compiler memoizes them identically either way.
 import { useCallback, useEffect, useRef } from 'react'
 import type { Dispatch, MutableRefObject } from 'react'
 import { Linking } from 'react-native'

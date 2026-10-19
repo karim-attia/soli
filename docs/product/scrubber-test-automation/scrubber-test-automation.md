@@ -4,6 +4,11 @@ Created: 2026-07-06
 Status: **DONE on both platforms (A1–A5, B1–B6, C1 iOS, C2 Android — all
 checks passed).**
 
+> **2026-10-18 — Part A retired.** agent-device 0.21.x pans (`yarn ad gesture pan …`) drive the
+> RNGH scrubber on iOS too, so `scripts/ios-scrub.js` and `docs/external-package-guides/appium.md`
+> were deleted (see `docs/product/next-steps-after-sdk-58/`). Part B (the `scrubtest` fixture) is
+> unchanged and remains the entry point on both platforms. The Appium sections below are history.
+
 > **⚠️ COORDINATION CONSTRAINT (read before touching any file):** Another agent is
 > concurrently cleaning up the demo game sheet (`DemoChoiceSheet` in
 > `app/(tabs)/index.tsx`, possibly also `useDemoGameLauncher.ts`). Therefore:

@@ -19,6 +19,27 @@ patch override only for a captured upstream defect, and retire it at the next SD
 
 The sections below are the definitive combined notes for this package or tool. Keep version-specific context when it affects compatibility, but update this single file instead of adding task- or feature-prefixed guides.
 
+### React Compiler interplay (ON since 2026-10-18)
+
+- `app.json` `expo.experiments.reactCompiler: true` is live (measured A/B in
+  `docs/product/next-steps-after-sdk-58/next-steps-after-sdk-58.md`, "S11 results": janky
+  9.12 % → 8.14 %, frame percentiles identical, PSS within noise, scrubber + celebration
+  identical on both platforms). Rollback is the one line in `app.json` (then delete
+  `android/app/build/generated/assets/react/release` before `yarn release`).
+- What the compiler does with Reanimated (verified against `babel-plugin-react-compiler
+  1.0.0`'s Reanimated type model): `useSharedValue`/`useDerivedValue` results are mutable
+  objects; `useAnimatedStyle`/`useAnimatedReaction`/`useFrameCallback`/… freeze their
+  arguments. A `sv.value = x` write after such a capture is an Immutability error and the
+  whole hook/component is silently left uncompiled (`panicThreshold none`). Therefore:
+  **write shared values with `.set(x)` on the JS thread** (`.set()` is `.value =` underneath,
+  plus an updater-function branch guarded by `__isAnimationDefinition`, so
+  `.set(withTiming(...))` is fine); reads inside worklets stay `.value` (hot path, no
+  wrapper). Latest-value refs written during render (`ref.current = fn`) are a Refs error —
+  `useUndoScrubber`, `useCelebrationController` and `AbsoluteLayerCard` are skipped on purpose
+  for that reason (behaviour unchanged, documented in the plan). Worklets are untouched: the
+  Worklets Babel plugin runs after the compiler. `scheduleOnRN`/`scheduleOnUI` come from
+  `react-native-worklets` (Reanimated 4.7 re-exports only the deprecated `runOnJS`/`runOnUI`).
+
 ### Expo SDK 58 Reanimated 4.7 / Worklets 0.13 Notes
 
 - Package: `react-native-reanimated` and `react-native-worklets`

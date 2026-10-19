@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react'
+import { useEffect } from 'react'
 import { StyleSheet, View } from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
 import Animated, {
@@ -223,16 +223,7 @@ const HintGhost = ({ hint, source, target, metrics }: HintGhostProps) => {
     // `hint` in deps on purpose: a repeated Hint press solves afresh and
     // delivers a NEW hint object for the same position — the glide replays as
     // the visible press feedback (the rings alone would just sit there).
-  }, [
-    hint,
-    opacity,
-    source.x,
-    source.y,
-    target.x,
-    target.y,
-    translateX,
-    translateY,
-  ])
+  }, [hint, opacity, source.x, source.y, target.x, target.y, translateX, translateY])
 
   const ghostStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -288,70 +279,69 @@ export type HintOverlayLayerProps = {
 // above-cards plane (HINT_OVERLAY_Z_INDEX — see that comment for why sibling
 // order alone is NOT enough). Mounted by KlondikeGameView only while a hint
 // is active (normal play never renders it), separate from AbsoluteCardLayer
-// so hint state cannot disturb the card layer's memo boundaries.
+// so hint state cannot disturb the card layer's cached render.
 // pointerEvents="none" throughout — hint visuals must never intercept board
 // touches.
-export const HintOverlayLayer = React.memo(
-  ({ hint, wasteCount, tableau, layouts, cardMetrics }: HintOverlayLayerProps) => {
-    // Ghost gates on the cardFlights sub-toggle (master-gated): it mimics a
-    // card flight, and a player who turned "Card flights" off asked for no
-    // cards flying across the board. Rings still show role-distinct.
-    const { cardFlights: ghostEnabled } = useAnimationToggles()
-    const rects = useMemo(
-      () =>
-        hint.kind === 'move'
-          ? resolveHintRects(hint, { wasteCount, tableau }, layouts, cardMetrics)
-          : null,
-      [cardMetrics, hint, layouts, tableau, wasteCount]
-    )
+export const HintOverlayLayer = ({
+  hint,
+  wasteCount,
+  tableau,
+  layouts,
+  cardMetrics,
+}: HintOverlayLayerProps) => {
+  // Ghost gates on the cardFlights sub-toggle (master-gated): it mimics a
+  // card flight, and a player who turned "Card flights" off asked for no
+  // cards flying across the board. Rings still show role-distinct.
+  const { cardFlights: ghostEnabled } = useAnimationToggles()
+  const rects =
+    hint.kind === 'move'
+      ? resolveHintRects(hint, { wasteCount, tableau }, layouts, cardMetrics)
+      : null
 
-    if (hint.kind === 'draw') {
-      const stockRect = resolveStockRect(layouts, cardMetrics)
-      if (!stockRect) {
-        return null
-      }
-      return (
-        <View pointerEvents="none" style={overlayStyle}>
-          {/* Same testID as the old TopRow ring so device recipes keep working. */}
-          <HintRing
-            {...stockRect}
-            radius={cardMetrics.radius}
-            testID="hint-stock-ring"
-            role="source"
-          />
-        </View>
-      )
-    }
-
-    if (!rects) {
+  if (hint.kind === 'draw') {
+    const stockRect = resolveStockRect(layouts, cardMetrics)
+    if (!stockRect) {
       return null
     }
     return (
       <View pointerEvents="none" style={overlayStyle}>
+        {/* Same testID as the old TopRow ring so device recipes keep working. */}
         <HintRing
-          {...rects.source}
+          {...stockRect}
           radius={cardMetrics.radius}
-          testID="hint-source-ring"
+          testID="hint-stock-ring"
           role="source"
         />
-        <HintRing
-          {...rects.target}
-          radius={cardMetrics.radius}
-          testID="hint-target-ring"
-          role="target"
-        />
-        {/* Ghost renders last = above both rings. */}
-        {ghostEnabled ? (
-          <HintGhost
-            hint={hint}
-            source={rects.source}
-            target={rects.landing}
-            metrics={cardMetrics}
-          />
-        ) : null}
       </View>
     )
   }
-)
 
-HintOverlayLayer.displayName = 'HintOverlayLayer'
+  if (!rects) {
+    return null
+  }
+  return (
+    <View pointerEvents="none" style={overlayStyle}>
+      <HintRing
+        {...rects.source}
+        radius={cardMetrics.radius}
+        testID="hint-source-ring"
+        role="source"
+      />
+      <HintRing
+        {...rects.target}
+        radius={cardMetrics.radius}
+        testID="hint-target-ring"
+        role="target"
+      />
+      {/* Ghost renders last = above both rings. */}
+      {ghostEnabled ? (
+        <HintGhost
+          hint={hint}
+          source={rects.source}
+          target={rects.landing}
+          metrics={cardMetrics}
+        />
+      ) : null}
+    </View>
+  )
+}

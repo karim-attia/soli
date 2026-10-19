@@ -1,4 +1,3 @@
-import { useCallback } from 'react'
 import {
   DrawerActions,
   type NavigationProp,
@@ -14,7 +13,7 @@ export const openNavigationDrawer = (navigation: AnyNavigation) => {
 
 export const useDrawerOpener = () => {
   const navigation = useNavigation<AnyNavigation>()
-  return useCallback(() => {
+  return () => {
     openNavigationDrawer(navigation)
-  }, [navigation])
+  }
 }

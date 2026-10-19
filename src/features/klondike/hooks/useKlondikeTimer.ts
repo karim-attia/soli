@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useEffectEvent, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import { AppState, type AppStateStatus } from 'react-native'
 import { useFocusEffect } from 'expo-router/react-navigation'
 
@@ -24,14 +24,14 @@ export const useKlondikeTimer = ({
     dispatch({ type: 'TIMER_TICK', timestamp: Date.now() })
   })
 
-  const pauseTimer = useCallback(() => {
+  const pauseTimer = () => {
     const snapshot = stateRef.current
     if (snapshot.timerState === 'running') {
       dispatch({ type: 'TIMER_STOP', timestamp: Date.now() })
     }
-  }, [dispatch, stateRef])
+  }
 
-  const resumeTimerIfNeeded = useCallback(() => {
+  const resumeTimerIfNeeded = () => {
     const snapshot = stateRef.current
     if (
       snapshot.timerState === 'paused' &&
@@ -41,7 +41,7 @@ export const useKlondikeTimer = ({
     ) {
       dispatch({ type: 'TIMER_START', startedAt: Date.now() })
     }
-  }, [dispatch, stateRef])
+  }
 
   const handleAppStateChange = useEffectEvent((nextState: AppStateStatus) => {
     if (nextState === 'active') {
@@ -51,14 +51,12 @@ export const useKlondikeTimer = ({
     }
   })
 
-  useFocusEffect(
-    useCallback(() => {
-      resumeTimerIfNeeded()
-      return () => {
-        pauseTimer()
-      }
-    }, [pauseTimer, resumeTimerIfNeeded])
-  )
+  useFocusEffect(() => {
+    resumeTimerIfNeeded()
+    return () => {
+      pauseTimer()
+    }
+  })
 
   useEffect(() => {
     const previousMoveCount = previousMoveCountRef.current

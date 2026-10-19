@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { BOARD_COLUMN_GAP, BOARD_COLUMN_MARGIN } from '../constants'
@@ -27,10 +26,7 @@ export const BoardPreview = ({ tableau, availableWidth }: BoardPreviewProps) => 
   // the sheet's content padding, provides them). computeCardMetrics assumes
   // availableWidth = 7*card + 8*gap (incl. 2 edge gutters), so compensate by
   // pretending those 2 gutters exist: cards then fill exactly 7*card + 6*gap.
-  const metrics = useMemo(
-    () => computeCardMetrics(availableWidth + 2 * BOARD_COLUMN_GAP),
-    [availableWidth]
-  )
+  const metrics = computeCardMetrics(availableWidth + 2 * BOARD_COLUMN_GAP)
 
   return (
     <View style={previewStyles.row} pointerEvents="none">

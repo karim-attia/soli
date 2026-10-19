@@ -50,7 +50,8 @@ Sources: https://github.com/callstack/agent-device/releases (v0.20.0 … v0.21.2
   rotates the device. iOS simulator pans are synthesized through XCTest with the authored
   duration (0.20.6 "preserve timed pan duration") — **the RNGH undo-scrubber pan now works on
   iOS** (verified 2026-10-18: `gesture pan 298 788 -130 0 1500` landed exactly on index 20,
-  same as Android), so Appium is no longer required for scrubber coverage. Android gestures run
+  same as Android), so the Appium scrub path (`scripts/ios-scrub.js`, `appium.md`) was deleted
+  on 2026-10-18 — this is the only iOS scrubber automation now. Android gestures run
   through the persistent helper (no more ADB `input swipe` fallback; the old
   `MultiTouchInstrumentation` teardown crash did not reproduce).
 - **Refs expire after every mutation (0.20.0)** and selectors that match several distinct

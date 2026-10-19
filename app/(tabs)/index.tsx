@@ -34,43 +34,34 @@ export default function TabOneScreen() {
     setDemoChoiceVisible(true)
   }, [])
 
-  const handleDemoChoice = useCallback(
-    (options: LaunchDemoGameOptions) => {
-      setDemoChoiceVisible(false)
-      sessionControls?.handleLaunchDemoGame(options)
-    },
-    [sessionControls]
-  )
+  const handleDemoChoice = (options: LaunchDemoGameOptions) => {
+    setDemoChoiceVisible(false)
+    sessionControls?.handleLaunchDemoGame(options)
+  }
 
-  const handleStartCelebration = useCallback(
-    (modeId?: number) => {
-      setDemoChoiceVisible(false)
-      // Delay mirrors the deep-link settle delay (DEMO_AUTO_STEP_INTERVAL_MS) so the
-      // sheet dismissal doesn't race the celebration overlay mount.
-      setTimeout(
-        () => sessionControls?.startCelebrationPreview(modeId),
-        DEMO_AUTO_STEP_INTERVAL_MS
-      )
-    },
-    [sessionControls]
-  )
+  const handleStartCelebration = (modeId?: number) => {
+    setDemoChoiceVisible(false)
+    // Delay mirrors the deep-link settle delay (DEMO_AUTO_STEP_INTERVAL_MS) so the
+    // sheet dismissal doesn't race the celebration overlay mount.
+    setTimeout(
+      () => sessionControls?.startCelebrationPreview(modeId),
+      DEMO_AUTO_STEP_INTERVAL_MS
+    )
+  }
 
-  const handleResetUndoHint = useCallback(() => {
+  const handleResetUndoHint = () => {
     setDemoChoiceVisible(false)
     sessionControls?.resetUndoHintForTesting()
-  }, [sessionControls])
+  }
 
-  const handleSeedHistory = useCallback(
-    (action: 'seed' | 'clear') => {
-      setDemoChoiceVisible(false)
-      sessionControls?.seedHistoryForTesting(action)
-    },
-    [sessionControls]
-  )
-
-  const closeDemoChoice = useCallback(() => {
+  const handleSeedHistory = (action: 'seed' | 'clear') => {
     setDemoChoiceVisible(false)
-  }, [])
+    sessionControls?.seedHistoryForTesting(action)
+  }
+
+  const closeDemoChoice = () => {
+    setDemoChoiceVisible(false)
+  }
 
   useLayoutEffect(() => {
     const onNewGame = () => sessionControls?.requestNewGame({ reason: 'manual' })

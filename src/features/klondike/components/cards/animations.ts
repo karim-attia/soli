@@ -33,6 +33,10 @@ export const useFoundationGlowAnimation = ({
   celebrationActive,
 }: UseFoundationGlowAnimationParams) => {
   const { foundationGlow: foundationGlowEnabled } = useAnimationToggles()
+  // Shared-value WRITES use `.set()` (Reanimated's React Compiler-compliant API): a
+  // `.value =` store after `useAnimatedStyle` captured the value makes the compiler skip
+  // the whole hook. Reads inside worklets keep `.value` (the compiler only models stores;
+  // `.get()` is a plain wrapper). `.set()` is `.value =` underneath on both runtimes.
   const glowOpacity = useSharedValue(0)
   const glowStyle = useAnimatedStyle(() => ({
     opacity: glowOpacity.value,
@@ -51,7 +55,7 @@ export const useFoundationGlowAnimation = ({
     const currentId = topCard?.id ?? null
 
     if (!foundationGlowEnabled) {
-      glowOpacity.value = 0
+      glowOpacity.set(0)
       lastGlowCardRef.current = currentId
       return
     }
@@ -60,19 +64,19 @@ export const useFoundationGlowAnimation = ({
       // Absolute celebration cards take over the visual stack; keep the structural
       // foundation glow quiet so it does not animate underneath the win overlay.
       lastGlowCardRef.current = currentId
-      glowOpacity.value = 0
+      glowOpacity.set(0)
       return
     }
 
     if (!currentId) {
       lastGlowCardRef.current = null
-      glowOpacity.value = 0
+      glowOpacity.set(0)
       return
     }
 
     if (removedCard) {
       lastGlowCardRef.current = currentId
-      glowOpacity.value = 0
+      glowOpacity.set(0)
       return
     }
 
@@ -82,12 +86,14 @@ export const useFoundationGlowAnimation = ({
 
     lastGlowCardRef.current = currentId
     cancelAnimation(glowOpacity)
-    glowOpacity.value = 0
+    glowOpacity.set(0)
     // Keep the proven shared-value sequence: the four foundation pulses are tiny, and the
     // imperative Native Animated replacement could remain visibly stuck when interrupted.
-    glowOpacity.value = withSequence(
-      withTiming(FOUNDATION_GLOW_MAX_OPACITY, FOUNDATION_GLOW_IN_TIMING),
-      withTiming(0, FOUNDATION_GLOW_OUT_TIMING)
+    glowOpacity.set(
+      withSequence(
+        withTiming(FOUNDATION_GLOW_MAX_OPACITY, FOUNDATION_GLOW_IN_TIMING),
+        withTiming(0, FOUNDATION_GLOW_OUT_TIMING)
+      )
     )
   }, [cards, celebrationActive, foundationGlowEnabled, glowOpacity])
 

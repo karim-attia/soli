@@ -1,4 +1,3 @@
-import { memo } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -12,35 +11,31 @@ type CelebrationDebugBadgeProps = {
 
 const BADGE_BASE_OFFSET = 12
 
-export const CelebrationDebugBadge = memo(
-  ({ label, onPress }: CelebrationDebugBadgeProps) => {
-    const insets = useSafeAreaInsets()
+export const CelebrationDebugBadge = ({ label, onPress }: CelebrationDebugBadgeProps) => {
+  const insets = useSafeAreaInsets()
 
-    return (
-      <Pressable
-        testID="celebration-debug-badge"
-        onPress={onPress}
-        // The badge renders after CelebrationTouchBlocker, so it sits above it and
-        // receives taps; a tap here cycles the mode instead of aborting the celebration.
-        style={{
-          position: 'absolute',
-          // Task 1-10: Keep badge above iOS home indicator / Android nav gesture area.
-          bottom: insets.bottom + BADGE_BASE_OFFSET,
-          right: insets.right + BADGE_BASE_OFFSET,
-        }}
-      >
-        <View style={styles.badge}>
-          {/* `body` keeps the Paragraph line height (23) this label always had. */}
-          <AppText color="#f8fafc" style={styles.label}>
-            {label}
-          </AppText>
-        </View>
-      </Pressable>
-    )
-  }
-)
-
-CelebrationDebugBadge.displayName = 'CelebrationDebugBadge'
+  return (
+    <Pressable
+      testID="celebration-debug-badge"
+      onPress={onPress}
+      // The badge renders after CelebrationTouchBlocker, so it sits above it and
+      // receives taps; a tap here cycles the mode instead of aborting the celebration.
+      style={{
+        position: 'absolute',
+        // Task 1-10: Keep badge above iOS home indicator / Android nav gesture area.
+        bottom: insets.bottom + BADGE_BASE_OFFSET,
+        right: insets.right + BADGE_BASE_OFFSET,
+      }}
+    >
+      <View style={styles.badge}>
+        {/* `body` keeps the Paragraph line height (23) this label always had. */}
+        <AppText color="#f8fafc" style={styles.label}>
+          {label}
+        </AppText>
+      </View>
+    </Pressable>
+  )
+}
 
 const styles = StyleSheet.create({
   badge: {

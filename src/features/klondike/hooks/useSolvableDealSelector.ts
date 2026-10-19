@@ -55,6 +55,10 @@ export const selectSolvableDeal = (
 }
 
 // Catalog filtering owns the draw-count guarantee; history stats only balance repeats.
+// useCallback KEPT with the React Compiler on (option D): in `infer` mode a `use*` function
+// is only compiled if it calls a hook — this one has no other hook call, so without the
+// useCallback it is left uncompiled and returns a fresh function every render (which
+// would cascade into createFreshGameState → dealNewGame → requestNewGame identities).
 export const useSolvableDealSelector = (
   solvableStats: ReadonlyMap<string, SolvableHistoryStat>,
   drawCount: DrawCount

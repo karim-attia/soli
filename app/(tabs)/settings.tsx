@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect } from 'react'
+import { useLayoutEffect } from 'react'
 import { Button, FieldGroup, Host, Switch } from '@expo/ui'
 import { useNavigation } from 'expo-router'
 import { Alert, Platform } from 'react-native'
@@ -53,7 +53,7 @@ export default function SettingsScreen() {
   // the live game only (or $0 on a won board). No number shown in Settings on
   // purpose — it would differ from the HUD by the live game, which this screen
   // cannot see (simplification; the TOTAL badge is the one source).
-  const confirmResetVegasTotal = useCallback(() => {
+  const confirmResetVegasTotal = () => {
     Alert.alert(vegasTotalPreference.resetTitle, vegasTotalPreference.resetMessage, [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -62,7 +62,7 @@ export default function SettingsScreen() {
         onPress: () => setVegasTotalOffset(settledVegasTotal),
       },
     ])
-  }, [setVegasTotalOffset, settledVegasTotal])
+  }
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -104,7 +104,9 @@ export default function SettingsScreen() {
             <PickerPreference
               {...scoringPreference}
               description={
-                vegasSelected ? scoringPreference.vegasDescription : scoringPreference.description
+                vegasSelected
+                  ? scoringPreference.vegasDescription
+                  : scoringPreference.description
               }
               value={state.statistics.scoring}
               onValueChange={setScoringMode}

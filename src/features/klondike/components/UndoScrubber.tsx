@@ -103,171 +103,167 @@ const SCRUBBER_TRANSITION = { duration: 140 } as const
 const UNDO_BUTTON_HEIGHT = 48
 
 // Keep the native gesture target isolated from board-preview commits. Only stable gesture,
-// shared-value, and undo-availability changes should update this subtree.
-const GestureWrapper = React.memo(
-  ({
-    gesture,
-    scrubActive,
-    canUndo,
-  }: {
-    gesture: GestureType
-    scrubActive: SharedValue<number>
-    canUndo: boolean
-  }) => {
-    const buttonStyle = useAnimatedStyle(() => {
-      const opacity =
-        scrubActive.value > 0
-          ? UNDO_SCRUB_BUTTON_DIM_OPACITY
-          : canUndo
-            ? 1
-            : UNDO_BUTTON_DISABLED_OPACITY
+// shared-value, and undo-availability changes should update this subtree. The isolation
+// used to be React.memo; with the React Compiler on (option D) the compiled UndoScrubber
+// caches this element on exactly those three props, so the wrapper is a plain component.
+const GestureWrapper = ({
+  gesture,
+  scrubActive,
+  canUndo,
+}: {
+  gesture: GestureType
+  scrubActive: SharedValue<number>
+  canUndo: boolean
+}) => {
+  const buttonStyle = useAnimatedStyle(() => {
+    const opacity =
+      scrubActive.value > 0
+        ? UNDO_SCRUB_BUTTON_DIM_OPACITY
+        : canUndo
+          ? 1
+          : UNDO_BUTTON_DISABLED_OPACITY
 
-      return { opacity: withTiming(opacity, SCRUBBER_TRANSITION) }
-    }, [canUndo, scrubActive])
+    return { opacity: withTiming(opacity, SCRUBBER_TRANSITION) }
+  }, [canUndo, scrubActive])
 
-    return (
-      <GestureDetector gesture={gesture}>
-        <Animated.View
-          style={[styles.undoButton, buttonStyle]}
-          collapsable={false}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="Undo"
-          // No accessibilityState={{ disabled: !canUndo }} here: on Android it
-          // disables the NATIVE view, which drops all touches — the scrub pan
-          // (which deliberately ignores canUndo so redo works from index 0)
-          // then never fires, making redo unreachable after a full-left scrub.
-          // Found 2026-07-06 by the Android scrubber workout; dimmed opacity
-          // already conveys the disabled look.
-          testID="undo"
-        >
-          <Undo2 size={20} color="#000" />
-          <Text style={styles.undoButtonText}>Undo</Text>
-        </Animated.View>
-      </GestureDetector>
-    )
-  }
-)
+  return (
+    <GestureDetector gesture={gesture}>
+      <Animated.View
+        style={[styles.undoButton, buttonStyle]}
+        collapsable={false}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel="Undo"
+        // No accessibilityState={{ disabled: !canUndo }} here: on Android it
+        // disables the NATIVE view, which drops all touches — the scrub pan
+        // (which deliberately ignores canUndo so redo works from index 0)
+        // then never fires, making redo unreachable after a full-left scrub.
+        // Found 2026-07-06 by the Android scrubber workout; dimmed opacity
+        // already conveys the disabled look.
+        testID="undo"
+      >
+        <Undo2 size={20} color="#000" />
+        <Text style={styles.undoButtonText}>Undo</Text>
+      </Animated.View>
+    </GestureDetector>
+  )
+}
 
-GestureWrapper.displayName = 'GestureWrapper'
+export const UndoScrubber = ({
+  visible,
+  scrubActive,
+  scrubIndex,
+  sliderMax,
+  historyIndex,
+  gesture,
+  canUndo,
+  onTrackMetrics,
+  hintVisible,
+  hintButtonVisible,
+  onHintPress,
+  hintBubbleText,
+  warningEmphasisNonce,
+  newGameButtonVisible,
+  onNewGamePress,
+}: UndoScrubberProps) => {
+  // RN 0.88 strict types: `View` is a function component, so the ref is its host
+  // instance (`ComponentRef<typeof View>`), not `View` itself.
+  const trackRef = useRef<React.ComponentRef<typeof View>>(null)
+  const trackWidth = useSharedValue(0)
+  const safeArea = useSafeAreaInsets()
+  const bottomDockOffset = safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING
 
-export const UndoScrubber = React.memo(
-  ({
-    visible,
-    scrubActive,
-    scrubIndex,
-    sliderMax,
-    historyIndex,
-    gesture,
-    canUndo,
-    onTrackMetrics,
-    hintVisible,
-    hintButtonVisible,
-    onHintPress,
-    hintBubbleText,
-    warningEmphasisNonce,
-    newGameButtonVisible,
-    onNewGamePress,
-  }: UndoScrubberProps) => {
-    // RN 0.88 strict types: `View` is a function component, so the ref is its host
-    // instance (`ComponentRef<typeof View>`), not `View` itself.
-    const trackRef = useRef<React.ComponentRef<typeof View>>(null)
-    const trackWidth = useSharedValue(0)
-    const safeArea = useSafeAreaInsets()
-    const bottomDockOffset = safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING
-
-    const measureTrack = useCallback(() => {
-      const track = trackRef.current
-      if (!track) {
-        return
-      }
-      track.measureInWindow((x, _y, width) => {
-        if (width <= 0) {
-          return
-        }
-        onTrackMetrics({ left: x, right: x + width })
-      })
-    }, [onTrackMetrics])
-
-    const handleTrackLayout = useCallback(
-      (event: LayoutChangeEvent) => {
-        trackWidth.value = event.nativeEvent.layout.width
-        measureTrack()
-      },
-      [measureTrack, trackWidth]
-    )
-
-    useEffect(() => {
-      if (!visible) {
-        return
-      }
-      measureTrack()
-    }, [measureTrack, sliderMax, visible])
-
-    const activeTrackStyle = useAnimatedStyle(() => {
-      const clampedIndex = Math.max(0, Math.min(scrubIndex.value, sliderMax))
-      const normalized = sliderMax <= 0 ? 0 : clampedIndex / sliderMax
-      const travelWidth = Math.max(trackWidth.value - SCRUBBER_THUMB_SIZE, 0)
-      const thumbCenter = normalized * travelWidth + SCRUBBER_THUMB_RADIUS
-      return {
-        width: Math.min(trackWidth.value, Math.max(SCRUBBER_THUMB_RADIUS, thumbCenter)),
-      }
-    }, [scrubIndex, sliderMax, trackWidth])
-
-    const thumbStyle = useAnimatedStyle(() => {
-      const clampedIndex = Math.max(0, Math.min(scrubIndex.value, sliderMax))
-      const normalized = sliderMax <= 0 ? 0 : clampedIndex / sliderMax
-      const travelWidth = Math.max(trackWidth.value - SCRUBBER_THUMB_SIZE, 0)
-      return {
-        transform: [{ translateX: normalized * travelWidth }],
-      }
-    }, [scrubIndex, sliderMax, trackWidth])
-
-    const overlayStyle = useAnimatedStyle(() => {
-      const active = scrubActive.value > 0
-      return {
-        opacity: withTiming(active ? 1 : 0, SCRUBBER_TRANSITION),
-        transform: [
-          {
-            scale: withTiming(active ? 1 : SCRUBBER_HIDDEN_SCALE, SCRUBBER_TRANSITION),
-          },
-        ],
-      }
-    }, [scrubActive])
-
-    if (!visible) {
-      return null
+  const measureTrack = useCallback(() => {
+    const track = trackRef.current
+    if (!track) {
+      return
     }
+    track.measureInWindow((x, _y, width) => {
+      if (width <= 0) {
+        return
+      }
+      onTrackMetrics({ left: x, right: x + width })
+    })
+  }, [onTrackMetrics])
 
-    return (
-      <View
+  const handleTrackLayout = (event: LayoutChangeEvent) => {
+    // `.set()` not `.value =`: a store after useAnimatedStyle captured the value is a
+    // React Compiler bail-out for the whole component (same behaviour underneath).
+    trackWidth.set(event.nativeEvent.layout.width)
+    measureTrack()
+  }
+
+  useEffect(() => {
+    if (!visible) {
+      return
+    }
+    measureTrack()
+  }, [measureTrack, sliderMax, visible])
+
+  const activeTrackStyle = useAnimatedStyle(() => {
+    const clampedIndex = Math.max(0, Math.min(scrubIndex.value, sliderMax))
+    const normalized = sliderMax <= 0 ? 0 : clampedIndex / sliderMax
+    const travelWidth = Math.max(trackWidth.value - SCRUBBER_THUMB_SIZE, 0)
+    const thumbCenter = normalized * travelWidth + SCRUBBER_THUMB_RADIUS
+    return {
+      width: Math.min(trackWidth.value, Math.max(SCRUBBER_THUMB_RADIUS, thumbCenter)),
+    }
+  }, [scrubIndex, sliderMax, trackWidth])
+
+  const thumbStyle = useAnimatedStyle(() => {
+    const clampedIndex = Math.max(0, Math.min(scrubIndex.value, sliderMax))
+    const normalized = sliderMax <= 0 ? 0 : clampedIndex / sliderMax
+    const travelWidth = Math.max(trackWidth.value - SCRUBBER_THUMB_SIZE, 0)
+    return {
+      transform: [{ translateX: normalized * travelWidth }],
+    }
+  }, [scrubIndex, sliderMax, trackWidth])
+
+  const overlayStyle = useAnimatedStyle(() => {
+    const active = scrubActive.value > 0
+    return {
+      opacity: withTiming(active ? 1 : 0, SCRUBBER_TRANSITION),
+      transform: [
+        {
+          scale: withTiming(active ? 1 : SCRUBBER_HIDDEN_SCALE, SCRUBBER_TRANSITION),
+        },
+      ],
+    }
+  }, [scrubActive])
+
+  if (!visible) {
+    return null
+  }
+
+  return (
+    <View
+      style={[
+        styles.container,
+        // Task 20-6: Keep the pre-wrapper geometry here: the scrubber's bottom dock
+        // height should be the Android/iOS inset plus our explicit extra breathing room.
+        // That matches the older layout more faithfully than the SafeAreaView wrapper
+        // experiments, including the perceived right-side placement.
+        { paddingBottom: safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING },
+      ]}
+    >
+      <AnimatedView
+        pointerEvents="none"
         style={[
-          styles.container,
-          // Task 20-6: Keep the pre-wrapper geometry here: the scrubber's bottom dock
-          // height should be the Android/iOS inset plus our explicit extra breathing room.
-          // That matches the older layout more faithfully than the SafeAreaView wrapper
-          // experiments, including the perceived right-side placement.
-          { paddingBottom: safeArea.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING },
+          styles.overlay,
+          overlayStyle,
+          {
+            // Task 20-6: The button can safely use container padding, but the scrubber
+            // overlay is absolutely positioned and will otherwise keep stretching into
+            // the Android system-bar area. Mirror the same dock offset here so the
+            // active scrubber panel stays above the nav/home indicator zone too.
+            bottom: bottomDockOffset,
+          },
         ]}
       >
-        <AnimatedView
-          pointerEvents="none"
-          style={[
-            styles.overlay,
-            overlayStyle,
-            {
-              // Task 20-6: The button can safely use container padding, but the scrubber
-              // overlay is absolutely positioned and will otherwise keep stretching into
-              // the Android system-bar area. Mirror the same dock offset here so the
-              // active scrubber panel stays above the nav/home indicator zone too.
-              bottom: bottomDockOffset,
-            },
-          ]}
-        >
-          {/* Keep the visual scrub overlay on shared values instead of Slider props:
+        {/* Keep the visual scrub overlay on shared values instead of Slider props:
             we learned that React-driven per-step updates add avoidable churn during long scrubs. */}
-          <View style={styles.slider}>
-            {/* Automation handle (klondike-card-accessibility follow-up): this node's
+        <View style={styles.slider}>
+          {/* Automation handle (klondike-card-accessibility follow-up): this node's
               bounds ARE the gesture's scrub bounds (same trackRef the pan math uses),
               and the label carries the resting position readout. Deterministic scrub
               drag for device tests: press on the Undo button (anchor = current
@@ -276,59 +272,56 @@ export const UndoScrubber = React.memo(
               for target < anchor (mirror with the right edge for redo). Keep vertical
               movement < 100px or the pan fails; needs >= 5px horizontal to start.
               Trade-off: historyIndex in the label makes this subtree re-render per scrub
-              step (the memoized GestureWrapper hot path stays isolated). If long scrubs
+              step (the GestureWrapper hot path stays isolated — cached element). If long scrubs
               ever jank, drop historyIndex from the label — geometry alone still helps. */}
-            <View
-              ref={trackRef}
-              onLayout={handleTrackLayout}
-              style={styles.track}
-              accessible
-              accessibilityLabel={`Undo scrubber, position ${historyIndex} of ${sliderMax}`}
-              testID="undo-scrubber-track"
-            >
-              <AnimatedView style={[styles.trackActive, activeTrackStyle]} />
-              <AnimatedView style={[styles.thumb, thumbStyle]} />
-            </View>
+          <View
+            ref={trackRef}
+            onLayout={handleTrackLayout}
+            style={styles.track}
+            accessible
+            accessibilityLabel={`Undo scrubber, position ${historyIndex} of ${sliderMax}`}
+            testID="undo-scrubber-track"
+          >
+            <AnimatedView style={[styles.trackActive, activeTrackStyle]} />
+            <AnimatedView style={[styles.thumb, thumbStyle]} />
           </View>
-        </AnimatedView>
-        {/* Hint disappears together with the whole dock on win/celebration (this
+        </View>
+      </AnimatedView>
+      {/* Hint disappears together with the whole dock on win/celebration (this
           component returns null above), so no extra hiding logic is needed here. */}
-        <UndoHintBubble
-          visible={hintVisible}
-          bottom={bottomDockOffset + UNDO_BUTTON_HEIGHT + 8}
-        />
-        {/* Hint/warning notices anchor above the dock like the undo discovery
+      <UndoHintBubble
+        visible={hintVisible}
+        bottom={bottomDockOffset + UNDO_BUTTON_HEIGHT + 8}
+      />
+      {/* Hint/warning notices anchor above the dock like the undo discovery
           hint (one bubble for all texts — see GameNoticeBubble). */}
-        <GameNoticeBubble
-          text={hintBubbleText}
-          bottom={bottomDockOffset + UNDO_BUTTON_HEIGHT + 8}
-          emphasisNonce={warningEmphasisNonce}
+      <GameNoticeBubble
+        text={hintBubbleText}
+        bottom={bottomDockOffset + UNDO_BUTTON_HEIGHT + 8}
+        emphasisNonce={warningEmphasisNonce}
+      />
+      {hintButtonVisible ? (
+        <DockActionButton
+          icon={<Lightbulb size={20} color="#000" />}
+          label="Hint"
+          testID="hint-button"
+          bottom={bottomDockOffset}
+          onPress={onHintPress}
         />
-        {hintButtonVisible ? (
-          <DockActionButton
-            icon={<Lightbulb size={20} color="#000" />}
-            label="Hint"
-            testID="hint-button"
-            bottom={bottomDockOffset}
-            onPress={onHintPress}
-          />
-        ) : null}
-        {newGameButtonVisible ? (
-          <DockActionButton
-            icon={<Shuffle size={20} color="#000" />}
-            label="New Game"
-            testID="new-game-button"
-            bottom={bottomDockOffset}
-            onPress={onNewGamePress}
-          />
-        ) : null}
-        <GestureWrapper gesture={gesture} scrubActive={scrubActive} canUndo={canUndo} />
-      </View>
-    )
-  }
-)
-
-UndoScrubber.displayName = 'UndoScrubber'
+      ) : null}
+      {newGameButtonVisible ? (
+        <DockActionButton
+          icon={<Shuffle size={20} color="#000" />}
+          label="New Game"
+          testID="new-game-button"
+          bottom={bottomDockOffset}
+          onPress={onNewGamePress}
+        />
+      ) : null}
+      <GestureWrapper gesture={gesture} scrubActive={scrubActive} canUndo={canUndo} />
+    </View>
+  )
+}
 
 const styles = StyleSheet.create({
   container: {

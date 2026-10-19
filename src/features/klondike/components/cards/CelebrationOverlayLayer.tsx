@@ -1,4 +1,8 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+// React Compiler (option D, 2026-10-19): CelebrationAtlas lost its 9 manual
+// useMemo/useCallback wrappers (the compiler caches each value on the same deps);
+// CascadeImprintLayer keeps its two useMemos because the compiler skips that component
+// (a `for` loop header it cannot lower yet) — no compiler memoization exists there.
+import React, { useMemo, useRef, useState } from 'react'
 import { PixelRatio, StyleSheet, View, useWindowDimensions } from 'react-native'
 import {
   Atlas,
@@ -25,11 +29,12 @@ import type {
 } from '@shopify/react-native-skia'
 import type { SharedValue } from 'react-native-reanimated'
 import {
-  runOnJS,
   useAnimatedReaction,
   useDerivedValue,
   useSharedValue,
 } from 'react-native-reanimated'
+// `scheduleOnRN(fn)` replaces the deprecated `runOnJS(fn)()`; lives in react-native-worklets.
+import { scheduleOnRN } from 'react-native-worklets'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
@@ -183,6 +188,26 @@ export const CelebrationOverlayLayer = ({
   )
 }
 
+// Avalanche (mode 31) launch schedule per slot: launchRaw = when the card leaves its pile,
+// prevLaunchRaw = when its pile predecessor left (the moment this card becomes the visible
+// pile top); -1 = visible from t 0. Pure helper so the compiled CelebrationAtlas can cache
+// the result on `assignments` (a multi-statement body would not be hoisted as a value).
+const computeAvalancheLaunch = (assignments: CelebrationAssignment[]) => {
+  const launchRaw = assignments.map(
+    (assignment) => assignment.index * AVALANCHE_LAUNCH_INTERVAL_RAW
+  )
+  const prevLaunchRaw = assignments.map(() => -1)
+  const bySuit: number[][] = [[], [], [], []]
+  assignments.forEach((assignment, slot) => bySuit[assignment.suitIndex].push(slot))
+  for (const pileSlots of bySuit) {
+    pileSlots.sort((a, b) => launchRaw[a] - launchRaw[b])
+    for (let i = 1; i < pileSlots.length; i += 1) {
+      prevLaunchRaw[pileSlots[i]] = launchRaw[pileSlots[i - 1]]
+    }
+  }
+  return { launchRaw, prevLaunchRaw }
+}
+
 type CelebrationAtlasProps = {
   state: CelebrationState
   bindings: CelebrationBindings
@@ -207,20 +232,23 @@ const CelebrationAtlas = ({
   // (~1 frame) the offset is 0 = the old clipped extent; invisible in practice because
   // cards launch from the foundations well inside the board.
   const window = useWindowDimensions()
+  // Hooks ahead of the derived data below on purpose (React Compiler): a hook call inside
+  // a compiler scope prunes that scope — with useSafeAreaInsets() between `assignments`
+  // and `drawOrder`, the compiler recomputed assignments/drawOrder/sprites/avalancheLaunch
+  // on every render (option D verification, prunedMemoValues 1 → 11).
+  const insets = useSafeAreaInsets()
   // RN 0.88 strict types: ref holds the View host instance, not the `View` component type.
   const wrapperRef = useRef<React.ComponentRef<typeof View>>(null)
   // null until measureInWindow resolves (~1 frame) — the floor derivation below must
   // know whether a real measurement exists, so no {0,0} sentinel.
-  const [windowOffset, setWindowOffset] = useState<{ x: number; y: number } | null>(
-    null
-  )
-  const handleWrapperLayout = useCallback(() => {
+  const [windowOffset, setWindowOffset] = useState<{ x: number; y: number } | null>(null)
+  const handleWrapperLayout = () => {
     wrapperRef.current?.measureInWindow((x, y) => {
       setWindowOffset((current) =>
         current && current.x === x && current.y === y ? current : { x, y }
       )
     })
-  }, [])
+  }
 
   // Pixel density (design decision 5): offscreen Skia surfaces are raw pixels with no
   // automatic density scaling, so the atlas is rasterized at pd× and the 1/pd is folded
@@ -250,118 +278,114 @@ const CelebrationAtlas = ({
   const shadowMargin = Math.ceil(CARD_SHADOW_MARGIN * pd)
   const cellWidth = faceWidth + 2 * shadowMargin
   const cellHeight = faceHeight + 2 * shadowMargin
-  const atlasSize = useMemo(() => {
-    const rows = Math.ceil(state.cards.length / ATLAS_COLUMNS)
-    return {
-      width: ATLAS_COLUMNS * (cellWidth + ATLAS_GUTTER),
-      height: rows * (cellHeight + ATLAS_GUTTER),
-    }
-  }, [state.cards.length, cellWidth, cellHeight])
+  const atlasRows = Math.ceil(state.cards.length / ATLAS_COLUMNS)
+  const atlasSize = {
+    width: ATLAS_COLUMNS * (cellWidth + ATLAS_GUTTER),
+    height: atlasRows * (cellHeight + ATLAS_GUTTER),
+  }
 
+  // The compiler caches this arrow on cellWidth/cellHeight, so the atlas element and the
+  // sprite rects below (which call it) are not re-keyed by dev badge mode cycles.
   const cellOrigin = (slot: number) => ({
     x: (slot % ATLAS_COLUMNS) * (cellWidth + ATLAS_GUTTER),
     y: Math.floor(slot / ATLAS_COLUMNS) * (cellHeight + ATLAS_GUTTER),
   })
 
-  const atlasElement = useMemo(
-    () => (
-      <Group>
-        {state.cards.map((config, slot) => {
-          const origin = cellOrigin(slot)
-          // Face top-left inside the padded cell; all face-relative drawing hangs off it.
-          const x = origin.x + shadowMargin
-          const y = origin.y + shadowMargin
-          const scale = (value: number) => value * cardScale * pd
-          const border = CARD_BORDER_WIDTH * pd
-          const suitColor = SUIT_COLORS[config.card.suit]
-          const rank = rankToLabel(config.card.rank)
-          const suit = SUIT_SYMBOLS[config.card.suit]
-          // Center suit reproduces CardVisual's flexbox result: the (text + marginTop)
-          // box is vertically centered in the content box, i.e. the glyph sits
-          // marginTop/2 below center. Text height ≈ descent − ascent (the font's
-          // vertical metrics are patched to be identical on both platforms — see
-          // components/cards/fonts.ts). Fine-tuned on device in plan step 7 if needed.
-          const centerTextHeight = centerFont
-            ? centerFont.getMetrics().descent - centerFont.getMetrics().ascent
-            : 0
-          const contentTop = border + scale(CARD_PADDING_VERTICAL)
-          const contentHeight = faceHeight - 2 * contentTop
-          const centerTop =
-            contentTop +
-            contentHeight / 2 -
-            centerTextHeight / 2 +
-            scale(CARD_SYMBOL_MARGIN_TOP) / 2
-          return (
-            <Group key={slot}>
-              <RoundedRect
-                x={x}
-                y={y}
-                width={faceWidth}
-                height={faceHeight}
-                r={metrics.radius * pd}
-                color={COLOR_CARD_FACE}
-              >
-                {/* Drop shadow baked into the cell; it rotates with the card sprite —
+  const atlasElement = (
+    <Group>
+      {state.cards.map((config, slot) => {
+        const origin = cellOrigin(slot)
+        // Face top-left inside the padded cell; all face-relative drawing hangs off it.
+        const x = origin.x + shadowMargin
+        const y = origin.y + shadowMargin
+        const scale = (value: number) => value * cardScale * pd
+        const border = CARD_BORDER_WIDTH * pd
+        const suitColor = SUIT_COLORS[config.card.suit]
+        const rank = rankToLabel(config.card.rank)
+        const suit = SUIT_SYMBOLS[config.card.suit]
+        // Center suit reproduces CardVisual's flexbox result: the (text + marginTop)
+        // box is vertically centered in the content box, i.e. the glyph sits
+        // marginTop/2 below center. Text height ≈ descent − ascent (the font's
+        // vertical metrics are patched to be identical on both platforms — see
+        // components/cards/fonts.ts). Fine-tuned on device in plan step 7 if needed.
+        const centerTextHeight = centerFont
+          ? centerFont.getMetrics().descent - centerFont.getMetrics().ascent
+          : 0
+        const contentTop = border + scale(CARD_PADDING_VERTICAL)
+        const contentHeight = faceHeight - 2 * contentTop
+        const centerTop =
+          contentTop +
+          contentHeight / 2 -
+          centerTextHeight / 2 +
+          scale(CARD_SYMBOL_MARGIN_TOP) / 2
+        return (
+          <Group key={slot}>
+            <RoundedRect
+              x={x}
+              y={y}
+              width={faceWidth}
+              height={faceHeight}
+              r={metrics.radius * pd}
+              color={COLOR_CARD_FACE}
+            >
+              {/* Drop shadow baked into the cell; it rotates with the card sprite —
                     same as the old transform-based view shadow did. */}
-                <Shadow
-                  dx={0}
-                  dy={CARD_SHADOW_DY * pd}
-                  blur={CARD_SHADOW_SIGMA * pd}
-                  color={CARD_SHADOW_COLOR}
-                />
-              </RoundedRect>
-              {/* RN draws borders inside the box; Skia strokes centered on the path,
-                  hence the half-stroke inset. */}
-              <RoundedRect
-                x={x + border / 2}
-                y={y + border / 2}
-                width={faceWidth - border}
-                height={faceHeight - border}
-                r={Math.max(0, metrics.radius * pd - border / 2)}
-                style="stroke"
-                strokeWidth={border}
-                color={COLOR_CARD_BORDER}
+              <Shadow
+                dx={0}
+                dy={CARD_SHADOW_DY * pd}
+                blur={CARD_SHADOW_SIGMA * pd}
+                color={CARD_SHADOW_COLOR}
               />
-              {rankFont ? (
-                <Text
-                  x={x + border + scale(CARD_CORNER_RANK_LEFT)}
-                  y={y + baselineFromTop(rankFont, border + scale(CARD_CORNER_RANK_TOP))}
-                  text={rank}
-                  font={rankFont}
-                  color={suitColor}
-                />
-              ) : null}
-              {suitFont ? (
-                <Text
-                  x={
-                    x +
-                    faceWidth -
-                    border -
-                    scale(CARD_CORNER_SUIT_RIGHT) -
-                    textAdvance(suitFont, suit)
-                  }
-                  y={y + baselineFromTop(suitFont, border + scale(CARD_CORNER_SUIT_TOP))}
-                  text={suit}
-                  font={suitFont}
-                  color={suitColor}
-                />
-              ) : null}
-              {centerFont ? (
-                <Text
-                  x={x + faceWidth / 2 - textAdvance(centerFont, suit) / 2}
-                  y={y + baselineFromTop(centerFont, centerTop)}
-                  text={suit}
-                  font={centerFont}
-                  color={suitColor}
-                />
-              ) : null}
-            </Group>
-          )
-        })}
-      </Group>
-    ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.cards, metrics, pd, rankFont, suitFont, centerFont]
+            </RoundedRect>
+            {/* RN draws borders inside the box; Skia strokes centered on the path,
+                  hence the half-stroke inset. */}
+            <RoundedRect
+              x={x + border / 2}
+              y={y + border / 2}
+              width={faceWidth - border}
+              height={faceHeight - border}
+              r={Math.max(0, metrics.radius * pd - border / 2)}
+              style="stroke"
+              strokeWidth={border}
+              color={COLOR_CARD_BORDER}
+            />
+            {rankFont ? (
+              <Text
+                x={x + border + scale(CARD_CORNER_RANK_LEFT)}
+                y={y + baselineFromTop(rankFont, border + scale(CARD_CORNER_RANK_TOP))}
+                text={rank}
+                font={rankFont}
+                color={suitColor}
+              />
+            ) : null}
+            {suitFont ? (
+              <Text
+                x={
+                  x +
+                  faceWidth -
+                  border -
+                  scale(CARD_CORNER_SUIT_RIGHT) -
+                  textAdvance(suitFont, suit)
+                }
+                y={y + baselineFromTop(suitFont, border + scale(CARD_CORNER_SUIT_TOP))}
+                text={suit}
+                font={suitFont}
+                color={suitColor}
+              />
+            ) : null}
+            {centerFont ? (
+              <Text
+                x={x + faceWidth / 2 - textAdvance(centerFont, suit) / 2}
+                y={y + baselineFromTop(centerFont, centerTop)}
+                text={suit}
+                font={centerFont}
+                color={suitColor}
+              />
+            ) : null}
+          </Group>
+        )
+      })}
+    </Group>
   )
 
   // Texture keying (design decision 8): rebuilt only when the card list / metrics /
@@ -400,18 +424,14 @@ const CelebrationAtlas = ({
   const perSlot = trailCount + 1
   const spriteCount = state.cards.length * perSlot
 
-  const assignments = useMemo<CelebrationAssignment[]>(
-    () =>
-      state.cards.map((config, index) => ({
-        baseX: config.baseX,
-        baseY: config.baseY,
-        stackIndex: config.stackIndex,
-        suitIndex: config.suitIndex,
-        randomSeed: config.randomSeed,
-        index,
-      })),
-    [state.cards]
-  )
+  const assignments: CelebrationAssignment[] = state.cards.map((config, index) => ({
+    baseX: config.baseX,
+    baseY: config.baseY,
+    stackIndex: config.stackIndex,
+    suitIndex: config.suitIndex,
+    randomSeed: config.randomSeed,
+    index,
+  }))
 
   // Sprite index → (slot, lag, opacity multiplier). Shared by both buffer worklets.
   // j < trailCount is ghost k = trailCount − 1 − j (oldest first, see draw order above);
@@ -430,7 +450,6 @@ const CelebrationAtlas = ({
   // (the canvas covers it anyway): floor in board coords = window bottom − board top
   // − bottom inset, identical for every entry path. state.floorY only bridges the
   // ~1 frame until measureInWindow resolves (cards still sit at base then).
-  const insets = useSafeAreaInsets()
   const floorY = windowOffset
     ? window.height - windowOffset.y - insets.bottom
     : state.floorY
@@ -438,10 +457,7 @@ const CelebrationAtlas = ({
   // values: they are fixed per celebration state (badge cycles re-render → mappers
   // re-register), and constants also close the 1-frame "board still {0,0} → frame
   // null" hole between the overlay mounting and the controller effect running.
-  const board = useMemo(
-    () => ({ width: state.boardWidth, height: state.boardHeight, floorY }),
-    [state.boardWidth, state.boardHeight, floorY]
-  )
+  const board = { width: state.boardWidth, height: state.boardHeight, floorY }
   const modeId = state.modeId
   const totalCards = assignments.length
 
@@ -467,19 +483,15 @@ const CelebrationAtlas = ({
   // the imprint surface, which always renders under the Atlas). Launch order in 31
   // is assignment.index · AVALANCHE_LAUNCH_INTERVAL_RAW, so "reverse launch" =
   // descending index.
-  const drawOrder = useMemo(() => {
-    const order = assignments.map((_, slot) => slot)
-    if (modeId === AVALANCHE_MODE_ID) {
-      order.sort((a, b) => assignments[b].index - assignments[a].index)
-    } else {
-      order.sort(
-        (a, b) =>
-          assignments[a].stackIndex - assignments[b].stackIndex ||
-          assignments[a].suitIndex - assignments[b].suitIndex
-      )
-    }
-    return order
-  }, [assignments, modeId])
+  const drawOrder = assignments
+    .map((_, slot) => slot)
+    .sort(
+      modeId === AVALANCHE_MODE_ID
+        ? (a, b) => assignments[b].index - assignments[a].index
+        : (a, b) =>
+            assignments[a].stackIndex - assignments[b].stackIndex ||
+            assignments[a].suitIndex - assignments[b].suitIndex
+    )
 
   // Draw order replaces zIndex (design decision 2): Atlas draws sprites in array
   // order, so per DRAW position we emit [oldest ghost … newest ghost, card], draw
@@ -487,38 +499,17 @@ const CelebrationAtlas = ({
   // renderer expressed with per-view zIndex bands, but rank-ordered between cards.
   // Sprite i belongs to slot drawOrder[⌊i/perSlot⌋] — both buffer worklets use the
   // same mapping so a sprite's rect, transform, and color always describe one card.
-  const sprites = useMemo<SkRect[]>(
-    () =>
-      Array.from({ length: spriteCount }, (_, spriteIndex) => {
-        const { x, y } = cellOrigin(drawOrder[Math.floor(spriteIndex / perSlot)])
-        return rect(x, y, cellWidth, cellHeight)
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [spriteCount, perSlot, cellWidth, cellHeight, drawOrder]
-  )
+  const sprites: SkRect[] = Array.from({ length: spriteCount }, (_, spriteIndex) => {
+    const { x, y } = cellOrigin(drawOrder[Math.floor(spriteIndex / perSlot)])
+    return rect(x, y, cellWidth, cellHeight)
+  })
 
   // Avalanche foundation-pile visibility (see IMPRINT_PILE_GAP_RAW comment): launch
   // order is the SHUFFLED assignment order, so same-pile launches are not evenly
   // spaced — precompute each card's launch time and its pile-predecessor's launch
   // time (the moment this card becomes the visible pile top). -1 = visible from t 0.
-  const avalancheLaunch = useMemo(() => {
-    if (modeId !== AVALANCHE_MODE_ID) {
-      return null
-    }
-    const launchRaw = assignments.map(
-      (assignment) => assignment.index * AVALANCHE_LAUNCH_INTERVAL_RAW
-    )
-    const prevLaunchRaw = assignments.map(() => -1)
-    const bySuit: number[][] = [[], [], [], []]
-    assignments.forEach((assignment, slot) => bySuit[assignment.suitIndex].push(slot))
-    for (const pileSlots of bySuit) {
-      pileSlots.sort((a, b) => launchRaw[a] - launchRaw[b])
-      for (let i = 1; i < pileSlots.length; i += 1) {
-        prevLaunchRaw[pileSlots[i]] = launchRaw[pileSlots[i - 1]]
-      }
-    }
-    return { launchRaw, prevLaunchRaw }
-  }, [assignments, modeId])
+  const avalancheLaunch =
+    modeId === AVALANCHE_MODE_ID ? computeAvalancheLaunch(assignments) : null
 
   // Launch anchor (cascade-fixes story, user item A): the launch blend used to run
   // off raw progress, which was correct pre-Skia because the old renderer kept its
@@ -549,7 +540,7 @@ const CelebrationAtlas = ({
         // wraps (dev-hold restarts / badge cycles): the overlay stays mounted, the
         // board cards are already hidden.
         if (onOverlayReady) {
-          runOnJS(onOverlayReady)()
+          scheduleOnRN(onOverlayReady)
         }
       } else if (current.progress < (previous?.progress ?? 0)) {
         launchAnchor.value = current.progress
@@ -597,8 +588,15 @@ const CelebrationAtlas = ({
       return
     }
 
-    const { pathX, pathY, rotation, targetScale, rawProgress, relativeIndex, stackFactor } =
-      frame
+    const {
+      pathX,
+      pathY,
+      rotation,
+      targetScale,
+      rawProgress,
+      relativeIndex,
+      stackFactor,
+    } = frame
     // Anchored launch blend (see the launchAnchor comment): frame.launchEased is
     // deliberately IGNORED — it runs off raw progress and has mostly saturated by
     // the renderer's first visible frame. Anchor < 0 (texture not ready) falls back
@@ -1020,17 +1018,11 @@ const CascadeImprintLayer = ({
       ) => {
         const src = Skia.XYWHRect(
           (slot % ATLAS_COLUMNS) * (cellWidth + ATLAS_GUTTER) + shadowMargin,
-          Math.floor(slot / ATLAS_COLUMNS) * (cellHeight + ATLAS_GUTTER) +
-            shadowMargin,
+          Math.floor(slot / ATLAS_COLUMNS) * (cellHeight + ATLAS_GUTTER) + shadowMargin,
           faceWidth,
           faceHeight
         )
-        const dst = Skia.XYWHRect(
-          -faceWidth / 2,
-          -faceHeight / 2,
-          faceWidth,
-          faceHeight
-        )
+        const dst = Skia.XYWHRect(-faceWidth / 2, -faceHeight / 2, faceWidth, faceHeight)
         canvas.save()
         canvas.translate(
           (offsetX + translateX + cardWidth / 2) * pd,
@@ -1146,18 +1138,10 @@ const CascadeImprintLayer = ({
             if (launchStamps && launchBlendArg > 0) {
               prevProgress =
                 next > 0
-                  ? getImprintStampRaw(
-                      modeId,
-                      assignment,
-                      next - 1,
-                      totalCards,
-                      stream
-                    ) / CELEBRATION_SPEED_MULTIPLIER
+                  ? getImprintStampRaw(modeId, assignment, next - 1, totalCards, stream) /
+                    CELEBRATION_SPEED_MULTIPLIER
                   : 0
-              if (
-                (prevProgress - anchor) * CELEBRATION_LAUNCH_SPEED_MULTIPLIER <
-                1
-              ) {
+              if ((prevProgress - anchor) * CELEBRATION_LAUNCH_SPEED_MULTIPLIER < 1) {
                 subCount = 4
               } else {
                 prevProgress = frozenProgress
@@ -1191,9 +1175,7 @@ const CascadeImprintLayer = ({
               if (frame.targetOpacity < 0.98) {
                 continue
               }
-              const launchEased = easeOutQuint(
-                Math.min(1, Math.max(0, subBlendArg))
-              )
+              const launchEased = easeOutQuint(Math.min(1, Math.max(0, subBlendArg)))
               const translateX =
                 assignment.baseX * (1 - launchEased) + frame.pathX * launchEased
               const translateY =

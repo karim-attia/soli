@@ -83,9 +83,24 @@ Age gate rule of thumb: the gate only bites exact pins and `expo install`'s own
   race. `expo-linking` 58: `Linking.parse()` no longer double-decodes (Soli uses `new URL`).
 - Expo Router 58 reworked its navigation core; see `expo-router.md`. Expo UI 58 changed
   `<Host>` alignment on iOS; see `expo-ui.md`.
-- Optional SDK 58 features deliberately not adopted in the upgrade: React Compiler,
-  Expo Modules 2.0 (beta), Noxcturnal transformer, Gesture Handler hook API,
-  `Stack.Toolbar`, Tamagui 3. Tracked in the upgrade plan's Follow-ups.
+- Optional SDK 58 features deliberately not adopted in the upgrade: Expo Modules 2.0
+  (beta), Noxcturnal transformer, Gesture Handler hook API, `Stack.Toolbar`, Tamagui 3.
+  Tracked in the upgrade plan's Follow-ups.
+- **React Compiler is ON since 2026-10-18** (`app.json` → `expo.experiments.reactCompiler:
+  true`, `infer` mode app-wide, every manual memo kept). Measured A/B on the Android phone
+  (Release, 2 × 20-game playlists per config): janky 9.12 % → 8.14 %, p50/p90/p95/p99
+  10/15/17/21 ms unchanged, PSS +2-6 MiB (inside run-to-run noise), 0 crashes, scrubber /
+  celebration / hint / glow identical on both platforms. Numbers in
+  `docs/product/next-steps-after-sdk-58/next-steps-after-sdk-58.md` ("S11 results").
+  **Rollback = delete the `"reactCompiler": true` line**, then `rm -rf
+  android/app/build/generated/assets/react/release` before `yarn release` (app.json is not
+  an input of the Gradle bundle task, so the old bundle would be reused) — iOS re-bundles on
+  every build. Reach: `babel-preset-expo` inserts `babel-plugin-react-compiler` (`target 19`,
+  `panicThreshold none`) for app code only; 75 functions compile, 8 are skipped on deliberate
+  render-time ref patterns (list in the same plan). Jest never sets `supportsReactCompiler`,
+  so unit tests run uncompiled code. The Release Android bundle is Hermes bytecode — to prove
+  the flag reached a build, export plain JS (`expo export:embed --platform android --dev
+  false --minify false …`) and count `react.memo_cache_sentinel` (off: 2, on: 86).
 - `expo.install.exclude` now lists only `typescript`. The `react-native-worklets`
   exclusion (SDK 57 `0.10.1` override) was removed because SDK 58 bundles `0.13.0`.
 
@@ -158,8 +173,9 @@ Soli is moving from SDK 56 to SDK 57, so this is an incremental upgrade.
 - Continue to prefer Expo/CNG tooling for native output.
 - Keep `babel.config.js` and `metro.config.js` because Tamagui needs custom Babel and
   Metro integration.
-- Do not opt into React Compiler, new Android edge-to-edge behavior, or Worklets bundle
-  mode as part of the baseline SDK 57 upgrade unless validation exposes a concrete need.
+- Do not opt into new Android edge-to-edge behavior or Worklets bundle mode as part of the
+  baseline SDK 57 upgrade unless validation exposes a concrete need. (React Compiler was
+  also held back here; it was measured and switched on 2026-10-18 — see the SDK 58 notes.)
 
 ### SDK 55 Upgrade Notes
 
