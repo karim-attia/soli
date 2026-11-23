@@ -1,0 +1,185 @@
+{
+  "nav": {
+    "play": "プレイ",
+    "hello": "こんにちは",
+    "history": "履歴",
+    "settings": "設定",
+    "rate": "Soliを評価",
+    "openMenu": "ナビゲーションメニューを開く",
+    "notFoundTitle": "おっと！",
+    "notFoundBody": "この画面は存在しません。",
+    "notFoundLink": "ホーム画面に戻る"
+  },
+  "common": {
+    "cancel": "キャンセル",
+    "reset": "リセット",
+    "off": "オフ",
+    "drawMode": "{{number}}枚めくり"
+  },
+  "about": {
+    "madeBy": "作者：",
+    "dedication": "ソリティアで遊ぶたびに広告を見せられていた、彼女のTに贈ります。",
+    "pitch": "無料でオープンソースのソリティアアプリです。",
+    "sourceLink": "GitHubのソースコード",
+    "promise": "広告も、アプリ内課金も、もっと遊ばせるための仕掛けもありません。"
+  },
+  "game": {
+    "newGame": "新しいゲーム",
+    "newGameA11y": "新しいゲームを始める",
+    "undo": "元に戻す",
+    "hint": "ヒント",
+    "draw": "めくる",
+    "recyclesLeft_other": "残り{{count}}回",
+    "newGameAlert": {
+      "title": "新しいゲームを始めますか？",
+      "message": "もう1ゲーム遊びますか？",
+      "messageWon": "クリアおめでとうございます！もう1ゲーム遊びますか？",
+      "confirm": "新しく配る"
+    },
+    "playDeal": {
+      "retryTitle": "この配置に再挑戦しますか？",
+      "retryConfirm": "再挑戦",
+      "sharedTitle": "共有された配置をプレイしますか？",
+      "sharedConfirm": "プレイ",
+      "message": "現在のゲームは終了し、未クリアとして記録されます。"
+    }
+  },
+  "notice": {
+    "unwinnable": "クリアにつながる手はもうありません。元に戻すか、新しいゲームを始めてください。",
+    "stuck": "役に立つ手はもうありません。元に戻すか、新しいゲームを始めてください。",
+    "noHint": "ヒントは見つかりませんでした。",
+    "undoTip": "「元に戻す」ボタンを横にドラッグすると、ゲームの中をタイムトラベルできます。"
+  },
+  "hud": {
+    "score": "スコア",
+    "vegas": "ベガス",
+    "total": "累計",
+    "moves": "手数",
+    "time": "タイム",
+    "badgeA11y": "{{label}}、{{value}}",
+    "vegasSpoken_other": "{{count}}ドル",
+    "vegasSpokenNegative_other": "マイナス{{count}}ドル"
+  },
+  "time": {
+    "hours_other": "{{count}}時間",
+    "minutes_other": "{{count}}分",
+    "seconds_other": "{{count}}秒",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "新しいゲーム",
+      "gameplay": "ゲームプレイ",
+      "statistics": "統計"
+    },
+    "cardsDrawn": "めくる枚数",
+    "solvableDeals": "クリアできる配置",
+    "scoring": {
+      "label": "スコア方式",
+      "description": "標準のポイントか、ベガスのドルかを選べます。次のゲームから適用されます。",
+      "vegasDescription": "ベガスでは、ヒント、警告、クリアできる配置がオフになります。次のゲームから適用されます。",
+      "standard": "標準",
+      "vegas": "ベガス"
+    },
+    "vegasTotal": {
+      "label": "ベガスの累計を引き継ぐ",
+      "description": "残高を次のゲームへ持ち越します。画面上部には、このゲームの結果の代わりに累計が表示されます。",
+      "resetLabel": "ベガスの累計をリセット",
+      "resetTitle": "ベガスの累計をリセットしますか？",
+      "resetMessage": "累計は$0から再スタートします。プレイ中のゲームは引き続きカウントされます。"
+    },
+    "autoUp": "自動移動",
+    "hintButton": {
+      "label": "ヒントボタン",
+      "description": "次の手を教えるヒントボタンを表示します。"
+    },
+    "warnings": {
+      "label": "警告",
+      "description": "役に立つ手がなくなったとき、またはクリアできなくなった時点でお知らせします。",
+      "noUsefulMoves": "役に立つ手がない",
+      "unwinnable": "クリアできない"
+    },
+    "showMoves": "手数の表示",
+    "showTime": "タイマーの表示"
+  },
+  "history": {
+    "title": "ゲーム履歴",
+    "stats": {
+      "games": "ゲーム数",
+      "solved": "クリア",
+      "incomplete": "未クリア"
+    },
+    "status": {
+      "solved": "クリア",
+      "incomplete": "未クリア",
+      "active": "プレイ中"
+    },
+    "dealName": "配置 {{code}}",
+    "moves_other": "{{count}}手",
+    "score": "スコア {{value}}",
+    "vegas": "ベガス {{value}}",
+    "solvable": "クリア可能",
+    "emptyTitle": "記録されたゲームはまだありません",
+    "emptyBody": "クロンダイクをプレイすると、履歴が作られていきます。終了したゲームとその配置がここに表示されます。",
+    "loadingTitle": "履歴を読み込み中…",
+    "loadingBody": "最近のゲームを取得しています。しばらくお待ちください。",
+    "justNow": "たった今",
+    "today": "今日 {{time}}",
+    "yesterday": "昨日 {{time}}",
+    "dateTime": "{{date}} {{time}}",
+    "retry": "再挑戦",
+    "retryA11y": "この配置に再挑戦",
+    "share": "共有",
+    "shareA11y": "この配置を共有"
+  },
+  "share": {
+    "dealMessage": "Soliでこのクロンダイクの配置をプレイしてみてください（{{number}}枚めくり）"
+  },
+  "a11y": {
+    "rank": {
+      "1": "エース",
+      "2": "2",
+      "3": "3",
+      "4": "4",
+      "5": "5",
+      "6": "6",
+      "7": "7",
+      "8": "8",
+      "9": "9",
+      "10": "10",
+      "11": "ジャック",
+      "12": "クイーン",
+      "13": "キング"
+    },
+    "suit": {
+      "clubs": "クラブ",
+      "diamonds": "ダイヤ",
+      "hearts": "ハート",
+      "spades": "スペード"
+    },
+    "card": "{{suit}}の{{rank}}",
+    "tableauCard": "{{card}}、{{column}}列目",
+    "faceDownCard": "裏向きのカード、{{column}}列目",
+    "emptyColumn": "{{column}}列目、空",
+    "stock_other": "山札、{{count}}枚",
+    "stockEmpty": "山札、空",
+    "stockExhausted": "山札、めくり直しの残りなし",
+    "stockRecycle": "捨て札を山札に戻す",
+    "stockRecycleLeft_other": "捨て札を山札に戻す、残り{{count}}回",
+    "waste": "捨て札、{{card}}",
+    "foundationPile": {
+      "clubs": "クラブの組札",
+      "diamonds": "ダイヤの組札",
+      "hearts": "ハートの組札",
+      "spades": "スペードの組札"
+    },
+    "foundation": "{{pile}}、{{card}}",
+    "foundationEmpty": "{{pile}}、空",
+    "scrubber": "元に戻すスライダー、{{total}}手中{{position}}手目",
+    "hint": {
+      "draw": "ヒント：山札からめくります。",
+      "toColumn": "ヒント：{{card}}を{{column}}列目に移動します。",
+      "toFoundation": "ヒント：{{card}}を組札に移動します。"
+    }
+  }
+}

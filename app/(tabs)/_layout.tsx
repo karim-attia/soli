@@ -3,6 +3,7 @@ import { Drawer } from 'expo-router/drawer'
 import { AppDrawerContent } from '../../components/navigation/AppDrawerContent'
 import { NativeIcon } from '../../components/NativeIcon'
 import { DRAWER_ICONS } from '../../components/navigation/drawerIcons'
+import { t } from '../../src/i18n'
 import { usePalette } from '../../src/theme/tokens'
 
 export default function DrawerLayout() {
@@ -42,9 +43,10 @@ export default function DrawerLayout() {
       <Drawer.Screen
         name="index"
         options={{
+          // "Soli" is the product name: literal in every language (not in en.json).
           title: 'Soli',
           headerTitle: 'Soli',
-          drawerLabel: 'Play',
+          drawerLabel: t('nav.play'),
           drawerIcon: ({ color, size }) => (
             <NativeIcon {...DRAWER_ICONS.play} color={color} size={size} />
           ),
@@ -53,8 +55,8 @@ export default function DrawerLayout() {
       <Drawer.Screen
         name="hello"
         options={{
-          title: 'Hello',
-          drawerLabel: 'Hello',
+          title: t('nav.hello'),
+          drawerLabel: t('nav.hello'),
           drawerIcon: ({ color, size }) => (
             <NativeIcon {...DRAWER_ICONS.hello} color={color} size={size} />
           ),
@@ -63,8 +65,8 @@ export default function DrawerLayout() {
       <Drawer.Screen
         name="history"
         options={{
-          title: 'History',
-          drawerLabel: 'History',
+          title: t('nav.history'),
+          drawerLabel: t('nav.history'),
           drawerIcon: ({ color, size }) => (
             <NativeIcon {...DRAWER_ICONS.history} color={color} size={size} />
           ),
@@ -73,8 +75,8 @@ export default function DrawerLayout() {
       <Drawer.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          drawerLabel: 'Settings',
+          title: t('nav.settings'),
+          drawerLabel: t('nav.settings'),
           drawerIcon: ({ color, size }) => (
             <NativeIcon {...DRAWER_ICONS.settings} color={color} size={size} />
           ),

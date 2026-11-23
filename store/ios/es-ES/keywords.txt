@@ -1,0 +1,1 @@
+cartas,juego,juegos,clásico,baraja,naipes,solitaire,paciencia,offline,internet,código abierto,relax

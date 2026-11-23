@@ -2,7 +2,7 @@
   "expo": {
     "name": "Soli",
     "slug": "soli",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "A polished Klondike Solitaire experience with responsive animations and a solvable shuffle catalog.",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -12,7 +12,7 @@
       "icon": "./assets/app.icon",
       "supportsTablet": true,
       "bundleIdentifier": "ch.karimattia.soli",
-      "buildNumber": "15",
+      "buildNumber": "17",
       "deploymentTarget": "16.4",
       "associatedDomains": ["applinks:karimattia.ch"],
       "infoPlist": {
@@ -26,7 +26,7 @@
         "backgroundColor": "#416F57"
       },
       "package": "ch.karimattia.soli",
-      "versionCode": 16,
+      "versionCode": 17,
       "permissions": [],
       "intentFilters": [
         {
@@ -89,7 +89,17 @@
       ],
       "expo-status-bar",
       "expo-sqlite",
-      "./plugins/withBuildSpeedGradleProperties"
+      "./plugins/withBuildSpeedGradleProperties",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": ["en", "de", "fr", "es", "pt-BR", "it", "nl", "ja", "ru", "pl", "tr", "zh-Hans", "ko", "ar", "he"],
+            "android": ["en", "de", "fr", "es", "pt-BR", "it", "nl", "ja", "ru", "pl", "tr", "zh-Hans", "ko", "ar", "he"]
+          },
+          "supportsRTL": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

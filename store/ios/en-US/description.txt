@@ -1,0 +1,17 @@
+Soli is classic Klondike Solitaire, thoughtfully refined. Free, open source and without ads.
+
+No ads, no in-app purchases, no streaks, coins or pop-ups to make you play more. Just cards.
+
+FEATURES
+
+- Classic Klondike with Draw 1 to Draw 5
+- Solvable deals: every new game can be won (you can turn this off)
+- Unlimited undo: drag the Undo button sideways to travel back through your game
+- Optional Hint button that shows the next move
+- A quiet notice when there are no more useful moves
+- Standard scoring, Vegas scoring, or no score at all
+- Auto Up moves cards to the foundations for you
+- Game history: replay any deal or share it with a friend
+- Dozens of win celebrations
+
+Made in Switzerland, for everyone who just wants to play cards.

@@ -30,6 +30,7 @@ export const DemoPlaylistHud: React.FC = () => {
         { bottom: insets.bottom + UNDO_SCRUBBER_SAFE_AREA_BOTTOM_PADDING },
       ]}
     >
+      {/* i18n: dev-only, intentionally English (demo playback HUD) */}
       <Text style={styles.label}>
         Game {progress.gameIndex + 1}/{progress.gameCount}
       </Text>

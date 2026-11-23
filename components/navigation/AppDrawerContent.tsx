@@ -8,6 +8,7 @@ import {
 
 import { NativeIcon } from '../NativeIcon'
 import { DRAWER_ICONS } from './drawerIcons'
+import { t } from '../../src/i18n'
 import { usePalette } from '../../src/theme/tokens'
 
 // Product decision: "Rate Soli" opens the store's review page instead of the native in-app
@@ -42,7 +43,7 @@ export function AppDrawerContent(props: DrawerContentComponentProps) {
     <DrawerContentScrollView {...props}>
       <DrawerItemList {...props} />
       <DrawerItem
-        label="Rate Soli"
+        label={t('nav.rate')}
         inactiveTintColor={palette.color}
         icon={({ color, size }) => (
           <NativeIcon {...DRAWER_ICONS.rate} color={color} size={size} />

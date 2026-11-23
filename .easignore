@@ -69,3 +69,8 @@ scripts/android-unlock-pattern.sh
 .test-artifacts/
 
 rust/target/
+
+# Store listing text + screenshots (~17 MB). Not in .gitignore on purpose: they
+# ARE tracked in git, but the app build never needs them, and this file
+# replaces .gitignore for EAS uploads. See store/README.md.
+/store

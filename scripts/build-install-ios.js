@@ -193,7 +193,9 @@ const bootSimulator = async (udid) => {
   // Tolerate "Unable to boot device in current state: Booted".
   await runSimctl(['boot', udid]).catch(() => {})
   // Booting via simctl alone leaves the device headless — bring the UI up.
-  await runCommand('open', ['-a', 'Simulator'], { capture: true, silent: true })
+  // Best effort: Xcode 27.2 ships no Simulator.app ("Unable to find application named
+  // 'Simulator'") — a headless boot is enough for the build, install and agent-device.
+  await runCommand('open', ['-a', 'Simulator'], { capture: true, silent: true }).catch(() => {})
   // Blocks until fully booted (-b also boots if somehow shut down again).
   await runSimctl(['bootstatus', udid, '-b'])
 }

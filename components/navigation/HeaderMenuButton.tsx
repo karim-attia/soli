@@ -3,6 +3,7 @@ import { Icon } from '@expo/ui'
 import { HeaderButton } from 'expo-router/react-navigation'
 
 import { NativeIcon } from '../NativeIcon'
+import { t } from '../../src/i18n'
 import { usePalette } from '../../src/theme/tokens'
 
 // The platform hamburger, decided 2026-10-18 after in-app comparisons (plan "prompt 5"):
@@ -36,7 +37,7 @@ export const HeaderMenuButton = ({ onPress }: HeaderMenuButtonProps) => {
   return (
     <HeaderButton
       onPress={onPress}
-      accessibilityLabel="Open navigation menu"
+      accessibilityLabel={t('nav.openMenu')}
       pressOpacity={0.65}
       style={styles.button}
     >

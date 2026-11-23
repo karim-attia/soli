@@ -5,70 +5,72 @@
 // on iOS, `testID` maps to `accessibilityIdentifier` and is the primary handle.
 // We ship both on every target so agent-device works on both platforms.
 //
-// Kept pure (no React imports) so test/unit/ can test it without rendering.
+// Kept pure (no React imports) so test/unit/ can test it without rendering. The plain
+// `t` import from src/i18n keeps that true (no hooks; see src/i18n/index.ts for why).
+// All texts are resolved at CALL time — never hoist a label into a module constant, it
+// would keep the language of the first import (Android can change language while running).
+// testIDs below are language-independent on purpose (iOS automation handles); the labels
+// are translated, so Android label-based automation must pin the app to English.
 
+import { t } from '../../../../i18n'
 import type { Card, Suit } from '../../../../solitaire/klondike'
-
-// Spelled-out ranks instead of reusing `rankToLabel` ("A"/"7"): screen readers
-// pronounce "Ace of hearts" correctly but stumble over "A of hearts".
-const RANK_WORDS = [
-  'Ace',
-  'Two',
-  'Three',
-  'Four',
-  'Five',
-  'Six',
-  'Seven',
-  'Eight',
-  'Nine',
-  'Ten',
-  'Jack',
-  'Queen',
-  'King',
-] as const
 
 type CardIdentity = Pick<Card, 'suit' | 'rank'>
 
-const capitalize = (value: string): string =>
-  value.charAt(0).toUpperCase() + value.slice(1)
-
+// Spelled-out ranks (a11y.rank.1..13) instead of reusing `rankToLabel` ("A"/"7"): screen
+// readers pronounce "Ace of hearts" correctly but stumble over "A of hearts". The name is
+// composed from 13 rank + 4 suit keys and the `a11y.card` pattern (translators reorder
+// it, e.g. suit first) instead of 52 keys.
 export const getCardAccessibilityLabel = (card: CardIdentity): string =>
-  `${RANK_WORDS[card.rank - 1]} of ${card.suit}`
+  t('a11y.card', {
+    rank: t(`a11y.rank.${card.rank}`),
+    suit: t(`a11y.suit.${card.suit}`),
+  })
 
 // Column numbers are 1-based in labels and testIDs (human-consistent), hence columnIndex + 1.
 export const getTableauCardLabel = (card: CardIdentity, columnIndex: number): string =>
-  `${getCardAccessibilityLabel(card)}, column ${columnIndex + 1}`
+  t('a11y.tableauCard', {
+    card: getCardAccessibilityLabel(card),
+    column: columnIndex + 1,
+  })
 
 export const getFaceDownCardLabel = (columnIndex: number): string =>
-  `Face-down card, column ${columnIndex + 1}`
+  t('a11y.faceDownCard', { column: columnIndex + 1 })
 
 export const getStockLabel = (stockCount: number): string =>
-  `Stock, ${stockCount} ${stockCount === 1 ? 'card' : 'cards'}`
+  t('a11y.stock', { count: stockCount })
 
-export const STOCK_RECYCLE_LABEL = 'Recycle waste into stock'
-export const STOCK_EMPTY_LABEL = 'Stock, empty'
+export const getStockEmptyLabel = (): string => t('a11y.stockEmpty')
 // Vegas pass limits (scoring plan, Phase 2): the recycle slot says how many
 // recycles remain on a limited game; once none is left the slot is disabled and
 // reads as exhausted (same testID as the recycle slot so device recipes resolve it).
-export const STOCK_EXHAUSTED_LABEL = 'Stock, no passes left'
+export const getStockExhaustedLabel = (): string => t('a11y.stockExhausted')
 
-// Infinity = unlimited game → the plain recycle label.
+// Infinity = unlimited game → the plain recycle label. The limited label is its own
+// plural key (not "recycle label + ', ' + caption") so translators get a whole phrase.
 export const getStockRecycleLabel = (recyclesLeft: number): string =>
   Number.isFinite(recyclesLeft)
-    ? `${STOCK_RECYCLE_LABEL}, ${formatRecyclesLeft(recyclesLeft)}`
-    : STOCK_RECYCLE_LABEL
+    ? t('a11y.stockRecycleLeft', { count: recyclesLeft })
+    : t('a11y.stockRecycle')
 
-// Also the caption printed on the recycle card back ("2 left").
-export const formatRecyclesLeft = (recyclesLeft: number): string => `${recyclesLeft} left`
+// The caption printed on the recycle card back ("2 left").
+export const formatRecyclesLeft = (recyclesLeft: number): string =>
+  t('game.recyclesLeft', { count: recyclesLeft })
 
 export const getWasteLabel = (topCard: CardIdentity): string =>
-  `Waste, ${getCardAccessibilityLabel(topCard)}`
+  t('a11y.waste', { card: getCardAccessibilityLabel(topCard) })
 
-export const getFoundationLabel = (suit: Suit, topCard: CardIdentity | null): string =>
-  `${capitalize(suit)} foundation, ${topCard ? getCardAccessibilityLabel(topCard) : 'empty'}`
+// One key per suit pile ("Hearts foundation") instead of capitalizing the suit word in
+// code: capitalization/compounding is language-specific.
+export const getFoundationLabel = (suit: Suit, topCard: CardIdentity | null): string => {
+  const pile = t(`a11y.foundationPile.${suit}`)
+  return topCard
+    ? t('a11y.foundation', { pile, card: getCardAccessibilityLabel(topCard) })
+    : t('a11y.foundationEmpty', { pile })
+}
 
 export const getEmptyColumnLabel = (columnIndex: number): string =>
-  `Column ${columnIndex + 1}, empty`
+  t('a11y.emptyColumn', { column: columnIndex + 1 })
 
 // testIDs: suit-rank instead of card.id — ids carry a per-deal instance suffix
 // (`hearts-7-1a`), while `card-hearts-7` stays stable across deals for automation.

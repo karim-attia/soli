@@ -7,6 +7,7 @@ import type { LaunchDemoGameOptions } from '../../src/features/klondike/hooks/us
 import { useSessionControls } from '../../src/features/klondike/state/sessionControlsStore'
 import { DEMO_AUTO_STEP_INTERVAL_MS } from '../../src/features/klondike/hooks/useDemoGameLauncher'
 import { CELEBRATION_MODE_METADATA } from '../../src/animation/celebrationModes'
+import { t } from '../../src/i18n'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
 import { SPACE, usePalette } from '../../src/theme/tokens'
 import { AppButton } from '../../components/AppButton'
@@ -133,6 +134,8 @@ const SheetSectionHeader = ({ children }: { children: string }) => {
   )
 }
 
+// i18n: dev-only, intentionally English (the whole Demo sheet incl. the header "Demo"
+// button; only reachable with Developer mode on). Not in en.json.
 const DemoChoiceSheet = ({
   isPresented,
   onDismiss,
@@ -290,13 +293,14 @@ type HeaderActionsProps = {
 
 const HeaderActions = ({ onNewGame, onDemoGame }: HeaderActionsProps) => (
   <View style={styles.headerActions}>
+    {/* i18n: dev-only, intentionally English */}
     {onDemoGame ? <HeaderActionButton label="Demo" onPress={onDemoGame} /> : null}
     {/* a11y handle `Start a new game` on both platforms since 2026-10-18 (was the
         button text "New Game" on Android) — soli-testing SKILL.md a11y matrix. */}
     <HeaderActionButton
-      label="New Game"
+      label={t('game.newGame')}
       onPress={onNewGame}
-      accessibilityLabel="Start a new game"
+      accessibilityLabel={t('game.newGameA11y')}
     />
   </View>
 )

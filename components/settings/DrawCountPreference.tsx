@@ -1,5 +1,6 @@
 import { Picker, Row, Spacer, Text } from '@expo/ui'
 
+import { t } from '../../src/i18n'
 import {
   DRAW_COUNT_OPTIONS,
   normalizeDrawCount,
@@ -18,7 +19,7 @@ export const DrawCountPreference = ({
   onValueChange,
 }: DrawCountPreferenceProps) => (
   <Row alignment="center" spacing={12}>
-    <Text>Cards drawn</Text>
+    <Text>{t('settings.cardsDrawn')}</Text>
     <Spacer flexible />
     {/* Expo UI 57 FieldGroup rows render lower-level menu/segmented/slider
         experiments on Android, but their nested gestures did not fire reliably
@@ -28,7 +29,12 @@ export const DrawCountPreference = ({
       onValueChange={(nextValue) => onValueChange(normalizeDrawCount(nextValue))}
     >
       {DRAW_COUNT_OPTIONS.map((drawCount) => (
-        <Picker.Item key={drawCount} label={`Draw ${drawCount}`} value={drawCount} />
+        // `number`, not `count`: "Draw 3" names a mode, it is not a quantity to pluralize.
+        <Picker.Item
+          key={drawCount}
+          label={t('common.drawMode', { number: drawCount })}
+          value={drawCount}
+        />
       ))}
     </Picker>
   </Row>

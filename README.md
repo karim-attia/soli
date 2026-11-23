@@ -15,6 +15,7 @@ No ads, in-app purchases, or gamification to get you to play more.
 - Solvable games
 - Nice animations
 - Undo time travel through game
+- 15 languages (follows your device language): English, German (Swiss High German), French, Spanish, Portuguese (Brazil), Italian, Dutch, Japanese, Russian, Polish, Turkish, Chinese (Simplified), Korean, Arabic, Hebrew
 
 # Upcoming ideas
 

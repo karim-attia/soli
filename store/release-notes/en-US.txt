@@ -1,0 +1,7 @@
+Soli 1.2 speaks your language!
+
+- Now in 15 languages, including German, French, Spanish and Japanese
+- New scoring options: Standard or Vegas
+- Small fixes and polish
+
+Happy playing!

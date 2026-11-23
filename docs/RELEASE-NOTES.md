@@ -4,6 +4,25 @@ Soli is a free, ad-free, open-source Solitaire.
 
 ---
 
+## 1.2.0 — 2026-11-24
+
+- **15 languages**: Soli now speaks German (Swiss High German), French, Spanish, Portuguese (Brazil), Italian, Dutch, Japanese, Russian, Polish, Turkish, Chinese (Simplified), Korean, Arabic and Hebrew. It follows your phone's language; you can also pick one per app in the system settings
+- **Scoring**: choose Standard scoring, Vegas scoring, or no score at all
+- Arabic and Hebrew: menus and settings read right-to-left, the card table keeps its classic layout
+- Framework upgrade (Expo SDK 58) and faster rendering
+
+Google Play:
+
+Soli 1.2 speaks your language!
+
+- Now in 15 languages, including German, French, Spanish and Japanese
+- New scoring options: Standard or Vegas
+- Small fixes and polish
+
+Happy playing!
+
+---
+
 ## 1.1.0 — 2026-10-11
 
 - **Hints**: optional Hint button next to Undo (turn it on in Settings, off by default). It shows the next move on a winning line — the card to move and where it goes, or the stock when drawing is the right move

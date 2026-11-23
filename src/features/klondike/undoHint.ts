@@ -12,6 +12,8 @@
 // - Scrub consumption (v2): users who demonstrably already use the scrubber (a scrub
 //   session that ended at a different timeline position) shouldn't be taught what they
 //   already know — each successful scrub silently consumes one remaining hint.
+import { t } from '../../i18n'
+
 export const UNDO_HINT_LIFETIME_THRESHOLD = 50
 export const UNDO_HINT_MAX_SHOWINGS = 3
 export const UNDO_HINT_STREAK_STEP = 10
@@ -24,8 +26,8 @@ export const UNDO_HINT_AUTO_DISMISS_MS = 10000
 // "Time travel" matches the Play Store listing's wording for the feature and avoids
 // the jargon "scrub" (device review 2026-07-07: even fluent non-native speakers may
 // not have "scrub" in their active vocabulary).
-export const UNDO_HINT_COPY =
-  'Tip: Drag the Undo button sideways to time travel through your game'
+// A function, not a constant: text is resolved at call time (src/i18n: no t() at module scope).
+export const getUndoHintCopy = (): string => t('notice.undoTip')
 
 // 3 remaining → 10, 2 → 20, 1 → 30. One derived formula instead of a schedule table.
 export const requiredStreakFor = (hintsRemaining: number): number =>

@@ -1,0 +1,17 @@
+Soli es el solitario Klondike clásico, cuidado al detalle. Gratis, de código abierto y sin anuncios.
+
+Sin anuncios, sin compras dentro de la app, sin rachas, monedas ni ventanas emergentes para que juegues más. Solo cartas.
+
+CARACTERÍSTICAS
+
+- Klondike clásico, de Robar 1 a Robar 5
+- Partidas con solución: toda partida nueva se puede ganar (puedes desactivarlo)
+- Deshacer ilimitado: arrastra el botón Deshacer hacia los lados para viajar en el tiempo por tu partida
+- Botón Pista opcional que muestra la siguiente jugada
+- Un aviso discreto cuando no quedan jugadas útiles
+- Puntuación estándar, puntuación Vegas o sin puntuación
+- La subida automática mueve las cartas a las bases por ti
+- Historial de partidas: vuelve a jugar cualquier partida o compártela con quien quieras
+- Decenas de celebraciones de victoria
+
+Hecho en Suiza, para quienes solo quieren jugar a las cartas.

@@ -21,8 +21,10 @@ import {
 } from '../../components/navigation/HeaderMenuButton'
 import { BoardPreview } from '../../src/features/klondike/components/BoardPreview'
 import { useSessionControls } from '../../src/features/klondike/state/sessionControlsStore'
-import { isExactDealId } from '../../src/solitaire/dealIdentity'
+import { formatExactDealCode, isExactDealId } from '../../src/solitaire/dealIdentity'
 import { buildDealShareUrl } from '../../src/solitaire/dealShareLink'
+import { getIntlLocale, t } from '../../src/i18n'
+import { formatHistoryTimestamp } from '../../src/i18n/format'
 import { formatStandardScore, formatVegasScore } from '../../src/solitaire/scoring'
 import {
   type HistoryEntry,
@@ -57,7 +59,7 @@ function HistoryScreen() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: 'Game History',
+      headerTitle: t('history.title'),
       headerBackVisible: false,
       headerLeft: () => <HeaderMenuButton onPress={openDrawer} />,
       headerLeftContainerStyle: {
@@ -77,9 +79,9 @@ function HistoryScreen() {
   }
 
   const stats: HistoryStat[] = [
-    { label: 'Games', value: totalCount, tone: 'neutral' },
-    { label: 'Solved', value: solvedCount, tone: 'success' },
-    { label: 'Incomplete', value: incompleteCount, tone: 'warning' },
+    { label: t('history.stats.games'), value: totalCount, tone: 'neutral' },
+    { label: t('history.stats.solved'), value: solvedCount, tone: 'success' },
+    { label: t('history.stats.incomplete'), value: incompleteCount, tone: 'warning' },
   ]
   const listHeader = (
     <View style={styles.listHeader}>
@@ -134,25 +136,28 @@ type HistoryListItemProps = {
   onSelect: (entry: HistoryEntry) => void
 }
 
-// Task 10-6: Map status to display labels and colors (palette keys).
-const STATUS_DISPLAY: Record<
-  HistoryEntryStatus,
-  { label: string; colorKey: 'green10' | 'yellow11' | 'blue10' }
-> = {
-  solved: { label: 'Solved', colorKey: 'green10' },
-  incomplete: { label: 'Incomplete', colorKey: 'yellow11' },
-  active: { label: 'Active', colorKey: 'blue10' },
+// Task 10-6: Map status to colors (palette keys). The label is `history.status.<status>`,
+// resolved at render (no t() at module scope).
+const STATUS_COLOR_KEYS: Record<HistoryEntryStatus, 'green10' | 'yellow11' | 'blue10'> = {
+  solved: 'green10',
+  incomplete: 'yellow11',
+  active: 'blue10',
 }
 
 // Feedback round 2: plain colored text instead of Badge pills — the pills were
 // "too aggressive and colorful". Shared by list rows and the sheet header.
 const StatusText = ({ status }: { status: HistoryEntryStatus }) => {
   const palette = usePalette()
-  const display = STATUS_DISPLAY[status] ?? STATUS_DISPLAY.incomplete
+  // Unknown stored statuses read as incomplete (same fallback as before).
+  const known = status in STATUS_COLOR_KEYS ? status : 'incomplete'
 
   return (
-    <AppText variant="plain" color={palette[display.colorKey]} style={styles.statusText}>
-      {display.label}
+    <AppText
+      variant="plain"
+      color={palette[STATUS_COLOR_KEYS[known]]}
+      style={styles.statusText}
+    >
+      {t(`history.status.${known}`)}
     </AppText>
   )
 }
@@ -181,7 +186,7 @@ const formatEntryMetadata = (entry: HistoryEntry, scoring: ScoringMode): string 
   // list to the game screen's reducer state, which isn't worth it.
   const showMoves = entry.status !== 'active'
   if (showMoves && typeof entry.moves === 'number' && entry.moves >= 0) {
-    segments.push(`${entry.moves} ${entry.moves === 1 ? 'move' : 'moves'}`)
+    segments.push(t('history.moves', { count: entry.moves }))
   }
   if (typeof entry.durationMs === 'number' && entry.durationMs >= 0) {
     segments.push(formatElapsedDuration(entry.durationMs))
@@ -189,15 +194,30 @@ const formatEntryMetadata = (entry: HistoryEntry, scoring: ScoringMode): string 
   // Scoring: only the tally matching the current setting; nothing when Off or when
   // the row predates scoring (null). Active rows carry null by construction.
   if (scoring === 'standard' && typeof entry.standardScore === 'number') {
-    segments.push(`Score ${formatStandardScore(entry.standardScore)}`)
+    segments.push(
+      t('history.score', {
+        value: formatStandardScore(entry.standardScore, getIntlLocale()),
+      })
+    )
   } else if (scoring === 'vegas' && typeof entry.vegasScore === 'number') {
-    segments.push(`Vegas ${formatVegasScore(entry.vegasScore)}`)
+    segments.push(
+      t('history.vegas', { value: formatVegasScore(entry.vegasScore, getIntlLocale()) })
+    )
   }
-  segments.push(`Draw ${entry.drawCount}`)
+  // `number`, not `count`: "Draw 3" names a mode, it is not a quantity to pluralize.
+  segments.push(t('common.drawMode', { number: entry.drawCount }))
   if (entry.solvable) {
-    segments.push('Solvable')
+    segments.push(t('history.solvable'))
   }
   return joinWrappingSegments(segments)
+}
+
+// i18n: the title is derived from the exact id at render time so it follows the current
+// language. The persisted `displayName` is English ("Deal XXXX-XXXX", frozen at write
+// time) and is only the fallback for legacy rows without an exact id ("Game XXXXX").
+const getEntryTitle = (entry: HistoryEntry): string => {
+  const code = formatExactDealCode(entry.exactId)
+  return code ? t('history.dealName', { code }) : entry.displayName
 }
 
 // Row title + status line, shared by the list card and the sheet header.
@@ -211,7 +231,7 @@ const EntryHeading = ({
   <>
     <View style={styles.headingRow}>
       <AppText variant="title" numberOfLines={1} style={styles.flex1}>
-        {entry.displayName}
+        {getEntryTitle(entry)}
       </AppText>
       <StatusText status={entry.status} />
     </View>
@@ -262,64 +282,13 @@ const EmptyHistory = ({
   return (
     <View style={[styles.empty, { paddingHorizontal, paddingVertical }]}>
       <AppText variant="plain" style={styles.emptyTitle}>
-        {hydrated ? 'No games recorded yet' : 'Loading history…'}
+        {hydrated ? t('history.emptyTitle') : t('history.loadingTitle')}
       </AppText>
       <AppText color={palette.color10}>
-        {hydrated
-          ? 'Play a game of Klondike to start building your history. Completed games and their deals will appear here.'
-          : 'Please wait while we retrieve your recent games.'}
+        {hydrated ? t('history.emptyBody') : t('history.loadingBody')}
       </AppText>
     </View>
   )
-}
-
-const isSameCalendarDay = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() &&
-  a.getMonth() === b.getMonth() &&
-  a.getDate() === b.getDate()
-
-// History-entries-cleanup B3: friendly dates shared by the list rows and the sheet
-// header — "Today, 5:33 PM" / "Yesterday, 5:33 PM" / "Jul 6, 5:33 PM" (same year) /
-// "Jul 6, 2025" (older, no time).
-const formatHistoryTimestamp = (isoTimestamp: string | undefined) => {
-  if (!isoTimestamp) {
-    return 'just now'
-  }
-
-  try {
-    const timestamp = new Date(isoTimestamp)
-    if (Number.isNaN(timestamp.getTime())) {
-      return isoTimestamp
-    }
-
-    const now = new Date()
-    const time = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' }).format(
-      timestamp
-    )
-    if (isSameCalendarDay(timestamp, now)) {
-      return `Today, ${time}`
-    }
-    const yesterday = new Date(now)
-    yesterday.setDate(now.getDate() - 1)
-    if (isSameCalendarDay(timestamp, yesterday)) {
-      return `Yesterday, ${time}`
-    }
-    if (timestamp.getFullYear() === now.getFullYear()) {
-      const monthDay = new Intl.DateTimeFormat(undefined, {
-        month: 'short',
-        day: 'numeric',
-      }).format(timestamp)
-      return `${monthDay}, ${time}`
-    }
-    return new Intl.DateTimeFormat(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    }).format(timestamp)
-  } catch (error) {
-    devLog('warn', '[history] Failed to format timestamp', error)
-    return isoTimestamp
-  }
 }
 
 type HistoryStat = {
@@ -354,7 +323,17 @@ const HistoryStatTile = ({ stat }: { stat: HistoryStat }) => {
 
   return (
     <View style={[styles.tile, { backgroundColor, borderColor }]}>
-      <AppText variant="plain" color={textColor} style={styles.tileLabel}>
+      {/* One line, shrink to fit (i18n phase 9): in a third of the width pl
+          «Nieukończone» broke mid-word («Nieukończon / e») and ru «Не завершено»
+          wrapped, making that tile taller than its neighbours. */}
+      <AppText
+        variant="plain"
+        color={textColor}
+        style={styles.tileLabel}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+      >
         {stat.label}
       </AppText>
       <AppText variant="plain" color={textColor} style={styles.tileValue}>
@@ -411,7 +390,7 @@ const HistoryPreviewSheet = ({ entry, onDismiss }: HistoryPreviewSheetProps) => 
       return
     }
     const url = buildDealShareUrl(exactId, drawCount)
-    const message = `Play this Klondike deal in Soli (Draw ${drawCount})`
+    const message = t('share.dealMessage', { number: drawCount })
     void Share.share(
       Platform.OS === 'ios' ? { message, url } : { message: `${message}: ${url}` }
     ).catch((error) => {
@@ -441,18 +420,18 @@ const HistoryPreviewSheet = ({ entry, onDismiss }: HistoryPreviewSheetProps) => 
             handles: label (Android) + testID (iOS). Both shown for every status. */}
         <View style={styles.buttonRow}>
           <AppButton
-            label="Retry"
+            label={t('history.retry')}
             style={styles.flex1}
             disabled={!canRetry}
             onPress={handleRetry}
-            accessibilityLabel="Retry this deal"
+            accessibilityLabel={t('history.retryA11y')}
             testID="history-retry"
           />
           <AppButton
-            label="Share"
+            label={t('history.share')}
             style={styles.flex1}
             onPress={handleShare}
-            accessibilityLabel="Share this deal"
+            accessibilityLabel={t('history.shareA11y')}
             testID="history-share"
           />
         </View>

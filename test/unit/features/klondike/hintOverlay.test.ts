@@ -12,15 +12,21 @@ import {
   type AbsoluteCardLayerLayouts,
 } from '../../../../src/features/klondike/components/cards/utils'
 import {
-  NO_HINT_BUBBLE_TEXT,
-  STUCK_BUBBLE_TEXT,
-  UNWINNABLE_BUBBLE_TEXT,
+  getNoHintBubbleText,
+  getStuckBubbleText,
+  getUnwinnableBubbleText,
   getHintAnnouncement,
   getHintFallbackNoticeText,
 } from '../../../../src/features/klondike/hooks/useHint'
 import type { CardMetrics } from '../../../../src/features/klondike/types'
 import type { SolverMoveHint } from '../../../../src/solitaire/solverBridge'
 import { card, tableauWith } from '../../solitaire/helpers'
+
+// Bubble copy comes from en.json via t() (jest runs in English, see
+// test/setup/mock-expo-localization.ts); resolved once here to keep the assertions short.
+const NO_HINT_BUBBLE_TEXT = getNoHintBubbleText()
+const STUCK_BUBBLE_TEXT = getStuckBubbleText()
+const UNWINNABLE_BUBBLE_TEXT = getUnwinnableBubbleText()
 
 const METRICS: CardMetrics = { width: 50, height: 70, stackOffset: 20, radius: 6 }
 

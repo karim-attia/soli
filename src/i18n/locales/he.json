@@ -1,0 +1,203 @@
+{
+  "nav": {
+    "play": "משחק",
+    "hello": "שלום",
+    "history": "היסטוריה",
+    "settings": "הגדרות",
+    "rate": "דירוג Soli",
+    "openMenu": "פתיחת תפריט הניווט",
+    "notFoundTitle": "אופס!",
+    "notFoundBody": "המסך הזה לא קיים.",
+    "notFoundLink": "מעבר למסך הבית"
+  },
+  "common": {
+    "cancel": "ביטול",
+    "reset": "איפוס",
+    "off": "כבוי",
+    "drawMode": "משיכת {{number}}"
+  },
+  "about": {
+    "madeBy": "נוצר על ידי",
+    "dedication": "לבת הזוג שלי T, כי תמיד נאלצה לצפות בפרסומות כששיחקה סוליטר.",
+    "pitch": "אפליקציית סוליטר חינמית בקוד פתוח.",
+    "sourceLink": "קוד המקור ב-GitHub",
+    "promise": "ללא פרסומות, ללא רכישות בתוך האפליקציה וללא תכסיסים שנועדו לגרום לך לשחק יותר."
+  },
+  "game": {
+    "newGame": "משחק חדש",
+    "newGameA11y": "התחלת משחק חדש",
+    "undo": "ביטול",
+    "hint": "רמז",
+    "draw": "משיכה",
+    "recyclesLeft_one": "נותר {{count}}",
+    "recyclesLeft_two": "נותרו {{count}}",
+    "recyclesLeft_other": "נותרו {{count}}",
+    "newGameAlert": {
+      "title": "להתחיל משחק חדש?",
+      "message": "מוכנים לסיבוב נוסף?",
+      "messageWon": "ניצחון יפה! מוכנים לסיבוב נוסף?",
+      "confirm": "חלוקה חדשה"
+    },
+    "playDeal": {
+      "retryTitle": "לנסות שוב את החלוקה הזאת?",
+      "retryConfirm": "ניסיון חוזר",
+      "sharedTitle": "לשחק בחלוקה ששיתפו איתך?",
+      "sharedConfirm": "לשחק",
+      "message": "המשחק הנוכחי שלך יסתיים ויירשם כמשחק שלא הושלם."
+    }
+  },
+  "notice": {
+    "unwinnable": "כבר אי אפשר לנצח במשחק הזה. אפשר לבטל מהלך או להתחיל משחק חדש.",
+    "stuck": "אין עוד מהלכים מועילים. אפשר לבטל מהלך או להתחיל משחק חדש.",
+    "noHint": "לא נמצא רמז.",
+    "undoTip": "טיפ: אפשר לגרור את כפתור הביטול הצידה כדי לצאת למסע בזמן לאורך המשחק"
+  },
+  "hud": {
+    "score": "ניקוד",
+    "vegas": "וגאס",
+    "total": "סה״כ",
+    "moves": "מהלכים",
+    "time": "זמן",
+    "badgeA11y": "{{label}}, {{value}}",
+    "vegasSpoken_one": "דולר אחד",
+    "vegasSpoken_two": "שני דולרים",
+    "vegasSpoken_other": "{{count}} דולרים",
+    "vegasSpokenNegative_one": "מינוס דולר אחד",
+    "vegasSpokenNegative_two": "מינוס שני דולרים",
+    "vegasSpokenNegative_other": "מינוס {{count}} דולרים"
+  },
+  "time": {
+    "hours_one": "שעה אחת",
+    "hours_two": "שעתיים",
+    "hours_other": "{{count}} שעות",
+    "minutes_one": "דקה אחת",
+    "minutes_two": "שתי דקות",
+    "minutes_other": "{{count}} דקות",
+    "seconds_one": "שנייה אחת",
+    "seconds_two": "שתי שניות",
+    "seconds_other": "{{count}} שניות",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "משחקים חדשים",
+      "gameplay": "אופן המשחק",
+      "statistics": "סטטיסטיקה"
+    },
+    "cardsDrawn": "קלפים במשיכה",
+    "solvableDeals": "חלוקות פתירות",
+    "scoring": {
+      "label": "שיטת ניקוד",
+      "description": "נקודות רגילות או דולרים של וגאס. ההגדרה תחול מהמשחק הבא שלך.",
+      "vegasDescription": "בווגאס הרמזים, האזהרות והחלוקות הפתירות כבויים. ההגדרה תחול מהמשחק הבא שלך.",
+      "standard": "רגיל",
+      "vegas": "וגאס"
+    },
+    "vegasTotal": {
+      "label": "שמירת סך הכול בווגאס",
+      "description": "היתרה שלך עוברת ממשחק למשחק. בראש המסך יוצג אז סך הכול המצטבר שלך במקום התוצאה של המשחק הזה.",
+      "resetLabel": "איפוס סך הכול בווגאס",
+      "resetTitle": "לאפס את סך הכול בווגאס?",
+      "resetMessage": "סך הכול המצטבר שלך יתחיל מחדש מ-\u200E$0. המשחק שעל השולחן עדיין ייחשב."
+    },
+    "autoUp": "העברת קלפים אוטומטית",
+    "hintButton": {
+      "label": "כפתור רמז",
+      "description": "הצגת כפתור רמז שחושף את המהלך הבא."
+    },
+    "warnings": {
+      "label": "אזהרות",
+      "description": "אזהרה כשנגמרים המהלכים המועילים, או ברגע שכבר אי אפשר לנצח במשחק.",
+      "noUsefulMoves": "אין עוד מהלכים מועילים",
+      "unwinnable": "משחק שאי אפשר לנצח"
+    },
+    "showMoves": "מונה מהלכים",
+    "showTime": "שעון משחק"
+  },
+  "history": {
+    "title": "היסטוריית משחקים",
+    "stats": {
+      "games": "משחקים",
+      "solved": "נפתרו",
+      "incomplete": "לא הושלמו"
+    },
+    "status": {
+      "solved": "נפתר",
+      "incomplete": "לא הושלם",
+      "active": "פעיל"
+    },
+    "dealName": "חלוקה {{code}}",
+    "moves_one": "מהלך אחד",
+    "moves_two": "שני מהלכים",
+    "moves_other": "{{count}} מהלכים",
+    "score": "ניקוד {{value}}",
+    "vegas": "וגאס \u200E{{value}}",
+    "solvable": "פתירה",
+    "emptyTitle": "עדיין לא נרשמו משחקים",
+    "emptyBody": "אפשר לשחק משחק סוליטר קלונדייק כדי להתחיל לבנות את ההיסטוריה שלך. משחקים שהושלמו והחלוקות שלהם יופיעו כאן.",
+    "loadingTitle": "ההיסטוריה נטענת…",
+    "loadingBody": "רק רגע, המשחקים האחרונים שלך נטענים.",
+    "justNow": "ממש עכשיו",
+    "today": "היום, {{time}}",
+    "yesterday": "אתמול, {{time}}",
+    "dateTime": "{{date}}, {{time}}",
+    "retry": "ניסיון חוזר",
+    "retryA11y": "ניסיון חוזר בחלוקה הזאת",
+    "share": "שיתוף",
+    "shareA11y": "שיתוף החלוקה הזאת"
+  },
+  "share": {
+    "dealMessage": "אפשר לשחק בחלוקת סוליטר קלונדייק הזאת ב-Soli (משיכת {{number}})"
+  },
+  "a11y": {
+    "rank": {
+      "1": "אס",
+      "2": "שתיים",
+      "3": "שלוש",
+      "4": "ארבע",
+      "5": "חמש",
+      "6": "שש",
+      "7": "שבע",
+      "8": "שמונה",
+      "9": "תשע",
+      "10": "עשר",
+      "11": "נסיך",
+      "12": "מלכה",
+      "13": "מלך"
+    },
+    "suit": {
+      "clubs": "תלתן",
+      "diamonds": "יהלום",
+      "hearts": "לב",
+      "spades": "עלה"
+    },
+    "card": "{{rank}} {{suit}}",
+    "tableauCard": "{{card}}, טור {{column}}",
+    "faceDownCard": "קלף הפוך, טור {{column}}",
+    "emptyColumn": "טור {{column}}, ריק",
+    "stock_one": "קופה, קלף אחד",
+    "stock_two": "קופה, שני קלפים",
+    "stock_other": "קופה, {{count}} קלפים",
+    "stockEmpty": "קופה, ריקה",
+    "stockExhausted": "קופה, לא נותרו סבבים",
+    "stockRecycle": "החזרת ערימת הפסולת לקופה",
+    "stockRecycleLeft_one": "החזרת ערימת הפסולת לקופה, נותר סבב אחד",
+    "stockRecycleLeft_two": "החזרת ערימת הפסולת לקופה, נותרו שני סבבים",
+    "stockRecycleLeft_other": "החזרת ערימת הפסולת לקופה, נותרו {{count}} סבבים",
+    "waste": "ערימת הפסולת, {{card}}",
+    "foundationPile": {
+      "clubs": "ערימת יסוד תלתן",
+      "diamonds": "ערימת יסוד יהלום",
+      "hearts": "ערימת יסוד לב",
+      "spades": "ערימת יסוד עלה"
+    },
+    "foundation": "{{pile}}, {{card}}",
+    "foundationEmpty": "{{pile}}, ריקה",
+    "scrubber": "מחוון ביטול מהלכים, שלב {{position}} מתוך {{total}}",
+    "hint": {
+      "draw": "רמז: משיכה מהקופה.",
+      "toColumn": "רמז: העברת {{card}} לטור {{column}}.",
+      "toFoundation": "רמז: העברת {{card}} לערימת היסוד."
+    }
+  }
+}

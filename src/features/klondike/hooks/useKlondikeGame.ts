@@ -8,6 +8,7 @@
 // "changes every render" (the rule cannot see compiler memoization). The "stays stable"
 // comments below still hold: they describe what the compiler guarantees and WHY handlers
 // read `stateRef` instead of `state` (a `state` read would re-create them per action).
+import { t } from '../../../i18n'
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { Alert, LayoutChangeEvent, LayoutRectangle, useColorScheme } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -80,10 +81,11 @@ export type RequestPlayDealFn = (
   options?: { prompt?: PlayDealPrompt; onConfirmed?: () => void }
 ) => void
 
-const PLAY_DEAL_PROMPTS: Record<PlayDealPrompt, { title: string; confirm: string }> = {
-  retry: { title: 'Retry this deal?', confirm: 'Retry' },
-  shared: { title: 'Play shared deal?', confirm: 'Play' },
-}
+// Translation KEYS, resolved with t() inside the callback (no t() at module scope).
+const PLAY_DEAL_PROMPTS = {
+  retry: { title: 'game.playDeal.retryTitle', confirm: 'game.playDeal.retryConfirm' },
+  shared: { title: 'game.playDeal.sharedTitle', confirm: 'game.playDeal.sharedConfirm' },
+} as const satisfies Record<PlayDealPrompt, { title: string; confirm: string }>
 
 // PBI-28: Run auto-up (auto-complete) much faster than manual play cadence.
 const AUTO_QUEUE_INTERVAL_MS = 25
@@ -678,7 +680,7 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
   )
 
   // Sets the stock button label, fading when the stock is empty.
-  const drawLabel = state.stock.length ? 'Draw' : ''
+  const drawLabel = state.stock.length ? t('game.draw') : ''
 
   // Captures board dimensions for card metrics and celebration sizing.
   const handleBoardLayout = (event: LayoutChangeEvent) => {
@@ -740,11 +742,11 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       if (forced) {
         updateBoardLocked(true)
       } else {
-        buttons.push({ text: 'Cancel', style: 'cancel' })
+        buttons.push({ text: t('common.cancel'), style: 'cancel' })
       }
 
       buttons.push({
-        text: 'Deal Again',
+        text: t('game.newGameAlert.confirm'),
         style: forced ? 'default' : 'destructive',
         onPress: () => {
           performDealAgain({ logContext: { reason, forced } })
@@ -752,8 +754,8 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
       })
 
       Alert.alert(
-        'Start a new game?',
-        forced ? 'Nice win! Ready for another round?' : 'Ready for another round?',
+        t('game.newGameAlert.title'),
+        forced ? t('game.newGameAlert.messageWon') : t('game.newGameAlert.message'),
         buttons,
         { cancelable: !forced }
       )
@@ -788,14 +790,10 @@ export const useKlondikeGame = (): UseKlondikeGameResult => {
         play()
         return
       }
-      Alert.alert(
-        prompt.title,
-        'Your current game will end and be recorded as incomplete.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: prompt.confirm, style: 'destructive', onPress: play },
-        ]
-      )
+      Alert.alert(t(prompt.title), t('game.playDeal.message'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t(prompt.confirm), style: 'destructive', onPress: play },
+      ])
     },
     [clearCelebrationDialogTimer, performDealAgain, vegasRules]
   )

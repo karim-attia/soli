@@ -1,0 +1,1 @@
+Ruhiges Klondike-Solitär. Jedes Spiel lösbar. Unbegrenzt rückgängig.

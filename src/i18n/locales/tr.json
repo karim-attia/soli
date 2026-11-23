@@ -1,0 +1,194 @@
+{
+  "nav": {
+    "play": "Oyna",
+    "hello": "Merhaba",
+    "history": "Geçmiş",
+    "settings": "Ayarlar",
+    "rate": "Soli’yi Değerlendir",
+    "openMenu": "Gezinme menüsünü aç",
+    "notFoundTitle": "Hay aksi!",
+    "notFoundBody": "Böyle bir ekran yok.",
+    "notFoundLink": "Ana ekrana dön"
+  },
+  "common": {
+    "cancel": "İptal",
+    "reset": "Sıfırla",
+    "off": "Kapalı",
+    "drawMode": "{{number}} Kart Çek"
+  },
+  "about": {
+    "madeBy": "Geliştiren:",
+    "dedication": "Solitaire oynarken hep reklam izlemek zorunda kalan kız arkadaşım T için.",
+    "pitch": "Ücretsiz ve açık kaynak kodlu Solitaire uygulaması.",
+    "sourceLink": "Kaynak kodu GitHub’da",
+    "promise": "Reklam yok, uygulama içi satın alma yok, daha çok oynatmaya çalışan oyunlaştırma yok."
+  },
+  "game": {
+    "newGame": "Yeni Oyun",
+    "newGameA11y": "Yeni bir oyun başlat",
+    "undo": "Geri Al",
+    "hint": "İpucu",
+    "draw": "Çek",
+    "recyclesLeft_one": "{{count}} kaldı",
+    "recyclesLeft_other": "{{count}} kaldı",
+    "newGameAlert": {
+      "title": "Yeni oyun başlatılsın mı?",
+      "message": "Yeni bir oyuna hazır mısın?",
+      "messageWon": "Tebrikler, kazandın! Yeni bir oyuna hazır mısın?",
+      "confirm": "Yeniden Dağıt"
+    },
+    "playDeal": {
+      "retryTitle": "Bu el yeniden denensin mi?",
+      "retryConfirm": "Yeniden Dene",
+      "sharedTitle": "Paylaşılan el oynansın mı?",
+      "sharedConfirm": "Oyna",
+      "message": "Şu anki oyunun sona erer ve “Tamamlanmadı” olarak kaydedilir."
+    }
+  },
+  "notice": {
+    "unwinnable": "Kazandıran hamle kalmadı. Geri al veya yeni bir oyun başlat.",
+    "stuck": "İşe yarar hamle kalmadı. Geri al veya yeni bir oyun başlat.",
+    "noHint": "İpucu bulunamadı.",
+    "undoTip": "Oyununda zamanda yolculuk yapmak için Geri Al düğmesini yana sürükle"
+  },
+  "hud": {
+    "score": "Puan",
+    "vegas": "Vegas",
+    "total": "Toplam",
+    "moves": "Hamle",
+    "time": "Süre",
+    "badgeA11y": "{{label}}, {{value}}",
+    "vegasSpoken_one": "{{count}} dolar",
+    "vegasSpoken_other": "{{count}} dolar",
+    "vegasSpokenNegative_one": "eksi {{count}} dolar",
+    "vegasSpokenNegative_other": "eksi {{count}} dolar"
+  },
+  "time": {
+    "hours_one": "{{count}} saat",
+    "hours_other": "{{count}} saat",
+    "minutes_one": "{{count}} dakika",
+    "minutes_other": "{{count}} dakika",
+    "seconds_one": "{{count}} saniye",
+    "seconds_other": "{{count}} saniye",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "Yeni Oyunlar",
+      "gameplay": "Oynanış",
+      "statistics": "İstatistikler"
+    },
+    "cardsDrawn": "Çekilen Kart Sayısı",
+    "solvableDeals": "Çözülebilir Eller",
+    "scoring": {
+      "label": "Puanlama",
+      "description": "Standart puanlar veya Vegas doları. Bir sonraki oyununda geçerli olur.",
+      "vegasDescription": "Vegas’ta ipuçları, uyarılar ve çözülebilir eller kapalıdır. Bir sonraki oyununda geçerli olur.",
+      "standard": "Standart",
+      "vegas": "Vegas"
+    },
+    "vegasTotal": {
+      "label": "Vegas Toplamını Tut",
+      "description": "Bakiyeni oyundan oyuna taşı. Üstteki gösterge o zaman bu oyunun sonucu yerine biriken toplamını gösterir.",
+      "resetLabel": "Vegas Toplamını Sıfırla",
+      "resetTitle": "Vegas toplamı sıfırlansın mı?",
+      "resetMessage": "Biriken toplamın yeniden $0’dan başlar. Masadaki oyun yine sayılır."
+    },
+    "autoUp": "Otomatik Yerleştir",
+    "hintButton": {
+      "label": "İpucu Düğmesi",
+      "description": "Sonraki hamleyi öneren İpucu düğmesini göster."
+    },
+    "warnings": {
+      "label": "Uyarılar",
+      "description": "İşe yarar hamlen kalmadığında veya oyun artık kazanılamaz hâle gelir gelmez uyar.",
+      "noUsefulMoves": "İşe yarar hamle kalmadı",
+      "unwinnable": "Kazanılamaz oyun"
+    },
+    "showMoves": "Hamle Sayacı",
+    "showTime": "Oyun Süresi"
+  },
+  "history": {
+    "title": "Oyun Geçmişi",
+    "stats": {
+      "games": "Oyun",
+      "solved": "Çözüldü",
+      "incomplete": "Tamamlanmadı"
+    },
+    "status": {
+      "solved": "Çözüldü",
+      "incomplete": "Tamamlanmadı",
+      "active": "Devam ediyor"
+    },
+    "dealName": "El {{code}}",
+    "moves_one": "{{count}} hamle",
+    "moves_other": "{{count}} hamle",
+    "score": "Puan {{value}}",
+    "vegas": "Vegas {{value}}",
+    "solvable": "Çözülebilir",
+    "emptyTitle": "Henüz kayıtlı oyun yok",
+    "emptyBody": "Geçmişini oluşturmaya başlamak için bir Solitaire oyunu oyna. Tamamlanan oyunlar ve oynadığın eller burada görünür.",
+    "loadingTitle": "Geçmiş yükleniyor…",
+    "loadingBody": "Son oyunların getiriliyor, lütfen bekle.",
+    "justNow": "az önce",
+    "today": "Bugün, {{time}}",
+    "yesterday": "Dün, {{time}}",
+    "dateTime": "{{date}}, {{time}}",
+    "retry": "Yeniden Dene",
+    "retryA11y": "Bu eli yeniden dene",
+    "share": "Paylaş",
+    "shareA11y": "Bu eli paylaş"
+  },
+  "share": {
+    "dealMessage": "Bu Solitaire elini Soli’de oyna ({{number}} Kart Çek)"
+  },
+  "a11y": {
+    "rank": {
+      "1": "ası",
+      "2": "ikilisi",
+      "3": "üçlüsü",
+      "4": "dörtlüsü",
+      "5": "beşlisi",
+      "6": "altılısı",
+      "7": "yedilisi",
+      "8": "sekizlisi",
+      "9": "dokuzlusu",
+      "10": "onlusu",
+      "11": "valesi",
+      "12": "kızı",
+      "13": "papazı"
+    },
+    "suit": {
+      "clubs": "Sinek",
+      "diamonds": "Karo",
+      "hearts": "Kupa",
+      "spades": "Maça"
+    },
+    "card": "{{suit}} {{rank}}",
+    "tableauCard": "{{card}}, {{column}}. sütun",
+    "faceDownCard": "Kapalı kart, {{column}}. sütun",
+    "emptyColumn": "{{column}}. sütun, boş",
+    "stock_one": "Deste, {{count}} kart",
+    "stock_other": "Deste, {{count}} kart",
+    "stockEmpty": "Deste, boş",
+    "stockExhausted": "Deste, tur hakkı kalmadı",
+    "stockRecycle": "Atık yığınını desteye geri çevir",
+    "stockRecycleLeft_one": "Atık yığınını desteye geri çevir, {{count}} tur kaldı",
+    "stockRecycleLeft_other": "Atık yığınını desteye geri çevir, {{count}} tur kaldı",
+    "waste": "Atık yığını, {{card}}",
+    "foundationPile": {
+      "clubs": "Sinek temel yığını",
+      "diamonds": "Karo temel yığını",
+      "hearts": "Kupa temel yığını",
+      "spades": "Maça temel yığını"
+    },
+    "foundation": "{{pile}}, {{card}}",
+    "foundationEmpty": "{{pile}}, boş",
+    "scrubber": "Geri alma kaydırıcısı, toplam {{total}} adım, konum {{position}}",
+    "hint": {
+      "draw": "İpucu: desteden kart çek.",
+      "toColumn": "İpucu: {{card}} kartını {{column}}. sütuna taşı.",
+      "toFoundation": "İpucu: {{card}} kartını temel yığına taşı."
+    }
+  }
+}

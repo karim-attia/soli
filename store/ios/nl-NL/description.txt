@@ -1,0 +1,17 @@
+Soli is klassieke Klondike-patience (Solitaire), met zorg verfijnd. Gratis, open source en zonder advertenties.
+
+Geen advertenties, geen in-app-aankopen, geen streaks, munten of pop-ups om je meer te laten spelen. Alleen kaarten.
+
+FUNCTIES
+
+- Klassieke Klondike met Trek 1 tot en met Trek 5
+- Oplosbare spellen: elk nieuw spel is te winnen (je kunt dit uitzetten)
+- Onbeperkt ongedaan maken: sleep de knop Ongedaan maken opzij om terug te reizen door je spel
+- Optionele hintknop die de volgende zet laat zien
+- Een rustige melding als er geen zinvolle zetten meer zijn
+- Standaardpuntentelling, Vegas-puntentelling of helemaal geen score
+- Automatisch wegspelen brengt kaarten voor je naar de eindstapels
+- Spelgeschiedenis: speel elk spel opnieuw of deel het met vrienden
+- Tientallen overwinningsanimaties
+
+Gemaakt in Zwitserland, voor iedereen die gewoon patience wil spelen.

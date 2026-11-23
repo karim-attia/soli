@@ -1,0 +1,203 @@
+{
+  "nav": {
+    "play": "Jouer",
+    "hello": "Bonjour",
+    "history": "Historique",
+    "settings": "Réglages",
+    "rate": "Noter Soli",
+    "openMenu": "Ouvrir le menu de navigation",
+    "notFoundTitle": "Oups !",
+    "notFoundBody": "Cet écran n’existe pas.",
+    "notFoundLink": "Revenir à l’écran d’accueil"
+  },
+  "common": {
+    "cancel": "Annuler",
+    "reset": "Réinitialiser",
+    "off": "Non",
+    "drawMode": "Tirage {{number}}"
+  },
+  "about": {
+    "madeBy": "Créé par",
+    "dedication": "Pour ma copine T, qui devait toujours regarder des publicités en jouant au solitaire.",
+    "pitch": "Application de solitaire gratuite et open source.",
+    "sourceLink": "Code source sur GitHub",
+    "promise": "Ni publicité, ni achats intégrés, ni mécanismes pour vous pousser à jouer davantage."
+  },
+  "game": {
+    "newGame": "Nouvelle partie",
+    "newGameA11y": "Commencer une nouvelle partie",
+    "undo": "Annuler",
+    "hint": "Indice",
+    "draw": "Tirer",
+    "recyclesLeft_one": "Encore {{count}}",
+    "recyclesLeft_many": "Encore {{count}}",
+    "recyclesLeft_other": "Encore {{count}}",
+    "newGameAlert": {
+      "title": "Commencer une nouvelle partie ?",
+      "message": "Envie d’une autre partie ?",
+      "messageWon": "Belle victoire ! Envie d’une autre partie ?",
+      "confirm": "Distribuer"
+    },
+    "playDeal": {
+      "retryTitle": "Rejouer cette donne ?",
+      "retryConfirm": "Rejouer",
+      "sharedTitle": "Jouer la donne partagée ?",
+      "sharedConfirm": "Jouer",
+      "message": "Votre partie en cours prendra fin et sera enregistrée comme inachevée."
+    }
+  },
+  "notice": {
+    "unwinnable": "Cette partie n’est plus gagnable. Annulez des coups ou commencez une nouvelle partie.",
+    "stuck": "Aucun coup utile restant. Annulez des coups ou commencez une nouvelle partie.",
+    "noHint": "Aucun indice trouvé.",
+    "undoTip": "Astuce : faites glisser le bouton Annuler latéralement pour voyager dans le temps au fil de votre partie"
+  },
+  "hud": {
+    "score": "Score",
+    "vegas": "Vegas",
+    "total": "Total",
+    "moves": "Coups",
+    "time": "Temps",
+    "badgeA11y": "{{label}}, {{value}}",
+    "vegasSpoken_one": "{{count}} dollar",
+    "vegasSpoken_many": "{{count}} dollars",
+    "vegasSpoken_other": "{{count}} dollars",
+    "vegasSpokenNegative_one": "moins {{count}} dollar",
+    "vegasSpokenNegative_many": "moins {{count}} dollars",
+    "vegasSpokenNegative_other": "moins {{count}} dollars"
+  },
+  "time": {
+    "hours_one": "{{count}} heure",
+    "hours_many": "{{count}} heures",
+    "hours_other": "{{count}} heures",
+    "minutes_one": "{{count}} minute",
+    "minutes_many": "{{count}} minutes",
+    "minutes_other": "{{count}} minutes",
+    "seconds_one": "{{count}} seconde",
+    "seconds_many": "{{count}} secondes",
+    "seconds_other": "{{count}} secondes",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "Nouvelles parties",
+      "gameplay": "Jeu",
+      "statistics": "Statistiques"
+    },
+    "cardsDrawn": "Cartes tirées",
+    "solvableDeals": "Donnes gagnables",
+    "scoring": {
+      "label": "Mode de score",
+      "description": "Points standard ou dollars Vegas. S’applique à la prochaine partie.",
+      "vegasDescription": "Indices, avertissements et donnes gagnables sont désactivés en mode Vegas. S’applique à la prochaine partie.",
+      "standard": "Standard",
+      "vegas": "Vegas"
+    },
+    "vegasTotal": {
+      "label": "Conserver le total Vegas",
+      "description": "Votre solde est reporté d’une partie à l’autre. L’en-tête affiche alors votre total cumulé au lieu du résultat de la partie en cours.",
+      "resetLabel": "Réinitialiser le total Vegas",
+      "resetTitle": "Réinitialiser le total Vegas ?",
+      "resetMessage": "Votre total cumulé repart de $0. La partie en cours compte toujours."
+    },
+    "autoUp": "Montée auto",
+    "hintButton": {
+      "label": "Bouton Indice",
+      "description": "Afficher un bouton Indice qui révèle le prochain coup."
+    },
+    "warnings": {
+      "label": "Avertissements",
+      "description": "Vous avertir lorsqu’il ne reste aucun coup utile, ou dès que la partie n’est plus gagnable.",
+      "noUsefulMoves": "Aucun coup utile",
+      "unwinnable": "Partie ingagnable"
+    },
+    "showMoves": "Compteur de coups",
+    "showTime": "Chronomètre"
+  },
+  "history": {
+    "title": "Historique des parties",
+    "stats": {
+      "games": "Parties",
+      "solved": "Gagnées",
+      "incomplete": "Inachevées"
+    },
+    "status": {
+      "solved": "Gagnée",
+      "incomplete": "Inachevée",
+      "active": "En cours"
+    },
+    "dealName": "Donne {{code}}",
+    "moves_one": "{{count}} coup",
+    "moves_many": "{{count}} coups",
+    "moves_other": "{{count}} coups",
+    "score": "Score {{value}}",
+    "vegas": "Vegas {{value}}",
+    "solvable": "Gagnable",
+    "emptyTitle": "Aucune partie enregistrée",
+    "emptyBody": "Jouez une partie de Klondike pour commencer votre historique. Les parties terminées et leurs donnes apparaîtront ici.",
+    "loadingTitle": "Chargement de l’historique…",
+    "loadingBody": "Veuillez patienter pendant la récupération de vos parties récentes.",
+    "justNow": "à l’instant",
+    "today": "Aujourd’hui à {{time}}",
+    "yesterday": "Hier à {{time}}",
+    "dateTime": "{{date}} à {{time}}",
+    "retry": "Rejouer",
+    "retryA11y": "Rejouer cette donne",
+    "share": "Partager",
+    "shareA11y": "Partager cette donne"
+  },
+  "share": {
+    "dealMessage": "Une donne de Klondike à jouer dans Soli (Tirage {{number}})"
+  },
+  "a11y": {
+    "rank": {
+      "1": "As",
+      "2": "Deux",
+      "3": "Trois",
+      "4": "Quatre",
+      "5": "Cinq",
+      "6": "Six",
+      "7": "Sept",
+      "8": "Huit",
+      "9": "Neuf",
+      "10": "Dix",
+      "11": "Valet",
+      "12": "Dame",
+      "13": "Roi"
+    },
+    "suit": {
+      "clubs": "trèfle",
+      "diamonds": "carreau",
+      "hearts": "cœur",
+      "spades": "pique"
+    },
+    "card": "{{rank}} de {{suit}}",
+    "tableauCard": "{{card}}, colonne {{column}}",
+    "faceDownCard": "Carte face cachée, colonne {{column}}",
+    "emptyColumn": "Colonne {{column}}, vide",
+    "stock_one": "Pioche, {{count}} carte",
+    "stock_many": "Pioche, {{count}} cartes",
+    "stock_other": "Pioche, {{count}} cartes",
+    "stockEmpty": "Pioche, vide",
+    "stockExhausted": "Pioche, aucun passage restant",
+    "stockRecycle": "Remettre la défausse dans la pioche",
+    "stockRecycleLeft_one": "Remettre la défausse dans la pioche, {{count}} passage restant",
+    "stockRecycleLeft_many": "Remettre la défausse dans la pioche, {{count}} passages restants",
+    "stockRecycleLeft_other": "Remettre la défausse dans la pioche, {{count}} passages restants",
+    "waste": "Défausse, {{card}}",
+    "foundationPile": {
+      "clubs": "Fondation de trèfle",
+      "diamonds": "Fondation de carreau",
+      "hearts": "Fondation de cœur",
+      "spades": "Fondation de pique"
+    },
+    "foundation": "{{pile}}, {{card}}",
+    "foundationEmpty": "{{pile}}, vide",
+    "scrubber": "Curseur d’annulation, position {{position}} sur {{total}}",
+    "hint": {
+      "draw": "Indice : piochez.",
+      "toColumn": "Indice : {{card}} vers la colonne {{column}}.",
+      "toFoundation": "Indice : {{card}} vers la fondation."
+    }
+  }
+}

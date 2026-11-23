@@ -1,0 +1,185 @@
+{
+  "nav": {
+    "play": "플레이",
+    "hello": "안녕하세요",
+    "history": "기록",
+    "settings": "설정",
+    "rate": "Soli 평가하기",
+    "openMenu": "탐색 메뉴 열기",
+    "notFoundTitle": "앗!",
+    "notFoundBody": "존재하지 않는 화면이에요.",
+    "notFoundLink": "홈 화면으로 가기"
+  },
+  "common": {
+    "cancel": "취소",
+    "reset": "초기화",
+    "off": "끔",
+    "drawMode": "{{number}}장 뽑기"
+  },
+  "about": {
+    "madeBy": "만든 사람:",
+    "dedication": "솔리테어를 할 때마다 광고를 봐야 했던 제 여자친구 T\u2060를 위해 만들었어요.",
+    "pitch": "무료 오픈 소스 솔리테어 앱이에요.",
+    "sourceLink": "GitHub에서 소스 코드 보기",
+    "promise": "광고도, 인앱 구매도, 더 오래 플레이하게 만드는 게임화 요소도 없어요."
+  },
+  "game": {
+    "newGame": "새 게임",
+    "newGameA11y": "새 게임 시작",
+    "undo": "실행 취소",
+    "hint": "힌트",
+    "draw": "뽑기",
+    "recyclesLeft_other": "{{count}}회 남음",
+    "newGameAlert": {
+      "title": "새 게임을 시작할까요?",
+      "message": "한 판 더 해 볼까요?",
+      "messageWon": "멋진 승리예요! 한 판 더 해 볼까요?",
+      "confirm": "한 판 더"
+    },
+    "playDeal": {
+      "retryTitle": "이 판을 다시 할까요?",
+      "retryConfirm": "다시 하기",
+      "sharedTitle": "공유받은 판을 플레이할까요?",
+      "sharedConfirm": "플레이",
+      "message": "진행 중인 게임은 종료되고 미완료로 기록돼요."
+    }
+  },
+  "notice": {
+    "unwinnable": "이 게임은 이제 이길 수 없어요. 실행 취소하거나 새 게임을 시작해 보세요.",
+    "stuck": "도움이 되는 이동이 더 없어요. 실행 취소하거나 새 게임을 시작해 보세요.",
+    "noHint": "힌트를 찾지 못했어요.",
+    "undoTip": "팁: 실행 취소 버튼을 옆으로 드래그하면 게임 속 시간 여행을 할 수 있어요"
+  },
+  "hud": {
+    "score": "점수",
+    "vegas": "베가스",
+    "total": "누적",
+    "moves": "이동",
+    "time": "시간",
+    "badgeA11y": "{{label}}: {{value}}",
+    "vegasSpoken_other": "{{count}}달러",
+    "vegasSpokenNegative_other": "마이너스 {{count}}달러"
+  },
+  "time": {
+    "hours_other": "{{count}}시간",
+    "minutes_other": "{{count}}분",
+    "seconds_other": "{{count}}초",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "새 게임",
+      "gameplay": "게임 플레이",
+      "statistics": "통계"
+    },
+    "cardsDrawn": "뽑는 카드 수",
+    "solvableDeals": "풀 수 있는 판",
+    "scoring": {
+      "label": "점수 방식",
+      "description": "표준 점수 또는 베가스 달러. 다음 게임부터 적용돼요.",
+      "vegasDescription": "베가스에서는 힌트, 경고, 풀 수 있는 판이 꺼져요. 다음 게임부터 적용돼요.",
+      "standard": "표준",
+      "vegas": "베가스"
+    },
+    "vegasTotal": {
+      "label": "베가스 누적 유지",
+      "description": "금액을 다음 게임으로 이어 가요. 그러면 화면 위쪽에 이번 게임 결과 대신 누적 금액이 표시돼요.",
+      "resetLabel": "베가스 누적 초기화",
+      "resetTitle": "베가스 누적을 초기화할까요?",
+      "resetMessage": "누적 금액이 $0부터 다시 시작돼요. 지금 진행 중인 게임은 그대로 반영돼요."
+    },
+    "autoUp": "자동 올리기",
+    "hintButton": {
+      "label": "힌트 버튼",
+      "description": "다음 이동을 알려 주는 힌트 버튼을 표시해요."
+    },
+    "warnings": {
+      "label": "경고",
+      "description": "도움이 되는 이동이 더 없을 때, 또는 게임을 더 이상 이길 수 없게 되는 즉시 알려 드려요.",
+      "noUsefulMoves": "도움이 되는 이동 없음",
+      "unwinnable": "이길 수 없는 게임"
+    },
+    "showMoves": "이동 횟수",
+    "showTime": "게임 타이머"
+  },
+  "history": {
+    "title": "게임 기록",
+    "stats": {
+      "games": "게임 수",
+      "solved": "승리",
+      "incomplete": "미완료"
+    },
+    "status": {
+      "solved": "승리",
+      "incomplete": "미완료",
+      "active": "진행 중"
+    },
+    "dealName": "판 {{code}}",
+    "moves_other": "{{count}}회 이동",
+    "score": "점수 {{value}}",
+    "vegas": "베가스 {{value}}",
+    "solvable": "풀 수 있음",
+    "emptyTitle": "아직 기록된 게임이 없어요",
+    "emptyBody": "클론다이크를 한 판 플레이하면 기록이 쌓이기 시작해요. 끝낸 게임과 그 판이 여기에 표시돼요.",
+    "loadingTitle": "기록 불러오는 중…",
+    "loadingBody": "최근 게임을 가져오는 동안 잠시 기다려 주세요.",
+    "justNow": "방금",
+    "today": "오늘 {{time}}",
+    "yesterday": "어제 {{time}}",
+    "dateTime": "{{date}} {{time}}",
+    "retry": "다시 하기",
+    "retryA11y": "이 판 다시 하기",
+    "share": "공유",
+    "shareA11y": "이 판 공유"
+  },
+  "share": {
+    "dealMessage": "Soli에서 이 클론다이크 판을 플레이해 보세요 ({{number}}장 뽑기)"
+  },
+  "a11y": {
+    "rank": {
+      "1": "에이스",
+      "2": "2",
+      "3": "3",
+      "4": "4",
+      "5": "5",
+      "6": "6",
+      "7": "7",
+      "8": "8",
+      "9": "9",
+      "10": "10",
+      "11": "잭",
+      "12": "퀸",
+      "13": "킹"
+    },
+    "suit": {
+      "clubs": "클로버",
+      "diamonds": "다이아몬드",
+      "hearts": "하트",
+      "spades": "스페이드"
+    },
+    "card": "{{suit}} {{rank}}",
+    "tableauCard": "{{card}}, {{column}}열",
+    "faceDownCard": "뒷면 카드, {{column}}열",
+    "emptyColumn": "{{column}}열, 비어 있음",
+    "stock_other": "뽑기 더미, 카드 {{count}}장",
+    "stockEmpty": "뽑기 더미, 비어 있음",
+    "stockExhausted": "뽑기 더미, 남은 횟수 없음",
+    "stockRecycle": "버림 더미를 뽑기 더미로 되돌리기",
+    "stockRecycleLeft_other": "버림 더미를 뽑기 더미로 되돌리기, {{count}}회 남음",
+    "waste": "버림 더미, {{card}}",
+    "foundationPile": {
+      "clubs": "클로버 완성 더미",
+      "diamonds": "다이아몬드 완성 더미",
+      "hearts": "하트 완성 더미",
+      "spades": "스페이드 완성 더미"
+    },
+    "foundation": "{{pile}}: {{card}}",
+    "foundationEmpty": "{{pile}}, 비어 있음",
+    "scrubber": "실행 취소 슬라이더, {{total}}단계 중 {{position}}단계",
+    "hint": {
+      "draw": "힌트: 뽑기 더미에서 카드를 뽑아 보세요.",
+      "toColumn": "힌트: {{card}}, {{column}}열로 옮겨 보세요.",
+      "toFoundation": "힌트: {{card}}, 완성 더미로 옮겨 보세요."
+    }
+  }
+}

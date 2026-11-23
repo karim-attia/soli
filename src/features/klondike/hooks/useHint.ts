@@ -1,3 +1,4 @@
+import { t } from '../../../i18n'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AccessibilityInfo } from 'react-native'
 import type { MutableRefObject } from 'react'
@@ -34,12 +35,14 @@ const NO_HINT_BUBBLE_MS = 2500
 
 // Solver-proven warning (opt-in "Unwinnable warning" setting) — the strong
 // claim, reserved for the exact engine.
-export const UNWINNABLE_BUBBLE_TEXT = 'No winning moves left — undo or start a new game.'
+// (Copy lives in en.json `notice.*`; these are FUNCTIONS because text must be resolved
+// at call time — see src/i18n/index.ts, "no t() at module scope".)
+export const getUnwinnableBubbleText = (): string => t('notice.unwinnable')
 // Classic stuck warning (default-on "No more moves warning" setting) — the
 // weaker genre framing on purpose (research 2026-07-23: no mainstream app
 // claims unwinnability from heuristics).
-export const STUCK_BUBBLE_TEXT = 'No more useful moves — undo or start a new game.'
-export const NO_HINT_BUBBLE_TEXT = 'No hint found.'
+export const getStuckBubbleText = (): string => t('notice.stuck')
+export const getNoHintBubbleText = (): string => t('notice.noHint')
 
 // Notice shown when a Hint press finds nothing (no winning line AND the
 // classic enumeration is empty). Mid-stock we only say "no hint" — the classic
@@ -47,7 +50,7 @@ export const NO_HINT_BUBBLE_TEXT = 'No hint found.'
 // the warning's own timing so the button never acts as a mid-deck oracle.
 // Exported for unit tests.
 export const getHintFallbackNoticeText = (board: Pick<GameState, 'stock'>): string =>
-  board.stock.length === 0 ? STUCK_BUBBLE_TEXT : NO_HINT_BUBBLE_TEXT
+  board.stock.length === 0 ? getStuckBubbleText() : getNoHintBubbleText()
 
 // Hint visuals are deliberately DECOUPLED from game selection state (user
 // feedback 2026-07-23): the earlier approach dispatched SELECT_* to reuse the
@@ -86,16 +89,19 @@ const positionKeyOf = (state: GameState): string =>
 // bubbles). Exported for unit tests.
 export const getHintAnnouncement = (hint: SolverHint): string => {
   if (hint.kind === 'draw') {
-    return 'Hint: draw from the stock.'
+    return t('a11y.hint.draw')
   }
-  const cardLabel = getCardAccessibilityLabel(parseSolverCardCode(hint.card))
-  const target =
-    // Column numbers are 1-based in a11y labels (see accessibility.ts).
-    hint.to.type === 'tableau' ? `column ${hint.to.index + 1}` : 'the foundation'
-  return `Hint: move ${cardLabel} to ${target}.`
+  const card = getCardAccessibilityLabel(parseSolverCardCode(hint.card))
+  // Two whole-sentence keys (not "move X to " + target) so translators can inflect.
+  return hint.to.type === 'tableau'
+    ? // Column numbers are 1-based in a11y labels (see accessibility.ts).
+      t('a11y.hint.toColumn', { card, column: hint.to.index + 1 })
+    : t('a11y.hint.toFoundation', { card })
 }
 
 type PositionKeyed = { positionKey: string }
+// Stores the already-translated text (not a variant id): the notice lives a few seconds
+// and a language change remounts the whole tree (src/i18n), so it can never go stale.
 type NoticeState = PositionKeyed & { text: string }
 type HighlightState = PositionKeyed & { hint: SolverHint }
 
@@ -129,7 +135,7 @@ type DeadEraMarker = {
 }
 
 const warningTextFor = (mode: DeadEraMarker['mode']): string =>
-  mode === 'unwinnable' ? UNWINNABLE_BUBBLE_TEXT : STUCK_BUBBLE_TEXT
+  mode === 'unwinnable' ? getUnwinnableBubbleText() : getStuckBubbleText()
 
 // Is `current` at/inside the dead era a proof for `evaluated` would define?
 // (Forward moves only: same deal, depth not below the evaluated depth.)

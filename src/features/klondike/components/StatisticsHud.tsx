@@ -2,24 +2,26 @@ import React from 'react'
 import { StyleSheet, View, Text } from 'react-native'
 
 import type { TimerState } from '../../../solitaire/klondike'
+import { getIntlLocale, t } from '../../../i18n'
+import { formatElapsedDurationSpoken, formatVegasScoreSpoken } from '../../../i18n/format'
 import {
   formatStandardScore,
   formatVegasScore,
-  formatVegasScoreSpoken,
   type ScoreTally,
 } from '../../../solitaire/scoring'
 import type { ScoringMode } from '../../../state/settings'
-import {
-  computeElapsedWithReference,
-  formatElapsedDuration,
-  formatElapsedDurationSpoken,
-} from '../../../utils/time'
+import { computeElapsedWithReference, formatElapsedDuration } from '../../../utils/time'
 import { STAT_BADGE_MIN_WIDTH } from '../constants'
 
+type StatisticsRowId = 'score' | 'vegas' | 'total' | 'moves' | 'time'
+
 export type StatisticsRow = {
+  // Language-independent identity: React key and testID (`stat-<id>`). The testID used
+  // to be derived from the label, which is translated now.
+  id: StatisticsRowId
   label: string
   value: string
-  // Spoken form of the whole badge ("Vegas, minus 47 dollars"); testID = `stat-<label>`.
+  // Spoken form of the whole badge ("Vegas, minus 47 dollars").
   accessibilityLabel: string
 }
 
@@ -39,10 +41,10 @@ export const StatisticsHud: React.FC<StatisticsHudProps> = ({ rows }) => {
         // badges"): the raw badge text reads "−$47" / "3:12" badly, and labelling
         // only the score badge would be inconsistent with its neighbours.
         <View
-          key={row.label}
+          key={row.id}
           accessible
           accessibilityLabel={row.accessibilityLabel}
-          testID={`stat-${row.label.toLowerCase()}`}
+          testID={`stat-${row.id}`}
           style={[styles.badge, index > 0 ? styles.badgeSpacing : undefined]}
         >
           <Text style={styles.badgeLabel}>{row.label}</Text>
@@ -71,11 +73,19 @@ type BuildStatisticsRowsParams = {
   timerStartedAt: number | null
 }
 
-const vegasRow = (label: 'Vegas' | 'Total', value: number): StatisticsRow => ({
-  label,
-  value: formatVegasScore(value),
-  accessibilityLabel: `${label}, ${formatVegasScoreSpoken(value)}`,
-})
+// One row shape for every badge; `spoken` defaults to the visible value.
+const row = (id: StatisticsRowId, value: string, spoken = value): StatisticsRow => {
+  const label = t(`hud.${id}`)
+  return {
+    id,
+    label,
+    value,
+    accessibilityLabel: t('hud.badgeA11y', { label, value: spoken }),
+  }
+}
+
+const vegasRow = (id: 'vegas' | 'total', value: number, locale: string): StatisticsRow =>
+  row(id, formatVegasScore(value, locale), formatVegasScoreSpoken(value))
 
 export const buildStatisticsRows = ({
   showMoves,
@@ -90,6 +100,9 @@ export const buildStatisticsRows = ({
   timerStartedAt,
 }: BuildStatisticsRowsParams): StatisticsRow[] => {
   const rows: StatisticsRow[] = []
+  // App language + device region, Latin digits (the engine formatters take it as a
+  // parameter because src/solitaire must not import src/i18n).
+  const locale = getIntlLocale()
   // Score badge goes FIRST so Moves/Time keep their familiar positions against
   // the right edge (docs/product/scoring/scoring.md, UX section).
   // Badge rule since Phase 2 (Vegas = rules mode): Off → none; a Vegas-rules game
@@ -99,23 +112,16 @@ export const buildStatisticsRows = ({
   // number, and the Vegas setting applies to the next deal.
   if (scoring !== 'off') {
     if (!vegasRules) {
-      rows.push({
-        label: 'Score',
-        value: formatStandardScore(score.standard),
-        accessibilityLabel: `Score, ${formatStandardScore(score.standard)}`,
-      })
+      rows.push(row('score', formatStandardScore(score.standard, locale)))
     } else if (vegasTotal === null) {
-      rows.push(vegasRow('Vegas', score.vegas))
+      rows.push(vegasRow('vegas', score.vegas, locale))
     } else {
-      rows.push(vegasRow('Total', vegasTotal))
+      rows.push(vegasRow('total', vegasTotal, locale))
     }
   }
   if (showMoves) {
-    rows.push({
-      label: 'Moves',
-      value: String(moveCount),
-      accessibilityLabel: `Moves, ${moveCount}`,
-    })
+    // Plain String(n): Latin digits in every language, like the cards.
+    rows.push(row('moves', String(moveCount)))
   }
   if (showTime) {
     const effectiveElapsedMs = computeElapsedWithReference(
@@ -124,11 +130,13 @@ export const buildStatisticsRows = ({
       timerStartedAt,
       Date.now()
     )
-    rows.push({
-      label: 'Time',
-      value: formatElapsedDuration(effectiveElapsedMs),
-      accessibilityLabel: `Time, ${formatElapsedDurationSpoken(effectiveElapsedMs)}`,
-    })
+    rows.push(
+      row(
+        'time',
+        formatElapsedDuration(effectiveElapsedMs),
+        formatElapsedDurationSpoken(effectiveElapsedMs)
+      )
+    )
   }
   return rows
 }

@@ -87,6 +87,9 @@ export const BoardPreview = ({ tableau, availableWidth }: BoardPreviewProps) => 
 const previewStyles = StyleSheet.create({
   row: {
     width: '100%',
+    // Same LTR pin as the game screen (KlondikeGameView styles.root): the history sheet
+    // around it mirrors in Arabic/Hebrew, the board preview must not.
+    direction: 'ltr',
     flexDirection: 'row',
     // Centered (unlike the main board's flex-start) so the preview stays balanced
     // if card widths clamp at MAX_CARD_WIDTH on wide screens.

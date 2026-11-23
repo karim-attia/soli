@@ -5596,6 +5596,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"expo-localization@npm:~58.0.5":
+  version: 58.0.5
+  resolution: "expo-localization@npm:58.0.5"
+  dependencies:
+    rtl-detect: "npm:^1.0.2"
+  peerDependencies:
+    expo: "*"
+    react: "*"
+  checksum: 10/93a2386ba7ce41452d217c243aa90a6bedf7b133bbc1aedaead5d11fa23656668e6b8818bd1ecc4d5029e2f8e38cd8a9bbb2602ba9c710fee5add14fab3a569f
+  languageName: node
+  linkType: hard
+
 "expo-modules-autolinking@npm:~58.0.13":
   version: 58.0.13
   resolution: "expo-modules-autolinking@npm:58.0.13"
@@ -6228,6 +6240,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"i18next@npm:^27.2.3":
+  version: 27.2.4
+  resolution: "i18next@npm:27.2.4"
+  peerDependencies:
+    typescript: ^5 || ^6 || ^7
+  peerDependenciesMeta:
+    typescript:
+      optional: true
+  checksum: 10/cf2a18cc009d84d1ceff0ca6186f428d6fb2cf1d90099d3a7e4830ada9634d11ad14d6b8ebdc736170855b4d32f1f9bb19d6a83fc278cae9817f301166b26281
+  languageName: node
+  linkType: hard
+
 "iconv-lite@npm:0.6.3, iconv-lite@npm:^0.6.2":
   version: 0.6.3
   resolution: "iconv-lite@npm:0.6.3"
@@ -6277,6 +6301,13 @@ __metadata:
   version: 2.0.4
   resolution: "inherits@npm:2.0.4"
   checksum: 10/cd45e923bee15186c07fa4c89db0aace24824c482fb887b528304694b2aa6ff8a898da8657046a5dcf3e46cd6db6c61629551f9215f208d7c3f157cf9b290521
+  languageName: node
+  linkType: hard
+
+"intl-pluralrules@npm:^2.0.1":
+  version: 2.0.1
+  resolution: "intl-pluralrules@npm:2.0.1"
+  checksum: 10/562964d81c4477ab0b66e051c31cdbb2ca599307ffdfdc88a1e16d2cf137e481082b90d5ad81f9d2d5f6767ec5528d764a44462f6752109ac035c04604973e23
   languageName: node
   linkType: hard
 
@@ -9088,6 +9119,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"rtl-detect@npm:^1.0.2":
+  version: 1.1.2
+  resolution: "rtl-detect@npm:1.1.2"
+  checksum: 10/d19089c3b5f7a6fbabfa2c4724fcdf8694f313d196d44c8eee3625ba2e46418afe65b4da38e3e92822985291efd0656d85daa4b2ef296a46a65a702d0b156876
+  languageName: node
+  linkType: hard
+
 "safe-buffer@npm:5.2.1":
   version: 5.2.1
   resolution: "safe-buffer@npm:5.2.1"
@@ -9392,11 +9430,14 @@ __metadata:
     expo-crypto: "npm:~58.0.7"
     expo-font: "npm:~58.0.8"
     expo-linking: "npm:~58.0.13"
+    expo-localization: "npm:~58.0.5"
     expo-router: "npm:~58.0.23"
     expo-splash-screen: "npm:~58.0.10"
     expo-sqlite: "npm:~58.0.13"
     expo-status-bar: "npm:~58.0.3"
     expo-system-ui: "npm:~58.0.6"
+    i18next: "npm:^27.2.3"
+    intl-pluralrules: "npm:^2.0.1"
     jest: "npm:~30.5.2"
     jest-expo: "npm:~58.0.11"
     lucide-react-native: "npm:1.50.0"

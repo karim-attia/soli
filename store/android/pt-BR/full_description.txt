@@ -1,0 +1,17 @@
+O Soli é a clássica Paciência Klondike, também conhecida como Solitário ou Solitaire, refinada com cuidado. Grátis, de código aberto e sem anúncios.
+
+Sem anúncios, sem compras no app, sem sequências diárias, moedas ou pop-ups para fazer você jogar mais. Só cartas.
+
+RECURSOS
+
+- Paciência Klondike clássica, de Virar 1 a Virar 5
+- Partidas com solução: todo novo jogo dá para vencer (você pode desativar)
+- Desfazer ilimitado: arraste o botão Desfazer para os lados para viajar no tempo pelo seu jogo
+- Botão Dica opcional, que mostra a próxima jogada
+- Um aviso discreto quando não há mais jogadas úteis
+- Pontuação padrão, pontuação Vegas ou nenhuma pontuação
+- A Subida automática leva as cartas às pilhas de fundação por você
+- Histórico de jogos: jogue qualquer partida de novo ou compartilhe com quem quiser
+- Dezenas de comemorações de vitória
+
+Feito na Suíça, para todo mundo que só quer jogar cartas.

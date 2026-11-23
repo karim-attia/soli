@@ -3,6 +3,7 @@ import { useLayoutEffect } from 'react'
 import { Linking, StyleSheet, View } from 'react-native'
 import { useNavigation } from 'expo-router'
 
+import { t } from '../../src/i18n'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
 import { SPACE, usePalette } from '../../src/theme/tokens'
 import { AppText } from '../../components/AppText'
@@ -20,7 +21,7 @@ export default function HelloScreen() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: 'Hello',
+      headerTitle: t('nav.hello'),
       headerLeft: () => <HeaderMenuButton onPress={openDrawer} />,
       headerLeftContainerStyle: {
         paddingLeft: HEADER_MENU_LEADING_PADDING,
@@ -36,29 +37,25 @@ export default function HelloScreen() {
     <View style={styles.screen}>
       <View style={styles.column}>
         <View style={styles.byline}>
-          <AppText style={styles.centered}>Made by</AppText>
+          <AppText style={styles.centered}>{t('about.madeBy')}</AppText>
           <AppText color={palette.blue10} onPress={openUrl('https://x.com/carimatia')}>
             @carimatia
           </AppText>
-          <AppText style={styles.centered}>
-            For my girlfriend T because she always had to look at ads when playing
-            Solitaire.
-          </AppText>
+          <AppText style={styles.centered}>{t('about.dedication')}</AppText>
         </View>
 
         <View style={styles.paragraphs}>
-          <AppText style={styles.centered}>
-            Free and{' '}
-            <AppText
-              color={palette.accent10}
-              onPress={openUrl('https://github.com/karim-attia/soli')}
-            >
-              open source
-            </AppText>{' '}
-            Solitaire app.
-          </AppText>
-          <AppText style={styles.centered}>
-            No ads, in-app purchases, or gamification to get you to play more.
+          {/* i18n (2026-11-23): the sentence used to carry an inline "open source" link
+              ("Free and <link>open source</link> Solitaire app."). Translators need whole
+              sentences (word order differs per language), so the link became its own line. */}
+          <AppText style={styles.centered}>{t('about.pitch')}</AppText>
+          <AppText style={styles.centered}>{t('about.promise')}</AppText>
+          <AppText
+            style={styles.centered}
+            color={palette.accent10}
+            onPress={openUrl('https://github.com/karim-attia/soli')}
+          >
+            {t('about.sourceLink')}
           </AppText>
         </View>
       </View>

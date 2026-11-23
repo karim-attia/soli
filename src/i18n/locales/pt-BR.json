@@ -1,0 +1,203 @@
+{
+  "nav": {
+    "play": "Jogar",
+    "hello": "Olá",
+    "history": "Histórico",
+    "settings": "Configurações",
+    "rate": "Avaliar o Soli",
+    "openMenu": "Abrir menu de navegação",
+    "notFoundTitle": "Opa!",
+    "notFoundBody": "Esta tela não existe.",
+    "notFoundLink": "Ir para a tela inicial"
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "reset": "Redefinir",
+    "off": "Não",
+    "drawMode": "Virar {{number}}"
+  },
+  "about": {
+    "madeBy": "Feito por",
+    "dedication": "Para a minha namorada T, que sempre tinha que ver anúncios quando jogava Paciência.",
+    "pitch": "App de Paciência grátis e de código aberto.",
+    "sourceLink": "Código-fonte no GitHub",
+    "promise": "Sem anúncios, compras no app nem gamificação para fazer você jogar mais."
+  },
+  "game": {
+    "newGame": "Novo jogo",
+    "newGameA11y": "Começar um novo jogo",
+    "undo": "Desfazer",
+    "hint": "Dica",
+    "draw": "Virar",
+    "recyclesLeft_one": "Resta {{count}}",
+    "recyclesLeft_many": "Restam {{count}}",
+    "recyclesLeft_other": "Restam {{count}}",
+    "newGameAlert": {
+      "title": "Começar um novo jogo?",
+      "message": "Que tal mais uma rodada?",
+      "messageWon": "Bela vitória! Que tal mais uma rodada?",
+      "confirm": "Dar as cartas"
+    },
+    "playDeal": {
+      "retryTitle": "Tentar esta partida de novo?",
+      "retryConfirm": "Tentar de novo",
+      "sharedTitle": "Jogar partida compartilhada?",
+      "sharedConfirm": "Jogar",
+      "message": "Seu jogo atual será encerrado e registrado como incompleto."
+    }
+  },
+  "notice": {
+    "unwinnable": "Não dá mais para vencer: desfaça jogadas ou comece um novo jogo.",
+    "stuck": "Não há mais jogadas úteis: desfaça jogadas ou comece um novo jogo.",
+    "noHint": "Nenhuma dica encontrada.",
+    "undoTip": "Arraste o botão Desfazer para os lados para viajar no tempo pelo seu jogo"
+  },
+  "hud": {
+    "score": "Pontos",
+    "vegas": "Vegas",
+    "total": "Total",
+    "moves": "Jogadas",
+    "time": "Tempo",
+    "badgeA11y": "{{label}}, {{value}}",
+    "vegasSpoken_one": "{{count}} dólar",
+    "vegasSpoken_many": "{{count}} dólares",
+    "vegasSpoken_other": "{{count}} dólares",
+    "vegasSpokenNegative_one": "menos {{count}} dólar",
+    "vegasSpokenNegative_many": "menos {{count}} dólares",
+    "vegasSpokenNegative_other": "menos {{count}} dólares"
+  },
+  "time": {
+    "hours_one": "{{count}} hora",
+    "hours_many": "{{count}} horas",
+    "hours_other": "{{count}} horas",
+    "minutes_one": "{{count}} minuto",
+    "minutes_many": "{{count}} minutos",
+    "minutes_other": "{{count}} minutos",
+    "seconds_one": "{{count}} segundo",
+    "seconds_many": "{{count}} segundos",
+    "seconds_other": "{{count}} segundos",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "Novos jogos",
+      "gameplay": "Jogabilidade",
+      "statistics": "Estatísticas"
+    },
+    "cardsDrawn": "Cartas viradas",
+    "solvableDeals": "Partidas com solução",
+    "scoring": {
+      "label": "Pontuação",
+      "description": "Pontos padrão ou dólares do Vegas. Vale a partir do próximo jogo.",
+      "vegasDescription": "No Vegas, dicas, avisos e partidas com solução ficam desativados. Vale a partir do próximo jogo.",
+      "standard": "Padrão",
+      "vegas": "Vegas"
+    },
+    "vegasTotal": {
+      "label": "Manter o total do Vegas",
+      "description": "Levar seu saldo de um jogo para o outro. O topo da tela passa a mostrar o total acumulado em vez do resultado deste jogo.",
+      "resetLabel": "Redefinir o total do Vegas",
+      "resetTitle": "Redefinir o total do Vegas?",
+      "resetMessage": "Seu total acumulado recomeça em $0. O jogo em andamento continua valendo."
+    },
+    "autoUp": "Subida automática",
+    "hintButton": {
+      "label": "Botão Dica",
+      "description": "Mostrar um botão Dica que revela a próxima jogada."
+    },
+    "warnings": {
+      "label": "Avisos",
+      "description": "Avisar quando acabarem as jogadas úteis ou assim que não der mais para vencer o jogo.",
+      "noUsefulMoves": "Sem jogadas úteis",
+      "unwinnable": "Impossível de vencer"
+    },
+    "showMoves": "Contador de jogadas",
+    "showTime": "Cronômetro"
+  },
+  "history": {
+    "title": "Histórico de jogos",
+    "stats": {
+      "games": "Jogos",
+      "solved": "Resolvidos",
+      "incomplete": "Incompletos"
+    },
+    "status": {
+      "solved": "Resolvido",
+      "incomplete": "Incompleto",
+      "active": "Em andamento"
+    },
+    "dealName": "Partida {{code}}",
+    "moves_one": "{{count}} jogada",
+    "moves_many": "{{count}} jogadas",
+    "moves_other": "{{count}} jogadas",
+    "score": "Pontos: {{value}}",
+    "vegas": "Vegas {{value}}",
+    "solvable": "Com solução",
+    "emptyTitle": "Nenhum jogo registrado ainda",
+    "emptyBody": "Jogue Paciência Klondike para começar a montar seu histórico. Os jogos concluídos vão aparecer aqui.",
+    "loadingTitle": "Carregando histórico…",
+    "loadingBody": "Aguarde enquanto buscamos seus jogos recentes.",
+    "justNow": "agora mesmo",
+    "today": "Hoje, {{time}}",
+    "yesterday": "Ontem, {{time}}",
+    "dateTime": "{{date}}, {{time}}",
+    "retry": "Tentar de novo",
+    "retryA11y": "Tentar esta partida de novo",
+    "share": "Compartilhar",
+    "shareA11y": "Compartilhar esta partida"
+  },
+  "share": {
+    "dealMessage": "Jogue esta partida de Paciência Klondike no Soli (Virar {{number}})"
+  },
+  "a11y": {
+    "rank": {
+      "1": "Ás",
+      "2": "Dois",
+      "3": "Três",
+      "4": "Quatro",
+      "5": "Cinco",
+      "6": "Seis",
+      "7": "Sete",
+      "8": "Oito",
+      "9": "Nove",
+      "10": "Dez",
+      "11": "Valete",
+      "12": "Dama",
+      "13": "Rei"
+    },
+    "suit": {
+      "clubs": "paus",
+      "diamonds": "ouros",
+      "hearts": "copas",
+      "spades": "espadas"
+    },
+    "card": "{{rank}} de {{suit}}",
+    "tableauCard": "{{card}}, coluna {{column}}",
+    "faceDownCard": "Carta virada para baixo, coluna {{column}}",
+    "emptyColumn": "Coluna {{column}}, vazia",
+    "stock_one": "Monte, {{count}} carta",
+    "stock_many": "Monte, {{count}} cartas",
+    "stock_other": "Monte, {{count}} cartas",
+    "stockEmpty": "Monte, vazio",
+    "stockExhausted": "Monte, sem passadas restantes",
+    "stockRecycle": "Voltar o descarte para o monte",
+    "stockRecycleLeft_one": "Voltar o descarte para o monte, resta {{count}}",
+    "stockRecycleLeft_many": "Voltar o descarte para o monte, restam {{count}}",
+    "stockRecycleLeft_other": "Voltar o descarte para o monte, restam {{count}}",
+    "waste": "Descarte, {{card}}",
+    "foundationPile": {
+      "clubs": "Fundação de paus",
+      "diamonds": "Fundação de ouros",
+      "hearts": "Fundação de copas",
+      "spades": "Fundação de espadas"
+    },
+    "foundation": "{{pile}}, {{card}}",
+    "foundationEmpty": "{{pile}}, vazia",
+    "scrubber": "Controle de desfazer, posição {{position}} de {{total}}",
+    "hint": {
+      "draw": "Dica: vire cartas do monte.",
+      "toColumn": "Dica: {{card}}, para a coluna {{column}}.",
+      "toFoundation": "Dica: {{card}}, para a fundação."
+    }
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "nav": {
+    "play": "Spielen",
+    "hello": "Hallo",
+    "history": "Verlauf",
+    "settings": "Einstellungen",
+    "rate": "Soli bewerten",
+    "openMenu": "Menü öffnen",
+    "notFoundTitle": "Hoppla!",
+    "notFoundBody": "Diese Seite gibt es nicht.",
+    "notFoundLink": "Zurück zum Spiel"
+  },
+  "common": {
+    "cancel": "Abbrechen",
+    "reset": "Zurücksetzen",
+    "off": "Aus",
+    "drawMode": "{{number}} ziehen"
+  },
+  "about": {
+    "madeBy": "Entwickelt von",
+    "dedication": "Für meine Freundin T, weil sie beim Solitär-Spielen immer Werbung anschauen musste.",
+    "pitch": "Solitär-App, kostenlos und Open Source.",
+    "sourceLink": "Quellcode auf GitHub",
+    "promise": "Keine Werbung, keine In-App-Käufe und keine Gamification, die dich zum Weiterspielen verleiten soll."
+  },
+  "game": {
+    "newGame": "Neues Spiel",
+    "newGameA11y": "Neues Spiel starten",
+    "undo": "Rückgängig",
+    "hint": "Tipp",
+    "draw": "Ziehen",
+    "recyclesLeft_one": "Noch {{count}}",
+    "recyclesLeft_other": "Noch {{count}}",
+    "newGameAlert": {
+      "title": "Neues Spiel starten?",
+      "message": "Bereit für die nächste Runde?",
+      "messageWon": "Schön gewonnen! Bereit für die nächste Runde?",
+      "confirm": "Neu austeilen"
+    },
+    "playDeal": {
+      "retryTitle": "Dieses Spiel nochmals spielen?",
+      "retryConfirm": "Nochmals spielen",
+      "sharedTitle": "Geteiltes Spiel spielen?",
+      "sharedConfirm": "Spielen",
+      "message": "Dein laufendes Spiel wird beendet und als nicht gelöst gespeichert."
+    }
+  },
+  "notice": {
+    "unwinnable": "Nicht mehr gewinnbar – mach einen Zug rückgängig oder starte ein neues Spiel.",
+    "stuck": "Keine sinnvollen Züge mehr – mach einen Zug rückgängig oder starte ein neues Spiel.",
+    "noHint": "Kein Tipp gefunden.",
+    "undoTip": "Zieh den Rückgängig-Knopf zur Seite für eine Zeitreise durch dein Spiel"
+  },
+  "hud": {
+    "score": "Punkte",
+    "vegas": "Vegas",
+    "total": "Total",
+    "moves": "Züge",
+    "time": "Zeit",
+    "badgeA11y": "{{label}}, {{value}}",
+    "vegasSpoken_one": "{{count}} Dollar",
+    "vegasSpoken_other": "{{count}} Dollar",
+    "vegasSpokenNegative_one": "minus {{count}} Dollar",
+    "vegasSpokenNegative_other": "minus {{count}} Dollar"
+  },
+  "time": {
+    "hours_one": "{{count}} Stunde",
+    "hours_other": "{{count}} Stunden",
+    "minutes_one": "{{count}} Minute",
+    "minutes_other": "{{count}} Minuten",
+    "seconds_one": "{{count}} Sekunde",
+    "seconds_other": "{{count}} Sekunden",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "Neue Spiele",
+      "gameplay": "Im Spiel",
+      "statistics": "Statistik"
+    },
+    "cardsDrawn": "Karten ziehen",
+    "solvableDeals": "Lösbare Spiele",
+    "scoring": {
+      "label": "Wertung",
+      "description": "Standardpunkte oder Vegas-Dollar. Gilt ab dem nächsten Spiel.",
+      "vegasDescription": "Tipps, Warnungen und lösbare Spiele sind bei Vegas aus. Gilt ab dem nächsten Spiel.",
+      "standard": "Standard",
+      "vegas": "Vegas"
+    },
+    "vegasTotal": {
+      "label": "Vegas-Total weiterführen",
+      "description": "Dein Saldo wird von Spiel zu Spiel mitgenommen. Oben steht dann dein laufendes Total, nicht mehr das Ergebnis des aktuellen Spiels.",
+      "resetLabel": "Vegas-Total zurücksetzen",
+      "resetTitle": "Vegas-Total zurücksetzen?",
+      "resetMessage": "Dein laufendes Total beginnt wieder bei $0. Das aktuelle Spiel zählt weiterhin."
+    },
+    "autoUp": "Automatisch ablegen",
+    "hintButton": {
+      "label": "Tipp-Knopf",
+      "description": "Zeigt einen Tipp-Knopf, der den nächsten Zug verrät."
+    },
+    "warnings": {
+      "label": "Warnungen",
+      "description": "Warnt, wenn es keine sinnvollen Züge mehr gibt, oder sobald das Spiel nicht mehr gewinnbar ist.",
+      "noUsefulMoves": "Keine sinnvollen Züge",
+      "unwinnable": "Nicht mehr gewinnbar"
+    },
+    "showMoves": "Zugzähler",
+    "showTime": "Spielzeit"
+  },
+  "history": {
+    "title": "Spielverlauf",
+    "stats": {
+      "games": "Spiele",
+      "solved": "Gelöst",
+      "incomplete": "Nicht gelöst"
+    },
+    "status": {
+      "solved": "Gelöst",
+      "incomplete": "Nicht gelöst",
+      "active": "Aktiv"
+    },
+    "dealName": "Spiel {{code}}",
+    "moves_one": "{{count}} Zug",
+    "moves_other": "{{count}} Züge",
+    "score": "{{value}} Punkte",
+    "vegas": "Vegas {{value}}",
+    "solvable": "Lösbar",
+    "emptyTitle": "Noch keine Spiele im Verlauf",
+    "emptyBody": "Spiel eine Runde Klondike-Solitär, dann füllt sich dein Verlauf. Beendete Spiele erscheinen hier.",
+    "loadingTitle": "Verlauf wird geladen…",
+    "loadingBody": "Einen Moment, deine letzten Spiele werden geladen.",
+    "justNow": "gerade eben",
+    "today": "Heute, {{time}}",
+    "yesterday": "Gestern, {{time}}",
+    "dateTime": "{{date}}, {{time}}",
+    "retry": "Nochmals spielen",
+    "retryA11y": "Dieses Spiel nochmals spielen",
+    "share": "Teilen",
+    "shareA11y": "Dieses Spiel teilen"
+  },
+  "share": {
+    "dealMessage": "Probier dieses Solitär-Spiel in Soli (Klondike, {{number}} ziehen)"
+  },
+  "a11y": {
+    "rank": {
+      "1": "Ass",
+      "2": "Zwei",
+      "3": "Drei",
+      "4": "Vier",
+      "5": "Fünf",
+      "6": "Sechs",
+      "7": "Sieben",
+      "8": "Acht",
+      "9": "Neun",
+      "10": "Zehn",
+      "11": "Bube",
+      "12": "Dame",
+      "13": "König"
+    },
+    "suit": {
+      "clubs": "Kreuz",
+      "diamonds": "Karo",
+      "hearts": "Herz",
+      "spades": "Pik"
+    },
+    "card": "{{suit}} {{rank}}",
+    "tableauCard": "{{card}}, Spalte {{column}}",
+    "faceDownCard": "Verdeckte Karte, Spalte {{column}}",
+    "emptyColumn": "Spalte {{column}}, leer",
+    "stock_one": "Nachziehstapel, {{count}} Karte",
+    "stock_other": "Nachziehstapel, {{count}} Karten",
+    "stockEmpty": "Nachziehstapel, leer",
+    "stockExhausted": "Nachziehstapel, keine Durchgänge mehr",
+    "stockRecycle": "Abwurfstapel wieder zum Nachziehstapel machen",
+    "stockRecycleLeft_one": "Abwurfstapel wieder zum Nachziehstapel machen, noch {{count}} Mal",
+    "stockRecycleLeft_other": "Abwurfstapel wieder zum Nachziehstapel machen, noch {{count}} Mal",
+    "waste": "Abwurfstapel, {{card}}",
+    "foundationPile": {
+      "clubs": "Ablagestapel Kreuz",
+      "diamonds": "Ablagestapel Karo",
+      "hearts": "Ablagestapel Herz",
+      "spades": "Ablagestapel Pik"
+    },
+    "foundation": "{{pile}}, {{card}}",
+    "foundationEmpty": "{{pile}}, leer",
+    "scrubber": "Rückgängig-Regler, Position {{position}} von {{total}}",
+    "hint": {
+      "draw": "Tipp: Vom Nachziehstapel ziehen.",
+      "toColumn": "Tipp: {{card}} auf Spalte {{column}} legen.",
+      "toFoundation": "Tipp: {{card}} auf den Ablagestapel legen."
+    }
+  }
+}

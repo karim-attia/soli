@@ -141,124 +141,38 @@ export const DEFAULT_SETTINGS: SettingsState = {
   },
 }
 
+// i18n: dev-only, intentionally English (rows of the "Animations" section, shown only
+// with Developer mode on). The unrendered `description` fields were deleted 2026-11-23
+// instead of translating dead copy; re-add them as en.json keys if rows ever get subtitles.
 export const animationPreferenceDescriptors: Array<{
   key: AnimationPreferenceKey
   label: string
-  description: string
 }> = [
-  {
-    key: 'cardFlights',
-    label: 'Card flights',
-    description: 'Animate cards flying between tableau, waste, and foundations.',
-  },
-  {
-    key: 'wasteFan',
-    label: 'Waste fan slide',
-    description: 'Slide the waste stack as new cards are drawn.',
-  },
-  {
-    key: 'invalidMoveWiggle',
-    label: 'Invalid move wiggle',
-    description: 'Give feedback when a move is blocked.',
-  },
-  {
-    key: 'cardFlip',
-    label: 'Card flips',
-    description: 'Flip facedown cards face up with an animated reveal.',
-  },
-  {
-    key: 'foundationGlow',
-    label: 'Foundation glow',
-    description: 'Highlight foundations briefly when cards land.',
-  },
-  {
-    key: 'celebrations',
-    label: 'Win celebrations',
-    description: 'Play the victory sequence after completing a game.',
-  },
+  { key: 'cardFlights', label: 'Card flights' },
+  { key: 'wasteFan', label: 'Waste fan slide' },
+  { key: 'invalidMoveWiggle', label: 'Invalid move wiggle' },
+  { key: 'cardFlip', label: 'Card flips' },
+  { key: 'foundationGlow', label: 'Foundation glow' },
+  { key: 'celebrations', label: 'Win celebrations' },
 ]
 
-// Settings-screen copy for the hint/warning features. Unlike the animation/
-// statistics descriptors (whose descriptions are currently unrendered), these
-// ARE shown as row subtitles — both features change gameplay in ways the
-// labels alone can't carry (user feedback 2026-07-23).
-export const hintButtonPreference = {
-  label: 'Hint button',
-  description: 'Show a Hint button that reveals the next move.',
-}
-
-export const warningModePreference: {
-  label: string
-  description: string
-  options: Array<{ value: WarningMode; label: string }>
-} = {
-  label: 'Warnings',
-  // One line explaining the strictness ladder between the two modes. Warnings
-  // are off in Vegas games (useHint); the Scoring row says so, not this one.
-  description:
-    "Warn when you run out of useful moves, or as soon as the game can't be won anymore.",
-  options: [
-    { value: 'off', label: 'Off' },
-    { value: 'noUsefulMoves', label: 'No more useful moves' },
-    { value: 'unwinnable', label: 'Unwinnable game' },
-  ],
-}
-
-// Rendered as a picker row with a description (like warningModePreference).
-// The description SWITCHES with the value — once Vegas is picked it says ONLY
-// what is switched off and when it applies (user, prompt 6: the round-2 version
-// "explained the whole thing" — $52, $5 per card, limited passes — and that was
-// too much); otherwise one plain line. Forbidden words: solver, catalog,
-// heuristic.
-export const scoringPreference: {
-  label: string
-  description: string
-  vegasDescription: string
-  options: Array<{ value: ScoringMode; label: string }>
-} = {
-  label: 'Scoring',
-  description: 'Standard points or Vegas dollars. Applies to your next game.',
-  vegasDescription:
-    'Hints, warnings and solvable deals are off in Vegas. Applies to your next game.',
-  options: [
-    { value: 'off', label: 'Off' },
-    { value: 'standard', label: 'Standard' },
-    { value: 'vegas', label: 'Vegas' },
-  ],
-}
-
-// "Keep Vegas total" switch (P2-C), shown under the Scoring picker only while
-// Vegas is selected; the reset row sits under it while the switch is on.
-// Copy made MORE explicit in round 3 (user, prompt 6: "wonder what you mean,
-// please explain better" — the opposite of the Scoring row, which got shorter):
-// say what carries over, where it shows, and what a reset does to the game on
-// the board.
-export const vegasTotalPreference = {
-  label: 'Keep Vegas total',
-  description:
-    'Carry your balance from game to game. The header then shows your running total instead of this game’s result.',
-  resetLabel: 'Reset Vegas total',
-  resetTitle: 'Reset Vegas total?',
-  resetMessage:
-    'Your running total starts again from $0. The game on the board still counts.',
-}
-
-export const statisticsPreferenceDescriptors: Array<{
-  key: StatisticsPreferenceKey
-  label: string
-  description: string
-}> = [
-  {
-    key: 'showMoves',
-    label: 'Move counter',
-    description: 'Display how many moves you have taken this game.',
-  },
-  {
-    key: 'showTime',
-    label: 'Game timer',
-    description: 'Track elapsed time, starting after your first move.',
-  },
-]
+// Settings COPY lives in src/i18n/locales/en.json (`settings.*`) since the i18n work
+// (2026-11-23) and is resolved with t() inside app/(tabs)/settings.tsx — the former
+// module-level copy objects (hintButtonPreference, warningModePreference,
+// scoringPreference, vegasTotalPreference, statisticsPreferenceDescriptors) would have
+// frozen the language of the first import. The product decisions behind the wording
+// moved to en.context.json and still hold:
+// - Hint/warning rows carry a description (both features change gameplay in ways the
+//   labels alone can't carry, user feedback 2026-07-23). Warnings are ONE select: the
+//   modes are a strictness ladder. Warnings are off in Vegas games (useHint); the
+//   Scoring row says so, not the Warnings row.
+// - The Scoring description SWITCHES with the value: once Vegas is picked it says ONLY
+//   what is switched off and when it applies (user, prompt 6: the round-2 version
+//   "explained the whole thing" — $52, $5 per card, limited passes — and that was too
+//   much); otherwise one plain line. Forbidden words: solver, catalog, heuristic.
+// - "Keep Vegas total" copy was made MORE explicit in round 3 (user, prompt 6: "wonder
+//   what you mean, please explain better"): say what carries over, where it shows, and
+//   what a reset does to the game on the board.
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined)
 

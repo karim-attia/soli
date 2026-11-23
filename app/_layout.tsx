@@ -1,8 +1,10 @@
-import { useColorScheme } from 'react-native'
+import { useEffect, useState } from 'react'
+import { AppState, useColorScheme } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation'
 import { Stack } from 'expo-router'
 import { Provider } from 'components/Provider'
+import { syncLanguage } from '../src/i18n'
 import { isDarkTheme, resolveThemeName } from '../src/theme'
 
 export {
@@ -32,8 +34,29 @@ export const unstable_settings = {
 // (Tamagui itself was removed on 2026-10-18; UI text is plain RN `Text` via AppText.)
 
 export default function RootLayout() {
+  // Language change while the app is running (i18n plan, approach C1). iOS restarts the
+  // app when its language changes; Android does not (expo-localization keeps the Activity
+  // alive), so on every return to the foreground the OS language is re-read and, if it
+  // changed, the WHOLE tree is remounted via `key` — the same guarantee a restart gives.
+  // That is what makes the plain `t()` import safe: no component, memo cache (React
+  // Compiler) or module store keeps text of the old language. Trade-off: the remount
+  // resets navigation to the Play screen and re-hydrates settings/history/game from
+  // storage (the game is persisted 180 ms after every change, useKlondikePersistence).
+  const [languageEpoch, setLanguageEpoch] = useState(0)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (status) => {
+      if (status !== 'active') {
+        return
+      }
+      if (syncLanguage()) {
+        setLanguageEpoch((epoch) => epoch + 1)
+      }
+    })
+    return () => subscription.remove()
+  }, [])
+
   return (
-    <Providers>
+    <Providers key={languageEpoch}>
       <RootLayoutNav />
     </Providers>
   )

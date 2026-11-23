@@ -17,8 +17,8 @@ import {
 } from '../../../../solitaire/klondike'
 import type { CardMetrics, DropHints } from '../../types'
 import {
-  STOCK_EMPTY_LABEL,
-  STOCK_EXHAUSTED_LABEL,
+  getStockEmptyLabel,
+  getStockExhaustedLabel,
   STOCK_RECYCLE_TEST_ID,
   formatRecyclesLeft,
   getStockRecycleLabel,
@@ -227,9 +227,9 @@ export const TopRow = ({
                     drawVariant === 'recycle'
                       ? getStockRecycleLabel(recyclesLeft)
                       : drawVariant === 'exhausted'
-                        ? STOCK_EXHAUSTED_LABEL
+                        ? getStockExhaustedLabel()
                         : drawVariant === 'empty'
-                          ? STOCK_EMPTY_LABEL
+                          ? getStockEmptyLabel()
                           : undefined
                   }
                   testID={STOCK_RECYCLE_TEST_ID}

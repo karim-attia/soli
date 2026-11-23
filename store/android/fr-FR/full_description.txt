@@ -1,0 +1,17 @@
+Soli, c’est le solitaire Klondike classique, peaufiné avec soin. Gratuit, open source et sans publicité.
+
+Pas de publicité, pas d’achats intégrés, pas de séries quotidiennes, de pièces ni de pop-ups pour vous pousser à jouer davantage. Juste des cartes.
+
+FONCTIONNALITÉS
+
+- Klondike classique, du Tirage 1 au Tirage 5
+- Donnes gagnables : chaque nouvelle partie peut être gagnée (option désactivable)
+- Annulation illimitée : faites glisser le bouton Annuler latéralement pour voyager dans le temps au fil de votre partie
+- Bouton Indice en option, qui montre le prochain coup
+- Un avertissement discret lorsqu’il ne reste aucun coup utile
+- Score standard, score Vegas ou aucun score
+- La montée auto envoie les cartes vers les fondations à votre place
+- Historique des parties : rejouez n’importe quelle donne ou partagez-la avec vos proches
+- Des dizaines d’animations de victoire
+
+Créé en Suisse, pour qui veut simplement jouer aux cartes.

@@ -31,23 +31,33 @@ describe('score badge rule', () => {
   })
 
   it('shows the Vegas tally for a Vegas-rules game regardless of the setting', () => {
-    const vegas = { label: 'Vegas', value: '−$17', accessibilityLabel: 'Vegas, minus 17 dollars' }
+    const vegas = {
+      id: 'vegas',
+      label: 'Vegas',
+      value: '−$17',
+      accessibilityLabel: 'Vegas, minus 17 dollars',
+    }
     expect(build('vegas', true)).toEqual([vegas])
     expect(build('standard', true)).toEqual([vegas])
   })
 
   it('shows the cumulative TOTAL instead of the per-game tally when keeping a total', () => {
     expect(build('vegas', true, -121)).toEqual([
-      { label: 'Total', value: '−$121', accessibilityLabel: 'Total, minus 121 dollars' },
+      {
+        id: 'total',
+        label: 'Total',
+        value: '−$121',
+        accessibilityLabel: 'Total, minus 121 dollars',
+      },
     ])
     // A Standard-rules game never shows a Vegas total, even with the switch on.
     expect(build('vegas', false, -121)).toEqual([
-      { label: 'Score', value: '385', accessibilityLabel: 'Score, 385' },
+      { id: 'score', label: 'Score', value: '385', accessibilityLabel: 'Score, 385' },
     ])
   })
 
   it('shows Standard for an unlimited game even while Vegas is selected', () => {
-    const score = { label: 'Score', value: '385', accessibilityLabel: 'Score, 385' }
+    const score = { id: 'score', label: 'Score', value: '385', accessibilityLabel: 'Score, 385' }
     expect(build('standard', false)).toEqual([score])
     expect(build('vegas', false)).toEqual([score])
   })
@@ -68,8 +78,13 @@ describe('badge accessibility labels', () => {
       timerStartedAt: null,
     })
     expect(rows).toEqual([
-      { label: 'Moves', value: '42', accessibilityLabel: 'Moves, 42' },
-      { label: 'Time', value: '3:12', accessibilityLabel: 'Time, 3 minutes 12 seconds' },
+      { id: 'moves', label: 'Moves', value: '42', accessibilityLabel: 'Moves, 42' },
+      {
+        id: 'time',
+        label: 'Time',
+        value: '3:12',
+        accessibilityLabel: 'Time, 3 minutes 12 seconds',
+      },
     ])
   })
 })

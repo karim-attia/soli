@@ -1,0 +1,230 @@
+{
+  "nav": {
+    "play": "اللعب",
+    "hello": "مرحبًا",
+    "history": "السجل",
+    "settings": "الإعدادات",
+    "rate": "تقييم Soli",
+    "openMenu": "فتح قائمة التنقل",
+    "notFoundTitle": "عذرًا!",
+    "notFoundBody": "هذه الشاشة غير موجودة.",
+    "notFoundLink": "الانتقال إلى الشاشة الرئيسية"
+  },
+  "common": {
+    "cancel": "إلغاء",
+    "reset": "إعادة تعيين",
+    "off": "إيقاف",
+    "drawMode": "سحب {{number}}"
+  },
+  "about": {
+    "madeBy": "من تطوير",
+    "dedication": "إلى حبيبتي T، لأنها كانت تضطر دائمًا إلى مشاهدة الإعلانات عند لعب السوليتير.",
+    "pitch": "تطبيق سوليتير مجاني ومفتوح المصدر.",
+    "sourceLink": "الشيفرة المصدرية على GitHub",
+    "promise": "بدون إعلانات أو مشتريات داخل التطبيق أو حيل تحفيزية تدفعك إلى اللعب أكثر."
+  },
+  "game": {
+    "newGame": "لعبة جديدة",
+    "newGameA11y": "بدء لعبة جديدة",
+    "undo": "تراجع",
+    "hint": "تلميح",
+    "draw": "سحب",
+    "recyclesLeft_zero": "بقي {{count}}",
+    "recyclesLeft_one": "بقي {{count}}",
+    "recyclesLeft_two": "بقي {{count}}",
+    "recyclesLeft_few": "بقي {{count}}",
+    "recyclesLeft_many": "بقي {{count}}",
+    "recyclesLeft_other": "بقي {{count}}",
+    "newGameAlert": {
+      "title": "بدء لعبة جديدة؟",
+      "message": "ما رأيك في جولة أخرى؟",
+      "messageWon": "فوز جميل! ما رأيك في جولة أخرى؟",
+      "confirm": "توزيعة جديدة"
+    },
+    "playDeal": {
+      "retryTitle": "إعادة محاولة هذه التوزيعة؟",
+      "retryConfirm": "إعادة المحاولة",
+      "sharedTitle": "لعب التوزيعة التي وصلتك؟",
+      "sharedConfirm": "بدء اللعب",
+      "message": "ستنتهي لعبتك الحالية وتسجل على أنها غير مكتملة."
+    }
+  },
+  "notice": {
+    "unwinnable": "لم تبق حركات تؤدي إلى الفوز. يمكنك التراجع أو بدء لعبة جديدة.",
+    "stuck": "لا مزيد من الحركات المفيدة. يمكنك التراجع أو بدء لعبة جديدة.",
+    "noHint": "لا يوجد تلميح حاليًا.",
+    "undoTip": "نصيحة: اسحب زر التراجع جانبًا للسفر عبر الزمن في لعبتك"
+  },
+  "hud": {
+    "score": "النقاط",
+    "vegas": "فيغاس",
+    "total": "المجموع",
+    "moves": "الحركات",
+    "time": "الوقت",
+    "badgeA11y": "{{label}}، {{value}}",
+    "vegasSpoken_zero": "{{count}} دولار",
+    "vegasSpoken_one": "دولار واحد",
+    "vegasSpoken_two": "دولاران",
+    "vegasSpoken_few": "{{count}} دولارات",
+    "vegasSpoken_many": "{{count}} دولارًا",
+    "vegasSpoken_other": "{{count}} دولار",
+    "vegasSpokenNegative_zero": "ناقص {{count}} دولار",
+    "vegasSpokenNegative_one": "ناقص دولار واحد",
+    "vegasSpokenNegative_two": "ناقص دولارين",
+    "vegasSpokenNegative_few": "ناقص {{count}} دولارات",
+    "vegasSpokenNegative_many": "ناقص {{count}} دولارًا",
+    "vegasSpokenNegative_other": "ناقص {{count}} دولار"
+  },
+  "time": {
+    "hours_zero": "{{count}} ساعات",
+    "hours_one": "ساعة واحدة",
+    "hours_two": "ساعتان",
+    "hours_few": "{{count}} ساعات",
+    "hours_many": "{{count}} ساعة",
+    "hours_other": "{{count}} ساعة",
+    "minutes_zero": "{{count}} دقائق",
+    "minutes_one": "دقيقة واحدة",
+    "minutes_two": "دقيقتان",
+    "minutes_few": "{{count}} دقائق",
+    "minutes_many": "{{count}} دقيقة",
+    "minutes_other": "{{count}} دقيقة",
+    "seconds_zero": "{{count}} ثوانٍ",
+    "seconds_one": "ثانية واحدة",
+    "seconds_two": "ثانيتان",
+    "seconds_few": "{{count}} ثوانٍ",
+    "seconds_many": "{{count}} ثانية",
+    "seconds_other": "{{count}} ثانية",
+    "join": "{{first}} و{{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "الألعاب الجديدة",
+      "gameplay": "أسلوب اللعب",
+      "statistics": "الإحصائيات"
+    },
+    "cardsDrawn": "عدد الأوراق المسحوبة",
+    "solvableDeals": "توزيعات قابلة للحل",
+    "scoring": {
+      "label": "احتساب النقاط",
+      "description": "نقاط عادية أو دولارات فيغاس. يسري ذلك بدءًا من لعبتك التالية.",
+      "vegasDescription": "التلميحات والتحذيرات والتوزيعات القابلة للحل متوقفة في وضع فيغاس. يسري ذلك بدءًا من لعبتك التالية.",
+      "standard": "عادي",
+      "vegas": "فيغاس"
+    },
+    "vegasTotal": {
+      "label": "الاحتفاظ بمجموع فيغاس",
+      "description": "ينتقل رصيدك من لعبة إلى أخرى. عندها يظهر في أعلى الشاشة مجموعك التراكمي بدلًا من نتيجة هذه اللعبة.",
+      "resetLabel": "إعادة تعيين مجموع فيغاس",
+      "resetTitle": "إعادة تعيين مجموع فيغاس؟",
+      "resetMessage": "يبدأ مجموعك التراكمي من \u200E$0 من جديد، وتبقى اللعبة الجارية محسوبة."
+    },
+    "autoUp": "نقل تلقائي للأوراق",
+    "hintButton": {
+      "label": "زر التلميح",
+      "description": "إظهار زر تلميح يكشف الحركة التالية."
+    },
+    "warnings": {
+      "label": "تحذيرات",
+      "description": "تحذير عند نفاد الحركات المفيدة، أو فور أن يصبح الفوز باللعبة غير ممكن.",
+      "noUsefulMoves": "لا حركات مفيدة",
+      "unwinnable": "لعبة لا يمكن الفوز بها"
+    },
+    "showMoves": "عدّاد الحركات",
+    "showTime": "مؤقت اللعبة"
+  },
+  "history": {
+    "title": "سجل الألعاب",
+    "stats": {
+      "games": "الألعاب",
+      "solved": "محلولة",
+      "incomplete": "غير مكتملة"
+    },
+    "status": {
+      "solved": "محلولة",
+      "incomplete": "غير مكتملة",
+      "active": "جارية"
+    },
+    "dealName": "توزيعة {{code}}",
+    "moves_zero": "{{count}} حركات",
+    "moves_one": "حركة واحدة",
+    "moves_two": "حركتان",
+    "moves_few": "{{count}} حركات",
+    "moves_many": "{{count}} حركة",
+    "moves_other": "{{count}} حركة",
+    "score": "النقاط {{value}}",
+    "vegas": "فيغاس \u200E{{value}}",
+    "solvable": "قابلة للحل",
+    "emptyTitle": "لا توجد ألعاب مسجلة بعد",
+    "emptyBody": "يبدأ سجلك بعد أول لعبة سوليتير كلوندايك. ستظهر هنا الألعاب المكتملة وتوزيعاتها.",
+    "loadingTitle": "جارٍ تحميل السجل…",
+    "loadingBody": "يرجى الانتظار ريثما نسترجع ألعابك الأخيرة.",
+    "justNow": "الآن",
+    "today": "اليوم، {{time}}",
+    "yesterday": "أمس، {{time}}",
+    "dateTime": "{{date}}، {{time}}",
+    "retry": "إعادة المحاولة",
+    "retryA11y": "إعادة محاولة هذه التوزيعة",
+    "share": "مشاركة",
+    "shareA11y": "مشاركة هذه التوزيعة"
+  },
+  "share": {
+    "dealMessage": "توزيعة سوليتير كلوندايك للعب في Soli (سحب {{number}})"
+  },
+  "a11y": {
+    "rank": {
+      "1": "آس",
+      "2": "اثنان",
+      "3": "ثلاثة",
+      "4": "أربعة",
+      "5": "خمسة",
+      "6": "ستة",
+      "7": "سبعة",
+      "8": "ثمانية",
+      "9": "تسعة",
+      "10": "عشرة",
+      "11": "ولد",
+      "12": "ملكة",
+      "13": "ملك"
+    },
+    "suit": {
+      "clubs": "السباتي",
+      "diamonds": "الديناري",
+      "hearts": "القلوب",
+      "spades": "البستوني"
+    },
+    "card": "{{rank}} {{suit}}",
+    "tableauCard": "{{card}}، العمود {{column}}",
+    "faceDownCard": "ورقة مقلوبة، العمود {{column}}",
+    "emptyColumn": "العمود {{column}}، فارغ",
+    "stock_zero": "كومة السحب، {{count}} أوراق",
+    "stock_one": "كومة السحب، ورقة واحدة",
+    "stock_two": "كومة السحب، ورقتان",
+    "stock_few": "كومة السحب، {{count}} أوراق",
+    "stock_many": "كومة السحب، {{count}} ورقة",
+    "stock_other": "كومة السحب، {{count}} ورقة",
+    "stockEmpty": "كومة السحب، فارغة",
+    "stockExhausted": "كومة السحب، لم تبق دورات",
+    "stockRecycle": "إعادة الكومة المكشوفة إلى كومة السحب",
+    "stockRecycleLeft_zero": "إعادة الكومة المكشوفة إلى كومة السحب، بقيت {{count}} دورات",
+    "stockRecycleLeft_one": "إعادة الكومة المكشوفة إلى كومة السحب، بقيت دورة واحدة",
+    "stockRecycleLeft_two": "إعادة الكومة المكشوفة إلى كومة السحب، بقيت دورتان",
+    "stockRecycleLeft_few": "إعادة الكومة المكشوفة إلى كومة السحب، بقيت {{count}} دورات",
+    "stockRecycleLeft_many": "إعادة الكومة المكشوفة إلى كومة السحب، بقيت {{count}} دورة",
+    "stockRecycleLeft_other": "إعادة الكومة المكشوفة إلى كومة السحب، بقيت {{count}} دورة",
+    "waste": "الكومة المكشوفة، {{card}}",
+    "foundationPile": {
+      "clubs": "أساس السباتي",
+      "diamonds": "أساس الديناري",
+      "hearts": "أساس القلوب",
+      "spades": "أساس البستوني"
+    },
+    "foundation": "{{pile}}، {{card}}",
+    "foundationEmpty": "{{pile}}، فارغ",
+    "scrubber": "شريط التراجع، الموضع {{position}} من {{total}}",
+    "hint": {
+      "draw": "تلميح: سحب ورقة من كومة السحب.",
+      "toColumn": "تلميح: نقل {{card}} إلى العمود {{column}}.",
+      "toFoundation": "تلميح: نقل {{card}} إلى الأساس."
+    }
+  }
+}

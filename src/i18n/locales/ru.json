@@ -1,0 +1,212 @@
+{
+  "nav": {
+    "play": "Играть",
+    "hello": "Привет",
+    "history": "История",
+    "settings": "Настройки",
+    "rate": "Оценить Soli",
+    "openMenu": "Открыть меню навигации",
+    "notFoundTitle": "Ой!",
+    "notFoundBody": "Такого экрана нет.",
+    "notFoundLink": "На главный экран"
+  },
+  "common": {
+    "cancel": "Отмена",
+    "reset": "Сбросить",
+    "off": "Выкл.",
+    "drawMode": "Брать по {{number}}"
+  },
+  "about": {
+    "madeBy": "Автор:",
+    "dedication": "Для моей девушки T: ей вечно приходилось смотреть рекламу, когда она раскладывала пасьянс.",
+    "pitch": "Бесплатный пасьянс с открытым исходным кодом.",
+    "sourceLink": "Исходный код на GitHub",
+    "promise": "Без рекламы, встроенных покупок и уловок, которые заставляют играть больше."
+  },
+  "game": {
+    "newGame": "Новая игра",
+    "newGameA11y": "Начать новую игру",
+    "undo": "Отменить",
+    "hint": "Подсказка",
+    "draw": "Взять",
+    "recyclesLeft_one": "Ещё {{count}}",
+    "recyclesLeft_few": "Ещё {{count}}",
+    "recyclesLeft_many": "Ещё {{count}}",
+    "recyclesLeft_other": "Ещё {{count}}",
+    "newGameAlert": {
+      "title": "Начать новую игру?",
+      "message": "Ещё одну партию?",
+      "messageWon": "Победа! Ещё одну партию?",
+      "confirm": "Раздать снова"
+    },
+    "playDeal": {
+      "retryTitle": "Переиграть эту раздачу?",
+      "retryConfirm": "Переиграть",
+      "sharedTitle": "Сыграть раздачу по ссылке?",
+      "sharedConfirm": "Играть",
+      "message": "Текущая игра закончится и будет записана как незавершённая."
+    }
+  },
+  "notice": {
+    "unwinnable": "Игру уже не выиграть — отмените ход или начните новую игру.",
+    "stuck": "Полезных ходов больше нет — отмените ход или начните новую игру.",
+    "noHint": "Подсказка не найдена.",
+    "undoTip": "Совет: потяните кнопку «Отменить» в сторону, чтобы путешествовать по игре во времени"
+  },
+  "hud": {
+    "score": "Счёт",
+    "vegas": "Вегас",
+    "total": "Итого",
+    "moves": "Ходы",
+    "time": "Время",
+    "badgeA11y": "{{label}}, {{value}}",
+    "vegasSpoken_one": "{{count}} доллар",
+    "vegasSpoken_few": "{{count}} доллара",
+    "vegasSpoken_many": "{{count}} долларов",
+    "vegasSpoken_other": "{{count}} доллара",
+    "vegasSpokenNegative_one": "минус {{count}} доллар",
+    "vegasSpokenNegative_few": "минус {{count}} доллара",
+    "vegasSpokenNegative_many": "минус {{count}} долларов",
+    "vegasSpokenNegative_other": "минус {{count}} доллара"
+  },
+  "time": {
+    "hours_one": "{{count}} час",
+    "hours_few": "{{count}} часа",
+    "hours_many": "{{count}} часов",
+    "hours_other": "{{count}} часа",
+    "minutes_one": "{{count}} минута",
+    "minutes_few": "{{count}} минуты",
+    "minutes_many": "{{count}} минут",
+    "minutes_other": "{{count}} минуты",
+    "seconds_one": "{{count}} секунда",
+    "seconds_few": "{{count}} секунды",
+    "seconds_many": "{{count}} секунд",
+    "seconds_other": "{{count}} секунды",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "Новые игры",
+      "gameplay": "Игра",
+      "statistics": "Статистика"
+    },
+    "cardsDrawn": "Сколько карт брать",
+    "solvableDeals": "Решаемые раздачи",
+    "scoring": {
+      "label": "Подсчёт очков",
+      "description": "Стандартные очки или доллары в режиме «Вегас». Действует со следующей игры.",
+      "vegasDescription": "В режиме «Вегас» подсказки, предупреждения и решаемые раздачи отключены. Действует со следующей игры.",
+      "standard": "Стандартный",
+      "vegas": "Вегас"
+    },
+    "vegasTotal": {
+      "label": "Сохранять итог «Вегас»",
+      "description": "Баланс переходит из игры в игру. Тогда вверху экрана показывается общий итог, а не результат текущей игры.",
+      "resetLabel": "Сбросить итог «Вегас»",
+      "resetTitle": "Сбросить итог «Вегас»?",
+      "resetMessage": "Общий итог снова начнётся с $0. Текущая игра по-прежнему учитывается."
+    },
+    "autoUp": "Автоперенос в дома",
+    "hintButton": {
+      "label": "Кнопка подсказки",
+      "description": "Показывать кнопку «Подсказка», которая подскажет следующий ход."
+    },
+    "warnings": {
+      "label": "Предупреждения",
+      "description": "Предупреждать, когда полезных ходов больше нет, или сразу, как только игру уже не выиграть.",
+      "noUsefulMoves": "Нет полезных ходов",
+      "unwinnable": "Игру уже не выиграть"
+    },
+    "showMoves": "Счётчик ходов",
+    "showTime": "Таймер игры"
+  },
+  "history": {
+    "title": "История игр",
+    "stats": {
+      "games": "Игры",
+      "solved": "Выиграно",
+      "incomplete": "Не завершено"
+    },
+    "status": {
+      "solved": "Выиграна",
+      "incomplete": "Не завершена",
+      "active": "Текущая"
+    },
+    "dealName": "Раздача {{code}}",
+    "moves_one": "{{count}} ход",
+    "moves_few": "{{count}} хода",
+    "moves_many": "{{count}} ходов",
+    "moves_other": "{{count}} хода",
+    "score": "Счёт {{value}}",
+    "vegas": "Вегас {{value}}",
+    "solvable": "Решаемая",
+    "emptyTitle": "Сыгранных игр пока нет",
+    "emptyBody": "Сыграйте в «Косынку», чтобы начать историю. Здесь появятся завершённые игры и их раздачи.",
+    "loadingTitle": "Загрузка истории…",
+    "loadingBody": "Подождите, загружаем недавние игры.",
+    "justNow": "только что",
+    "today": "Сегодня, {{time}}",
+    "yesterday": "Вчера, {{time}}",
+    "dateTime": "{{date}}, {{time}}",
+    "retry": "Переиграть",
+    "retryA11y": "Переиграть эту раздачу",
+    "share": "Поделиться",
+    "shareA11y": "Поделиться этой раздачей"
+  },
+  "share": {
+    "dealMessage": "Сыграйте эту раздачу «Косынки» в Soli (брать по {{number}})"
+  },
+  "a11y": {
+    "rank": {
+      "1": "Туз",
+      "2": "Двойка",
+      "3": "Тройка",
+      "4": "Четвёрка",
+      "5": "Пятёрка",
+      "6": "Шестёрка",
+      "7": "Семёрка",
+      "8": "Восьмёрка",
+      "9": "Девятка",
+      "10": "Десятка",
+      "11": "Валет",
+      "12": "Дама",
+      "13": "Король"
+    },
+    "suit": {
+      "clubs": "треф",
+      "diamonds": "бубен",
+      "hearts": "червей",
+      "spades": "пик"
+    },
+    "card": "{{rank}} {{suit}}",
+    "tableauCard": "{{card}}, столбец {{column}}",
+    "faceDownCard": "Закрытая карта, столбец {{column}}",
+    "emptyColumn": "Столбец {{column}}, пусто",
+    "stock_one": "Колода, {{count}} карта",
+    "stock_few": "Колода, {{count}} карты",
+    "stock_many": "Колода, {{count}} карт",
+    "stock_other": "Колода, {{count}} карты",
+    "stockEmpty": "Колода, пусто",
+    "stockExhausted": "Колода, проходов не осталось",
+    "stockRecycle": "Вернуть отбой в колоду",
+    "stockRecycleLeft_one": "Вернуть отбой в колоду, осталось: {{count}}",
+    "stockRecycleLeft_few": "Вернуть отбой в колоду, осталось: {{count}}",
+    "stockRecycleLeft_many": "Вернуть отбой в колоду, осталось: {{count}}",
+    "stockRecycleLeft_other": "Вернуть отбой в колоду, осталось: {{count}}",
+    "waste": "Отбой, {{card}}",
+    "foundationPile": {
+      "clubs": "Дом треф",
+      "diamonds": "Дом бубен",
+      "hearts": "Дом червей",
+      "spades": "Дом пик"
+    },
+    "foundation": "{{pile}}, {{card}}",
+    "foundationEmpty": "{{pile}}, пусто",
+    "scrubber": "Шкала отмены, позиция {{position}} из {{total}}",
+    "hint": {
+      "draw": "Подсказка: взять карту из колоды.",
+      "toColumn": "Подсказка: {{card}} — в столбец {{column}}.",
+      "toFoundation": "Подсказка: {{card}} — в дом."
+    }
+  }
+}

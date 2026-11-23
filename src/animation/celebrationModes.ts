@@ -64,6 +64,8 @@ export type CelebrationMetadata = {
 // didn't convince on device, user decided remove (the pre-agreed outcome).
 // Never reuse these ids. A `?celebration=<retired id>` deep link devLogs
 // "unknown mode" and is ignored (metadata lookup miss — verified on device).
+// i18n: dev-only, intentionally English (mode names appear only in the Demo sheet, the
+// debug badge and logs).
 export const CELEBRATION_MODE_METADATA: CelebrationMetadata[] = [
   { id: 0, name: 'Spiral Bloom' },
   // Mode-uplift story (2026-07-08): trails added to the user's "boring set"

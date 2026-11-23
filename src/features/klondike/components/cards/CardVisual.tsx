@@ -1,3 +1,7 @@
+// i18n: the embedded card font family (CardTextAndroid) is used ONLY for rank/suit glyphs
+// here and must never receive translated text (it has no CJK/Cyrillic/Arabic glyphs). Card
+// faces stay A/J/Q/K with Latin digits in every language; every other text in the app
+// uses the system font, which falls back natively.
 import React, { useEffect } from 'react'
 import {
   Animated as NativeAnimated,
@@ -190,7 +194,19 @@ export const CardBack = ({ label, caption, metrics, variant }: CardBackProps) =>
       {variant === 'recycle' ? (
         <>
           <RefreshCcw color="#0f172a" size={iconSize} />
-          {caption ? <Text style={styles.cardBackCaption}>{caption}</Text> : null}
+          {/* One line, shrink to fit (i18n phase 9): the caption only has the card
+              width; pl «Jeszcze 2» wrapped onto two lines and fr «Encore 2» touched
+              the dashed outline. */}
+          {caption ? (
+            <Text
+              style={styles.cardBackCaption}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {caption}
+            </Text>
+          ) : null}
         </>
       ) : variant === 'exhausted' ? (
         <Ban color="#0f172a" size={iconSize} />

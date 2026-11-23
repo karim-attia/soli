@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated'
 
-import { UNDO_HINT_COPY } from '../undoHint'
+import { getUndoHintCopy } from '../undoHint'
 
 const HINT_TRANSITION = { duration: 140 } as const
 const HINT_HIDDEN_SCALE = 0.985
@@ -46,12 +46,12 @@ export const UndoHintBubble = ({
       pointerEvents="none"
       style={[styles.layer, { bottom }, animatedStyle]}
       accessible
-      accessibilityLabel={UNDO_HINT_COPY}
+      accessibilityLabel={getUndoHintCopy()}
       accessibilityLiveRegion="polite"
       testID="undo-hint"
     >
       <View style={styles.bubble}>
-        <Text style={styles.text}>{UNDO_HINT_COPY}</Text>
+        <Text style={styles.text}>{getUndoHintCopy()}</Text>
       </View>
       {/* v2: downward caret pointing at the Undo button (border-trick triangle). */}
       <View style={styles.caret} />

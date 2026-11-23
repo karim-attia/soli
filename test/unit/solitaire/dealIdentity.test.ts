@@ -3,6 +3,7 @@ import {
   createRandomExactDealId,
   decodeExactDealId,
   encodeExactDealId,
+  formatExactDealCode,
   formatExactDealDisplayName,
   hasDrawCountInMask,
   isExactDealId,
@@ -87,6 +88,12 @@ describe('dealIdentity', () => {
   it('formats display names without exposing the parser prefix', () => {
     expect(formatExactDealDisplayName('E1_123456789')).toBe('Deal 2345-6789')
     expect(formatExactDealDisplayName('not-exact')).toBe('')
+  })
+
+  it('exposes the text-free deal code for display-time translation', () => {
+    expect(formatExactDealCode('E1_123456789')).toBe('2345-6789')
+    expect(formatExactDealCode('E1_abc')).toBe('0000-0ABC')
+    expect(formatExactDealCode('not-exact')).toBe('')
   })
 
   it('checks draw masks by selected draw count', () => {

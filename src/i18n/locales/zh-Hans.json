@@ -1,0 +1,185 @@
+{
+  "nav": {
+    "play": "游戏",
+    "hello": "你好",
+    "history": "历史记录",
+    "settings": "设置",
+    "rate": "给 Soli 评分",
+    "openMenu": "打开导航菜单",
+    "notFoundTitle": "哎呀！",
+    "notFoundBody": "这个页面不存在。",
+    "notFoundLink": "返回主页面"
+  },
+  "common": {
+    "cancel": "取消",
+    "reset": "重置",
+    "off": "关闭",
+    "drawMode": "翻 {{number}} 张"
+  },
+  "about": {
+    "madeBy": "作者",
+    "dedication": "献给我的女朋友 T，因为她以前玩纸牌接龙时总是不得不看广告。",
+    "pitch": "免费、开源的纸牌接龙应用。",
+    "sourceLink": "GitHub 上的源代码",
+    "promise": "没有广告，没有应用内购买，也没有诱导你多玩的游戏化设计。"
+  },
+  "game": {
+    "newGame": "新游戏",
+    "newGameA11y": "开始新游戏",
+    "undo": "撤销",
+    "hint": "提示",
+    "draw": "翻牌",
+    "recyclesLeft_other": "剩 {{count}} 轮",
+    "newGameAlert": {
+      "title": "开始新游戏？",
+      "message": "准备好再来一局了吗？",
+      "messageWon": "赢得漂亮！准备好再来一局了吗？",
+      "confirm": "再来一局"
+    },
+    "playDeal": {
+      "retryTitle": "重玩这局牌？",
+      "retryConfirm": "重玩",
+      "sharedTitle": "玩分享的牌局？",
+      "sharedConfirm": "开始",
+      "message": "当前游戏将结束，并记录为未完成。"
+    }
+  },
+  "notice": {
+    "unwinnable": "这局已无法获胜。可以撤销，或开始新游戏。",
+    "stuck": "没有有用的走法了。可以撤销，或开始新游戏。",
+    "noHint": "没有找到提示。",
+    "undoTip": "小技巧：左右拖动“撤销”按钮，可以在这局游戏中时光穿梭"
+  },
+  "hud": {
+    "score": "得分",
+    "vegas": "维加斯",
+    "total": "累计",
+    "moves": "步数",
+    "time": "用时",
+    "badgeA11y": "{{label}}，{{value}}",
+    "vegasSpoken_other": "{{count}} 美元",
+    "vegasSpokenNegative_other": "负 {{count}} 美元"
+  },
+  "time": {
+    "hours_other": "{{count}} 小时",
+    "minutes_other": "{{count}} 分钟",
+    "seconds_other": "{{count}} 秒",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "新游戏",
+      "gameplay": "玩法",
+      "statistics": "统计"
+    },
+    "cardsDrawn": "翻牌张数",
+    "solvableDeals": "有解牌局",
+    "scoring": {
+      "label": "计分",
+      "description": "标准得分或维加斯美元。从下一局开始生效。",
+      "vegasDescription": "维加斯计分下，提示、提醒和有解牌局都会关闭。从下一局开始生效。",
+      "standard": "标准",
+      "vegas": "维加斯"
+    },
+    "vegasTotal": {
+      "label": "保留维加斯累计",
+      "description": "把余额从一局带到下一局。开启后，顶部显示的是累计金额，而不是本局的结果。",
+      "resetLabel": "重置维加斯累计",
+      "resetTitle": "重置维加斯累计？",
+      "resetMessage": "累计金额将从 $0 重新开始。正在进行的这局游戏仍会计入。"
+    },
+    "autoUp": "自动收牌",
+    "hintButton": {
+      "label": "提示按钮",
+      "description": "显示“提示”按钮，点按可查看下一步走法。"
+    },
+    "warnings": {
+      "label": "提醒",
+      "description": "在没有有用的走法时提醒你，或在牌局无法获胜时立即提醒。",
+      "noUsefulMoves": "没有有用的走法",
+      "unwinnable": "无法获胜的牌局"
+    },
+    "showMoves": "显示步数",
+    "showTime": "显示用时"
+  },
+  "history": {
+    "title": "游戏记录",
+    "stats": {
+      "games": "局数",
+      "solved": "获胜",
+      "incomplete": "未完成"
+    },
+    "status": {
+      "solved": "获胜",
+      "incomplete": "未完成",
+      "active": "进行中"
+    },
+    "dealName": "牌局 {{code}}",
+    "moves_other": "{{count}} 步",
+    "score": "得分 {{value}}",
+    "vegas": "维加斯 {{value}}",
+    "solvable": "有解",
+    "emptyTitle": "还没有游戏记录",
+    "emptyBody": "玩一局纸牌接龙，就会开始留下记录。完成的游戏和对应的牌局会显示在这里。",
+    "loadingTitle": "正在加载记录…",
+    "loadingBody": "请稍候，正在读取你最近的游戏。",
+    "justNow": "刚刚",
+    "today": "今天 {{time}}",
+    "yesterday": "昨天 {{time}}",
+    "dateTime": "{{date}} {{time}}",
+    "retry": "重玩",
+    "retryA11y": "重玩这局牌",
+    "share": "分享",
+    "shareA11y": "分享这局牌"
+  },
+  "share": {
+    "dealMessage": "在 Soli 中玩这局纸牌接龙（翻 {{number}} 张）"
+  },
+  "a11y": {
+    "rank": {
+      "1": "A",
+      "2": "2",
+      "3": "3",
+      "4": "4",
+      "5": "5",
+      "6": "6",
+      "7": "7",
+      "8": "8",
+      "9": "9",
+      "10": "10",
+      "11": "J",
+      "12": "Q",
+      "13": "K"
+    },
+    "suit": {
+      "clubs": "梅花",
+      "diamonds": "方块",
+      "hearts": "红桃",
+      "spades": "黑桃"
+    },
+    "card": "{{suit}}{{rank}}",
+    "tableauCard": "{{card}}，第 {{column}} 列",
+    "faceDownCard": "未翻开的牌，第 {{column}} 列",
+    "emptyColumn": "第 {{column}} 列，空",
+    "stock_other": "牌库，{{count}} 张牌",
+    "stockEmpty": "牌库，空",
+    "stockExhausted": "牌库，轮数已用完",
+    "stockRecycle": "把弃牌堆翻回牌库",
+    "stockRecycleLeft_other": "把弃牌堆翻回牌库，剩 {{count}} 轮",
+    "waste": "弃牌堆，{{card}}",
+    "foundationPile": {
+      "clubs": "梅花收牌区",
+      "diamonds": "方块收牌区",
+      "hearts": "红桃收牌区",
+      "spades": "黑桃收牌区"
+    },
+    "foundation": "{{pile}}，{{card}}",
+    "foundationEmpty": "{{pile}}，空",
+    "scrubber": "撤销滑块，第 {{position}} 步，共 {{total}} 步",
+    "hint": {
+      "draw": "提示：从牌库翻牌。",
+      "toColumn": "提示：把{{card}}移到第 {{column}} 列。",
+      "toFoundation": "提示：把{{card}}移到收牌区。"
+    }
+  }
+}

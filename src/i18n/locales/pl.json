@@ -1,0 +1,212 @@
+{
+  "nav": {
+    "play": "Graj",
+    "hello": "Cześć",
+    "history": "Historia",
+    "settings": "Ustawienia",
+    "rate": "Oceń Soli",
+    "openMenu": "Otwórz menu nawigacji",
+    "notFoundTitle": "Ups!",
+    "notFoundBody": "Ten ekran nie istnieje.",
+    "notFoundLink": "Wróć do ekranu głównego"
+  },
+  "common": {
+    "cancel": "Anuluj",
+    "reset": "Wyzeruj",
+    "off": "Wył.",
+    "drawMode": "Dobierz {{number}}"
+  },
+  "about": {
+    "madeBy": "Autor:",
+    "dedication": "Dla mojej dziewczyny T, bo grając w pasjansa, zawsze musiała oglądać reklamy.",
+    "pitch": "Bezpłatny pasjans o otwartym kodzie źródłowym (open source).",
+    "sourceLink": "Kod źródłowy na GitHubie",
+    "promise": "Bez reklam, zakupów w aplikacji i grywalizacji, która miałaby cię skłaniać do częstszego grania."
+  },
+  "game": {
+    "newGame": "Nowa gra",
+    "newGameA11y": "Rozpocznij nową grę",
+    "undo": "Cofnij",
+    "hint": "Podpowiedź",
+    "draw": "Weź",
+    "recyclesLeft_one": "Jeszcze {{count}}",
+    "recyclesLeft_few": "Jeszcze {{count}}",
+    "recyclesLeft_many": "Jeszcze {{count}}",
+    "recyclesLeft_other": "Jeszcze {{count}}",
+    "newGameAlert": {
+      "title": "Rozpocząć nową grę?",
+      "message": "Masz ochotę na kolejną rundę?",
+      "messageWon": "Brawo, wygrana! Masz ochotę na kolejną rundę?",
+      "confirm": "Rozdaj ponownie"
+    },
+    "playDeal": {
+      "retryTitle": "Powtórzyć to rozdanie?",
+      "retryConfirm": "Powtórz",
+      "sharedTitle": "Rozegrać udostępnione rozdanie?",
+      "sharedConfirm": "Graj",
+      "message": "Bieżąca gra zakończy się i zostanie zapisana jako nieukończona."
+    }
+  },
+  "notice": {
+    "unwinnable": "Gra jest już nie do wygrania – cofnij ruch lub zacznij nową grę.",
+    "stuck": "Brak przydatnych ruchów – cofnij ruch lub zacznij nową grę.",
+    "noHint": "Nie znaleziono podpowiedzi.",
+    "undoTip": "Porada: przeciągnij przycisk „Cofnij” w bok, aby podróżować w czasie po całej grze"
+  },
+  "hud": {
+    "score": "Wynik",
+    "vegas": "Vegas",
+    "total": "Suma",
+    "moves": "Ruchy",
+    "time": "Czas",
+    "badgeA11y": "{{label}}, {{value}}",
+    "vegasSpoken_one": "{{count}} dolar",
+    "vegasSpoken_few": "{{count}} dolary",
+    "vegasSpoken_many": "{{count}} dolarów",
+    "vegasSpoken_other": "{{count}} dolara",
+    "vegasSpokenNegative_one": "minus {{count}} dolar",
+    "vegasSpokenNegative_few": "minus {{count}} dolary",
+    "vegasSpokenNegative_many": "minus {{count}} dolarów",
+    "vegasSpokenNegative_other": "minus {{count}} dolara"
+  },
+  "time": {
+    "hours_one": "{{count}} godzina",
+    "hours_few": "{{count}} godziny",
+    "hours_many": "{{count}} godzin",
+    "hours_other": "{{count}} godziny",
+    "minutes_one": "{{count}} minuta",
+    "minutes_few": "{{count}} minuty",
+    "minutes_many": "{{count}} minut",
+    "minutes_other": "{{count}} minuty",
+    "seconds_one": "{{count}} sekunda",
+    "seconds_few": "{{count}} sekundy",
+    "seconds_many": "{{count}} sekund",
+    "seconds_other": "{{count}} sekundy",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "Nowe gry",
+      "gameplay": "Rozgrywka",
+      "statistics": "Statystyki"
+    },
+    "cardsDrawn": "Dobierane karty",
+    "solvableDeals": "Rozdania rozwiązywalne",
+    "scoring": {
+      "label": "Punktacja",
+      "description": "Standardowe punkty lub dolary Vegas. Obowiązuje od następnej gry.",
+      "vegasDescription": "W trybie Vegas podpowiedzi, ostrzeżenia i rozdania rozwiązywalne są wyłączone. Obowiązuje od następnej gry.",
+      "standard": "Standardowa",
+      "vegas": "Vegas"
+    },
+    "vegasTotal": {
+      "label": "Zachowuj sumę Vegas",
+      "description": "Przenoś saldo z gry do gry. U góry ekranu zobaczysz wtedy łączną sumę zamiast wyniku bieżącej gry.",
+      "resetLabel": "Wyzeruj sumę Vegas",
+      "resetTitle": "Wyzerować sumę Vegas?",
+      "resetMessage": "Łączna suma zacznie się ponownie od $0. Gra na stole nadal się liczy."
+    },
+    "autoUp": "Automatyczne odkładanie",
+    "hintButton": {
+      "label": "Przycisk podpowiedzi",
+      "description": "Pokazuj przycisk „Podpowiedź”, który wskazuje następny ruch."
+    },
+    "warnings": {
+      "label": "Ostrzeżenia",
+      "description": "Ostrzegaj, gdy skończą się przydatne ruchy albo gdy tylko gra stanie się nie do wygrania.",
+      "noUsefulMoves": "Brak przydatnych ruchów",
+      "unwinnable": "Gra nie do wygrania"
+    },
+    "showMoves": "Licznik ruchów",
+    "showTime": "Czas gry"
+  },
+  "history": {
+    "title": "Historia gier",
+    "stats": {
+      "games": "Gry",
+      "solved": "Wygrane",
+      "incomplete": "Nieukończone"
+    },
+    "status": {
+      "solved": "Wygrana",
+      "incomplete": "Nieukończona",
+      "active": "W toku"
+    },
+    "dealName": "Rozdanie {{code}}",
+    "moves_one": "{{count}} ruch",
+    "moves_few": "{{count}} ruchy",
+    "moves_many": "{{count}} ruchów",
+    "moves_other": "{{count}} ruchu",
+    "score": "Wynik {{value}}",
+    "vegas": "Vegas {{value}}",
+    "solvable": "Rozwiązywalne",
+    "emptyTitle": "Brak zapisanych gier",
+    "emptyBody": "Zagraj w pasjansa Klondike, aby zacząć tworzyć historię. Pojawią się tu ukończone gry i ich rozdania.",
+    "loadingTitle": "Wczytywanie historii…",
+    "loadingBody": "Poczekaj, wczytujemy twoje ostatnie gry.",
+    "justNow": "przed chwilą",
+    "today": "Dzisiaj, {{time}}",
+    "yesterday": "Wczoraj, {{time}}",
+    "dateTime": "{{date}}, {{time}}",
+    "retry": "Powtórz",
+    "retryA11y": "Powtórz to rozdanie",
+    "share": "Udostępnij",
+    "shareA11y": "Udostępnij to rozdanie"
+  },
+  "share": {
+    "dealMessage": "Zagraj w to rozdanie pasjansa Klondike w aplikacji Soli (Dobierz {{number}})"
+  },
+  "a11y": {
+    "rank": {
+      "1": "As",
+      "2": "Dwójka",
+      "3": "Trójka",
+      "4": "Czwórka",
+      "5": "Piątka",
+      "6": "Szóstka",
+      "7": "Siódemka",
+      "8": "Ósemka",
+      "9": "Dziewiątka",
+      "10": "Dziesiątka",
+      "11": "Walet",
+      "12": "Dama",
+      "13": "Król"
+    },
+    "suit": {
+      "clubs": "trefl",
+      "diamonds": "karo",
+      "hearts": "kier",
+      "spades": "pik"
+    },
+    "card": "{{rank}} {{suit}}",
+    "tableauCard": "{{card}}, kolumna {{column}}",
+    "faceDownCard": "Zakryta karta, kolumna {{column}}",
+    "emptyColumn": "Kolumna {{column}}, pusta",
+    "stock_one": "Talia rezerwowa, {{count}} karta",
+    "stock_few": "Talia rezerwowa, {{count}} karty",
+    "stock_many": "Talia rezerwowa, {{count}} kart",
+    "stock_other": "Talia rezerwowa, {{count}} karty",
+    "stockEmpty": "Talia rezerwowa, pusta",
+    "stockExhausted": "Talia rezerwowa, brak kolejnych przejść",
+    "stockRecycle": "Przełóż odrzucone karty do talii",
+    "stockRecycleLeft_one": "Przełóż odrzucone karty do talii, zostało: {{count}}",
+    "stockRecycleLeft_few": "Przełóż odrzucone karty do talii, zostało: {{count}}",
+    "stockRecycleLeft_many": "Przełóż odrzucone karty do talii, zostało: {{count}}",
+    "stockRecycleLeft_other": "Przełóż odrzucone karty do talii, zostało: {{count}}",
+    "waste": "Stos odrzuconych, {{card}}",
+    "foundationPile": {
+      "clubs": "Stos bazowy trefl",
+      "diamonds": "Stos bazowy karo",
+      "hearts": "Stos bazowy kier",
+      "spades": "Stos bazowy pik"
+    },
+    "foundation": "{{pile}}, {{card}}",
+    "foundationEmpty": "{{pile}}, pusty",
+    "scrubber": "Suwak cofania, pozycja {{position}} z {{total}}",
+    "hint": {
+      "draw": "Podpowiedź: dobierz kartę z talii rezerwowej.",
+      "toColumn": "Podpowiedź: {{card}} – na kolumnę {{column}}.",
+      "toFoundation": "Podpowiedź: {{card}} – na stos bazowy."
+    }
+  }
+}

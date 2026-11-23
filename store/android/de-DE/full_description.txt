@@ -1,0 +1,17 @@
+Soli ist klassisches Klondike-Solitär, mit Sorgfalt verfeinert. Kostenlos, Open Source und ohne Werbung.
+
+Keine Werbung, keine In-App-Käufe, keine Streaks, Münzen oder Pop-ups, die dich zum Weiterspielen bringen sollen. Einfach Karten.
+
+FUNKTIONEN
+
+- Klassisches Klondike-Solitär, von «1 ziehen» bis «5 ziehen»
+- Lösbare Spiele: Jedes neue Spiel lässt sich gewinnen (kannst du ausschalten)
+- Unbegrenzt rückgängig: Zieh den Rückgängig-Knopf zur Seite und reise durch dein Spiel zurück
+- Auf Wunsch ein Tipp-Knopf, der den nächsten Zug zeigt
+- Ein ruhiger Hinweis, wenn es keine sinnvollen Züge mehr gibt
+- Standardwertung, Vegas-Wertung oder ganz ohne Punkte
+- «Automatisch ablegen» legt die Karten für dich auf die Ablagestapel
+- Spielverlauf: Wiederhol jedes Spiel oder teile es mit Freunden
+- Dutzende Siegesanimationen
+
+Made in Switzerland – für alle, die einfach Karten spielen wollen.

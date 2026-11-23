@@ -196,14 +196,27 @@ export const randomUnitInterval = (): number => {
 export const hasDrawCountInMask = (drawMask: number, drawCount: DrawCount): boolean =>
   (drawMask & DRAW_COUNT_MASKS[drawCount]) !== 0
 
-export const formatExactDealDisplayName = (exactId: string): string => {
+// The short human code of an exact deal ("XXXX-XXXX"), '' for a non-exact id. Text-free
+// on purpose: the engine must not import src/i18n, so the UI wraps the code at DISPLAY
+// time (history screen: t('history.dealName', { code })).
+export const formatExactDealCode = (exactId: string): string => {
   if (!isExactDealId(exactId)) {
     return ''
   }
 
   const payload = exactId.slice(EXACT_ID_PREFIX.length).toUpperCase()
   const compact = payload.slice(-8).padStart(8, '0')
-  return `Deal ${compact.slice(0, 4)}-${compact.slice(4)}`
+  return `${compact.slice(0, 4)}-${compact.slice(4)}`
+}
+
+// i18n (2026-11-23): this English "Deal XXXX-XXXX" is only the PERSISTED fallback
+// (history rows' display_name). It is still written so the column stays non-empty and
+// old builds / exports keep a readable name, but it must never be SHOWN for a row with an
+// exact id: translating at write time would freeze the language of the day the game was
+// played, so the UI derives the title from the exact id via formatExactDealCode instead.
+export const formatExactDealDisplayName = (exactId: string): string => {
+  const code = formatExactDealCode(exactId)
+  return code ? `Deal ${code}` : ''
 }
 
 const bytesToBigInt = (bytes: Uint8Array): bigint => {

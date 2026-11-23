@@ -11,6 +11,7 @@ type CelebrationDebugBadgeProps = {
 
 const BADGE_BASE_OFFSET = 12
 
+// i18n: dev-only, intentionally English (badge only shows with Developer mode on).
 export const CelebrationDebugBadge = ({ label, onPress }: CelebrationDebugBadgeProps) => {
   const insets = useSafeAreaInsets()
 

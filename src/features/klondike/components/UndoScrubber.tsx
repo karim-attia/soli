@@ -1,3 +1,4 @@
+import { t } from '../../../i18n'
 import React, { useCallback, useEffect, useRef } from 'react'
 import { type LayoutChangeEvent, Pressable, StyleSheet, View, Text } from 'react-native'
 import Animated, {
@@ -133,7 +134,7 @@ const GestureWrapper = ({
         collapsable={false}
         accessible
         accessibilityRole="button"
-        accessibilityLabel="Undo"
+        accessibilityLabel={t('game.undo')}
         // No accessibilityState={{ disabled: !canUndo }} here: on Android it
         // disables the NATIVE view, which drops all touches — the scrub pan
         // (which deliberately ignores canUndo so redo works from index 0)
@@ -143,7 +144,7 @@ const GestureWrapper = ({
         testID="undo"
       >
         <Undo2 size={20} color="#000" />
-        <Text style={styles.undoButtonText}>Undo</Text>
+        <Text style={styles.undoButtonText}>{t('game.undo')}</Text>
       </Animated.View>
     </GestureDetector>
   )
@@ -279,7 +280,10 @@ export const UndoScrubber = ({
             onLayout={handleTrackLayout}
             style={styles.track}
             accessible
-            accessibilityLabel={`Undo scrubber, position ${historyIndex} of ${sliderMax}`}
+            accessibilityLabel={t('a11y.scrubber', {
+              position: historyIndex,
+              total: sliderMax,
+            })}
             testID="undo-scrubber-track"
           >
             <AnimatedView style={[styles.trackActive, activeTrackStyle]} />
@@ -303,7 +307,7 @@ export const UndoScrubber = ({
       {hintButtonVisible ? (
         <DockActionButton
           icon={<Lightbulb size={20} color="#000" />}
-          label="Hint"
+          label={t('game.hint')}
           testID="hint-button"
           bottom={bottomDockOffset}
           onPress={onHintPress}
@@ -312,7 +316,7 @@ export const UndoScrubber = ({
       {newGameButtonVisible ? (
         <DockActionButton
           icon={<Shuffle size={20} color="#000" />}
-          label="New Game"
+          label={t('game.newGame')}
           testID="new-game-button"
           bottom={bottomDockOffset}
           onPress={onNewGamePress}

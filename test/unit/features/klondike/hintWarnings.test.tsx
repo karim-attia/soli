@@ -3,9 +3,9 @@ import TestRenderer from 'react-test-renderer'
 import { AccessibilityInfo } from 'react-native'
 
 import {
-  NO_HINT_BUBBLE_TEXT,
-  STUCK_BUBBLE_TEXT,
-  UNWINNABLE_BUBBLE_TEXT,
+  getNoHintBubbleText,
+  getStuckBubbleText,
+  getUnwinnableBubbleText,
   useHint,
 } from '../../../../src/features/klondike/hooks/useHint'
 import {
@@ -17,6 +17,12 @@ import {
 import type { SolverHint } from '../../../../src/solitaire/solverBridge'
 import type { WarningMode } from '../../../../src/state/settings'
 import { card, createTestState, tableauWith } from '../../solitaire/helpers'
+
+// Bubble copy comes from en.json via t() (jest runs in English, see
+// test/setup/mock-expo-localization.ts); resolved once here to keep the assertions short.
+const NO_HINT_BUBBLE_TEXT = getNoHintBubbleText()
+const STUCK_BUBBLE_TEXT = getStuckBubbleText()
+const UNWINNABLE_BUBBLE_TEXT = getUnwinnableBubbleText()
 
 // Hook-level tests for the F14 sticky dead era and the F15 hint × warning
 // decision table. The solver native module and the useful-move enumeration

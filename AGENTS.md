@@ -122,6 +122,8 @@ However, also test everything you do in a real environment (when it makes sense!
 
 **Any agent doing a store release ("let's release", TestFlight / Google Play upload) must first read `.agents/skills/soli-release/SKILL.md`** — the release cookbook (bump rules, release notes + approval, builds, uploads in API/manual mode, testers, what needs Karim's go-ahead, troubleshooting).
 
+**Any agent adding/changing user-facing text, translations or store listing text must first read `.agents/skills/soli-translation/SKILL.md`** — glossary, translator/reviewer roles, add-a-language playbook (German is Swiss High German: ss, never ß).
+
 ## Commands
 
 - Cheap gates: `yarn typecheck` — `yarn lint` — `yarn jest`

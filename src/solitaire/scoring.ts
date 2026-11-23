@@ -17,6 +17,7 @@
 //   Vegas-rules games run with hints and warnings off entirely (useHint).
 // - No undo penalty, no hint charge: the score is a pure function of the board
 //   timeline, which is exactly why undo/scrub/replay need no special handling.
+import { toLatinDigits } from '../utils/latinDigits'
 import type { DrawCount } from './drawCount'
 
 // Pass limit = draw count (Draw 1 → 1 pass = 0 recycles, Draw 3 → 3 passes, …).
@@ -118,24 +119,24 @@ const MINUS_SIGN = '−'
 // Hermes build without Intl degrades toLocaleString to toString — it never throws.
 // Untimed Standard maxes at 740, so grouping only shows up once timed scoring
 // (follow-up F1) exists; the helper is here so both call sites agree from day one.
-export const formatStandardScore = (value: number): string =>
-  Math.max(0, Math.trunc(value)).toLocaleString()
+// `locale` is OPTIONAL on purpose (i18n plan): the engine must not import src/i18n, so
+// UI callers pass `getIntlLocale()` (app language + device region, Latin digits) and
+// engine/tests get the runtime default.
+// `toLatinDigits`: Hermes ignores `nu-latn`, so an `ar-EG` / `ar-SA` tag would print
+// Arabic-Indic digits next to the Latin cards and move counter (i18n plan, issue 15).
+export const formatStandardScore = (value: number, locale?: string): string =>
+  toLatinDigits(Math.max(0, Math.trunc(value)).toLocaleString(locale))
 
-// `−$52` / `$0` / `$158`. Literal `$`: Vegas dollars are notional, not the device
-// currency. No `+` for profit — user decision 2026-10-11 (the total reads fine on
-// its own); re-adding it is a one-liner here if wanted.
-export const formatVegasScore = (value: number): string => {
-  const amount = Math.abs(Math.trunc(value)).toLocaleString()
+// `−$52` / `$0` / `$158`. Literal `$` in every language: Vegas dollars are notional, not
+// the device currency. No `+` for profit — user decision 2026-10-11 (the total reads fine
+// on its own); re-adding it is a one-liner here if wanted.
+export const formatVegasScore = (value: number, locale?: string): string => {
+  const amount = toLatinDigits(Math.abs(Math.trunc(value)).toLocaleString(locale))
   return value < 0 ? `${MINUS_SIGN}$${amount}` : `$${amount}`
 }
 
-// Screen-reader form of the Vegas amount ("minus 47 dollars"): the badge's
-// U+2212 and literal `$` are not read reliably. Always plural — the tally is
-// −52 + 5 × n, so ±1 can never occur.
-export const formatVegasScoreSpoken = (value: number): string => {
-  const amount = Math.abs(Math.trunc(value))
-  return `${value < 0 ? 'minus ' : ''}${amount} dollars`
-}
+// The spoken (screen-reader) Vegas amount needs translated words and lives in
+// src/i18n/format.ts (`formatVegasScoreSpoken`); this module stays text-free.
 
 // No Vegas "game over" text any more (round 3, 2026-10-13): rounds 1–2 showed a
 // "Game over — result −$47" bubble from the pass-aware stuck heuristic; it could

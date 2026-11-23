@@ -11,7 +11,7 @@ import {
   noteNewDeal as noteNewDealPure,
   recordUndoTap,
   UNDO_HINT_AUTO_DISMISS_MS,
-  UNDO_HINT_COPY,
+  getUndoHintCopy,
   UNDO_HINT_LIFETIME_THRESHOLD,
   UNDO_HINT_MAX_SHOWINGS,
   type UndoHintTracker,
@@ -75,7 +75,7 @@ export const useUndoHint = () => {
     }
 
     setUndoHintVisible(true)
-    AccessibilityInfo.announceForAccessibility(UNDO_HINT_COPY)
+    AccessibilityInfo.announceForAccessibility(getUndoHintCopy())
     // Deliberately NOT dismissed by further undo taps: the user is mid-rapid-tapping
     // and needs time to read the copy. Only the 10s timer or the dock unmounting
     // (win/celebration) hides it.

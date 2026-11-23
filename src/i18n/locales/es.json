@@ -1,0 +1,203 @@
+{
+  "nav": {
+    "play": "Jugar",
+    "hello": "Hola",
+    "history": "Historial",
+    "settings": "Ajustes",
+    "rate": "Valorar Soli",
+    "openMenu": "Abrir el menú de navegación",
+    "notFoundTitle": "¡Ups!",
+    "notFoundBody": "Esta pantalla no existe.",
+    "notFoundLink": "Ir a la pantalla de inicio"
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "reset": "Restablecer",
+    "off": "No",
+    "drawMode": "Robar {{number}}"
+  },
+  "about": {
+    "madeBy": "Hecho por",
+    "dedication": "Para mi novia T, porque siempre tenía que ver anuncios cuando jugaba al solitario.",
+    "pitch": "Solitario gratis y de código abierto.",
+    "sourceLink": "Código fuente en GitHub",
+    "promise": "Sin anuncios, sin compras dentro de la app y sin gamificación para que juegues más."
+  },
+  "game": {
+    "newGame": "Nueva partida",
+    "newGameA11y": "Empezar una partida nueva",
+    "undo": "Deshacer",
+    "hint": "Pista",
+    "draw": "Robar",
+    "recyclesLeft_one": "Queda {{count}}",
+    "recyclesLeft_many": "Quedan {{count}}",
+    "recyclesLeft_other": "Quedan {{count}}",
+    "newGameAlert": {
+      "title": "¿Empezar una partida nueva?",
+      "message": "¿Jugamos otra ronda?",
+      "messageWon": "¡Bien jugado! ¿Jugamos otra ronda?",
+      "confirm": "Repartir"
+    },
+    "playDeal": {
+      "retryTitle": "¿Reintentar esta partida?",
+      "retryConfirm": "Reintentar",
+      "sharedTitle": "¿Jugar la partida compartida?",
+      "sharedConfirm": "Jugar",
+      "message": "Tu partida actual terminará y quedará registrada como incompleta."
+    }
+  },
+  "notice": {
+    "unwinnable": "Esta partida ya no se puede ganar: deshaz o empieza otra.",
+    "stuck": "No quedan jugadas útiles: deshaz o empieza otra partida.",
+    "noHint": "No se encontró ninguna pista.",
+    "undoTip": "Consejo: arrastra el botón Deshacer hacia los lados para viajar en el tiempo por tu partida"
+  },
+  "hud": {
+    "score": "Puntos",
+    "vegas": "Vegas",
+    "total": "Total",
+    "moves": "Jugadas",
+    "time": "Tiempo",
+    "badgeA11y": "{{label}}, {{value}}",
+    "vegasSpoken_one": "{{count}} dólar",
+    "vegasSpoken_many": "{{count}} dólares",
+    "vegasSpoken_other": "{{count}} dólares",
+    "vegasSpokenNegative_one": "menos {{count}} dólar",
+    "vegasSpokenNegative_many": "menos {{count}} dólares",
+    "vegasSpokenNegative_other": "menos {{count}} dólares"
+  },
+  "time": {
+    "hours_one": "{{count}} hora",
+    "hours_many": "{{count}} horas",
+    "hours_other": "{{count}} horas",
+    "minutes_one": "{{count}} minuto",
+    "minutes_many": "{{count}} minutos",
+    "minutes_other": "{{count}} minutos",
+    "seconds_one": "{{count}} segundo",
+    "seconds_many": "{{count}} segundos",
+    "seconds_other": "{{count}} segundos",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "Nuevas partidas",
+      "gameplay": "Jugabilidad",
+      "statistics": "Estadísticas"
+    },
+    "cardsDrawn": "Cartas a robar",
+    "solvableDeals": "Partidas con solución",
+    "scoring": {
+      "label": "Puntuación",
+      "description": "Puntos estándar o dólares de Vegas. Se aplica a tu próxima partida.",
+      "vegasDescription": "En Vegas no hay pistas, avisos ni partidas con solución. Se aplica a tu próxima partida.",
+      "standard": "Estándar",
+      "vegas": "Vegas"
+    },
+    "vegasTotal": {
+      "label": "Mantener el total de Vegas",
+      "description": "Conserva tu saldo de una partida a otra. En la parte superior verás entonces tu total acumulado en lugar del resultado de esta partida.",
+      "resetLabel": "Restablecer el total de Vegas",
+      "resetTitle": "¿Restablecer el total de Vegas?",
+      "resetMessage": "Tu total acumulado vuelve a empezar desde $0. La partida en curso sigue contando."
+    },
+    "autoUp": "Subida automática",
+    "hintButton": {
+      "label": "Botón Pista",
+      "description": "Muestra un botón Pista que revela la siguiente jugada."
+    },
+    "warnings": {
+      "label": "Avisos",
+      "description": "Avisa cuando te quedes sin jugadas útiles o en cuanto la partida ya no se pueda ganar.",
+      "noUsefulMoves": "Sin jugadas útiles",
+      "unwinnable": "Imposible de ganar"
+    },
+    "showMoves": "Contador de jugadas",
+    "showTime": "Cronómetro"
+  },
+  "history": {
+    "title": "Historial de partidas",
+    "stats": {
+      "games": "Partidas",
+      "solved": "Resueltas",
+      "incomplete": "Incompletas"
+    },
+    "status": {
+      "solved": "Resuelta",
+      "incomplete": "Incompleta",
+      "active": "En curso"
+    },
+    "dealName": "Partida {{code}}",
+    "moves_one": "{{count}} jugada",
+    "moves_many": "{{count}} jugadas",
+    "moves_other": "{{count}} jugadas",
+    "score": "Puntos {{value}}",
+    "vegas": "Vegas {{value}}",
+    "solvable": "Con solución",
+    "emptyTitle": "Aún no hay partidas registradas",
+    "emptyBody": "Juega una partida de solitario Klondike para empezar tu historial. Las partidas terminadas aparecerán aquí.",
+    "loadingTitle": "Cargando historial…",
+    "loadingBody": "Espera mientras recuperamos tus partidas recientes.",
+    "justNow": "ahora mismo",
+    "today": "Hoy, {{time}}",
+    "yesterday": "Ayer, {{time}}",
+    "dateTime": "{{date}}, {{time}}",
+    "retry": "Reintentar",
+    "retryA11y": "Reintentar esta partida",
+    "share": "Compartir",
+    "shareA11y": "Compartir esta partida"
+  },
+  "share": {
+    "dealMessage": "Juega esta partida de solitario Klondike en Soli (Robar {{number}})"
+  },
+  "a11y": {
+    "rank": {
+      "1": "As",
+      "2": "Dos",
+      "3": "Tres",
+      "4": "Cuatro",
+      "5": "Cinco",
+      "6": "Seis",
+      "7": "Siete",
+      "8": "Ocho",
+      "9": "Nueve",
+      "10": "Diez",
+      "11": "Jota",
+      "12": "Reina",
+      "13": "Rey"
+    },
+    "suit": {
+      "clubs": "tréboles",
+      "diamonds": "diamantes",
+      "hearts": "corazones",
+      "spades": "picas"
+    },
+    "card": "{{rank}} de {{suit}}",
+    "tableauCard": "{{card}}, columna {{column}}",
+    "faceDownCard": "Carta boca abajo, columna {{column}}",
+    "emptyColumn": "Columna {{column}}, vacía",
+    "stock_one": "Mazo, {{count}} carta",
+    "stock_many": "Mazo, {{count}} cartas",
+    "stock_other": "Mazo, {{count}} cartas",
+    "stockEmpty": "Mazo, vacío",
+    "stockExhausted": "Mazo, sin pasadas restantes",
+    "stockRecycle": "Devolver el descarte al mazo",
+    "stockRecycleLeft_one": "Devolver el descarte al mazo, queda {{count}} pasada",
+    "stockRecycleLeft_many": "Devolver el descarte al mazo, quedan {{count}} pasadas",
+    "stockRecycleLeft_other": "Devolver el descarte al mazo, quedan {{count}} pasadas",
+    "waste": "Descarte, {{card}}",
+    "foundationPile": {
+      "clubs": "Base de tréboles",
+      "diamonds": "Base de diamantes",
+      "hearts": "Base de corazones",
+      "spades": "Base de picas"
+    },
+    "foundation": "{{pile}}, {{card}}",
+    "foundationEmpty": "{{pile}}, vacía",
+    "scrubber": "Línea de tiempo de Deshacer, posición {{position}} de {{total}}",
+    "hint": {
+      "draw": "Pista: roba del mazo.",
+      "toColumn": "Pista: {{card}}, a la columna {{column}}.",
+      "toFoundation": "Pista: {{card}}, a la base."
+    }
+  }
+}

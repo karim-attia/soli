@@ -37,6 +37,8 @@ Add a `## <version> — <YYYY-MM-DD>` entry at the top, format of the existing o
 
 **Always paste both texts in chat and wait for Karim's approval before any upload.**
 
+**Translated "What's new" (after Karim approved the English text):** copy the approved Google Play text to `store/release-notes/en-US.txt`, then run the translation skill (`.agents/skills/soli-translation/SKILL.md`, section 3 "Store files") for `store/release-notes/<locale>.txt` in all 14 languages (≤ 500 characters each; `yarn jest test/unit/store` checks it). Never translate before the approval: a reworded English text means 14 re-translations. `yarn submit:android` still uploads only the English block from `docs/RELEASE-NOTES.md`; the translated notes and all listing text under `store/` are pasted by hand into Play Console / App Store Connect until the upload follow-up exists (i18n plan, Follow-ups), and every listing upload needs Karim's go-ahead.
+
 ## 5. Gates
 
 `yarn typecheck && yarn lint && yarn jest --ci` (the jest suite includes a test that the current app.json version has a valid "Google Play:" block). Then `yarn submit:android --dry-run` — prints package, versions, AAB path/sha256, track, release name, notes and the service-key status without talking to Google (needs the AAB; run it again after the build).

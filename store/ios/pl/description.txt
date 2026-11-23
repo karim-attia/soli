@@ -1,0 +1,17 @@
+Soli to klasyczny pasjans Klondike, dopracowany z dbałością o szczegóły. Za darmo, open source (z otwartym kodem źródłowym) i bez reklam.
+
+Bez reklam, bez zakupów w aplikacji, bez serii wygranych, monet i wyskakujących okienek, które miałyby cię skłaniać do częstszego grania. Po prostu karty.
+
+FUNKCJE
+
+- Klasyczny pasjans Klondike w trybach od „Dobierz 1” do „Dobierz 5”
+- Rozdania rozwiązywalne: każdą nową grę da się wygrać (możesz to wyłączyć)
+- Cofanie bez ograniczeń: przeciągnij przycisk „Cofnij” w bok, aby cofnąć się do dowolnego momentu gry
+- Opcjonalny przycisk „Podpowiedź”, który wskazuje następny ruch
+- Dyskretna informacja, gdy skończą się przydatne ruchy
+- Punktacja standardowa, punktacja Vegas albo gra bez punktów
+- Automatyczne odkładanie przenosi karty na stosy bazowe za ciebie
+- Historia gier: powtórz dowolne rozdanie albo udostępnij je znajomym
+- Dziesiątki animacji wygranej
+
+Stworzone w Szwajcarii dla wszystkich, którzy chcą po prostu pograć w karty.

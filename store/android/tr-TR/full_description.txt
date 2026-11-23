@@ -1,0 +1,17 @@
+Soli, özenle geliştirilmiş klasik bir Klondike Solitaire oyunu. Ücretsiz, açık kaynak kodlu ve reklamsız.
+
+Reklam yok, uygulama içi satın alma yok; daha çok oynatmak için galibiyet serisi, jeton veya açılır pencere de yok. Sadece kartlar.
+
+ÖZELLİKLER
+
+- Klasik Klondike, 1 Kart Çek’ten 5 Kart Çek’e kadar
+- Çözülebilir eller: her yeni oyun kazanılabilir (istersen kapatabilirsin)
+- Sınırsız geri alma: oyununda geriye gitmek için Geri Al düğmesini yana sürükle
+- Sonraki hamleyi gösteren, isteğe bağlı İpucu düğmesi
+- İşe yarar hamle kalmadığında sakin bir uyarı
+- Standart puanlama, Vegas puanlaması ya da puansız oyun
+- Otomatik Yerleştir, kartları senin yerine temel yığınlara taşır
+- Oyun geçmişi: istediğin eli yeniden oyna veya bir arkadaşınla paylaş
+- Kazandığında onlarca farklı kutlama animasyonu
+
+İsviçre’de, sadece kart oynamak isteyen herkes için yapıldı.

@@ -1,0 +1,17 @@
+Soli è il classico solitario Klondike, rifinito con cura. Gratuito, open source e senza pubblicità.
+
+Niente pubblicità, niente acquisti in-app, niente serie giornaliere, monete o pop-up per farti giocare di più. Solo carte.
+
+FUNZIONI
+
+- Klondike classico, da Pesca 1 a Pesca 5
+- Mani vincibili: ogni nuova partita si può vincere (puoi disattivare l’opzione)
+- Annullamento illimitato: trascina di lato il pulsante Annulla per viaggiare indietro nel tempo nella tua partita
+- Pulsante Suggerimento opzionale che mostra la prossima mossa
+- Un avviso discreto quando non restano mosse utili
+- Punteggio standard, punteggio Vegas o nessun punteggio
+- Mosse automatiche: le carte vanno sulle basi da sole
+- Cronologia delle partite: rigioca qualsiasi mano o condividila con chi vuoi
+- Decine di animazioni di vittoria
+
+Creato in Svizzera, per chi vuole semplicemente giocare a carte.

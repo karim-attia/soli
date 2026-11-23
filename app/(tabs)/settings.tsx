@@ -12,16 +12,9 @@ import { DescribedSwitchRow } from '../../components/settings/DescribedSwitchRow
 import { DrawCountPreference } from '../../components/settings/DrawCountPreference'
 import { PickerPreference } from '../../components/settings/PickerPreference'
 import { useDrawerOpener } from '../../src/navigation/useDrawerOpener'
+import { t } from '../../src/i18n'
 import { useHistory } from '../../src/state/history'
-import {
-  animationPreferenceDescriptors,
-  hintButtonPreference,
-  scoringPreference,
-  statisticsPreferenceDescriptors,
-  useSettings,
-  vegasTotalPreference,
-  warningModePreference,
-} from '../../src/state/settings'
+import { animationPreferenceDescriptors, useSettings } from '../../src/state/settings'
 
 export default function SettingsScreen() {
   const navigation = useNavigation()
@@ -54,14 +47,18 @@ export default function SettingsScreen() {
   // purpose — it would differ from the HUD by the live game, which this screen
   // cannot see (simplification; the TOTAL badge is the one source).
   const confirmResetVegasTotal = () => {
-    Alert.alert(vegasTotalPreference.resetTitle, vegasTotalPreference.resetMessage, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Reset',
-        style: 'destructive',
-        onPress: () => setVegasTotalOffset(settledVegasTotal),
-      },
-    ])
+    Alert.alert(
+      t('settings.vegasTotal.resetTitle'),
+      t('settings.vegasTotal.resetMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.reset'),
+          style: 'destructive',
+          onPress: () => setVegasTotalOffset(settledVegasTotal),
+        },
+      ]
+    )
   }
 
   useLayoutEffect(() => {
@@ -87,10 +84,10 @@ export default function SettingsScreen() {
     <SafeAreaView edges={Platform.OS === 'ios' ? [] : ['bottom']} style={{ flex: 1 }}>
       <Host style={{ flex: 1 }}>
         <FieldGroup>
-          <FieldGroup.Section title="New Games">
+          <FieldGroup.Section title={t('settings.section.newGames')}>
             <DrawCountPreference value={state.drawCount} onValueChange={setDrawCount} />
             <Switch
-              label="Solvable deals"
+              label={t('settings.solvableDeals')}
               value={state.solvableGamesOnly}
               onValueChange={setSolvableGamesOnly}
             />
@@ -102,19 +99,24 @@ export default function SettingsScreen() {
                 and that it applies from the next game — no rules explanation
                 (user, prompt 6). */}
             <PickerPreference
-              {...scoringPreference}
+              label={t('settings.scoring.label')}
               description={
                 vegasSelected
-                  ? scoringPreference.vegasDescription
-                  : scoringPreference.description
+                  ? t('settings.scoring.vegasDescription')
+                  : t('settings.scoring.description')
               }
+              options={[
+                { value: 'off', label: t('common.off') },
+                { value: 'standard', label: t('settings.scoring.standard') },
+                { value: 'vegas', label: t('settings.scoring.vegas') },
+              ]}
               value={state.statistics.scoring}
               onValueChange={setScoringMode}
             />
             {vegasSelected ? (
               <DescribedSwitchRow
-                label={vegasTotalPreference.label}
-                description={vegasTotalPreference.description}
+                label={t('settings.vegasTotal.label')}
+                description={t('settings.vegasTotal.description')}
                 value={state.statistics.vegasTotal}
                 onValueChange={setVegasTotalEnabled}
               />
@@ -122,16 +124,16 @@ export default function SettingsScreen() {
             {vegasSelected && state.statistics.vegasTotal ? (
               <Button
                 variant="outlined"
-                label={vegasTotalPreference.resetLabel}
+                label={t('settings.vegasTotal.resetLabel')}
                 onPress={confirmResetVegasTotal}
                 testID="reset-vegas-total"
               />
             ) : null}
           </FieldGroup.Section>
 
-          <FieldGroup.Section title="Gameplay">
+          <FieldGroup.Section title={t('settings.section.gameplay')}>
             <Switch
-              label="Auto Up"
+              label={t('settings.autoUp')}
               value={state.autoUpEnabled}
               onValueChange={setAutoUpEnabled}
             />
@@ -141,29 +143,39 @@ export default function SettingsScreen() {
                 (F14) — they form a strictness ladder, not independent
                 features. */}
             <DescribedSwitchRow
-              label={hintButtonPreference.label}
-              description={hintButtonPreference.description}
+              label={t('settings.hintButton.label')}
+              description={t('settings.hintButton.description')}
               value={state.hints.hintButton}
               onValueChange={setHintButtonEnabled}
             />
             <PickerPreference
-              {...warningModePreference}
+              label={t('settings.warnings.label')}
+              description={t('settings.warnings.description')}
+              options={[
+                { value: 'off', label: t('common.off') },
+                { value: 'noUsefulMoves', label: t('settings.warnings.noUsefulMoves') },
+                { value: 'unwinnable', label: t('settings.warnings.unwinnable') },
+              ]}
               value={state.hints.warningMode}
               onValueChange={setWarningMode}
             />
           </FieldGroup.Section>
 
-          <FieldGroup.Section title="Statistics">
-            {statisticsPreferenceDescriptors.map(({ key, label }) => (
-              <Switch
-                key={key}
-                label={label}
-                value={state.statistics[key]}
-                onValueChange={(enabled) => setStatisticsPreference(key, enabled)}
-              />
-            ))}
+          <FieldGroup.Section title={t('settings.section.statistics')}>
+            <Switch
+              label={t('settings.showMoves')}
+              value={state.statistics.showMoves}
+              onValueChange={(enabled) => setStatisticsPreference('showMoves', enabled)}
+            />
+            <Switch
+              label={t('settings.showTime')}
+              value={state.statistics.showTime}
+              onValueChange={(enabled) => setStatisticsPreference('showTime', enabled)}
+            />
           </FieldGroup.Section>
 
+          {/* i18n: dev-only, intentionally English ("Developer" + "Animations" sections
+              and their rows are not in en.json). */}
           <FieldGroup.Section title="Developer">
             <Switch
               label="Developer mode"

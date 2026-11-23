@@ -1,6 +1,6 @@
 {
   "name": "soli",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -39,11 +39,14 @@
     "expo-crypto": "~58.0.7",
     "expo-font": "~58.0.8",
     "expo-linking": "~58.0.13",
+    "expo-localization": "~58.0.5",
     "expo-router": "~58.0.23",
     "expo-splash-screen": "~58.0.10",
     "expo-sqlite": "~58.0.13",
     "expo-status-bar": "~58.0.3",
     "expo-system-ui": "~58.0.6",
+    "i18next": "^27.2.3",
+    "intl-pluralrules": "^2.0.1",
     "lucide-react-native": "1.50.0",
     "react": "19.3.0",
     "react-native": "0.88.0",
@@ -83,7 +86,8 @@
     "preset": "jest-expo",
     "resolver": "react-native-reanimated/jest/resolver",
     "setupFiles": [
-      "<rootDir>/test/setup/mock-expo-crypto.ts"
+      "<rootDir>/test/setup/mock-expo-crypto.ts",
+      "<rootDir>/test/setup/mock-expo-localization.ts"
     ]
   },
   "packageManager": "yarn@4.17.1",

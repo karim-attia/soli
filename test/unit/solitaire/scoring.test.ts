@@ -3,7 +3,6 @@ import {
   addScore,
   formatStandardScore,
   formatVegasScore,
-  formatVegasScoreSpoken,
   scoreMove,
   scoreRecycle,
 } from '../../../src/solitaire/scoring'
@@ -69,13 +68,5 @@ describe('score formatting', () => {
     expect(formatVegasScore(158)).toBe('$158')
     expect(formatVegasScore(158)).not.toContain('+')
     expect(formatVegasScore(-1240)).toBe(`−$${(1240).toLocaleString()}`)
-  })
-
-  // Spoken form for the HUD badge a11y label (round 2): the U+2212 and `$` are
-  // not read reliably by screen readers.
-  it('speaks the Vegas amount as plain words', () => {
-    expect(formatVegasScoreSpoken(-47)).toBe('minus 47 dollars')
-    expect(formatVegasScoreSpoken(0)).toBe('0 dollars')
-    expect(formatVegasScoreSpoken(208)).toBe('208 dollars')
   })
 })

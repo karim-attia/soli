@@ -1,0 +1,194 @@
+{
+  "nav": {
+    "play": "Spelen",
+    "hello": "Hallo",
+    "history": "Geschiedenis",
+    "settings": "Instellingen",
+    "rate": "Soli beoordelen",
+    "openMenu": "Menu openen",
+    "notFoundTitle": "Oeps!",
+    "notFoundBody": "Dit scherm bestaat niet.",
+    "notFoundLink": "Terug naar het spel"
+  },
+  "common": {
+    "cancel": "Annuleren",
+    "reset": "Resetten",
+    "off": "Uit",
+    "drawMode": "Trek {{number}}"
+  },
+  "about": {
+    "madeBy": "Gemaakt door",
+    "dedication": "Voor mijn vriendin T, omdat zij bij het patiencen altijd naar advertenties moest kijken.",
+    "pitch": "Gratis en open source patience-app.",
+    "sourceLink": "Broncode op GitHub",
+    "promise": "Geen advertenties, geen in-app-aankopen en geen gamification om je meer te laten spelen."
+  },
+  "game": {
+    "newGame": "Nieuw spel",
+    "newGameA11y": "Een nieuw spel starten",
+    "undo": "Ongedaan maken",
+    "hint": "Hint",
+    "draw": "Trek",
+    "recyclesLeft_one": "Nog {{count}}",
+    "recyclesLeft_other": "Nog {{count}}",
+    "newGameAlert": {
+      "title": "Een nieuw spel starten?",
+      "message": "Klaar voor nog een spel?",
+      "messageWon": "Mooi gewonnen! Klaar voor nog een spel?",
+      "confirm": "Kaarten delen"
+    },
+    "playDeal": {
+      "retryTitle": "Dit spel opnieuw spelen?",
+      "retryConfirm": "Opnieuw spelen",
+      "sharedTitle": "Gedeeld spel spelen?",
+      "sharedConfirm": "Spelen",
+      "message": "Je huidige spel wordt beëindigd en opgeslagen als niet afgemaakt."
+    }
+  },
+  "notice": {
+    "unwinnable": "Dit spel is niet meer te winnen. Maak zetten ongedaan of start een nieuw spel.",
+    "stuck": "Geen zinvolle zetten meer. Maak zetten ongedaan of start een nieuw spel.",
+    "noHint": "Geen hint gevonden.",
+    "undoTip": "Tip: sleep de knop Ongedaan maken opzij om door je spel te tijdreizen"
+  },
+  "hud": {
+    "score": "Score",
+    "vegas": "Vegas",
+    "total": "Totaal",
+    "moves": "Zetten",
+    "time": "Tijd",
+    "badgeA11y": "{{label}}, {{value}}",
+    "vegasSpoken_one": "{{count}} dollar",
+    "vegasSpoken_other": "{{count}} dollar",
+    "vegasSpokenNegative_one": "min {{count}} dollar",
+    "vegasSpokenNegative_other": "min {{count}} dollar"
+  },
+  "time": {
+    "hours_one": "{{count}} uur",
+    "hours_other": "{{count}} uur",
+    "minutes_one": "{{count}} minuut",
+    "minutes_other": "{{count}} minuten",
+    "seconds_one": "{{count}} seconde",
+    "seconds_other": "{{count}} seconden",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "Nieuwe spellen",
+      "gameplay": "Tijdens het spel",
+      "statistics": "Statistieken"
+    },
+    "cardsDrawn": "Kaarten trekken",
+    "solvableDeals": "Oplosbare spellen",
+    "scoring": {
+      "label": "Puntentelling",
+      "description": "Standaardpunten of Vegas-dollars. Geldt vanaf je volgende spel.",
+      "vegasDescription": "Bij Vegas staan hints, waarschuwingen en oplosbare spellen uit. Geldt vanaf je volgende spel.",
+      "standard": "Standaard",
+      "vegas": "Vegas"
+    },
+    "vegasTotal": {
+      "label": "Vegas-totaal bijhouden",
+      "description": "Neem je saldo mee van spel naar spel. Bovenaan het spelscherm staat dan je lopende totaal in plaats van het resultaat van dit spel.",
+      "resetLabel": "Vegas-totaal resetten",
+      "resetTitle": "Vegas-totaal resetten?",
+      "resetMessage": "Je lopende totaal begint weer bij $0. Het spel dat je nu speelt, telt nog mee."
+    },
+    "autoUp": "Automatisch wegspelen",
+    "hintButton": {
+      "label": "Hintknop",
+      "description": "Toon een hintknop die de volgende zet laat zien."
+    },
+    "warnings": {
+      "label": "Waarschuwingen",
+      "description": "Waarschuw als er geen zinvolle zetten meer zijn, of zodra het spel niet meer te winnen is.",
+      "noUsefulMoves": "Geen zinvolle zetten",
+      "unwinnable": "Niet meer te winnen"
+    },
+    "showMoves": "Zettenteller",
+    "showTime": "Speltimer"
+  },
+  "history": {
+    "title": "Spelgeschiedenis",
+    "stats": {
+      "games": "Spellen",
+      "solved": "Opgelost",
+      "incomplete": "Niet afgemaakt"
+    },
+    "status": {
+      "solved": "Opgelost",
+      "incomplete": "Niet afgemaakt",
+      "active": "Bezig"
+    },
+    "dealName": "Spel {{code}}",
+    "moves_one": "{{count}} zet",
+    "moves_other": "{{count}} zetten",
+    "score": "Score {{value}}",
+    "vegas": "Vegas {{value}}",
+    "solvable": "Oplosbaar",
+    "emptyTitle": "Nog geen spellen opgeslagen",
+    "emptyBody": "Speel een spelletje Klondike-patience om je geschiedenis op te bouwen. Afgeronde spellen verschijnen hier.",
+    "loadingTitle": "Geschiedenis laden…",
+    "loadingBody": "Even geduld, we halen je recente spellen op.",
+    "justNow": "zojuist",
+    "today": "Vandaag, {{time}}",
+    "yesterday": "Gisteren, {{time}}",
+    "dateTime": "{{date}}, {{time}}",
+    "retry": "Opnieuw spelen",
+    "retryA11y": "Dit spel opnieuw spelen",
+    "share": "Delen",
+    "shareA11y": "Dit spel delen"
+  },
+  "share": {
+    "dealMessage": "Speel dit Klondike-spel in Soli (Trek {{number}})"
+  },
+  "a11y": {
+    "rank": {
+      "1": "aas",
+      "2": "twee",
+      "3": "drie",
+      "4": "vier",
+      "5": "vijf",
+      "6": "zes",
+      "7": "zeven",
+      "8": "acht",
+      "9": "negen",
+      "10": "tien",
+      "11": "boer",
+      "12": "vrouw",
+      "13": "koning"
+    },
+    "suit": {
+      "clubs": "klaveren",
+      "diamonds": "ruiten",
+      "hearts": "harten",
+      "spades": "schoppen"
+    },
+    "card": "{{suit}} {{rank}}",
+    "tableauCard": "{{card}}, kolom {{column}}",
+    "faceDownCard": "Dichte kaart, kolom {{column}}",
+    "emptyColumn": "Kolom {{column}}, leeg",
+    "stock_one": "Voorraadstapel, {{count}} kaart",
+    "stock_other": "Voorraadstapel, {{count}} kaarten",
+    "stockEmpty": "Voorraadstapel, leeg",
+    "stockExhausted": "Voorraadstapel, geen rondes meer",
+    "stockRecycle": "Aflegstapel terugleggen als voorraadstapel",
+    "stockRecycleLeft_one": "Aflegstapel terugleggen als voorraadstapel, nog {{count}} keer",
+    "stockRecycleLeft_other": "Aflegstapel terugleggen als voorraadstapel, nog {{count}} keer",
+    "waste": "Aflegstapel, {{card}}",
+    "foundationPile": {
+      "clubs": "Eindstapel klaveren",
+      "diamonds": "Eindstapel ruiten",
+      "hearts": "Eindstapel harten",
+      "spades": "Eindstapel schoppen"
+    },
+    "foundation": "{{pile}}, {{card}}",
+    "foundationEmpty": "{{pile}}, leeg",
+    "scrubber": "Tijdlijn voor ongedaan maken, positie {{position}} van {{total}}",
+    "hint": {
+      "draw": "Hint: trek van de voorraadstapel.",
+      "toColumn": "Hint: verplaats {{card}} naar kolom {{column}}.",
+      "toFoundation": "Hint: verplaats {{card}} naar de eindstapel."
+    }
+  }
+}

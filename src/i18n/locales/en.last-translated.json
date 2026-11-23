@@ -1,0 +1,194 @@
+{
+  "nav": {
+    "play": "Play",
+    "hello": "Hello",
+    "history": "History",
+    "settings": "Settings",
+    "rate": "Rate Soli",
+    "openMenu": "Open navigation menu",
+    "notFoundTitle": "Oops!",
+    "notFoundBody": "This screen doesn't exist.",
+    "notFoundLink": "Go to home screen!"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "reset": "Reset",
+    "off": "Off",
+    "drawMode": "Draw {{number}}"
+  },
+  "about": {
+    "madeBy": "Made by",
+    "dedication": "For my girlfriend T because she always had to look at ads when playing Solitaire.",
+    "pitch": "Free and open source Solitaire app.",
+    "sourceLink": "Source code on GitHub",
+    "promise": "No ads, in-app purchases, or gamification to get you to play more."
+  },
+  "game": {
+    "newGame": "New Game",
+    "newGameA11y": "Start a new game",
+    "undo": "Undo",
+    "hint": "Hint",
+    "draw": "Draw",
+    "recyclesLeft_one": "{{count}} left",
+    "recyclesLeft_other": "{{count}} left",
+    "newGameAlert": {
+      "title": "Start a new game?",
+      "message": "Ready for another round?",
+      "messageWon": "Nice win! Ready for another round?",
+      "confirm": "Deal Again"
+    },
+    "playDeal": {
+      "retryTitle": "Retry this deal?",
+      "retryConfirm": "Retry",
+      "sharedTitle": "Play shared deal?",
+      "sharedConfirm": "Play",
+      "message": "Your current game will end and be recorded as incomplete."
+    }
+  },
+  "notice": {
+    "unwinnable": "No winning moves left — undo or start a new game.",
+    "stuck": "No more useful moves — undo or start a new game.",
+    "noHint": "No hint found.",
+    "undoTip": "Tip: Drag the Undo button sideways to time travel through your game"
+  },
+  "hud": {
+    "score": "Score",
+    "vegas": "Vegas",
+    "total": "Total",
+    "moves": "Moves",
+    "time": "Time",
+    "badgeA11y": "{{label}}, {{value}}",
+    "vegasSpoken_one": "{{count}} dollar",
+    "vegasSpoken_other": "{{count}} dollars",
+    "vegasSpokenNegative_one": "minus {{count}} dollar",
+    "vegasSpokenNegative_other": "minus {{count}} dollars"
+  },
+  "time": {
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours",
+    "minutes_one": "{{count}} minute",
+    "minutes_other": "{{count}} minutes",
+    "seconds_one": "{{count}} second",
+    "seconds_other": "{{count}} seconds",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "New Games",
+      "gameplay": "Gameplay",
+      "statistics": "Statistics"
+    },
+    "cardsDrawn": "Cards drawn",
+    "solvableDeals": "Solvable deals",
+    "scoring": {
+      "label": "Scoring",
+      "description": "Standard points or Vegas dollars. Applies to your next game.",
+      "vegasDescription": "Hints, warnings and solvable deals are off in Vegas. Applies to your next game.",
+      "standard": "Standard",
+      "vegas": "Vegas"
+    },
+    "vegasTotal": {
+      "label": "Keep Vegas total",
+      "description": "Carry your balance from game to game. The header then shows your running total instead of this game’s result.",
+      "resetLabel": "Reset Vegas total",
+      "resetTitle": "Reset Vegas total?",
+      "resetMessage": "Your running total starts again from $0. The game on the board still counts."
+    },
+    "autoUp": "Auto Up",
+    "hintButton": {
+      "label": "Hint button",
+      "description": "Show a Hint button that reveals the next move."
+    },
+    "warnings": {
+      "label": "Warnings",
+      "description": "Warn when you run out of useful moves, or as soon as the game can't be won anymore.",
+      "noUsefulMoves": "No more useful moves",
+      "unwinnable": "Unwinnable game"
+    },
+    "showMoves": "Move counter",
+    "showTime": "Game timer"
+  },
+  "history": {
+    "title": "Game History",
+    "stats": {
+      "games": "Games",
+      "solved": "Solved",
+      "incomplete": "Incomplete"
+    },
+    "status": {
+      "solved": "Solved",
+      "incomplete": "Incomplete",
+      "active": "Active"
+    },
+    "dealName": "Deal {{code}}",
+    "moves_one": "{{count}} move",
+    "moves_other": "{{count}} moves",
+    "score": "Score {{value}}",
+    "vegas": "Vegas {{value}}",
+    "solvable": "Solvable",
+    "emptyTitle": "No games recorded yet",
+    "emptyBody": "Play a game of Klondike to start building your history. Completed games and their deals will appear here.",
+    "loadingTitle": "Loading history…",
+    "loadingBody": "Please wait while we retrieve your recent games.",
+    "justNow": "just now",
+    "today": "Today, {{time}}",
+    "yesterday": "Yesterday, {{time}}",
+    "dateTime": "{{date}}, {{time}}",
+    "retry": "Retry",
+    "retryA11y": "Retry this deal",
+    "share": "Share",
+    "shareA11y": "Share this deal"
+  },
+  "share": {
+    "dealMessage": "Play this Klondike deal in Soli (Draw {{number}})"
+  },
+  "a11y": {
+    "rank": {
+      "1": "Ace",
+      "2": "Two",
+      "3": "Three",
+      "4": "Four",
+      "5": "Five",
+      "6": "Six",
+      "7": "Seven",
+      "8": "Eight",
+      "9": "Nine",
+      "10": "Ten",
+      "11": "Jack",
+      "12": "Queen",
+      "13": "King"
+    },
+    "suit": {
+      "clubs": "clubs",
+      "diamonds": "diamonds",
+      "hearts": "hearts",
+      "spades": "spades"
+    },
+    "card": "{{rank}} of {{suit}}",
+    "tableauCard": "{{card}}, column {{column}}",
+    "faceDownCard": "Face-down card, column {{column}}",
+    "emptyColumn": "Column {{column}}, empty",
+    "stock_one": "Stock, {{count}} card",
+    "stock_other": "Stock, {{count}} cards",
+    "stockEmpty": "Stock, empty",
+    "stockExhausted": "Stock, no passes left",
+    "stockRecycle": "Recycle waste into stock",
+    "stockRecycleLeft_one": "Recycle waste into stock, {{count}} left",
+    "stockRecycleLeft_other": "Recycle waste into stock, {{count}} left",
+    "waste": "Waste, {{card}}",
+    "foundationPile": {
+      "clubs": "Clubs foundation",
+      "diamonds": "Diamonds foundation",
+      "hearts": "Hearts foundation",
+      "spades": "Spades foundation"
+    },
+    "foundation": "{{pile}}, {{card}}",
+    "foundationEmpty": "{{pile}}, empty",
+    "scrubber": "Undo scrubber, position {{position}} of {{total}}",
+    "hint": {
+      "draw": "Hint: draw from the stock.",
+      "toColumn": "Hint: move {{card}} to column {{column}}.",
+      "toFoundation": "Hint: move {{card}} to the foundation."
+    }
+  }
+}

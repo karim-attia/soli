@@ -104,6 +104,8 @@ export const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     marginTop: 2,
+    // Keeps a shrunk-to-fit caption (CardVisual) off the dashed outline.
+    paddingHorizontal: 2,
   },
   stockContainer: {
     position: 'relative',

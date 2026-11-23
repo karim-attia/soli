@@ -144,6 +144,13 @@ export const KlondikeGameView: React.FC<KlondikeGameViewProps> = ({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    // The whole game surface (HUD, board, dock/scrubber, bubbles, celebration overlay) is
+    // PINNED left-to-right in every language, including Arabic/Hebrew (i18n plan, RTL):
+    // card positions, flight animations, hint rects, celebration paths and the scrubber
+    // pan are computed in LTR coordinates, and a mirrored Klondike layout is not what
+    // players expect (Microsoft Solitaire keeps it too). Only the app chrome (drawer,
+    // headers, settings, history) mirrors. Texts inside keep their natural bidi order.
+    direction: 'ltr',
     paddingHorizontal: SPACE[2],
     paddingBottom: SPACE[2],
     gap: SPACE[3],

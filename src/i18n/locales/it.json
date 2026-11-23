@@ -1,0 +1,203 @@
+{
+  "nav": {
+    "play": "Gioca",
+    "hello": "Ciao",
+    "history": "Cronologia",
+    "settings": "Impostazioni",
+    "rate": "Valuta Soli",
+    "openMenu": "Apri il menu di navigazione",
+    "notFoundTitle": "Ops!",
+    "notFoundBody": "Questa schermata non esiste.",
+    "notFoundLink": "Vai alla schermata principale"
+  },
+  "common": {
+    "cancel": "Annulla",
+    "reset": "Azzera",
+    "off": "No",
+    "drawMode": "Pesca {{number}}"
+  },
+  "about": {
+    "madeBy": "Creato da",
+    "dedication": "Per la mia ragazza T, che giocando a solitario doveva sempre guardare la pubblicità.",
+    "pitch": "App di solitario gratuita e open source.",
+    "sourceLink": "Codice sorgente su GitHub",
+    "promise": "Niente pubblicità, acquisti in-app o meccanismi per farti giocare di più."
+  },
+  "game": {
+    "newGame": "Nuova partita",
+    "newGameA11y": "Inizia una nuova partita",
+    "undo": "Annulla",
+    "hint": "Suggerimento",
+    "draw": "Pesca",
+    "recyclesLeft_one": "Ancora {{count}}",
+    "recyclesLeft_many": "Ancora {{count}}",
+    "recyclesLeft_other": "Ancora {{count}}",
+    "newGameAlert": {
+      "title": "Vuoi iniziare una nuova partita?",
+      "message": "Ti va un’altra partita?",
+      "messageWon": "Bella vittoria! Ti va un’altra partita?",
+      "confirm": "Nuova mano"
+    },
+    "playDeal": {
+      "retryTitle": "Vuoi rigiocare questa mano?",
+      "retryConfirm": "Rigioca",
+      "sharedTitle": "Vuoi giocare la mano condivisa?",
+      "sharedConfirm": "Gioca",
+      "message": "La partita in corso terminerà e sarà registrata come incompleta."
+    }
+  },
+  "notice": {
+    "unwinnable": "Questa partita non si può più vincere. Annulla qualche mossa o inizia una nuova partita.",
+    "stuck": "Nessuna mossa utile rimasta. Annulla qualche mossa o inizia una nuova partita.",
+    "noHint": "Nessun suggerimento trovato.",
+    "undoTip": "Consiglio: trascina di lato il pulsante Annulla per viaggiare nel tempo nella tua partita"
+  },
+  "hud": {
+    "score": "Punti",
+    "vegas": "Vegas",
+    "total": "Totale",
+    "moves": "Mosse",
+    "time": "Tempo",
+    "badgeA11y": "{{label}}, {{value}}",
+    "vegasSpoken_one": "{{count}} dollaro",
+    "vegasSpoken_many": "{{count}} dollari",
+    "vegasSpoken_other": "{{count}} dollari",
+    "vegasSpokenNegative_one": "meno {{count}} dollaro",
+    "vegasSpokenNegative_many": "meno {{count}} dollari",
+    "vegasSpokenNegative_other": "meno {{count}} dollari"
+  },
+  "time": {
+    "hours_one": "{{count}} ora",
+    "hours_many": "{{count}} ore",
+    "hours_other": "{{count}} ore",
+    "minutes_one": "{{count}} minuto",
+    "minutes_many": "{{count}} minuti",
+    "minutes_other": "{{count}} minuti",
+    "seconds_one": "{{count}} secondo",
+    "seconds_many": "{{count}} secondi",
+    "seconds_other": "{{count}} secondi",
+    "join": "{{first}} {{second}}"
+  },
+  "settings": {
+    "section": {
+      "newGames": "Nuove partite",
+      "gameplay": "Gioco",
+      "statistics": "Statistiche"
+    },
+    "cardsDrawn": "Carte pescate",
+    "solvableDeals": "Mani vincibili",
+    "scoring": {
+      "label": "Punteggio",
+      "description": "Punti standard o dollari Vegas. Vale dalla prossima partita.",
+      "vegasDescription": "Con Vegas, suggerimenti, avvisi e mani vincibili sono disattivati. Vale dalla prossima partita.",
+      "standard": "Standard",
+      "vegas": "Vegas"
+    },
+    "vegasTotal": {
+      "label": "Mantieni il totale Vegas",
+      "description": "Porta il saldo da una partita all’altra. In alto compare allora il totale progressivo al posto del risultato di questa partita.",
+      "resetLabel": "Azzera il totale Vegas",
+      "resetTitle": "Vuoi azzerare il totale Vegas?",
+      "resetMessage": "Il totale progressivo riparte da $0. La partita in corso conta comunque."
+    },
+    "autoUp": "Mosse automatiche",
+    "hintButton": {
+      "label": "Pulsante Suggerimento",
+      "description": "Mostra un pulsante Suggerimento che indica la prossima mossa."
+    },
+    "warnings": {
+      "label": "Avvisi",
+      "description": "Avvisa quando non restano mosse utili, oppure appena la partita non si può più vincere.",
+      "noUsefulMoves": "Nessuna mossa utile",
+      "unwinnable": "Non più vincibile"
+    },
+    "showMoves": "Contatore mosse",
+    "showTime": "Tempo di gioco"
+  },
+  "history": {
+    "title": "Cronologia partite",
+    "stats": {
+      "games": "Partite",
+      "solved": "Vinte",
+      "incomplete": "Incomplete"
+    },
+    "status": {
+      "solved": "Vinta",
+      "incomplete": "Incompleta",
+      "active": "In corso"
+    },
+    "dealName": "Mano {{code}}",
+    "moves_one": "{{count}} mossa",
+    "moves_many": "{{count}} mosse",
+    "moves_other": "{{count}} mosse",
+    "score": "Punti {{value}}",
+    "vegas": "Vegas {{value}}",
+    "solvable": "Vincibile",
+    "emptyTitle": "Nessuna partita registrata",
+    "emptyBody": "Gioca una partita a Klondike per iniziare la tua cronologia. Le partite concluse e le loro mani compariranno qui.",
+    "loadingTitle": "Caricamento della cronologia…",
+    "loadingBody": "Attendi mentre recuperiamo le tue partite recenti.",
+    "justNow": "adesso",
+    "today": "Oggi, {{time}}",
+    "yesterday": "Ieri, {{time}}",
+    "dateTime": "{{date}}, {{time}}",
+    "retry": "Rigioca",
+    "retryA11y": "Rigioca questa mano",
+    "share": "Condividi",
+    "shareA11y": "Condividi questa mano"
+  },
+  "share": {
+    "dealMessage": "Gioca questa mano di Klondike su Soli (Pesca {{number}})"
+  },
+  "a11y": {
+    "rank": {
+      "1": "Asso",
+      "2": "Due",
+      "3": "Tre",
+      "4": "Quattro",
+      "5": "Cinque",
+      "6": "Sei",
+      "7": "Sette",
+      "8": "Otto",
+      "9": "Nove",
+      "10": "Dieci",
+      "11": "Fante",
+      "12": "Donna",
+      "13": "Re"
+    },
+    "suit": {
+      "clubs": "fiori",
+      "diamonds": "quadri",
+      "hearts": "cuori",
+      "spades": "picche"
+    },
+    "card": "{{rank}} di {{suit}}",
+    "tableauCard": "{{card}}, colonna {{column}}",
+    "faceDownCard": "Carta coperta, colonna {{column}}",
+    "emptyColumn": "Colonna {{column}}, vuota",
+    "stock_one": "Mazzo, {{count}} carta",
+    "stock_many": "Mazzo, {{count}} carte",
+    "stock_other": "Mazzo, {{count}} carte",
+    "stockEmpty": "Mazzo, vuoto",
+    "stockExhausted": "Mazzo, nessun giro rimasto",
+    "stockRecycle": "Rimetti gli scarti nel mazzo",
+    "stockRecycleLeft_one": "Rimetti gli scarti nel mazzo, {{count}} giro rimasto",
+    "stockRecycleLeft_many": "Rimetti gli scarti nel mazzo, {{count}} giri rimasti",
+    "stockRecycleLeft_other": "Rimetti gli scarti nel mazzo, {{count}} giri rimasti",
+    "waste": "Scarti, {{card}}",
+    "foundationPile": {
+      "clubs": "Base di fiori",
+      "diamonds": "Base di quadri",
+      "hearts": "Base di cuori",
+      "spades": "Base di picche"
+    },
+    "foundation": "{{pile}}, {{card}}",
+    "foundationEmpty": "{{pile}}, vuota",
+    "scrubber": "Cursore di annullamento, posizione {{position}} di {{total}}",
+    "hint": {
+      "draw": "Suggerimento: pesca dal mazzo.",
+      "toColumn": "Suggerimento: {{card}} nella colonna {{column}}.",
+      "toFoundation": "Suggerimento: {{card}} sulla base."
+    }
+  }
+}
