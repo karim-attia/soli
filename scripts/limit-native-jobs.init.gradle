@@ -1,0 +1,28 @@
+// Gradle init script: caps native (C++) compile concurrency of local Android builds.
+// Passed via `--init-script` by build-android.sh (`yarn build:android`) and
+// scripts/lib/build-tools.js (`yarn release`). An init script (instead of patching
+// android/build.gradle) survives `expo prebuild --clean`, which regenerates android/.
+//
+// Why (2026-11-24): AGP starts ninja per CMake task without -j, so ninja runs ncpu+2
+// clang jobs. On the 16 GB / 8-core Mac the 1.2.0 AAB build ran ~10 clang (~1.3 GB each)
+// next to the 4 GB Gradle daemon and filled the RAM plus 9 GB of swap. CMake job pools
+// are the only knob that reaches ninja through AGP. Default 1 job (Karim's choice,
+// much slower cold builds accepted); raise with SOLI_NATIVE_JOBS=<n>.
+// Changing the value changes the CMake arguments -> every module reconfigures and
+// recompiles once. The callers also pass --max-workers so Gradle does not run several
+// CMake tasks (modules/ABIs) side by side, which would multiply the pool.
+def soliNativeJobs = System.getenv('SOLI_NATIVE_JOBS') ?: '1'
+
+allprojects { project ->
+  // Registered before the module's own build script is evaluated, so it runs before
+  // AGP's afterEvaluate creates the variants (and after the module set its own arguments).
+  project.afterEvaluate {
+    def android = project.extensions.findByName('android')
+    if (android == null || !android.hasProperty('defaultConfig')) return
+    android.defaultConfig.externalNativeBuild.cmake.arguments(
+      "-DCMAKE_JOB_POOLS=compile=${soliNativeJobs};link=1",
+      '-DCMAKE_JOB_POOL_COMPILE=compile',
+      '-DCMAKE_JOB_POOL_LINK=link'
+    )
+  }
+}

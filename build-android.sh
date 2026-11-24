@@ -190,7 +190,12 @@ export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 # Navigate to android directory and build.
 cd android
 echo "Building Android App Bundle..."
-./gradlew bundleRelease
+# One native compile job at a time by default (SOLI_NATIVE_JOBS): see
+# scripts/limit-native-jobs.init.gradle for the why (16 GB Mac ran out of RAM + swap
+# on 2026-11-24). --max-workers keeps Gradle from running several CMake tasks in parallel.
+./gradlew bundleRelease \
+  --init-script ../scripts/limit-native-jobs.init.gradle \
+  --max-workers="${SOLI_NATIVE_JOBS:-1}"
 
 AAB_PATH="app/build/outputs/bundle/release/app-release.aab"
 # Guard for the ABI note above: every ABI in the bundle must carry the solver.

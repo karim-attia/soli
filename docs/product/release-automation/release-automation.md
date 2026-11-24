@@ -232,6 +232,14 @@ Phase 2 — make it repeatable (sub-agent, 2026-10-11):
 
 - Play service account activated 2026-10-11 (orchestrator): Google Cloud project `soli-play`, API enabled, service account `soli-release@soli-play.iam.gserviceaccount.com`, invited in Play Console by Karim (app Soli, all tracks incl. production — his choice). Key lives on kDrive next to the upload keystore (`~/kDrive/Projects/Soli/Soli keystore more files/play-service-account.json`, synced), path set via `SOLI_PLAY_SERVICE_ACCOUNT_KEY` in `.env` — NOT the `~/.config/soli` default (Karim wants it backed up). Verified read-only against the API (edit insert → tracks list → edit delete): production 14, beta "1.1 Beta" 16. `yarn submit:android --dry-run` finds the key. A real upload is still untested (first real run = next release).
 
+### 1.2.0 release run (2026-11-23/24)
+
+- Android: `yarn build:android` → 1.2.0 (17), four ABIs with solver, `yarn submit:android` committed "1.2 Beta" to open testing (English notes only; translated notes still by hand).
+- Native compile limit: ninja's default (ncpu+2 clang next to the 4 GB Gradle daemon) filled 16 GB RAM + 9 GB swap. `scripts/limit-native-jobs.init.gradle` (CMake job pools via `--init-script`, `SOLI_NATIVE_JOBS`, default 1) + `--max-workers` in `build-android.sh` and `scripts/lib/build-tools.js`. An init script survives `expo prebuild --clean`; patching android/build.gradle would not. Verified: exactly 1 clang + 1 ninja; full 4-ABI native rebuild 16 min.
+- iOS: first EAS build (71cfb700) failed — profile "Soli App Store" lacks Associated Domains (`ios.associatedDomains` was new since 1.1.0). Removed the key from app.json for 1.2.0 (re-add with the credential renewal due 2026-12-06); second build c9604d11 finished. Two of the month's 15 builds used.
+- TestFlight upload not done by the agent: Transporter's session had expired (password prompt), and App Store Connect shows a pending Developer Program License Agreement that only the Account Holder (Timo) can accept.
+- `yarn release` does not sync versionCode from app.json (installed build stayed 16 / 1.1.0 with the 1.2.0 JS) — follow-up "A4 version sync" still open.
+
 ## Identified issues
 
 - [handled, revised] 32-bit ABI splits without the solver — first handled by shipping 64-bit only (versionCode 15); after Play's "5,607 devices no longer supported" warning the solver is now built for all four ABIs and the bundle ships all four again (versionCode 16). The per-ABI guard in `build-android.sh` stays as the invariant.

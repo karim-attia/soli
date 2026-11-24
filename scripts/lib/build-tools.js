@@ -657,7 +657,16 @@ const buildReleaseApk = async ({ logFilePath = createBuildLogFilePath() } = {}) 
     // `./gradlew --stop`.
     const { durationMs } = await runCommandWithProgress(
       './gradlew',
-      ['app:assembleRelease', '--console=plain'],
+      [
+        'app:assembleRelease',
+        '--console=plain',
+        // One native compile job at a time by default (SOLI_NATIVE_JOBS) — see
+        // scripts/limit-native-jobs.init.gradle (16 GB Mac ran out of RAM + swap
+        // on 2026-11-24). --max-workers stops parallel CMake tasks multiplying it.
+        '--init-script',
+        path.join(__dirname, '..', 'limit-native-jobs.init.gradle'),
+        `--max-workers=${process.env.SOLI_NATIVE_JOBS || 1}`,
+      ],
       {
         silent: true,
         onOutput: (chunk) => logStream.write(chunk),
