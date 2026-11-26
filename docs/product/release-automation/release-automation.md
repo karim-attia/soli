@@ -246,6 +246,7 @@ Phase 2 — make it repeatable (sub-agent, 2026-10-11):
 - [handled, revised] 32-bit ABI splits without the solver — first handled by shipping 64-bit only (versionCode 15); after Play's "5,607 devices no longer supported" warning the solver is now built for all four ABIs and the bundle ships all four again (versionCode 16). The per-ABI guard in `build-android.sh` stays as the invariant.
 - [note] iOS buildNumber 15 vs Android versionCode 16 for 1.1.0 — Play consumed 15 with the draft upload of the 64-bit-only bundle; the iOS 15 build was already uploaded, so only Android moved. Next release: bump both to 17 (or 16/17 → keep moving together from there) — the skill should say "both numbers move together unless one store already consumed a number".
 - [answered] iOS distribution certificate / provisioning profile expire 2026-12-06 (printed by `eas build` itself, see learnings) — renew before the first release after that date.
+- [done 2026-11-26] Renewed with the App Store Connect API key through `eas credentials` (EAS-generated certificate `3NS8NHQQ68` + profile `8569XZ3U4R`, both expire 2027-11-26, profile includes Associated Domains); `ios.associatedDomains` is back in app.json. Steps for next year: `docs/publishing/ios-release-build.md`.
 - [fixed] `package.json` `build:ios` now uses `npx eas-cli`.
 - [fixed] `eas.json` has `cli.appVersionSource: "local"`.
 - [moot] `eas submit` `track` enum vs custom closed track — Soli's track is open testing (`beta`) and Android uses the own script anyway.

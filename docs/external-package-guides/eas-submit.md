@@ -1,6 +1,6 @@
 # EAS Submit (eas-cli) — usage guide
 
-Date-stamped: 2026-11-26 (iOS key setup; rest 2026-10-11). eas-cli checked locally: 27.11.0 (flags originally against 24.12.1) (`npx eas-cli submit --help`, `npx eas-cli build --help`). Project: `ch.karimattia.soli`, EAS project `9de7c7ee-2f1d-418d-ad51-eee7ede5d609`, account `karim.attia`.
+Date-stamped: 2026-11-26 (iOS key setup, credentials renewal with the key; rest 2026-10-11). eas-cli checked locally: 27.11.0 (flags originally against 24.12.1) (`npx eas-cli submit --help`, `npx eas-cli build --help`). Project: `ch.karimattia.soli`, EAS project `9de7c7ee-2f1d-418d-ad51-eee7ede5d609`, account `karim.attia`.
 
 Sources:
 
@@ -142,7 +142,7 @@ scripts/with-asc-key.sh npx eas-cli submit -p ios --id <buildId> --non-interacti
 
 The upload shows up under App Store Connect → TestFlight → Build Uploads as "Processing" (1.2.0 (17): well over 10 min); the build itself is only listed once processing finished.
 
-Build-time Apple auth (https://docs.expo.dev/build/building-on-ci/): `EXPO_ASC_API_KEY_PATH`, `EXPO_ASC_KEY_ID`, `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`, `EXPO_APPLE_TEAM_TYPE` (`INDIVIDUAL` for this team) let `eas build --non-interactive` talk to Apple when credentials must be repaired (e.g. re-signing the provisioning profile). NOT set by `yarn build:ios` on purpose: the first authenticated run may change the stored profile, and a failed cloud build costs quota — set them deliberately for the renewal (release skill, pre-flight).
+Apple auth for credentials (https://docs.expo.dev/build/building-on-ci/, https://docs.expo.dev/app-signing/managed-credentials/): `EXPO_ASC_API_KEY_PATH`, `EXPO_ASC_KEY_ID`, `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`, `EXPO_APPLE_TEAM_TYPE` (`INDIVIDUAL` for this team) let eas-cli talk to Apple without an Apple ID login. Verified 2026-11-26 (eas-cli 27.11.0): with them, the interactive `npx eas-cli credentials -p ios` created a new distribution certificate and App Store provisioning profile for Soli and stored them on EAS — the team key's role is sufficient, no password/2FA prompt appears. Steps: `docs/publishing/ios-release-build.md` ("Renewal"). NOT set by `yarn build:ios` on purpose: an authenticated build may rewrite the stored profile, and a failed cloud build costs quota — set them deliberately for a renewal only.
 
 Still manual (or direct App Store Connect API, same key, JWT ES256): adding the build to the EXTERNAL TestFlight group and submitting it for beta review. `eas.json` has no external-group key and `--groups` is internal-only.
 
