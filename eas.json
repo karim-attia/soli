@@ -17,7 +17,10 @@
     "production": {
       "ios": {
         "appleTeamId": "A73YSR4W75",
-        "ascAppId": "6755950876"
+        "ascAppId": "6755950876",
+        "ascApiKeyPath": "$SOLI_ASC_API_KEY_PATH",
+        "ascApiKeyId": "3DC38PC55T",
+        "ascApiKeyIssuerId": "3ffa317d-28f3-4328-a656-73950020199d"
       }
     }
   }

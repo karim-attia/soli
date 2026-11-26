@@ -16,8 +16,8 @@ Karim's explicit go-ahead is required for: the release-notes texts, anything tha
 ## 2. Pre-flight
 
 - Git: a dirty tree is fine (Karim stages between turns). Never commit/stage/unstage anything.
-- Versions: `app.json` is the truth (`expo.version`, `ios.buildNumber`, `android.versionCode`). Current on the stores (2026-10-11): 1.1.0 = iOS build **15**, Android versionCode **16**. To re-check: Play Console → Soli → Open testing (latest release); App Store Connect → TestFlight → builds. `npx eas-cli build:list -p ios --limit 3` shows the last EAS builds (appVersion/appBuildVersion).
-- Credentials: iOS distribution certificate + provisioning profile on EAS **expire 2026-12-06**. Releasing after that date → renewal first (Timo exports a new `.p12` + profile, `npx eas-cli credentials -p ios`; see `docs/publishing/ios-release-build.md`). `eas build` prints the expiry in its credentials summary — read it every time.
+- Versions: `app.json` is the truth (`expo.version`, `ios.buildNumber`, `android.versionCode`). Current on the stores (2026-11-26): 1.2.0 = iOS build **17**, Android versionCode **17**. To re-check: Play Console → Soli → Open testing (latest release); App Store Connect → TestFlight → builds. `npx eas-cli build:list -p ios --limit 3` shows the last EAS builds (appVersion/appBuildVersion).
+- Credentials: iOS distribution certificate + provisioning profile on EAS **expire 2026-12-06**. Releasing after that date → renewal first: either with the App Store Connect API key (`EXPO_ASC_*` variables + `npx eas-cli credentials -p ios` in a real terminal — expected to work, not yet tried) or Timo exports a new `.p12` + profile; both in `docs/publishing/ios-release-build.md`. `eas build` prints the expiry in its credentials summary — read it every time.
 - New iOS capability since the last release (`git diff <last-release-commit> -- app.json`: `ios.associatedDomains`, `ios.entitlements`, plugins that add entitlements)? The uploaded provisioning profile must include it, otherwise the EAS build dies in fastlane after ~3 min and the quota is spent. Timo enables the capability on the App ID and exports a new profile first (same procedure as the renewal above).
 - **`ios.associatedDomains` is deliberately absent from app.json since 1.2.0** (removed 2026-11-24): the profile "Soli App Store" lacks the Associated Domains capability and the first 1.2.0 EAS build failed on it. No regression (1.1.0 shipped without it; iOS https share links open Safari, `soli://` links and Android app links work). Re-add `"associatedDomains": ["applinks:karimattia.ch"]` under `expo.ios` once Timo enabled the capability on the App ID and a new profile is uploaded — do it together with the certificate/profile renewal due 2026-12-06.
 - Local prerequisites: `.env` with `SOLI_UPLOAD_*` (keystore outside the repo), Rust toolchain (`cargo`, `rustup`; `scripts/ensure-rust-solver.js` rebuilds the solver artifacts for all four ABIs + the xcframework), `npx eas-cli whoami` → `karim.attia`.
@@ -25,7 +25,7 @@ Karim's explicit go-ahead is required for: the release-notes texts, anything tha
 
 ## 3. Version bump rules
 
-- Bump `app.json`: `expo.version` (semver; a beta is still `x.y.0`), `ios.buildNumber` and `android.versionCode` **both to the same next integer** = max(current iOS, current Android) + 1 → next release is **17 / 17** (they diverged at 15/16 once because Play consumed 16's predecessor; from now on they move together). `package.json` `version` follows `expo.version` (no runtime effect, kept in sync by precedent).
+- Bump `app.json`: `expo.version` (semver; a beta is still `x.y.0`), `ios.buildNumber` and `android.versionCode` **both to the same next integer** = max(current iOS, current Android) + 1 → next release is **18 / 18** (they diverged at 15/16 once because Play consumed 16's predecessor; from now on they move together). `package.json` `version` follows `expo.version` (no runtime effect, kept in sync by precedent).
 - A number consumed by a store cannot be reused: Play consumes a versionCode as soon as a release containing it is SAVED in the Console (even a draft later discarded); TestFlight consumes a build number once uploaded. If one store consumed a number, skip to the next for BOTH.
 - `build-android.sh` patches the generated `android/app/build.gradle` from app.json (versionCode/versionName); `eas build` reads app.json (`cli.appVersionSource: local`). No other place to edit. If app.json plugins/icons/splash or a native module changed since the last prebuild, run `yarn prebuild:android` once before `yarn build:android` (slow; resets the signing block, which the script re-applies).
 
@@ -52,9 +52,10 @@ Add a `## <version> — <YYYY-MM-DD>` entry at the top, format of the existing o
 ### iOS (EAS cloud)
 
 ```bash
-yarn build:ios            # = node scripts/ensure-rust-solver.js && npx eas-cli build --platform ios --profile production --non-interactive
+yarn build:ios            # = ensure-rust-solver + scripts/with-asc-key.sh npx eas-cli build --platform ios --profile production --non-interactive --auto-submit
 ```
 
+- **`--auto-submit` uploads the finished build to TestFlight by itself** (API key, section 8) and the internal group gets it automatically, so run the smoke test (section 7) BEFORE `yarn build:ios`. Append `--what-to-test "<Google Play text>"` to fill the internal "What to Test".
 - Use `npx eas-cli`, never `npx eas` (that npm package is not the CLI and fails with "could not determine executable to run"). Add `--no-wait` to get the build id/URL immediately and poll with `npx eas-cli build:view <id>` / `build:list` every few minutes (a 5–10 min timer, not a tight loop). Typical duration 7–20 min.
 - Expected output: credentials summary (distribution certificate serial, profile, **expiry dates**), `appVersion 1.x.0`, `appBuildVersion <buildNumber>`, status FINISHED, artifact URL `https://expo.dev/artifacts/eas/<id>.ipa`.
 - A failed cloud build costs quota: read the log (`npx eas-cli build:view <id>`, Xcode log link in the JSON) and fix the cause before any retry. Builds started from a machine without the solver artifacts fail at pod install — `.easignore` uploads `modules/soli-solver/` artifacts on purpose.
@@ -93,19 +94,24 @@ Manual fallback (no key, or API failure): the browser agent cannot upload files 
 
 ### TestFlight
 
-API mode (needs the App Store Connect API key — not available yet, see `docs/external-package-guides/eas-submit.md`):
+API mode (App Store Connect API key since 2026-11-25; setup in `docs/external-package-guides/eas-submit.md`): `yarn build:ios` already submits. Only when that submission failed or the build ran without `--auto-submit`:
 
 ```bash
-yarn submit:ios                      # = npx eas-cli submit -p ios --latest --non-interactive
-npx eas-cli submit -p ios --latest --non-interactive --what-to-test "<Google Play text>" -g Testers   # also fills internal "What to test"
+yarn submit:ios                      # = scripts/with-asc-key.sh npx eas-cli submit -p ios --latest --non-interactive
 ```
 
-(or `--auto-submit` on the build). Manual fallback (today's mode): download the IPA (above), open Transporter (Karim's Apple ID is signed in; the agent can drive it via computer-use), drag the IPA, Deliver; processing takes 10–30 min; the build then appears in App Store Connect → TestFlight.
+The key file is `~/.config/soli/AuthKey_3DC38PC55T.p8` (never in the repo; `scripts/with-asc-key.sh` fails clearly when it is missing). Processing takes 10–60 min: the upload sits under TestFlight → Build Uploads as "Processing" and the build is listed only afterwards. Check without a browser: `scripts/with-asc-key.sh node scripts/asc-api.js GET '/v1/builds?filter[app]=6755950876&filter[version]=<buildNumber>&include=buildBetaDetail'` → `processingState: VALID`.
+
+Manual fallback: download the IPA (above), Transporter → drag the IPA → Deliver. Transporter and the App Store Connect website both lose their session regularly and then need Karim's password — the agent never enters it. A pending "Apple Developer Program License Agreement" banner (Account Holder = Timo must accept) can make deliveries fail.
 
 ## 9. Testers
 
 - TestFlight **internal** group "Testers": gets every processed build automatically — nothing to do.
-- TestFlight **external** group "Testers" (public link): always manual — App Store Connect → TestFlight → Testers (external) → Builds → add build `<version> (<buildNumber>)` → "What to Test" = Google Play text → submit for beta review (**Karim's OK first**; the first build of a new version goes through beta review, usually < 1 day). Neither `eas submit` nor `eas.json` can do this.
+- TestFlight **external** group "Testers" (public link, id `60e284e3-e38d-4a9a-bd8a-27b09d6b28c8`): per build, **Karim's OK first** — set "What to Test" = Google Play text, add the build, submit for beta review (the first build of a new version is reviewed, usually < 1 day). `eas submit` cannot do this. Via the API (used for 1.2.0; `A` = `scripts/with-asc-key.sh node scripts/asc-api.js`, `<b>` = build id from the builds query above, whose `included` also has the `betaBuildLocalizations` id `<l>`):
+  1. `A PATCH /v1/betaBuildLocalizations/<l> '{"data":{"type":"betaBuildLocalizations","id":"<l>","attributes":{"whatsNew":"<text>"}}}'` → 200
+  2. `A POST /v1/betaGroups/60e284e3-e38d-4a9a-bd8a-27b09d6b28c8/relationships/builds '{"data":[{"type":"builds","id":"<b>"}]}'` → 204
+  3. `A POST /v1/betaAppReviewSubmissions '{"data":{"type":"betaAppReviewSubmissions","relationships":{"build":{"data":{"type":"builds","id":"<b>"}}}}}'` → 201, `WAITING_FOR_REVIEW`
+  Export compliance needs no answer (`ITSAppUsesNonExemptEncryption: false` in app.json). Same steps by hand: App Store Connect → TestFlight → Testers (external) → Builds → add build.
 - Google Play open testing: testers are on the track; the committed release reaches them after Google's review. Nothing per release.
 
 ## 10. Verify + report
@@ -132,6 +138,7 @@ npx eas-cli submit -p ios --latest --non-interactive --what-to-test "<Google Pla
 | Gradle configuration-cache problems after dependency changes | `cd android && ./gradlew bundleRelease --no-configuration-cache` once |
 | First build after new ABIs/clean prebuild takes 20+ min | Expected (NDK compile of every native module per new ABI); later builds are warm again |
 | Browser agent cannot attach the AAB/IPA | 10 MB upload cap — Karim drags the file; the agent fills the forms |
+| `eas submit --non-interactive` → "App Store Connect API Keys cannot be set up in --non-interactive mode" | The key did not reach eas-cli: it ignores `EXPO_ASC_*` here and needs `ascApiKeyPath` from eas.json → run through `scripts/with-asc-key.sh` (`yarn submit:ios`) |
 | `eas credentials` has no `--non-interactive` | Credential checks are interactive or read off the `eas build` credentials summary |
 
 ## 12. Self-improvement

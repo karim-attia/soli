@@ -75,3 +75,6 @@ rust/target/
 modules/soli-solver/android/src/main/jniLibs/
 modules/soli-solver/ios/SoliSolver.xcframework/
 modules/soli-solver/.artifacts-fingerprint.json
+
+# App Store Connect API keys never go into this public repo; they live in ~/.config/soli/ (2026-11-25).
+*.p8

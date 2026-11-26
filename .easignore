@@ -62,6 +62,8 @@ modules/**/ios/DerivedData
 # Never commit keystore files
 *.keystore
 *.jks
+# App Store Connect API keys (mirrors .gitignore; the key lives in ~/.config/soli/)
+*.p8
 .venv
 scripts/android-unlock-pattern.sh
 

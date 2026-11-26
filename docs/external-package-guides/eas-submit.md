@@ -1,6 +1,6 @@
 # EAS Submit (eas-cli) — usage guide
 
-Date-stamped: 2026-10-11. eas-cli checked locally: 24.12.1 (`npx eas-cli submit --help`, `npx eas-cli build --help`). Project: `ch.karimattia.soli`, EAS project `9de7c7ee-2f1d-418d-ad51-eee7ede5d609`, account `karim.attia`.
+Date-stamped: 2026-11-26 (iOS key setup; rest 2026-10-11). eas-cli checked locally: 27.11.0 (flags originally against 24.12.1) (`npx eas-cli submit --help`, `npx eas-cli build --help`). Project: `ch.karimattia.soli`, EAS project `9de7c7ee-2f1d-418d-ad51-eee7ede5d609`, account `karim.attia`.
 
 Sources:
 
@@ -112,23 +112,44 @@ npx eas-cli submit -p android --path android/app/build/outputs/bundle/release/ap
 
 Re-verified 2026-10-11 against https://docs.expo.dev/eas/json/ and the eas-cli CHANGELOG: the Android submit profile has **no key for the Play release name or release notes** (only `serviceAccountKeyPath`, `track`, `releaseStatus`, `rollout`, `changesNotSentForReview`, `applicationId`; the only notes-like option ever added is `--what-to-test`, iOS only). Karim wants the "Google Play:" text of `docs/RELEASE-NOTES.md` in every Play release, so the Android upload is done by `yarn submit:android` (`scripts/submit-android.js`, direct Play Developer API) — see `docs/external-package-guides/google-play-developer-api.md`. The `android` submit profile is therefore deliberately absent from `eas.json`. Soli's Play testers are on the Console's **Open testing** track, which the API (and this enum) call `beta`.
 
-## iOS: prepared, inactive until an App Store Connect API key exists
+## iOS: active since 2026-11-25 (App Store Connect API key)
 
-`eas.json` `submit.production.ios` already has `appleTeamId` and `ascAppId` (`6755950876`, the App Store Connect "Apple ID" of Soli), so `--non-interactive` can find the app. What is still missing is the API key — App Store Connect API access is not enabled for the team yet; only the Account Holder (Timo) can enable it. Once it exists, the three values (`.p8` file, Key ID, Issuer ID) go to ONE of these places:
+Team key `3DC38PC55T` (Issuer ID `3ffa317d-28f3-4328-a656-73950020199d`, team `A73YSR4W75`, Individual). The `.p8` lives at `~/.config/soli/AuthKey_3DC38PC55T.p8` (chmod 600) — outside the repo, `*.p8` is in `.gitignore` AND `.easignore` (the EAS build archive uploads the project directory; `.easignore` replaces `.gitignore` there).
 
-| Option | Where the three values go | Pros / cons |
-|---|---|---|
-| **A (recommended): host on EAS** | `npx eas-cli credentials -p ios` → production → "App Store Connect: Manage your API Key" → "Set up your project to use an API Key for EAS Submit" → upload the `.p8`, type Key ID + Issuer ID | nothing in the repo, no env expansion question, `eas submit --non-interactive` and `eas build --auto-submit` just work; one interactive run by Karim |
-| B: local file | `eas.json` → `ascApiKeyPath` (absolute path outside the repo, e.g. `~/.config/soli/AuthKey_<KEYID>.p8`), `ascApiKeyId`, `ascApiKeyIssuerId` | key ids land in a committed file (not secret, but noisy); `$ENV` expansion for these three is not documented |
+`eas.json` → `submit.production.ios`:
 
-Then iOS is: `yarn submit:ios` (= `eas submit -p ios --latest --non-interactive`) after `yarn build:ios`, or `npx eas-cli build -p ios --profile production --non-interactive --auto-submit` in one go. Add `--what-to-test "<text>"` and `-g Testers` to `eas submit` to fill TestFlight's "What to test" and the INTERNAL group (the internal group already gets every build automatically).
+```json
+"appleTeamId": "A73YSR4W75",
+"ascAppId": "6755950876",
+"ascApiKeyPath": "$SOLI_ASC_API_KEY_PATH",
+"ascApiKeyId": "3DC38PC55T",
+"ascApiKeyIssuerId": "3ffa317d-28f3-4328-a656-73950020199d"
+```
 
-Stays manual even with the key: adding the build to the EXTERNAL TestFlight group and submitting it for beta review (App Store Connect → TestFlight → the external group → add build → "What to Test" → submit). `eas.json` has no external-group key, `--groups` is internal-only (CLI help, 2026-10-11), and the only Expo feature that covers external groups is the `testflight` EAS Workflows job, which Soli does not use (no CI).
+- eas-cli expands `$VAR` / `${VAR}` from the local environment in exactly `ascApiKeyPath`, `ascApiKeyIssuerId`, `ascApiKeyId` (docs: https://docs.expo.dev/eas/json/ "The path can include environment variables"; source: `@expo/eas-json` `IosSubmitProfileFieldsToEvaluate`, `env-string`). Key ID and Issuer ID are identifiers, not secrets, so they are committed literally; only the path is machine-specific.
+- `scripts/with-asc-key.sh <command>` exports `SOLI_ASC_API_KEY_PATH` (default: the path above), fails with a clear message when the file is missing, then runs the command. `yarn build:ios` and `yarn submit:ios` go through it. An unset variable would otherwise reach eas-cli as the literal string and fail with a "file doesn't exist" error.
+- `eas submit --non-interactive` IGNORES the `EXPO_ASC_*` environment variables ("App Store Connect API Keys cannot be set up in --non-interactive mode", seen 2026-11-25): the key must come from `eas.json` or from a key stored on EAS.
+- Alternative not used: store the key on EAS (`npx eas-cli credentials -p ios` → production → "App Store Connect: Manage your API Key" → "Set up your project to use an API Key for EAS Submit") and drop the three `ascApiKey*` fields. Pros: nothing in eas.json. Cons: interactive one-time setup, the key leaves this Mac, and local tools (below) still need the file.
 
-## Not confirmed (could not verify from the docs on 2026-10-11)
+Commands:
+
+```bash
+yarn build:ios                                   # EAS build + --auto-submit to TestFlight when it finishes
+yarn build:ios --what-to-test "<Google Play text>"   # same, fills the internal "What to Test"
+yarn submit:ios                                  # submit the latest finished EAS build (after a build without auto-submit, or a failed submission)
+scripts/with-asc-key.sh npx eas-cli submit -p ios --id <buildId> --non-interactive --what-to-test "<text>"
+```
+
+The upload shows up under App Store Connect → TestFlight → Build Uploads as "Processing" (1.2.0 (17): well over 10 min); the build itself is only listed once processing finished.
+
+Build-time Apple auth (https://docs.expo.dev/build/building-on-ci/): `EXPO_ASC_API_KEY_PATH`, `EXPO_ASC_KEY_ID`, `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`, `EXPO_APPLE_TEAM_TYPE` (`INDIVIDUAL` for this team) let `eas build --non-interactive` talk to Apple when credentials must be repaired (e.g. re-signing the provisioning profile). NOT set by `yarn build:ios` on purpose: the first authenticated run may change the stored profile, and a failed cloud build costs quota — set them deliberately for the renewal (release skill, pre-flight).
+
+Still manual (or direct App Store Connect API, same key, JWT ES256): adding the build to the EXTERNAL TestFlight group and submitting it for beta review. `eas.json` has no external-group key and `--groups` is internal-only.
+
+## Not confirmed (could not verify from the docs on 2026-10-11; item 2 resolved 2026-11-26)
 
 1. Whether `eas submit --path` (local AAB) is counted anywhere (it is not a build, and submissions have no stated cap — but no doc states "unlimited"). Moot for Soli since Android no longer goes through EAS Submit.
-2. Whether `ascApiKeyPath/ascApiKeyId/ascApiKeyIssuerId` accept `$ENV` expansion like `serviceAccountKeyPath` does (schema note only exists for the Android key). Workaround: hosted key on EAS (option A above).
+2. ~~Whether `ascApiKeyPath/ascApiKeyId/ascApiKeyIssuerId` accept `$ENV` expansion~~ — yes (docs + source, see the iOS section).
 3. Which App Store Connect role can CREATE a team API key on an Individual developer account. Apple's model (from memory, not re-verified): the Account Holder (Timo) must enable "Team Keys" once under Users and Access → Integrations; after that an Admin can generate keys. Treat as needing Timo.
 4. `--groups` only covers INTERNAL TestFlight groups per the CLI help; external groups still need App Store Connect UI (or the `testflight` workflow job).
 5. `track` accepts only the four enum values — a custom closed track created in Play Console cannot be targeted by name through `eas submit`. Not relevant anymore (own script, open testing = `beta`).
