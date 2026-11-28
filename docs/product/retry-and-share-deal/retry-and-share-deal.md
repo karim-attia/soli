@@ -273,7 +273,17 @@ Website (`/Users/karim/kDrive/Code/karimattia.ch`, left uncommitted):
 
 ## Identified issues
 
-- None in this feature. Watch items: Alert layering on Android (iOS verified); Android
+- FIXED 2026-11-28: a share link arriving while the History preview sheet was open left the
+  sheet presented over the game. `onPendingDealRequest` (pendingDealRequestStore) now
+  notifies synchronously on every incoming request; `HistoryScreen` subscribes and clears
+  `selectedEntry`. Subscription instead of a render-time read because the game session
+  clears the slot in the same tick on warm starts. Test:
+  `test/unit/features/klondike/pendingDealRequestStore.test.ts`. Gates: typecheck 0 · lint 0 ·
+  jest 50/601. Not device-tested; covered by the next release smoke test.
+- 2026-11-28: karimattia.ch `assetlinks.json` now lists the Play App Signing fingerprint
+  `EE:6C:E3:DA:…:2A:10:07` (read from the Play Developer API by the release session) plus the
+  upload key; site commit 96462a4, Google's statements:list returns both.
+- Watch items: Alert layering on Android (iOS verified); Android
   `Share` chooser shows the URL inline (by design).
 - Pre-existing, out of scope: website `yarn.lock` staleness (above); the testing agent's
   environment notes from round 1 (Xcode 27 pod issue, iOS 27 runtime crash) are recorded

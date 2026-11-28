@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -20,6 +20,7 @@ import {
   HEADER_MENU_LEADING_PADDING,
 } from '../../components/navigation/HeaderMenuButton'
 import { BoardPreview } from '../../src/features/klondike/components/BoardPreview'
+import { onPendingDealRequest } from '../../src/features/klondike/state/pendingDealRequestStore'
 import { useSessionControls } from '../../src/features/klondike/state/sessionControlsStore'
 import { formatExactDealCode, isExactDealId } from '../../src/solitaire/dealIdentity'
 import { buildDealShareUrl } from '../../src/solitaire/dealShareLink'
@@ -56,6 +57,10 @@ function HistoryScreen() {
   // Rows show the tally matching the CURRENT Scoring setting (both are stored).
   const scoring = useSettings().state.statistics.scoring
   const [selectedEntry, setSelectedEntry] = useState<HistoryEntry | null>(null)
+
+  // An incoming share link switches to the game tab; close the preview sheet so it
+  // doesn't stay presented over the game (retry-and-share-deal plan, round 2 finding).
+  useEffect(() => onPendingDealRequest(() => setSelectedEntry(null)), [])
 
   useLayoutEffect(() => {
     navigation.setOptions({
