@@ -1,7 +1,8 @@
 Soli 1.2 parla la tua lingua!
 
 - Ora in 15 lingue, tra cui italiano, tedesco, francese e giapponese
+- Nuovo pulsante Suggerimento (attivalo nelle impostazioni)
 - Nuove opzioni di punteggio: Standard o Vegas
-- Piccole correzioni e rifiniture
+- I link alle mani condivise ora si aprono direttamente in Soli
 
 Buon divertimento!

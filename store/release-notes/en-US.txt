@@ -1,7 +1,8 @@
 Soli 1.2 speaks your language!
 
 - Now in 15 languages, including German, French, Spanish and Japanese
+- New Hint button (turn it on in the settings)
 - New scoring options: Standard or Vegas
-- Small fixes and polish
+- Shared deal links now open right in Soli
 
 Happy playing!

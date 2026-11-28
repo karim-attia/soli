@@ -4,6 +4,25 @@ Soli is a free, ad-free, open-source Solitaire.
 
 ---
 
+## 1.2.1 — 2026-11-28
+
+- **Shared deal links open the app**: a `https://karimattia.ch/soli/deal/…` link (History → Share) now opens the deal right in Soli on iOS and Android; without Soli installed it opens a web page with the store links
+- First public release of everything since 1.0: **Hints** (1.1), **15 languages** and **Scoring** (1.2)
+- Fix: a share link that arrives while a History preview is open now closes the preview
+
+Google Play:
+
+Soli 1.2 speaks your language!
+
+- Now in 15 languages, including German, French, Spanish and Japanese
+- New Hint button (turn it on in the settings)
+- New scoring options: Standard or Vegas
+- Shared deal links now open right in Soli
+
+Happy playing!
+
+---
+
 ## 1.2.0 — 2026-11-24
 
 - **15 languages**: Soli now speaks German (Swiss High German), French, Spanish, Portuguese (Brazil), Italian, Dutch, Japanese, Russian, Polish, Turkish, Chinese (Simplified), Korean, Arabic and Hebrew. It follows your phone's language; you can also pick one per app in the system settings

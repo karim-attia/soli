@@ -1,7 +1,8 @@
 Soli 1.2 artık senin dilini konuşuyor!
 
 - Türkçe, Almanca, Fransızca ve Japonca dahil 15 dilde
+- Yeni İpucu düğmesi (ayarlardan açabilirsin)
 - Yeni puanlama seçenekleri: Standart veya Vegas
-- Küçük düzeltmeler ve iyileştirmeler
+- Paylaşılan el bağlantıları artık doğrudan Soli’de açılıyor
 
 İyi oyunlar!

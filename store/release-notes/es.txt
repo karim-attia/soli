@@ -1,7 +1,8 @@
 ¡Soli 1.2 habla tu idioma!
 
 - Ahora en 15 idiomas, entre ellos español, alemán, francés y japonés
+- Nuevo botón Pista (actívalo en los ajustes)
 - Nuevas opciones de puntuación: Estándar o Vegas
-- Pequeñas correcciones y mejoras
+- Los enlaces a partidas compartidas ahora se abren directamente en Soli
 
 ¡Que lo disfrutes!

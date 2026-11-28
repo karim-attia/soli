@@ -1,7 +1,8 @@
 Soli 1.2 spricht deine Sprache!
 
 - Neu in 15 Sprachen, darunter Deutsch, Französisch, Spanisch und Japanisch
+- Neuer Tipp-Knopf (in den Einstellungen einschalten)
 - Neue Wertungen zur Auswahl: Standard oder Vegas
-- Kleine Korrekturen und Feinschliff
+- Links zu geteilten Spielen öffnen sich jetzt direkt in Soli
 
 Viel Vergnügen beim Spielen!

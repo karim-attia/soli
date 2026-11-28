@@ -1,7 +1,8 @@
 Soli 1.2 parle votre langue !
 
 - Désormais en 15 langues, dont le français, l’allemand, l’espagnol et le japonais
+- Nouveau bouton Indice (à activer dans les réglages)
 - Nouveaux modes de score : Standard ou Vegas
-- Petites corrections et finitions
+- Les liens de donnes partagées s’ouvrent maintenant directement dans Soli
 
 Bon jeu !

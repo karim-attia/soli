@@ -1,7 +1,8 @@
 O Soli 1.2 fala o seu idioma!
 
 - Agora em 15 idiomas, incluindo português, alemão, francês e japonês
+- Novo botão Dica (ative nas configurações)
 - Novas opções de pontuação: Padrão ou Vegas
-- Pequenas correções e melhorias
+- Links de partidas compartilhadas agora abrem direto no Soli
 
 Bom jogo!

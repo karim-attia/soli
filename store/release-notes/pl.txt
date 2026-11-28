@@ -1,7 +1,8 @@
 Soli 1.2 mówi w twoim języku!
 
 - Teraz w 15 językach, m.in. po polsku, niemiecku, francusku i japońsku
+- Nowy przycisk podpowiedzi (włącz go w ustawieniach)
 - Nowe opcje punktacji: standardowa lub Vegas
-- Drobne poprawki i szlify
+- Linki do udostępnionych rozdań otwierają się teraz od razu w Soli
 
 Miłej gry!
