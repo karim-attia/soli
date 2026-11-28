@@ -2,7 +2,12 @@
 
 Everything the App Store and Google Play show about Soli, as plain text in git: one file per field, one folder per language. Plan and decisions: `docs/product/i18n/i18n.md` (approach E1). Translating these files: `.agents/skills/soli-translation/SKILL.md`. Terms: `docs/product/i18n/glossary.md`.
 
-**Nothing here uploads itself, and nothing is uploaded without Karim's go-ahead.** Until the upload follow-up exists (plan, Follow-ups), text is pasted by hand into App Store Connect / Play Console. Name and subtitle on iOS only change with a new app version submission.
+**Uploads are tools, not automatic, and each one needs Karim's go-ahead** (store-launch plan, 2026-11-28). Both read this folder through `scripts/lib/store-listings.js`, which holds the locale table below:
+
+- App Store: `scripts/with-asc-key.sh npx eas-cli metadata:push --non-interactive` (config generator `store.config.js`; guide `docs/external-package-guides/eas-metadata.md`). Name and subtitle go live only with the next approved app version; push twice when a locale is new (the first push creates it empty).
+- Google Play: `yarn submit:android --listings-only` (or `--listings` together with a release; guide `docs/external-package-guides/google-play-developer-api.md`). Goes live after Google's review.
+
+Uploaded: both stores, all locales, 2026-11-28 (App Store version 1.2.1 in preparation; Play listings committed, in Google review).
 
 ## Layout
 
@@ -62,7 +67,8 @@ One folder per language. Some store locales reuse a folder's text (plan, open qu
 
 - **German is Swiss High German** (ss, never ß) for every German speaker. `de-DE` is the only German listing locale in both stores (no de-CH: [App Store localizations](https://developer.apple.com/help/app-store-connect/reference/app-information/app-store-localizations), [Google Play languages](https://support.google.com/googleplay/android-developer/table/4419860)), so the Swiss text goes there, and its description says "Made in Switzerland" so ss reads as origin, not as a typo. Never "correct" it to ß; a jest check fails on ß.
 - **en-GB** exists for the word "Patience" (what Solitaire is called in the UK). It differs from en-US in subtitle, short description and keywords only (the name / title is "Soli: Klondike Solitaire" in both). The app itself has no en-GB locale.
-- Store locale codes were taken from the two lists linked above on 2026-11-23; check them again in the console when uploading.
+- Store locale codes were taken from the two lists linked above on 2026-11-23; both stores accepted all of them on 2026-11-28.
+- **China mainland:** Soli is not available in China mainland on the App Store since 2026-11-28 (Apple requires a game licence number there, which a hobby app cannot get; Karim accepted it). The `zh-Hans` / `zh-CN` listings still serve Simplified-Chinese readers elsewhere (Singapore, Malaysia, overseas).
 
 ## English text: where it comes from
 
@@ -72,7 +78,7 @@ One folder per language. Some store locales reuse a folder's text (plan, open qu
 |---|---|
 | `ios/en-US/*`, `android/en-US/*` | `PROPOSALS.md`: name / title "Soli: Klondike Solitaire", subtitle, keywords, short description, description, promotional text |
 | `ios/en-GB/*`, `android/en-GB/*` | en-US with "Patience" in the subtitle and the short description; keywords without "patience" and "klondike" (both are in its name / subtitle) |
-| `release-notes/en-US.txt` | the "Google Play:" block of the newest entry in `docs/RELEASE-NOTES.md` (1.1.0) |
+| `release-notes/en-US.txt` | the "Google Play:" block of the newest entry in `docs/RELEASE-NOTES.md` (1.2.1) |
 
 The live text (version 1.0, fetched 2026-11-23 from the [App Store](https://apps.apple.com/app/id6755950876) via the iTunes lookup API and from [Google Play](https://play.google.com/store/apps/details?id=ch.karimattia.soli&hl=en)) is in the "Live" column of `PROPOSALS.md` and in git history: iOS name "Soli - Solitaire", subtitle "Thoughtfully refined Solitaire"; Play title "Soli", short description "Classic Solitaire, thoughtfully refined". The live iOS keywords and promotional text were never readable from outside.
 

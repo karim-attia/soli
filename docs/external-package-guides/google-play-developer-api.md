@@ -58,6 +58,27 @@ Track ids (Play docs "tracks"): Console "Open testing" = `beta`, "Production" = 
 - `true`: the release is saved as "Changes ready to send for review"; someone must press "Send changes for review" in Play Console → Publishing overview. The API reference describes it for the post-rejection case ("won't be reviewed until they are explicitly sent for review from within the Google Play Console UI"). The Expo forum thread shows Google sometimes *refuses* a plain commit with "set the query parameter changesNotSentForReview to true" (apps not yet approved / other pending changes). `scripts/submit-android.js` retries once with `true` in that case and prints the Console instruction; `--hold-review` forces it.
 - Managed publishing ON would change this (nothing goes live until "Publish" in the Console); Soli has it OFF.
 
+## Listings, production track, staged rollout (added 2026-11-28; listings and the dry check RUN 2026-11-28)
+
+For the store launch (`docs/product/store-launch/store-launch.md`). Sources: https://developers.google.com/android-publisher/api-ref/rest/v3/edits.listings · https://developers.google.com/android-publisher/api-ref/rest/v3/edits.images · https://developers.google.com/android-publisher/api-ref/rest/v3/edits.tracks · https://developers.google.com/android-publisher/api-ref/rest/v3/edits/validate · https://developers.google.com/android-publisher/tracks
+
+All inside one edit (same `{base}/edits/{editId}` as above), committed once:
+
+- **Listing text per language:** `PUT {base}/edits/{editId}/listings/{language}` with `{ "language": "de-DE", "title": "…", "shortDescription": "…", "fullDescription": "…" }` (creates or replaces; `PATCH` for partial; `GET {base}/edits/{editId}/listings` lists all). `language` is a BCP-47 tag from Play's language list — the folder names under `store/android/` (`iw-IL` for Hebrew, `zh-CN`, `es-419`, …).
+- **Images** (not planned: default-language graphics serve every language): `POST https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/{packageName}/edits/{editId}/listings/{language}/{imageType}?uploadType=media` with `imageType` ∈ `phoneScreenshots | sevenInchScreenshots | tenInchScreenshots | icon | featureGraphic | …`; `DELETE …/{imageType}` clears a set.
+- **Production release of a versionCode that is already on Play** (uploaded to open testing before): no bundle upload; `PUT {base}/edits/{editId}/tracks/production` with
+  ```json
+  { "track": "production", "releases": [ { "name": "1.2.1", "versionCodes": ["18"],
+      "status": "inProgress", "userFraction": 0.2,
+      "releaseNotes": [ { "language": "en-US", "text": "…" }, { "language": "de-DE", "text": "…" } ] } ] }
+  ```
+  `userFraction` is exclusive 0–1 and only valid with `inProgress` / `halted`; full rollout = `status: "completed"` without `userFraction`. Raising the fraction later = the same PUT with a higher value in a new edit. Release-note languages must be languages the listing has.
+- **Dry check without committing:** `POST {base}/edits/{editId}:validate` reports what a commit would reject (200 → the edit itself, `{id, expiryTimeSeconds}`); `DELETE {base}/edits/{editId}` throws the edit away (204). Every read (listings, tracks) also needs an edit: open, read, delete.
+- **Permissions — checked 2026-11-28, nothing changed in the Console:** dry check (edit → `GET listings` / `GET tracks/production` → `PUT listings/en-US` and `PUT tracks/production` with the current values → `:validate` → `DELETE` edit) answered 200 / 200 / 200 / 200 / 200 / 204, and the real listings commit (18 languages) went through. So Soli's service account can already edit store listings; production PUT + validate pass too (a production **commit** is first proven at the 1.2.1 production release). If a later call answers 403, the missing app permissions are "Release to production, exclude devices, and use Play App Signing" / "Manage store presence" (Console labels not re-verified).
+- **In `scripts/submit-android.js` (2026-11-28):** `--listings` (PUT all 18 languages from `store/android/*` via `scripts/lib/store-listings.js`; fr-CA ← fr-FR, es-419 ← es-ES), `--listings-only` (no upload, no track change), `--track beta|production`, `--rollout <0–1>` (`inProgress` + `userFraction`), `--promote` (no upload; checks `GET edits/{id}/bundles` has the versionCode), release notes for all 18 languages from `store/release-notes/*` (the script fails if `en-US.txt` ≠ the "Google Play:" block), `:validate` before every commit. Listings are PUT before the track (release-note languages must exist in the listing).
+- **No list-edits endpoint:** an edit left open by a crashed run cannot be found or deleted later; it expires by itself (`expiryTimeSeconds`: about 2 h after opening, observed 2026-11-28) and commits nothing.
+- **No API** (Console only): data safety form, content rating questionnaire, target audience, ads declaration and the rest of Policy → App content.
+
 ## Limits and Console facts
 
 - Release notes: "up to 500 Unicode characters per language"; the script counts code points and fails before uploading.
